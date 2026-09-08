@@ -41,3 +41,9 @@ secrets/
 
 # OS
 Thumbs.db
+
+# Frontends (Node)
+node_modules/
+frontends/**/_npm_out.txt
+npm-debug.log*
+.DS_Store
