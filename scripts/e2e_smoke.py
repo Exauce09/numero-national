@@ -19,7 +19,8 @@ from datetime import date
 import httpx
 
 BASE = os.getenv("BASE_URL", "http://localhost:8000").rstrip("/")
-EMAIL = f"e2e.{uuid.uuid4().hex[:8]}@example.gov"
+RUN_ID = uuid.uuid4().hex[:8]
+EMAIL = f"e2e.{RUN_ID}@example.gov"
 PASSWORD = "SecurePass123!"
 
 
@@ -85,14 +86,18 @@ def main() -> None:
         )
         headers = {"Authorization": f"Bearer {login2.json()['access_token']}"}
 
+        # Unique identity fields each run (avoids OPEN duplicate NIC block)
+        day = int(RUN_ID[:2], 16) % 28 + 1
+        month = int(RUN_ID[2:4], 16) % 12 + 1
+        year = 1980 + (int(RUN_ID[4:6], 16) % 25)
         citizen = client.post(
             "/api/v1/registry/citizens",
             headers=headers,
             json={
-                "given_names": "Amina",
-                "family_name": "Teste2e",
+                "given_names": f"Amina{RUN_ID}",
+                "family_name": f"Teste2e{RUN_ID}",
                 "sex": "FEMALE",
-                "date_of_birth": str(date(1995, 3, 15)),
+                "date_of_birth": str(date(year, month, day)),
                 "place_of_birth": "Kinshasa",
                 "nationality": "COD",
                 "addresses": [],
