@@ -102,6 +102,12 @@ async def create_act(
         raise ValueError("act_type is required")
     prefix = data.act_type.value[:3]
     number = data.act_number or _act_number(prefix, data.commune_code)
+    payload = dict(data.payload or {})
+    # NIC national unique porté dans l'acte (jamais dans le QR brut comme PII étendu)
+    national_id = payload.get("national_id") or payload.get("nic")
+    if not national_id:
+        national_id = f"NIC-{uuid.uuid4().hex[:12].upper()}"
+        payload["national_id"] = national_id
     act = CivilAct(
         act_type=data.act_type.value,
         act_number=number,
@@ -111,12 +117,25 @@ async def create_act(
         related_citizen_ids=[str(x) for x in data.related_citizen_ids]
         if data.related_citizen_ids
         else None,
-        payload=data.payload or {},
+        payload=payload,
     )
     if data.status == ActStatus.VALIDATED:
         act.issued_at = datetime.now(UTC)
         act.validated_by = actor_id
     db.add(act)
+    await db.flush()
+    # QR = référence signée vers l'acte (pas de PII)
+    try:
+        from apps.api.domains.cards.qr import build_qr_payload
+
+        qr = build_qr_payload(act.id, version=1)
+        payload = dict(act.payload or {})
+        payload["qr"] = qr
+        payload["act_ref"] = act.act_number
+        payload["national_id"] = national_id
+        act.payload = payload
+    except Exception as exc:  # noqa: BLE001
+        logger.info("qr attach skipped: %s", exc)
     await db.commit()
     await db.refresh(act)
     return act

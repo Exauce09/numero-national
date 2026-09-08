@@ -116,6 +116,14 @@ router.add_api_route("/recognitions", _act_create(ActType.RECOGNITION), methods=
 router.add_api_route("/recognitions", _act_list(ActType.RECOGNITION), methods=["GET"], response_model=list[CivilActRead])
 router.add_api_route("/rectifications", _act_create(ActType.RECTIFICATION), methods=["POST"], response_model=CivilActRead)
 router.add_api_route("/rectifications", _act_list(ActType.RECTIFICATION), methods=["GET"], response_model=list[CivilActRead])
+router.add_api_route("/adoptions", _act_create(ActType.ADOPTION), methods=["POST"], response_model=CivilActRead)
+router.add_api_route("/adoptions", _act_list(ActType.ADOPTION), methods=["GET"], response_model=list[CivilActRead])
+router.add_api_route("/displacements", _act_create(ActType.DISPLACEMENT), methods=["POST"], response_model=CivilActRead)
+router.add_api_route("/displacements", _act_list(ActType.DISPLACEMENT), methods=["GET"], response_model=list[CivilActRead])
+router.add_api_route("/census", _act_create(ActType.CENSUS), methods=["POST"], response_model=CivilActRead)
+router.add_api_route("/census", _act_list(ActType.CENSUS), methods=["GET"], response_model=list[CivilActRead])
+router.add_api_route("/documents-acts", _act_create(ActType.DOCUMENT), methods=["POST"], response_model=CivilActRead)
+router.add_api_route("/documents-acts", _act_list(ActType.DOCUMENT), methods=["GET"], response_model=list[CivilActRead])
 
 
 @router.post("/residence", response_model=ResidenceRead, status_code=status.HTTP_201_CREATED)
