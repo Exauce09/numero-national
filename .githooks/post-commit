@@ -1,0 +1,8 @@
+#!/bin/sh
+# Auto-push to origin after every local commit (requested project policy).
+remote=$(git remote)
+if [ -z "$remote" ]; then
+  exit 0
+fi
+branch=$(git rev-parse --abbrev-ref HEAD)
+git push -u origin "$branch" || true
