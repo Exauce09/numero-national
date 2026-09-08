@@ -42,7 +42,19 @@ flutter pub get
 flutter run
 ```
 
-Sans SDK Flutter, ce dépôt fournit le scaffold manuel complet sous `lib/`.
+**Téléphone Android branché (Windows) :**
+
+```powershell
+# Débogage USB activé — API Docker sur le PC
+.\scripts\run-android-device.ps1
+# ou APK seul :
+.\scripts\build-android-apk.ps1 -ApiHost 192.168.x.x
+```
+
+L’app pointe vers `API_BASE_URL` (IP LAN du PC + `:8000/api/v1`).  
+**iOS** : build uniquement sur macOS (Xcode) — pas possible depuis Windows.
+
+Sans SDK Flutter, ce dépôt fournit le scaffold sous `lib/` + `android/`.
 
 ### API backend
 
