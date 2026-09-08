@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { clearSession, getSession } from "./auth";
 import AnomaliesPage from "./pages/AnomaliesPage";
 import CampaignsPage from "./pages/CampaignsPage";
@@ -13,7 +14,20 @@ function RequireAuth({ children }: { children: ReactNode }) {
 
 function Shell() {
   const navigate = useNavigate();
+  const location = useLocation();
   const session = getSession();
+  const [navOpen, setNavOpen] = useState(false);
+
+  useEffect(() => {
+    setNavOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    document.body.style.overflow = navOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [navOpen]);
 
   function logout() {
     clearSession();
@@ -21,12 +35,18 @@ function Shell() {
   }
 
   return (
-    <div className="page-wrapper">
-      <aside className="sidebar">
+    <div className={`page-wrapper${navOpen ? " nav-open" : ""}`}>
+      {navOpen ? (
+        <button type="button" className="sidebar-backdrop" aria-label="Fermer le menu" onClick={() => setNavOpen(false)} />
+      ) : null}
+      <aside className="sidebar" id="app-sidebar">
         <div className="sidebar-brand">
           <img src="/logo-rdc.jpg" alt="RDC" />
           <strong>ONIP</strong>
           <span>E-GOUV</span>
+          <button type="button" className="sidebar-close" aria-label="Fermer le menu" onClick={() => setNavOpen(false)}>
+            ×
+          </button>
         </div>
         <nav className="sidebar-nav">
           <NavLink to="/" end>
@@ -44,10 +64,20 @@ function Shell() {
 
       <div className="body-wrap">
         <header className="topbar">
-          <h1 className="topbar-title">Tableau de bord ONIP</h1>
-          <div>
-            <span className="topbar-user">{session?.username}</span>
+          <div className="topbar-left">
+            <button
+              type="button"
+              className="menu-toggle"
+              aria-label={navOpen ? "Fermer le menu" : "Ouvrir le menu"}
+              aria-expanded={navOpen}
+              aria-controls="app-sidebar"
+              onClick={() => setNavOpen((o) => !o)}
+            >
+              <span />
+            </button>
+            <h1 className="topbar-title">Tableau de bord ONIP</h1>
           </div>
+          <span className="topbar-user">{session?.username}</span>
         </header>
         <main className="shell">
           <Routes>

@@ -10,6 +10,22 @@
   grid-column: 1 / -1;
 }
 
+.geo-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.geo-field-head .form-label {
+  margin-bottom: 0;
+}
+
+.geo-field-head .btn-sm {
+  flex-shrink: 0;
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
@@ -369,7 +385,20 @@
   font-size: 0.85rem;
 }
 
-@media print {
+@media (max-width: 640px) {
+  .act-print-fields > div {
+    grid-template-columns: 1fr;
+  }
+
+  .person-picker-controls {
+    flex-direction: column;
+  }
+
+  .data-table {
+    display: block;
+    overflow-x: auto;
+  }
+}
   .sidebar,
   .topbar,
   .no-print,

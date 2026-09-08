@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { clearSession, getSession, setActivePortal, type Portal } from "../auth";
 
 export type NavItem = { to: string; label: string };
@@ -15,8 +16,21 @@ type Props = {
 
 export default function PortalShell({ portal, brand, tagline, nav, title, children }: Props) {
   const navigate = useNavigate();
+  const location = useLocation();
   const session = getSession(portal);
+  const [navOpen, setNavOpen] = useState(false);
   setActivePortal(portal);
+
+  useEffect(() => {
+    setNavOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    document.body.style.overflow = navOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [navOpen]);
 
   function logout() {
     clearSession(portal);
@@ -24,12 +38,28 @@ export default function PortalShell({ portal, brand, tagline, nav, title, childr
   }
 
   return (
-    <div className="page-wrapper">
-      <aside className="sidebar">
+    <div className={`page-wrapper${navOpen ? " nav-open" : ""}`}>
+      {navOpen ? (
+        <button
+          type="button"
+          className="sidebar-backdrop"
+          aria-label="Fermer le menu"
+          onClick={() => setNavOpen(false)}
+        />
+      ) : null}
+      <aside className="sidebar" id={`${portal}-sidebar`}>
         <div className="sidebar-brand">
           <img src="/logo-rdc.jpg" alt="RDC" />
           <strong>{brand}</strong>
           <span>{tagline}</span>
+          <button
+            type="button"
+            className="sidebar-close"
+            aria-label="Fermer le menu"
+            onClick={() => setNavOpen(false)}
+          >
+            ×
+          </button>
         </div>
         <nav className="sidebar-nav">
           {nav.map((item) => (
@@ -47,7 +77,19 @@ export default function PortalShell({ portal, brand, tagline, nav, title, childr
 
       <div className="body-wrap">
         <header className="topbar">
-          <h1 className="topbar-title">{title}</h1>
+          <div className="topbar-left">
+            <button
+              type="button"
+              className="menu-toggle"
+              aria-label={navOpen ? "Fermer le menu" : "Ouvrir le menu"}
+              aria-expanded={navOpen}
+              aria-controls={`${portal}-sidebar`}
+              onClick={() => setNavOpen((o) => !o)}
+            >
+              <span />
+            </button>
+            <h1 className="topbar-title">{title}</h1>
+          </div>
           <span className="topbar-user">{session?.username}</span>
         </header>
         <main className="shell">{children}</main>

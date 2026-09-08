@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from apps.api.db.session import get_db
 from apps.api.domains.geography import models as m
+from apps.api.domains.geography.create_routes import register_create_routes
 from apps.api.domains.geography.seed import ensure_geography_seeded
 
 router = APIRouter(prefix="/geo", tags=["geography"])
@@ -258,3 +259,6 @@ async def province_tree(province_id: UUID, db: AsyncSession = Depends(get_db)) -
             "voies": n_voies,
         },
     )
+
+
+register_create_routes(router, GeoItem, VoieOut)
