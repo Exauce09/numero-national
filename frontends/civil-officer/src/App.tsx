@@ -26,9 +26,13 @@ function Shell() {
   const location = useLocation();
   const session = getSession();
   const [navOpen, setNavOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     setNavOpen(false);
+    setNotifOpen(false);
+    setProfileOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
@@ -42,6 +46,9 @@ function Shell() {
     clearSession();
     navigate("/login", { replace: true });
   }
+
+  const responsableLabel = session?.displayName ?? session?.username ?? "—";
+  const roleTitle = session?.roleTitle ?? "Responsable — Officier d'état civil";
 
   return (
     <div className={`page-wrapper${navOpen ? " nav-open" : ""}`}>
@@ -91,7 +98,7 @@ function Shell() {
       </aside>
 
       <div className="body-wrap">
-        <header className="topbar">
+        <header className="topbar topbar-3">
           <div className="topbar-left">
             <button
               type="button"
@@ -103,9 +110,83 @@ function Shell() {
             >
               <span />
             </button>
-            <h1 className="topbar-title">Officier d&apos;état civil</h1>
+            <h1 className="topbar-title">État civil</h1>
           </div>
-          <span className="topbar-user">{session?.username}</span>
+
+          <div className="topbar-center" title={roleTitle}>
+            <span className="topbar-role">{roleTitle}</span>
+            <strong className="topbar-responsable">{responsableLabel}</strong>
+          </div>
+
+          <div className="topbar-right">
+            <div className="topbar-icon-wrap">
+              <button
+                type="button"
+                className="topbar-icon-btn"
+                aria-label="Notifications"
+                aria-expanded={notifOpen}
+                onClick={() => {
+                  setNotifOpen((o) => !o);
+                  setProfileOpen(false);
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm8-6V11a8 8 0 1 0-16 0v5l-2 2v1h20v-1l-2-2Z"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span className="topbar-badge">2</span>
+              </button>
+              {notifOpen ? (
+                <div className="topbar-dropdown">
+                  <p className="topbar-dropdown-title">Notifications</p>
+                  <button type="button" className="topbar-dropdown-item">
+                    Nouvelle déclaration en attente
+                  </button>
+                  <button type="button" className="topbar-dropdown-item">
+                    Acte à valider — commune
+                  </button>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="topbar-icon-wrap">
+              <button
+                type="button"
+                className="topbar-icon-btn topbar-profile-btn"
+                aria-label="Profil"
+                aria-expanded={profileOpen}
+                onClick={() => {
+                  setProfileOpen((o) => !o);
+                  setNotifOpen(false);
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.7" />
+                  <path
+                    d="M5 19.5c1.8-3.2 4.2-4.5 7-4.5s5.2 1.3 7 4.5"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+              {profileOpen ? (
+                <div className="topbar-dropdown topbar-dropdown-right">
+                  <p className="topbar-dropdown-title">{responsableLabel}</p>
+                  <p className="muted small" style={{ margin: "0 0 0.5rem", padding: "0 0.75rem" }}>
+                    @{session?.username}
+                  </p>
+                  <button type="button" className="topbar-dropdown-item" onClick={logout}>
+                    Déconnexion
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </div>
         </header>
         <main className="shell">
           <Routes>

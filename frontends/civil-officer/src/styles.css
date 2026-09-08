@@ -399,6 +399,8 @@
     overflow-x: auto;
   }
 }
+
+@media print {
   .sidebar,
   .topbar,
   .no-print,

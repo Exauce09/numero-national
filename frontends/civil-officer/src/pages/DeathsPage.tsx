@@ -26,13 +26,21 @@ export default function DeathsPage() {
       setError("La personne décédée est obligatoire.");
       return;
     }
+    if (!cause.trim()) {
+      setError("La cause du décès est obligatoire.");
+      return;
+    }
+    if (!dateDeces) {
+      setError("La date du décès est obligatoire.");
+      return;
+    }
     const payload = {
       deceased_id: deceased.id,
       deceased_name: displayName(deceased),
-      cause_deces: cause,
+      cause_deces: cause.trim(),
       lieu_deces: (geoDeces.label || lieuDeces).trim(),
-      lieu_enterrement: lieuEnterrement,
-      cimetiere,
+      lieu_enterrement: lieuEnterrement.trim(),
+      cimetiere: cimetiere.trim(),
       lieu_enregistrement: (geoEnreg.label || lieuEnregistrement).trim(),
       commune_code: geoEnreg.commune_code ?? geoDeces.commune_code ?? null,
       date_deces: dateDeces,
@@ -47,17 +55,35 @@ export default function DeathsPage() {
   return (
     <div>
       <h2 className="page-title">Décès</h2>
-      <p className="page-lead">Enregistrement d&apos;un acte de décès avec QR et NIC du défunt.</p>
+      <p className="page-lead">Enregistrement d&apos;un acte de décès (cause, lieux, dates, responsable).</p>
 
       <div className="panel">
         <form className="form-grid" onSubmit={onSubmit}>
           {error ? <div className="login-error full">{error}</div> : null}
+
           <div className="full">
             <PersonPicker label="Personne décédée" value={deceased} onChange={setDeceased} required />
           </div>
+
           <div className="full">
             <label className="form-label">Cause du Décès</label>
-            <input className="form-control" value={cause} onChange={(e) => setCause(e.target.value)} required />
+            <input
+              className="form-control"
+              value={cause}
+              onChange={(e) => setCause(e.target.value)}
+              placeholder="Ex. Cause naturelle, accident…"
+              required
+            />
+          </div>
+
+          <div className="full">
+            <label className="form-label">Lieu du Décès</label>
+            <input
+              className="form-control"
+              value={lieuDeces}
+              onChange={(e) => setLieuDeces(e.target.value)}
+              placeholder="Complément ou adresse libre"
+            />
           </div>
           <div className="full">
             <GeoCascade
@@ -66,20 +92,37 @@ export default function DeathsPage() {
                 setGeoDeces(g);
                 if (g.label) setLieuDeces(g.label);
               }}
-              label="Lieu du décès — territoire RDC"
+              label="Lieu du Décès — sélection territoriale"
             />
           </div>
+
           <div>
             <label className="form-label">Lieu d&apos;enterrement</label>
             <input
               className="form-control"
               value={lieuEnterrement}
               onChange={(e) => setLieuEnterrement(e.target.value)}
+              placeholder="Lieu d'enterrement"
             />
           </div>
           <div>
             <label className="form-label">Cimetière</label>
-            <input className="form-control" value={cimetiere} onChange={(e) => setCimetiere(e.target.value)} />
+            <input
+              className="form-control"
+              value={cimetiere}
+              onChange={(e) => setCimetiere(e.target.value)}
+              placeholder="Nom du cimetière"
+            />
+          </div>
+
+          <div className="full">
+            <label className="form-label">Lieu d&apos;enregistrement</label>
+            <input
+              className="form-control"
+              value={lieuEnregistrement}
+              onChange={(e) => setLieuEnregistrement(e.target.value)}
+              placeholder="Complément ou adresse libre"
+            />
           </div>
           <div className="full">
             <GeoCascade
@@ -88,9 +131,10 @@ export default function DeathsPage() {
                 setGeoEnreg(g);
                 if (g.label) setLieuEnregistrement(g.label);
               }}
-              label="Lieu d'enregistrement — territoire RDC"
+              label="Lieu d'enregistrement — sélection territoriale"
             />
           </div>
+
           <div>
             <label className="form-label">Date du Décès</label>
             <input
@@ -110,9 +154,11 @@ export default function DeathsPage() {
               onChange={(e) => setDateEnterrement(e.target.value)}
             />
           </div>
+
           <div className="full">
             <PersonPicker label="Responsable" value={responsable} onChange={setResponsable} />
           </div>
+
           <div className="full">
             <button className="btn-primary" style={{ width: "auto", minWidth: 180 }} type="submit">
               Enregistrer le décès
