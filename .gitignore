@@ -46,4 +46,5 @@ Thumbs.db
 node_modules/
 frontends/**/_npm_out.txt
 npm-debug.log*
+*.tsbuildinfo
 .DS_Store
