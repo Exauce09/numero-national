@@ -1,8 +1,8 @@
-"""Idempotent seed — 26 provinces RDC + Kinshasa detail + chefs-lieux."""
+"""Idempotent / forceable seed — 26 provinces, villes, communes CENI, quartiers & voies."""
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.domains.geography.models import (
@@ -14,84 +14,19 @@ from apps.api.domains.geography.models import (
     Ville,
     Voie,
 )
+from apps.api.domains.geography.seed_data import (
+    CITY_COMMUNES,
+    DEFAULT_QUARTIERS,
+    KIN_DISTRICTS,
+    PROVINCES,
+    QUARTIERS_VOIES,
+)
 
-# 26 provinces (réforme 2015) — codes ISO-like internes
-PROVINCES: list[tuple[str, str, str]] = [
-    ("KIN", "Kinshasa", "Kinshasa"),
-    ("BC", "Kongo Central", "Matadi"),
-    ("KWG", "Kwango", "Kenge"),
-    ("KWL", "Kwilu", "Bandundu"),
-    ("MND", "Mai-Ndombe", "Inongo"),
-    ("EQT", "Équateur", "Mbandaka"),
-    ("MNG", "Mongala", "Lisala"),
-    ("NUB", "Nord-Ubangi", "Gbadolite"),
-    ("SUB", "Sud-Ubangi", "Gemena"),
-    ("TSH", "Tshuapa", "Boende"),
-    ("TSHO", "Tshopo", "Kisangani"),
-    ("BUE", "Bas-Uélé", "Buta"),
-    ("HUE", "Haut-Uélé", "Isiro"),
-    ("ITU", "Ituri", "Bunia"),
-    ("NKV", "Nord-Kivu", "Goma"),
-    ("SKV", "Sud-Kivu", "Bukavu"),
-    ("MNM", "Maniema", "Kindu"),
-    ("HKT", "Haut-Katanga", "Lubumbashi"),
-    ("LLB", "Lualaba", "Kolwezi"),
-    ("HLM", "Haut-Lomami", "Kamina"),
-    ("TGY", "Tanganyika", "Kalemie"),
-    ("KAS", "Kasaï", "Tshikapa"),
-    ("KAC", "Kasaï Central", "Kananga"),
-    ("KAO", "Kasaï Oriental", "Mbuji-Mayi"),
-    ("LOM", "Lomami", "Kabinda"),
-    ("SNK", "Sankuru", "Lusambo"),
-]
-
-# Kinshasa districts → communes
-KIN_DISTRICTS: dict[str, list[str]] = {
-    "Lukunga": ["Gombe", "Kinshasa", "Barumbu", "Kintambo", "Lingwala", "Ngaliema"],
-    "Funa": ["Kasa-Vubu", "Kalamu", "Ngiri-Ngiri", "Bandalungwa", "Bumbu", "Makala", "Selembao"],
-    "Mont-Amba": ["Lemba", "Mont-Ngafula", "Kisenso", "Limete", "Matete", "Ngaba"],
-    "Tshangu": ["Ndjili", "Kimbanseke", "Masina", "Nsele", "Maluku"],
-}
-
-# Sample quartiers + voies for key communes
-KIN_QUARTIERS: dict[str, list[tuple[str, list[tuple[str, str]]]]] = {
-    "Gombe": [
-        ("Centre-ville", [("AVENUE", "du Port"), ("AVENUE", "de la Justice"), ("RUE", "Bureau")]),
-        ("Batetela", [("AVENUE", "Batetela"), ("AVENUE", "Wagenia"), ("RUE", "Cliniques")]),
-        ("Golf", [("AVENUE", "du Golf"), ("AVENUE", "Roi Baudouin")]),
-    ],
-    "Ngaliema": [
-        ("Ma Campagne", [("AVENUE", "de la Libération"), ("RUE", "Pere Boka")]),
-        ("Binza Poids Lourds", [("AVENUE", "Kasa-Vubu"), ("AVENUE", "de l'Université")]),
-        ("Djelo Binza", [("AVENUE", "By Pass"), ("RUE", "Mukoso")]),
-    ],
-    "Limete": [
-        ("Résidentiel", [("AVENUE", "de la Science"), ("AVENUE", "Sendwe")]),
-        ("Industriel", [("AVENUE", "des Usines"), ("RUE", "Trou du Loup")]),
-    ],
-    "Ndjili": [
-        ("Quartier 1", [("AVENUE", "Sapeur"), ("RUE", "Salongo")]),
-        ("Quartier 7", [("AVENUE", "Kimbangu"), ("RUE", "Mbenseke")]),
-    ],
-    "Kalamu": [
-        ("Yolo Nord", [("AVENUE", "Kasa-Vubu"), ("RUE", "Kwango")]),
-        ("Matonge", [("AVENUE", "Victoire"), ("RUE", "Forescom")]),
-    ],
-    "Masina": [
-        ("Sans Fil", [("AVENUE", "de la Libération"), ("RUE", "Mpasa")]),
-        ("Marché", [("AVENUE", "Bangala"), ("RUE", "Lokole")]),
-    ],
-}
-
-# Extra villes importantes hors chef-lieu
-EXTRA_VILLES: dict[str, list[str]] = {
-    "Kongo Central": ["Boma", "Muanda", "Kisantu"],
-    "Haut-Katanga": ["Likasi", "Kipushi"],
-    "Nord-Kivu": ["Butembo", "Beni"],
-    "Sud-Kivu": ["Uvira", "Baraka"],
-    "Kasaï Oriental": ["Miabi"],
-    "Kwilu": ["Kikwit"],
-}
+# Seuil : au-dessous → rechargement automatique (données anciennes trop pauvres)
+MIN_COMMUNES = 150
+MIN_QUARTIERS = 400
+MIN_VOIES = 1200
+SEED_VERSION = 2
 
 
 def _slug(name: str) -> str:
@@ -102,18 +37,67 @@ def _slug(name: str) -> str:
         .replace("È", "E")
         .replace("Ê", "E")
         .replace("À", "A")
+        .replace("Ô", "O")
+        .replace("Ç", "C")
         .replace("'", "")
+        .replace(".", "")
     )
 
 
-async def ensure_geography_seeded(db: AsyncSession) -> dict[str, int]:
-    existing = await db.scalar(select(func.count()).select_from(Province))
-    if existing and existing >= 26:
-        return {
-            "provinces": int(existing),
-            "skipped": 1,
-        }
+async def _counts(db: AsyncSession) -> dict[str, int]:
+    return {
+        "provinces": int(await db.scalar(select(func.count()).select_from(Province)) or 0),
+        "districts": int(await db.scalar(select(func.count()).select_from(District)) or 0),
+        "villes": int(await db.scalar(select(func.count()).select_from(Ville)) or 0),
+        "communes": int(await db.scalar(select(func.count()).select_from(Commune)) or 0),
+        "quartiers": int(await db.scalar(select(func.count()).select_from(Quartier)) or 0),
+        "localites": int(await db.scalar(select(func.count()).select_from(Localite)) or 0),
+        "voies": int(await db.scalar(select(func.count()).select_from(Voie)) or 0),
+    }
 
+
+async def clear_geography(db: AsyncSession) -> None:
+    """Supprime tout le référentiel geography (CASCADE via FK)."""
+    await db.execute(delete(Voie))
+    await db.execute(delete(Localite))
+    await db.execute(delete(Quartier))
+    await db.execute(delete(Commune))
+    await db.execute(delete(Ville))
+    await db.execute(delete(District))
+    await db.execute(delete(Province))
+    await db.flush()
+
+
+def _quartier_defs(ville: str, commune: str) -> list[tuple[str, list[tuple[str, str]]]]:
+    return QUARTIERS_VOIES.get(f"{ville}|{commune}", DEFAULT_QUARTIERS)
+
+
+async def _add_quartiers_voies(
+    db: AsyncSession,
+    commune: Commune,
+    ville_name: str,
+    commune_name: str,
+    counts: dict[str, int],
+) -> None:
+    for qi, (qname, voies) in enumerate(_quartier_defs(ville_name, commune_name), start=1):
+        qcode = f"{commune.code}-Q{qi}"
+        quar = Quartier(commune_id=commune.id, code=qcode, name=qname)
+        db.add(quar)
+        await db.flush()
+        counts["quartiers"] += 1
+        for vi, (vt, vn) in enumerate(voies, start=1):
+            db.add(
+                Voie(
+                    quartier_id=quar.id,
+                    code=f"{qcode}-{vt[:3]}-{vi}-{_slug(vn)[:14]}",
+                    name=vn,
+                    voie_type=vt,
+                )
+            )
+            counts["voies"] += 1
+
+
+async def _seed_all(db: AsyncSession) -> dict[str, int]:
     counts = {
         "provinces": 0,
         "districts": 0,
@@ -122,6 +106,7 @@ async def ensure_geography_seeded(db: AsyncSession) -> dict[str, int]:
         "quartiers": 0,
         "localites": 0,
         "voies": 0,
+        "seed_version": SEED_VERSION,
     }
 
     province_by_name: dict[str, Province] = {}
@@ -132,163 +117,110 @@ async def ensure_geography_seeded(db: AsyncSession) -> dict[str, int]:
         province_by_name[name] = p
         counts["provinces"] += 1
 
-        # Ville chef-lieu
-        v = Ville(
-            province_id=p.id,
-            code=f"{code}-{_slug(chef)[:12]}",
-            name=chef,
-            is_chef_lieu=True,
-        )
-        db.add(v)
-        await db.flush()
-        counts["villes"] += 1
-
-        # District administratif générique (territoire / zone)
         d_urbain = District(province_id=p.id, code=f"{code}-URB", name=f"District urbain {chef}")
         d_rural = District(province_id=p.id, code=f"{code}-RUR", name=f"District rural {name}")
         db.add_all([d_urbain, d_rural])
         await db.flush()
         counts["districts"] += 2
 
-        # Commune centre du chef-lieu
-        c_centre = Commune(
-            ville_id=v.id,
-            district_id=d_urbain.id,
-            code=f"{code}-COM-CENTRE",
-            name=f"Commune de {chef}",
-        )
-        db.add(c_centre)
-        await db.flush()
-        counts["communes"] += 1
-
-        q = Quartier(commune_id=c_centre.id, code=f"{c_centre.code}-Q1", name="Centre")
-        db.add(q)
-        await db.flush()
-        counts["quartiers"] += 1
-        for vt, vn in (("AVENUE", "Principale"), ("RUE", "du Marché"), ("AVENUE", "de l'Indépendance")):
-            db.add(
-                Voie(
-                    quartier_id=q.id,
-                    code=f"{q.code}-{vt[:3]}-{_slug(vn)[:10]}",
-                    name=vn,
-                    voie_type=vt,
-                )
-            )
-            counts["voies"] += 1
-
-        loc = Localite(
-            district_id=d_rural.id,
-            commune_id=c_centre.id,
-            code=f"{code}-LOC-01",
-            name=f"Localité {chef} périphérie",
-        )
-        db.add(loc)
-        counts["localites"] += 1
-
-        # Extra villes
-        for extra in EXTRA_VILLES.get(name, []):
-            ve = Ville(
+        cities = CITY_COMMUNES.get(name, {chef: [f"Commune de {chef}"]})
+        for ville_name, communes in cities.items():
+            is_chef = ville_name == chef or (name == "Kinshasa" and ville_name == "Kinshasa")
+            ville = Ville(
                 province_id=p.id,
-                code=f"{code}-{_slug(extra)[:12]}",
-                name=extra,
-                is_chef_lieu=False,
+                code=f"{code}-{_slug(ville_name)[:14]}",
+                name=ville_name,
+                is_chef_lieu=is_chef,
             )
-            db.add(ve)
+            db.add(ville)
             await db.flush()
             counts["villes"] += 1
-            ce = Commune(
-                ville_id=ve.id,
-                district_id=d_urbain.id,
-                code=f"{code}-COM-{_slug(extra)[:10]}",
-                name=f"Commune de {extra}",
-            )
-            db.add(ce)
-            await db.flush()
-            counts["communes"] += 1
-            qe = Quartier(commune_id=ce.id, code=f"{ce.code}-Q1", name="Centre")
-            db.add(qe)
-            await db.flush()
-            counts["quartiers"] += 1
-            db.add(
-                Voie(
-                    quartier_id=qe.id,
-                    code=f"{qe.code}-AVE-PRINC",
-                    name="Principale",
-                    voie_type="AVENUE",
-                )
-            )
-            counts["voies"] += 1
 
-    # Kinshasa détail (24 communes, 4 districts)
-    kin = province_by_name["Kinshasa"]
-    # Replace generic with detailed structure
-    kin_ville = (
-        await db.execute(select(Ville).where(Ville.province_id == kin.id, Ville.is_chef_lieu.is_(True)))
-    ).scalar_one()
-
-    district_map: dict[str, District] = {}
-    for dname, communes in KIN_DISTRICTS.items():
-        dcode = f"KIN-D-{_slug(dname)[:10]}"
-        existing_d = await db.scalar(select(District).where(District.code == dcode))
-        if existing_d:
-            district_map[dname] = existing_d
-            continue
-        dist = District(province_id=kin.id, code=dcode, name=dname)
-        db.add(dist)
-        await db.flush()
-        counts["districts"] += 1
-        district_map[dname] = dist
-
-        for cname in communes:
-            ccode = f"KIN-{_slug(cname)[:14]}"
-            if await db.scalar(select(Commune).where(Commune.code == ccode)):
-                continue
-            com = Commune(
-                ville_id=kin_ville.id,
-                district_id=dist.id,
-                code=ccode,
-                name=cname,
-            )
-            db.add(com)
-            await db.flush()
-            counts["communes"] += 1
-
-            qdefs = KIN_QUARTIERS.get(
-                cname,
-                [
-                    ("Quartier 1", [("AVENUE", "Principale"), ("RUE", "Commerciale")]),
-                    ("Quartier 2", [("AVENUE", "de la Paix"), ("RUE", "École")]),
-                ],
-            )
-            for qi, (qname, voies) in enumerate(qdefs, start=1):
-                qcode = f"{ccode}-Q{qi}"
-                quar = Quartier(commune_id=com.id, code=qcode, name=qname)
-                db.add(quar)
-                await db.flush()
-                counts["quartiers"] += 1
-                for vt, vn in voies:
-                    db.add(
-                        Voie(
-                            quartier_id=quar.id,
-                            code=f"{qcode}-{vt[:3]}-{_slug(vn)[:12]}",
-                            name=vn,
-                            voie_type=vt,
-                        )
+            # Districts Kinshasa détaillés
+            if name == "Kinshasa" and ville_name == "Kinshasa":
+                district_map: dict[str, District] = {}
+                for dname, dcommunes in KIN_DISTRICTS.items():
+                    dist = District(
+                        province_id=p.id,
+                        code=f"KIN-D-{_slug(dname)[:12]}",
+                        name=dname,
                     )
-                    counts["voies"] += 1
-
-            # Localités périurbaines pour Maluku / Nsele
-            if cname in {"Maluku", "Nsele", "Mont-Ngafula"}:
-                for i in range(1, 4):
-                    db.add(
-                        Localite(
+                    db.add(dist)
+                    await db.flush()
+                    counts["districts"] += 1
+                    district_map[dname] = dist
+                    for cname in dcommunes:
+                        com = Commune(
+                            ville_id=ville.id,
                             district_id=dist.id,
-                            commune_id=com.id,
-                            code=f"{ccode}-LOC-{i}",
-                            name=f"Localité {cname} {i}",
+                            code=f"KIN-{_slug(cname)[:16]}",
+                            name=cname,
                         )
+                        db.add(com)
+                        await db.flush()
+                        counts["communes"] += 1
+                        await _add_quartiers_voies(db, com, "Kinshasa", cname, counts)
+                        if cname in {"Maluku", "Nsele", "Mont-Ngafula"}:
+                            for i in range(1, 4):
+                                db.add(
+                                    Localite(
+                                        district_id=dist.id,
+                                        commune_id=com.id,
+                                        code=f"{com.code}-LOC-{i}",
+                                        name=f"Localité {cname} {i}",
+                                    )
+                                )
+                                counts["localites"] += 1
+                continue
+
+            for cname in communes:
+                com = Commune(
+                    ville_id=ville.id,
+                    district_id=d_urbain.id,
+                    code=f"{code}-{_slug(ville_name)[:8]}-{_slug(cname)[:12]}",
+                    name=cname,
+                )
+                db.add(com)
+                await db.flush()
+                counts["communes"] += 1
+                await _add_quartiers_voies(db, com, ville_name, cname, counts)
+
+            # Localité périphérique chef-lieu
+            if is_chef:
+                db.add(
+                    Localite(
+                        district_id=d_rural.id,
+                        code=f"{code}-LOC-RUR-01",
+                        name=f"Périphérie {chef}",
                     )
-                    counts["localites"] += 1
+                )
+                counts["localites"] += 1
 
     await db.commit()
     return counts
+
+
+async def ensure_geography_seeded(db: AsyncSession, *, force: bool = False) -> dict[str, int]:
+    """Charge le référentiel si vide / incomplet, ou force=True pour tout recharger."""
+    current = await _counts(db)
+    complete = (
+        current["provinces"] >= 26
+        and current["communes"] >= MIN_COMMUNES
+        and current["quartiers"] >= MIN_QUARTIERS
+        and current["voies"] >= MIN_VOIES
+    )
+    if complete and not force:
+        return {**current, "skipped": 1, "seed_version": SEED_VERSION}
+
+    if current["provinces"] > 0:
+        await clear_geography(db)
+        await db.commit()
+
+    # gen_random_uuid nécessite pgcrypto / extension — déjà utilisée en migration
+    try:
+        await db.execute(text("CREATE EXTENSION IF NOT EXISTS pgcrypto"))
+        await db.commit()
+    except Exception:
+        await db.rollback()
+
+    return await _seed_all(db)

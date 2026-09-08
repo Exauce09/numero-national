@@ -37,9 +37,12 @@ class VoieOut(GeoItem):
     voie_type: str
 
 
-@router.post("/seed", summary="Idempotent seed of RDC geography")
-async def seed_geo(db: AsyncSession = Depends(get_db)) -> dict:
-    counts = await ensure_geography_seeded(db)
+@router.post("/seed", summary="Seed / refresh RDC geography (force=true pour recharger)")
+async def seed_geo(
+    force: bool = Query(False, description="Supprime et recharge tout le référentiel"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    counts = await ensure_geography_seeded(db, force=force)
     return {"status": "ok", "counts": counts}
 
 
