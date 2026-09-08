@@ -1,0 +1,76 @@
+export type Session = {
+  username: string;
+  accountType: string;
+  accessToken?: string;
+};
+
+const KEY = "nn_session_institutional";
+
+export function getSession(): Session | null {
+  const raw = sessionStorage.getItem(KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as Session;
+  } catch {
+    return null;
+  }
+}
+
+export function clearSession(): void {
+  sessionStorage.removeItem(KEY);
+}
+
+export async function login(
+  username: string,
+  password: string,
+  accountType: string
+): Promise<Session> {
+  const user = username.trim();
+  if (!user || !password) {
+    throw new Error("Identifiant et mot de passe requis.");
+  }
+
+  const base = import.meta.env.VITE_API_BASE ?? "/api/v1";
+  try {
+    const res = await fetch(`${base}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: user, password }),
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { access_token?: string };
+      const session: Session = {
+        username: user,
+        accountType,
+        accessToken: data.access_token,
+      };
+      sessionStorage.setItem(KEY, JSON.stringify(session));
+      return session;
+    }
+  } catch {
+    /* API indisponible */
+  }
+
+  const session: Session = { username: user, accountType };
+  sessionStorage.setItem(KEY, JSON.stringify(session));
+  return session;
+}
+
+/** Map account type to a default post-login route. */
+export function homeForAccountType(accountType: string): string {
+  switch (accountType) {
+    case "COMMUNE":
+    case "CIVIL":
+      return "/civil";
+    case "MINISTERE":
+      return "/ministry";
+    case "PRESIDENCY":
+      return "/gov/presidency/overview";
+    case "PRIMATURE":
+      return "/gov/primature/overview";
+    case "INTERIOR":
+      return "/gov/interior/overview";
+    default:
+      return "/";
+  }
+}

@@ -1,0 +1,310 @@
+/* Charte unifiée type e-gov (Justicia / Modernize) + couleurs RDC */
+:root {
+  --egouv-primary: #5d87ff;
+  --egouv-primary-hover: #4a74e8;
+  --egouv-ink: #2a3547;
+  --egouv-muted: #5a6a85;
+  --egouv-line: #e5eaf2;
+  --egouv-card: #ffffff;
+  --egouv-bg1: rgb(210, 241, 223);
+  --egouv-bg2: rgb(211, 229, 250);
+  --egouv-danger: #fa896b;
+  --egouv-rdc-red: #ce1126;
+  --egouv-rdc-yellow: #f7d618;
+  --egouv-rdc-blue: #007fff;
+  font-family: "Plus Jakarta Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  color: var(--egouv-ink);
+  background: #f5f7fb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+a {
+  color: var(--egouv-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* ——— Login (mire e-gov) ——— */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: radial-gradient(
+    circle at 50% 20%,
+    var(--egouv-bg1) 0%,
+    var(--egouv-bg2) 45%,
+    #eef2f8 100%
+  );
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--egouv-card);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(42, 53, 71, 0.12);
+  padding: 1.75rem 1.75rem 2rem;
+}
+
+.login-logo {
+  display: block;
+  margin: 0 auto 0.75rem;
+  width: 160px;
+  height: auto;
+}
+
+.login-title {
+  text-align: center;
+  margin: 0 0 0.25rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--egouv-ink);
+}
+
+.login-subtitle {
+  text-align: center;
+  margin: 0 0 1.5rem;
+  font-size: 0.85rem;
+  color: var(--egouv-muted);
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 560;
+  color: var(--egouv-ink);
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--egouv-line);
+  border-radius: 8px;
+  font: inherit;
+  color: var(--egouv-ink);
+  background: #fff;
+  margin-bottom: 1rem;
+}
+
+.form-control:focus {
+  outline: 2px solid rgba(93, 135, 255, 0.35);
+  border-color: var(--egouv-primary);
+}
+
+.login-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: -0.35rem 0 1.1rem;
+}
+
+.login-forgot {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--egouv-primary);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.8rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--egouv-primary);
+  color: #fff;
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background: var(--egouv-primary-hover);
+}
+
+.btn-primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.login-error {
+  background: #fff2ee;
+  color: #b42318;
+  border: 1px solid #ffd2c5;
+  border-radius: 8px;
+  padding: 0.65rem 0.8rem;
+  margin-bottom: 1rem;
+  font-size: 0.88rem;
+}
+
+/* ——— Shell authentifié ——— */
+.shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem 2.5rem;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+  padding: 0.85rem 1.1rem;
+  background: var(--egouv-card);
+  border: 1px solid var(--egouv-line);
+  border-radius: 12px;
+  box-shadow: 0 4px 18px rgba(42, 53, 71, 0.06);
+}
+
+.brand-block {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.brand-logo {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+}
+
+.brand {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--egouv-ink);
+  line-height: 1.2;
+}
+
+.brand small {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 560;
+  color: var(--egouv-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.top nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.85rem;
+}
+
+.top nav a {
+  color: var(--egouv-ink);
+  font-weight: 560;
+  font-size: 0.92rem;
+  margin-right: 0;
+  text-decoration: none;
+  padding: 0.35rem 0.55rem;
+  border-radius: 6px;
+}
+
+.top nav a:hover {
+  background: #eef3ff;
+  color: var(--egouv-primary);
+  text-decoration: none;
+}
+
+.btn-logout {
+  border: 1px solid var(--egouv-line);
+  background: #fff;
+  color: var(--egouv-ink);
+  border-radius: 8px;
+  padding: 0.4rem 0.75rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-logout:hover {
+  border-color: var(--egouv-primary);
+  color: var(--egouv-primary);
+}
+
+.panel {
+  margin-top: 1rem;
+  background: var(--egouv-card);
+  border: 1px solid var(--egouv-line);
+  border-radius: 12px;
+  padding: 1.1rem 1.25rem;
+  box-shadow: 0 4px 18px rgba(42, 53, 71, 0.04);
+}
+
+.muted {
+  color: var(--egouv-muted);
+}
+
+.error {
+  color: var(--egouv-danger);
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.metric {
+  background: var(--egouv-card);
+  border: 1px solid var(--egouv-line);
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 18px rgba(42, 53, 71, 0.04);
+}
+
+.metric .label {
+  color: var(--egouv-muted);
+  font-size: 0.85rem;
+}
+
+.metric .value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-top: 0.35rem;
+  color: var(--egouv-ink);
+}
+
+.card-link {
+  display: block;
+  background: var(--egouv-card);
+  border: 1px solid var(--egouv-line);
+  border-radius: 12px;
+  padding: 1.1rem;
+  color: inherit;
+  text-decoration: none;
+  box-shadow: 0 4px 18px rgba(42, 53, 71, 0.04);
+}
+
+.card-link:hover {
+  border-color: var(--egouv-primary);
+  text-decoration: none;
+}
+
+.placeholder {
+  border: 1px dashed var(--egouv-line);
+  border-radius: 10px;
+  padding: 1rem;
+  color: var(--egouv-muted);
+  background: #fafbfd;
+}
