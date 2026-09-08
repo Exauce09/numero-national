@@ -45,7 +45,7 @@ def upgrade() -> None:
         sa.Column("template_encrypted", sa.LargeBinary(), nullable=False),
         sa.Column("quality_score", sa.Float()),
         sa.Column("algorithm_version", sa.String(64), nullable=False, server_default="mvp-hash-v1"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False"),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False),
         schema="biometric",
     )
     op.create_index(
@@ -62,7 +62,7 @@ def upgrade() -> None:
         sa.Column("media_type", sa.String(64), nullable=False, server_default="OFFICIAL_PHOTO"),
         sa.Column("storage_uri", sa.Text(), nullable=False),
         sa.Column("content_hash", sa.String(128)),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False"),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False),
         schema="biometric",
     )
     op.create_index(
@@ -81,7 +81,7 @@ def upgrade() -> None:
         sa.Column("scores", postgresql.JSONB()),
         sa.Column("decision", decision),
         sa.Column("notes", sa.Text()),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False"),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False),
         schema="biometric",
     )
 

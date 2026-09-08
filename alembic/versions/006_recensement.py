@@ -51,8 +51,8 @@ def upgrade() -> None:
         sa.Column("status", campaign_status, nullable=False, server_default="DRAFT"),
         sa.Column("starts_at", sa.DateTime(timezone=True)),
         sa.Column("ends_at", sa.DateTime(timezone=True)),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False"),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False"),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False),
         schema="recensement",
     )
     op.create_index("ix_recensement_campaigns_code", "campaigns", ["code"], schema="recensement")
@@ -87,7 +87,7 @@ def upgrade() -> None:
         sa.Column("agent_user_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("role_label", sa.String(64), server_default="CENSUS_AGENT"),
         sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-        sa.Column("assigned_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False"),
+        sa.Column("assigned_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False),
         schema="recensement",
     )
 
@@ -99,7 +99,7 @@ def upgrade() -> None:
         sa.Column("platform", sa.String(64)),
         sa.Column("app_version", sa.String(32)),
         sa.Column("last_seen_at", sa.DateTime(timezone=True)),
-        sa.Column("registered_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False"),
+        sa.Column("registered_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         schema="recensement",
     )
@@ -116,8 +116,8 @@ def upgrade() -> None:
         sa.Column("member_count", sa.Integer(), server_default="0"),
         sa.Column("collected_by", postgresql.UUID(as_uuid=True)),
         sa.Column("device_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("recensement.devices.id")),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False"),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False"),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False),
         schema="recensement",
     )
 
@@ -137,8 +137,8 @@ def upgrade() -> None:
         sa.Column("version", sa.Integer(), nullable=False, server_default="1"),
         sa.Column("collected_by", postgresql.UUID(as_uuid=True)),
         sa.Column("synced_at", sa.DateTime(timezone=True)),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False"),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False"),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False),
         schema="recensement",
     )
 
@@ -153,7 +153,7 @@ def upgrade() -> None:
         sa.Column("accepted_count", sa.Integer(), server_default="0"),
         sa.Column("conflict_count", sa.Integer(), server_default="0"),
         sa.Column("payload_summary", postgresql.JSONB()),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False"),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False),
         sa.Column("completed_at", sa.DateTime(timezone=True)),
         schema="recensement",
     )

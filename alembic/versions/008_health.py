@@ -42,7 +42,7 @@ def upgrade() -> None:
         sa.Column("name", sa.String(255), nullable=False),
         sa.Column("facility_type", facility_type, nullable=False, server_default="HOSPITAL"),
         sa.Column("commune_code", sa.String(32)),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False"),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False),
         schema="health",
     )
 
@@ -53,7 +53,7 @@ def upgrade() -> None:
         sa.Column("facility_id", postgresql.UUID(as_uuid=True)),
         sa.Column("record_type", sa.String(64), nullable=False),
         sa.Column("payload", postgresql.JSONB()),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False"),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False),
         schema="health",
     )
     op.create_index(
@@ -71,7 +71,7 @@ def upgrade() -> None:
         sa.Column("payload", postgresql.JSONB(), nullable=False),
         sa.Column("status", notif_status, nullable=False, server_default="DRAFT"),
         sa.Column("civil_declaration_id", postgresql.UUID(as_uuid=True)),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False"),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False),
         schema="health",
     )
 
@@ -84,7 +84,7 @@ def upgrade() -> None:
         sa.Column("status", notif_status, nullable=False, server_default="DRAFT"),
         sa.Column("civil_declaration_id", postgresql.UUID(as_uuid=True)),
         sa.Column("notes", sa.Text()),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False"),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False),
         schema="health",
     )
 

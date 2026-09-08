@@ -28,7 +28,7 @@ def upgrade() -> None:
         sa.Column("dimension", postgresql.JSONB()),
         sa.Column("value", sa.Float(), nullable=False),
         sa.Column("period", sa.String(64), nullable=False),
-        sa.Column("computed_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False"),
+        sa.Column("computed_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False),
         schema="analytics",
     )
     op.create_index(
@@ -68,7 +68,7 @@ def upgrade() -> None:
         sa.Column("body", sa.Text(), nullable=False),
         sa.Column("status", nstatus, nullable=False, server_default="PENDING"),
         sa.Column("meta", postgresql.JSONB()),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False"),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False),
         sa.Column("sent_at", sa.DateTime(timezone=True)),
         schema="notifications",
     )
