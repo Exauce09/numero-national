@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
+import GeoCascade, { type GeoSelection } from "../components/GeoCascade";
 import PersonPicker from "../components/PersonPicker";
 import { addAct, displayName, type Act, type Person } from "../registry";
 
@@ -10,6 +11,7 @@ export default function AdoptionsPage() {
   const [motif, setMotif] = useState("");
   const [lieuAdoption, setLieuAdoption] = useState("");
   const [lieuComplement, setLieuComplement] = useState("");
+  const [geo, setGeo] = useState<GeoSelection>({});
   const [dateAdoption, setDateAdoption] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Act | null>(null);
@@ -29,8 +31,9 @@ export default function AdoptionsPage() {
       motif,
       officier_id: officier?.id ?? null,
       officier_name: officier ? displayName(officier) : null,
-      lieu_adoption: lieuAdoption,
+      lieu_adoption: (geo.label || lieuAdoption).trim(),
       lieu_complement: lieuComplement,
+      commune_code: geo.commune_code ?? null,
       date_adoption: dateAdoption,
     };
     const act = addAct("ADOPTION", payload, enfant.nic);
@@ -58,15 +61,17 @@ export default function AdoptionsPage() {
           <div className="full">
             <PersonPicker label="Officier" value={officier} onChange={setOfficier} />
           </div>
-          <div>
-            <label className="form-label">Lieu d&apos;adoption</label>
-            <input
-              className="form-control"
-              value={lieuAdoption}
-              onChange={(e) => setLieuAdoption(e.target.value)}
+          <div className="full">
+            <GeoCascade
+              value={geo}
+              onChange={(g) => {
+                setGeo(g);
+                if (g.label) setLieuAdoption(g.label);
+              }}
+              label="Lieu d'adoption — territoire RDC"
             />
           </div>
-          <div>
+          <div className="full">
             <label className="form-label">Complément lieu</label>
             <input
               className="form-control"

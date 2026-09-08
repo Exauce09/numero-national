@@ -1,8 +1,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api, type Residence } from "../api";
+import GeoCascade, { type GeoSelection } from "../components/GeoCascade";
 
 export default function ResidencePage() {
   const [commune, setCommune] = useState("KIN-GOMBE");
+  const [geo, setGeo] = useState<GeoSelection>({});
   const [citizenId, setCitizenId] = useState("");
   const [address, setAddress] = useState("");
   const [rows, setRows] = useState<Residence[]>([]);
@@ -33,9 +35,9 @@ export default function ResidencePage() {
     try {
       await api.createResidence({
         citizen_id: citizenId,
-        commune_code: commune,
-        line1: address || "Adresse non précisée",
-        city: "Kinshasa",
+        commune_code: geo.commune_code || commune,
+        line1: address || geo.label || "Adresse non précisée",
+        city: geo.ville_name || "Kinshasa",
         country_code: "COD",
       });
       setMessage("Attestation de résidence créée.");
@@ -70,12 +72,23 @@ export default function ResidencePage() {
               onChange={(e) => setCitizenId(e.target.value)}
             />
           </div>
+          <div className="full">
+            <GeoCascade
+              value={geo}
+              onChange={(g) => {
+                setGeo(g);
+                if (g.commune_code) setCommune(g.commune_code);
+                if (g.label) setAddress(g.label);
+              }}
+              label="Adresse territoriale"
+            />
+          </div>
           <div>
             <label className="form-label">Code commune</label>
             <input className="form-control" required value={commune} onChange={(e) => setCommune(e.target.value)} />
           </div>
           <div className="full">
-            <label className="form-label">Adresse</label>
+            <label className="form-label">Adresse (complément)</label>
             <input className="form-control" value={address} onChange={(e) => setAddress(e.target.value)} />
           </div>
           <div className="full">

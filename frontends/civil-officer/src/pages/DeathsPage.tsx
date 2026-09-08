@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
+import GeoCascade, { type GeoSelection } from "../components/GeoCascade";
 import PersonPicker from "../components/PersonPicker";
 import { addAct, displayName, type Act, type Person } from "../registry";
 
@@ -11,6 +12,8 @@ export default function DeathsPage() {
   const [lieuEnterrement, setLieuEnterrement] = useState("");
   const [cimetiere, setCimetiere] = useState("");
   const [lieuEnregistrement, setLieuEnregistrement] = useState("");
+  const [geoDeces, setGeoDeces] = useState<GeoSelection>({});
+  const [geoEnreg, setGeoEnreg] = useState<GeoSelection>({});
   const [dateDeces, setDateDeces] = useState("");
   const [dateEnterrement, setDateEnterrement] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -27,10 +30,11 @@ export default function DeathsPage() {
       deceased_id: deceased.id,
       deceased_name: displayName(deceased),
       cause_deces: cause,
-      lieu_deces: lieuDeces,
+      lieu_deces: (geoDeces.label || lieuDeces).trim(),
       lieu_enterrement: lieuEnterrement,
       cimetiere,
-      lieu_enregistrement: lieuEnregistrement,
+      lieu_enregistrement: (geoEnreg.label || lieuEnregistrement).trim(),
+      commune_code: geoEnreg.commune_code ?? geoDeces.commune_code ?? null,
       date_deces: dateDeces,
       date_enterrement: dateEnterrement,
       responsable_id: responsable?.id ?? null,
@@ -55,9 +59,15 @@ export default function DeathsPage() {
             <label className="form-label">Cause du Décès</label>
             <input className="form-control" value={cause} onChange={(e) => setCause(e.target.value)} required />
           </div>
-          <div>
-            <label className="form-label">Lieu du Décès</label>
-            <input className="form-control" value={lieuDeces} onChange={(e) => setLieuDeces(e.target.value)} />
+          <div className="full">
+            <GeoCascade
+              value={geoDeces}
+              onChange={(g) => {
+                setGeoDeces(g);
+                if (g.label) setLieuDeces(g.label);
+              }}
+              label="Lieu du décès — territoire RDC"
+            />
           </div>
           <div>
             <label className="form-label">Lieu d&apos;enterrement</label>
@@ -71,12 +81,14 @@ export default function DeathsPage() {
             <label className="form-label">Cimetière</label>
             <input className="form-control" value={cimetiere} onChange={(e) => setCimetiere(e.target.value)} />
           </div>
-          <div>
-            <label className="form-label">Lieu d&apos;enregistrement</label>
-            <input
-              className="form-control"
-              value={lieuEnregistrement}
-              onChange={(e) => setLieuEnregistrement(e.target.value)}
+          <div className="full">
+            <GeoCascade
+              value={geoEnreg}
+              onChange={(g) => {
+                setGeoEnreg(g);
+                if (g.label) setLieuEnregistrement(g.label);
+              }}
+              label="Lieu d'enregistrement — territoire RDC"
             />
           </div>
           <div>

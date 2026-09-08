@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
+import GeoCascade, { type GeoSelection } from "../components/GeoCascade";
 import PersonPicker from "../components/PersonPicker";
 import {
   addAct,
@@ -24,6 +25,7 @@ export default function MarriagesPage() {
   const [temoin2, setTemoin2] = useState<Person | null>(null);
   const [officier, setOfficier] = useState<Person | null>(null);
   const [lieuEtatCivil, setLieuEtatCivil] = useState("");
+  const [geo, setGeo] = useState<GeoSelection>({});
   const [motif, setMotif] = useState("");
   const [dateMariage, setDateMariage] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +65,8 @@ export default function MarriagesPage() {
       temoin2_name: temoin2 ? displayName(temoin2) : null,
       officier_id: officier?.id ?? null,
       officier_name: officier ? displayName(officier) : null,
-      lieu_etat_civil: lieuEtatCivil,
+      lieu_etat_civil: (geo.label || lieuEtatCivil).trim(),
+      commune_code: geo.commune_code ?? null,
       motif,
       date_mariage: dateMariage,
     };
@@ -122,12 +125,14 @@ export default function MarriagesPage() {
           <div className="full">
             <PersonPicker label="Officier" value={officier} onChange={setOfficier} />
           </div>
-          <div>
-            <label className="form-label">Lieu état civil</label>
-            <input
-              className="form-control"
-              value={lieuEtatCivil}
-              onChange={(e) => setLieuEtatCivil(e.target.value)}
+          <div className="full">
+            <GeoCascade
+              value={geo}
+              onChange={(g) => {
+                setGeo(g);
+                if (g.label) setLieuEtatCivil(g.label);
+              }}
+              label="Lieu état civil — territoire RDC"
             />
           </div>
           <div>

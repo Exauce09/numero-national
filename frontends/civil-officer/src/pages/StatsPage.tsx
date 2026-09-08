@@ -1,8 +1,10 @@
 import { FormEvent, useState } from "react";
 import { api } from "../api";
+import GeoCascade, { type GeoSelection } from "../components/GeoCascade";
 
 export default function StatsPage() {
   const [commune, setCommune] = useState("KIN-GOMBE");
+  const [geo, setGeo] = useState<GeoSelection>({});
   const [counts, setCounts] = useState<Record<string, number> | null>(null);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -13,7 +15,7 @@ export default function StatsPage() {
     setBusy(true);
     setError(null);
     try {
-      const data = await api.stats(commune);
+      const data = await api.stats(geo.commune_code || commune);
       setCounts(data.counts);
       setTotal(data.total);
     } catch (err) {
@@ -29,7 +31,15 @@ export default function StatsPage() {
       <h2 className="page-title">Statistiques communales</h2>
       <p className="page-lead">Indicateurs agrégés par type d&apos;acte pour la commune.</p>
       <div className="panel">
-        <form className="toolbar" onSubmit={onSubmit}>
+        <GeoCascade
+          value={geo}
+          onChange={(g) => {
+            setGeo(g);
+            if (g.commune_code) setCommune(g.commune_code);
+          }}
+          label="Sélectionner la commune"
+        />
+        <form className="toolbar" onSubmit={onSubmit} style={{ marginTop: "1rem" }}>
           <div>
             <label className="form-label">Code commune</label>
             <input className="form-control" value={commune} onChange={(e) => setCommune(e.target.value)} />

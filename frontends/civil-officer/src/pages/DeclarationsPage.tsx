@@ -6,10 +6,12 @@ import {
   demoValidateDeclaration,
   type Declaration,
 } from "../api";
+import GeoCascade, { type GeoSelection } from "../components/GeoCascade";
 
 export default function DeclarationsPage() {
   const [rows, setRows] = useState<Declaration[]>([]);
   const [commune, setCommune] = useState("KIN-GOMBE");
+  const [geo, setGeo] = useState<GeoSelection>({});
   const [type, setType] = useState("BIRTH");
   const [notes, setNotes] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -82,6 +84,16 @@ export default function DeclarationsPage() {
               <option value="BIRTH">Naissance</option>
               <option value="DEATH">Décès</option>
             </select>
+          </div>
+          <div className="full">
+            <GeoCascade
+              value={geo}
+              onChange={(g) => {
+                setGeo(g);
+                if (g.commune_code) setCommune(g.commune_code);
+              }}
+              label="Commune de la déclaration"
+            />
           </div>
           <div>
             <label className="form-label">Code commune</label>

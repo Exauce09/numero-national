@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
+import GeoCascade, { type GeoSelection } from "../components/GeoCascade";
 import PersonPicker from "../components/PersonPicker";
 import {
   ETAT_CIVIL_OPTIONS,
@@ -24,6 +25,7 @@ export default function CensusPage() {
   const [sexe, setSexe] = useState<Sexe>("M");
   const [dateNaissance, setDateNaissance] = useState("");
   const [lieuNaissance, setLieuNaissance] = useState("");
+  const [geo, setGeo] = useState<GeoSelection>({});
   const [etatCivil, setEtatCivil] = useState<EtatCivil>("CELIBATAIRE");
   const [taille, setTaille] = useState("");
   const [poids, setPoids] = useState("");
@@ -103,7 +105,7 @@ export default function CensusPage() {
         prenom: prenom.trim(),
         sexe,
         date_naissance: dateNaissance,
-        lieu_naissance: lieuNaissance.trim(),
+        lieu_naissance: (geo.label || lieuNaissance).trim(),
         etat_civil: etatCivil,
         taille: taille ? Number(taille) : undefined,
         poids: poids ? Number(poids) : undefined,
@@ -126,6 +128,7 @@ export default function CensusPage() {
         sexe: person.sexe,
         date_naissance: person.date_naissance,
         lieu_naissance: person.lieu_naissance,
+        commune_code: geo.commune_code ?? null,
         etat_civil: person.etat_civil,
         taille: person.taille ?? null,
         poids: person.poids ?? null,
@@ -212,12 +215,14 @@ export default function CensusPage() {
                 onChange={(e) => setDateNaissance(e.target.value)}
               />
             </div>
-            <div>
-              <label className="form-label">Lieu de naissance</label>
-              <input
-                className="form-control"
-                value={lieuNaissance}
-                onChange={(e) => setLieuNaissance(e.target.value)}
+            <div className="full">
+              <GeoCascade
+                value={geo}
+                onChange={(g) => {
+                  setGeo(g);
+                  if (g.label) setLieuNaissance(g.label);
+                }}
+                label="Lieu de naissance — territoire RDC"
               />
             </div>
             <div>

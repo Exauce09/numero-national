@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from apps.api.db.session import get_db
 from apps.api.domains.geography import models as m
@@ -138,3 +139,119 @@ async def list_voies(
     stmt = stmt.order_by(m.Voie.voie_type, m.Voie.name)
     rows = (await db.execute(stmt)).scalars().all()
     return [VoieOut.model_validate(r) for r in rows]
+
+
+class TreeVoie(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    code: str
+    name: str
+    voie_type: str
+
+
+class TreeQuartier(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    code: str
+    name: str
+    voies: list[TreeVoie] = []
+
+
+class TreeLocalite(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    code: str
+    name: str
+
+
+class TreeCommune(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    code: str
+    name: str
+    quartiers: list[TreeQuartier] = []
+    localites: list[TreeLocalite] = []
+
+
+class TreeDistrict(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    code: str
+    name: str
+    communes: list[TreeCommune] = []
+    localites: list[TreeLocalite] = []
+
+
+class TreeVille(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    code: str
+    name: str
+    is_chef_lieu: bool
+    communes: list[TreeCommune] = []
+
+
+class ProvinceTree(BaseModel):
+    id: UUID
+    code: str
+    name: str
+    chef_lieu: str
+    districts: list[TreeDistrict]
+    villes: list[TreeVille]
+    counts: dict[str, int]
+
+
+@router.get("/provinces/{province_id}/tree", response_model=ProvinceTree)
+async def province_tree(province_id: UUID, db: AsyncSession = Depends(get_db)) -> ProvinceTree:
+    """Toutes les infos liées à une province (villes, districts, communes, quartiers, voies…)."""
+    await ensure_geography_seeded(db)
+
+    stmt = (
+        select(m.Province)
+        .where(m.Province.id == province_id)
+        .options(
+            selectinload(m.Province.districts)
+            .selectinload(m.District.communes)
+            .selectinload(m.Commune.quartiers)
+            .selectinload(m.Quartier.voies),
+            selectinload(m.Province.districts).selectinload(m.District.localites),
+            selectinload(m.Province.districts)
+            .selectinload(m.District.communes)
+            .selectinload(m.Commune.localites),
+            selectinload(m.Province.villes)
+            .selectinload(m.Ville.communes)
+            .selectinload(m.Commune.quartiers)
+            .selectinload(m.Quartier.voies),
+            selectinload(m.Province.villes)
+            .selectinload(m.Ville.communes)
+            .selectinload(m.Commune.localites),
+        )
+    )
+    prov = (await db.execute(stmt)).scalar_one_or_none()
+    if prov is None:
+        raise HTTPException(status_code=404, detail="Province introuvable")
+
+    districts = [TreeDistrict.model_validate(d) for d in prov.districts]
+    villes = [TreeVille.model_validate(v) for v in prov.villes]
+    n_communes = sum(len(v.communes) for v in villes)
+    n_quartiers = sum(len(c.quartiers) for v in villes for c in v.communes)
+    n_voies = sum(len(q.voies) for v in villes for c in v.communes for q in c.quartiers)
+    n_localites = sum(len(d.localites) for d in districts) + sum(
+        len(c.localites) for v in villes for c in v.communes
+    )
+    return ProvinceTree(
+        id=prov.id,
+        code=prov.code,
+        name=prov.name,
+        chef_lieu=prov.chef_lieu,
+        districts=districts,
+        villes=villes,
+        counts={
+            "districts": len(districts),
+            "villes": len(villes),
+            "communes": n_communes,
+            "quartiers": n_quartiers,
+            "localites": n_localites,
+            "voies": n_voies,
+        },
+    )

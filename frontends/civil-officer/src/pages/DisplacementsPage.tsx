@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
+import GeoCascade, { type GeoSelection } from "../components/GeoCascade";
 import PersonPicker from "../components/PersonPicker";
 import { addAct, displayName, type Act, type Person } from "../registry";
 
@@ -7,6 +8,7 @@ export default function DisplacementsPage() {
   const [personne, setPersonne] = useState<Person | null>(null);
   const [officier, setOfficier] = useState<Person | null>(null);
   const [lieuAller, setLieuAller] = useState("");
+  const [geo, setGeo] = useState<GeoSelection>({});
   const [motif, setMotif] = useState("");
   const [dateDeplacement, setDateDeplacement] = useState("");
   const [dateRetour, setDateRetour] = useState("");
@@ -23,7 +25,8 @@ export default function DisplacementsPage() {
     const payload = {
       person_id: personne.id,
       person_name: displayName(personne),
-      lieu_a_aller: lieuAller,
+      lieu_a_aller: (geo.label || lieuAller).trim(),
+      commune_code: geo.commune_code ?? null,
       motif,
       date_deplacement: dateDeplacement,
       date_retour: dateRetour,
@@ -45,9 +48,19 @@ export default function DisplacementsPage() {
           <div className="full">
             <PersonPicker label="Personne" value={personne} onChange={setPersonne} required />
           </div>
+          <div className="full">
+            <GeoCascade
+              value={geo}
+              onChange={(g) => {
+                setGeo(g);
+                if (g.label) setLieuAller(g.label);
+              }}
+              label="Lieu de destination — territoire RDC"
+            />
+          </div>
           <div>
-            <label className="form-label">Lieu à aller</label>
-            <input className="form-control" value={lieuAller} onChange={(e) => setLieuAller(e.target.value)} required />
+            <label className="form-label">Complément lieu (optionnel)</label>
+            <input className="form-control" value={lieuAller} onChange={(e) => setLieuAller(e.target.value)} />
           </div>
           <div>
             <label className="form-label">Motif</label>
