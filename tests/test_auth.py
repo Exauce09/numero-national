@@ -109,7 +109,7 @@ async def auth_client(monkeypatch, fake_user_store):
         fake_user_store[user.email] = user
         return user
 
-    async def fake_authenticate(_db, payload):
+    async def fake_authenticate(_db, payload, lock_key=None):
         user = fake_user_store.get(payload.email.lower())
         if user is None or not verify_password(payload.password, user.hashed_password):
             raise HTTPException(status_code=401, detail="Incorrect email or password")

@@ -1,3 +1,3 @@
-"""National Identity System — API service (MVP Phases 1–9)."""
+"""National Identity System — API service (MVP + ops hardening)."""
 
-__version__ = "0.9.0"
+__version__ = "0.9.1"

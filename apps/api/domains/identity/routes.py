@@ -106,9 +106,24 @@ async def login(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> TokenPair:
-    tokens = await identity_services.authenticate_user(db, payload)
-    user = await identity_services.get_user_by_email(db, payload.email)
     ip, device = _client_meta(request)
+    lock_key = f"{payload.email.lower()}:{ip or 'unknown'}"
+    try:
+        tokens = await identity_services.authenticate_user(db, payload, lock_key=lock_key)
+    except HTTPException as exc:
+        if exc.status_code in {401, 429}:
+            await write_audit(
+                db,
+                action="user.login",
+                resource_type="user",
+                resource_id=payload.email.lower(),
+                ip=ip,
+                device=device,
+                result="failure",
+                new_value={"status_code": exc.status_code},
+            )
+        raise
+    user = await identity_services.get_user_by_email(db, payload.email)
     await write_audit(
         db,
         actor_id=user.id if user else None,
@@ -123,12 +138,30 @@ async def login(
     return tokens
 
 
-@auth_router.post("/refresh", response_model=TokenPair, summary="Refresh access token")
+@auth_router.post("/refresh", response_model=TokenPair, summary="Refresh access token (rotating)")
 async def refresh(
     payload: RefreshRequest,
     db: AsyncSession = Depends(get_db),
 ) -> TokenPair:
     return await identity_services.refresh_tokens(db, payload.refresh_token)
+
+
+@auth_router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, summary="Revoke refresh token")
+async def logout(
+    payload: RefreshRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    await identity_services.logout_user(db, payload.refresh_token)
+    ip, device = _client_meta(request)
+    await write_audit(
+        db,
+        action="user.logout",
+        resource_type="user",
+        ip=ip,
+        device=device,
+        result="success",
+    )
 
 
 @auth_router.post("/mfa/setup", response_model=MFASetupResponse, summary="Start MFA enrollment")

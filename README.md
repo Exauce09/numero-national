@@ -4,9 +4,11 @@ Infrastructure numérique d'État autour du **NIC** (Numéro d'Identification Ci
 
 **Dépôt GitHub :** [https://github.com/Exauce09/numero-national](https://github.com/Exauce09/numero-national)
 
-> **Phases livrées : 1 → 9 (domaine)**  
+CI : GitHub Actions (pytest + Postgres + Redis) sur chaque push `main`.
+
+> **Phases livrées : 1 → 9 (domaine) + ops**  
 > Fondation · IAM · Core Registry · Recensement Flutter · État civil · Cartes ·  
-> Biométrie · ONIP · Santé · Analytics / portails institutionnels
+> Biométrie · ONIP · Santé · Analytics · **Redis rate-limit · refresh rotation · CI**
 
 ### Sync Git automatique
 

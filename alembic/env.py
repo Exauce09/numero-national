@@ -14,6 +14,7 @@ import apps.api.domains.biometric.models  # noqa: F401
 import apps.api.domains.health.models  # noqa: F401
 import apps.api.domains.analytics.models  # noqa: F401
 import apps.api.domains.notifications.models  # noqa: F401
+import apps.api.domains.identity.models  # noqa: F401
 
 # Optional sibling-phase models (ignore if not yet present).
 for _mod in (

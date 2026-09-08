@@ -1,10 +1,8 @@
-"""Security middleware: TrustedHost, CORS, security headers, rate limits."""
+"""Security middleware: TrustedHost, CORS, security headers, Redis-aware rate limits."""
 
 from __future__ import annotations
 
-import time
 import uuid
-from collections import defaultdict, deque
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +11,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from apps.api.core.config import Settings
+from apps.api.core.redis_client import get_rate_limiter
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -36,26 +35,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """
-    In-memory sliding-window rate limiter (single process).
+    Sliding/fixed window rate limiter.
 
-    Production: replace with Redis / API gateway. Auth paths use a stricter bucket.
+    Uses Redis when REDIS_URL is reachable; otherwise in-memory fallback.
     """
 
     def __init__(self, app, settings: Settings):
         super().__init__(app)
         self.settings = settings
-        self._buckets: dict[str, deque[float]] = defaultdict(deque)
-
-    def _check(self, key: str, limit: int, window: int = 60) -> bool:
-        now = time.monotonic()
-        bucket = self._buckets[key]
-        cutoff = now - window
-        while bucket and bucket[0] < cutoff:
-            bucket.popleft()
-        if len(bucket) >= limit:
-            return False
-        bucket.append(now)
-        return True
 
     async def dispatch(self, request: Request, call_next):
         if request.url.path in {"/health", "/docs", "/redoc", "/openapi.json"}:
@@ -70,7 +57,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             else self.settings.rate_limit_per_minute
         )
         key = f"{'auth' if is_auth else 'api'}:{host}"
-        if not self._check(key, limit):
+        limiter = await get_rate_limiter()
+        allowed = await limiter.hit(key, limit=limit, window_seconds=60)
+        if not allowed:
             return JSONResponse(
                 status_code=429,
                 content={"detail": "Rate limit exceeded"},
@@ -88,7 +77,14 @@ def apply_security_middleware(app: FastAPI, settings: Settings) -> None:
         allow_origins=settings.cors_origin_list,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "X-Request-Id", "X-Citizen-Id"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "X-Request-Id",
+            "X-Citizen-Id",
+            "X-Actor-Id",
+            "X-Permissions",
+        ],
     )
     if settings.is_production:
         app.add_middleware(

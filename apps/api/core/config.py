@@ -62,6 +62,8 @@ class Settings(BaseSettings):
     allowed_hosts: str = Field(default="localhost,127.0.0.1", alias="ALLOWED_HOSTS")
     rate_limit_per_minute: int = Field(default=120, alias="RATE_LIMIT_PER_MINUTE")
     auth_rate_limit_per_minute: int = Field(default=20, alias="AUTH_RATE_LIMIT_PER_MINUTE")
+    redis_url: str | None = Field(default=None, alias="REDIS_URL")
+    login_max_failures: int = Field(default=8, alias="LOGIN_MAX_FAILURES")
 
     postgres_host: str = Field(default="localhost", alias="POSTGRES_HOST")
     postgres_port: int = Field(default=5432, alias="POSTGRES_PORT")

@@ -23,6 +23,11 @@ from apps.api.core.security import (
     verify_password,
 )
 from apps.api.domains.identity.models import Institution, Permission, Role, User
+from apps.api.domains.identity.refresh_store import (
+    issue_token_pair,
+    revoke_refresh_token,
+    rotate_refresh_token,
+)
 from apps.api.domains.identity.schemas import (
     InstitutionCreate,
     InstitutionUpdate,
@@ -31,6 +36,11 @@ from apps.api.domains.identity.schemas import (
     UserLogin,
     UserMe,
     UserRegister,
+)
+from apps.api.core.redis_client import (
+    clear_login_failures,
+    is_login_locked,
+    record_login_failure,
 )
 
 
@@ -120,9 +130,22 @@ async def register_user(db: AsyncSession, payload: UserRegister) -> User:
     return loaded
 
 
-async def authenticate_user(db: AsyncSession, payload: UserLogin) -> TokenPair:
+async def authenticate_user(
+    db: AsyncSession,
+    payload: UserLogin,
+    *,
+    lock_key: str | None = None,
+) -> TokenPair:
+    key = lock_key or payload.email.lower()
+    if await is_login_locked(key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Account temporarily locked after failed attempts",
+        )
+
     user = await get_user_by_email(db, payload.email)
     if user is None or not verify_password(payload.password, user.hashed_password):
+        await record_login_failure(key)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -146,50 +169,22 @@ async def authenticate_user(db: AsyncSession, payload: UserLogin) -> TokenPair:
             )
         secret = decrypt_mfa_secret(user.mfa_secret)
         if not verify_mfa_code(secret, payload.mfa_code):
+            await record_login_failure(key)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid MFA code",
             )
 
-    subject = str(user.id)
-    return TokenPair(
-        access_token=create_access_token(subject),
-        refresh_token=create_refresh_token(subject),
-    )
+    await clear_login_failures(key)
+    return await issue_token_pair(db, user)
 
 
 async def refresh_tokens(db: AsyncSession, refresh_token: str) -> TokenPair:
-    payload = decode_token(refresh_token)
-    if payload.get("type") != "refresh":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token",
-        )
-    subject = payload.get("sub")
-    if not subject:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token",
-        )
-    try:
-        user_id = UUID(str(subject))
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token",
-        ) from exc
+    return await rotate_refresh_token(db, refresh_token)
 
-    user = await get_user_by_id(db, user_id)
-    if user is None or not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User inactive or not found",
-        )
 
-    return TokenPair(
-        access_token=create_access_token(str(user.id)),
-        refresh_token=create_refresh_token(str(user.id)),
-    )
+async def logout_user(db: AsyncSession, refresh_token: str) -> None:
+    await revoke_refresh_token(db, refresh_token)
 
 
 async def setup_mfa(db: AsyncSession, user: User) -> MFASetupResponse:

@@ -17,6 +17,18 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: nic_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   api:
     build:
       context: .
@@ -26,6 +38,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       APP_NAME: ${APP_NAME:-Systeme National d Identite}
       APP_ENV: ${APP_ENV:-development}
@@ -33,12 +47,15 @@ services:
       APP_HOST: 0.0.0.0
       APP_PORT: 8000
       API_V1_PREFIX: ${API_V1_PREFIX:-/api/v1}
-      SECRET_KEY: ${SECRET_KEY:-change-me-generate-a-strong-random-secret}
+      SECRET_KEY: ${SECRET_KEY:-dev-local-secret-key-change-before-any-deploy-32}
+      ALLOW_DEV_AUTH_HEADERS: ${ALLOW_DEV_AUTH_HEADERS:-true}
+      ALLOW_OPEN_REGISTRATION: ${ALLOW_OPEN_REGISTRATION:-true}
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       POSTGRES_USER: ${POSTGRES_USER:-nic_admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-strong-db-password}
       POSTGRES_DB: ${POSTGRES_DB:-nic_core}
+      REDIS_URL: redis://redis:6379/0
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       RUN_MIGRATIONS: "true"
     ports:

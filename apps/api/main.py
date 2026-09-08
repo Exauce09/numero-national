@@ -18,7 +18,12 @@ from apps.api.db.session import engine
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     setup_logging(settings)
+    # Warm Redis if configured (non-fatal if down).
+    from apps.api.core.redis_client import close_redis, get_redis
+
+    await get_redis()
     yield
+    await close_redis()
     await engine.dispose()
 
 
