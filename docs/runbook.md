@@ -1,6 +1,27 @@
 # Runbook — opérations courantes
 
-## Démarrage local
+## Démarrage local (Windows natif — recommandé si Docker/WSL indisponible)
+
+Prérequis : PostgreSQL 16+ en service local, Python 3.11+, venv projet.
+
+```powershell
+# Depuis la racine du repo
+copy .env.example .env
+# POSTGRES_* → localhost / nic_admin / nic_core
+# ALLOW_DEV_AUTH_HEADERS=true, ALLOW_OPEN_REGISTRATION=true (dev)
+# REDIS_URL commenté → rate-limit mémoire OK
+
+.\.venv\Scripts\alembic.exe upgrade head
+.\.venv\Scripts\uvicorn.exe apps.api.main:app --host 127.0.0.1 --port 8000
+# autre terminal :
+.\.venv\Scripts\python.exe scripts\e2e_smoke.py
+```
+
+Health attendu : `{"status":"ok","api":"up","database":"up"}`.
+
+## Démarrage local (Docker)
+
+Nécessite WSL2 + Virtual Machine Platform actifs (redémarrage Windows après `scripts/enable-wsl-features.ps1`).
 
 ```bash
 cp .env.example .env
@@ -10,6 +31,8 @@ curl http://localhost:8000/health
 alembic upgrade head   # déjà lancé par entrypoint Docker
 py -3 scripts/e2e_smoke.py
 ```
+
+Après reboot WSL : `powershell -ExecutionPolicy Bypass -File scripts/post-reboot-docker.ps1`
 
 ## Parcours de validation
 
