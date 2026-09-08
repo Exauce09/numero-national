@@ -12,6 +12,7 @@ import {
   type Person,
   type Sexe,
 } from "../registry";
+import GeoCascade, { type GeoSelection } from "../components/GeoCascade";
 
 export default function BirthsPage() {
   const [nom, setNom] = useState("");
@@ -20,6 +21,7 @@ export default function BirthsPage() {
   const [sexe, setSexe] = useState<Sexe>("M");
   const [dateNaissance, setDateNaissance] = useState("");
   const [lieuNaissance, setLieuNaissance] = useState("");
+  const [geo, setGeo] = useState<GeoSelection>({});
   const [mother, setMother] = useState<Person | null>(null);
   const [father, setFather] = useState<Person | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +51,7 @@ export default function BirthsPage() {
         prenom: prenom.trim(),
         sexe,
         date_naissance: dateNaissance,
-        lieu_naissance: lieuNaissance.trim(),
+        lieu_naissance: (geo.label || lieuNaissance).trim(),
         etat_civil: "CELIBATAIRE",
         mother_id: mother.id,
         father_id: father?.id,
@@ -62,6 +64,8 @@ export default function BirthsPage() {
         sexe: child.sexe,
         date_naissance: child.date_naissance,
         lieu_naissance: child.lieu_naissance,
+        geo,
+        commune_code: geo.commune_code ?? "KIN-GOMBE",
         mother_id: mother.id,
         mother_name: `${mother.nom} ${mother.prenom}`,
         father_id: father?.id ?? null,
@@ -143,11 +147,22 @@ export default function BirthsPage() {
             />
           </div>
           <div>
-            <label className="form-label">Lieu de naissance</label>
+            <label className="form-label">Lieu de naissance (texte libre optionnel)</label>
             <input
               className="form-control"
               value={lieuNaissance}
               onChange={(e) => setLieuNaissance(e.target.value)}
+              placeholder="Complément si besoin"
+            />
+          </div>
+          <div className="full">
+            <GeoCascade
+              value={geo}
+              onChange={(g) => {
+                setGeo(g);
+                if (g.label) setLieuNaissance(g.label);
+              }}
+              label="Lieu de naissance — sélection territoriale"
             />
           </div>
           <div className="full">

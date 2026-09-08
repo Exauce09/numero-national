@@ -24,6 +24,7 @@ _OPTIONAL_ROUTERS: tuple[tuple[str, str], ...] = (
     ("apps.api.domains.audit.routes", "router"),
     ("apps.api.domains.interop.routes", "router"),
     ("apps.api.domains.core_registry.router", "router"),
+    ("apps.api.domains.geography.routes", "router"),
 )
 
 

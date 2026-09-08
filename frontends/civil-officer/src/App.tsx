@@ -13,6 +13,7 @@ import DivorcesPage from "./pages/DivorcesPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import ActsPage from "./pages/ActsPage";
 import SearchPage from "./pages/SearchPage";
+import TerritoryPage from "./pages/TerritoryPage";
 
 function RequireAuth({ children }: { children: ReactNode }) {
   if (!getSession()) return <Navigate to="/login" replace />;
@@ -49,6 +50,7 @@ function Shell() {
           <NavLink to="/divorces">Divorce</NavLink>
           <NavLink to="/documents">Documents</NavLink>
           <NavLink to="/acts">Actes</NavLink>
+          <NavLink to="/territory">Territoire RDC</NavLink>
           <NavLink to="/search">Recherche</NavLink>
         </nav>
         <div className="sidebar-foot">
@@ -75,6 +77,7 @@ function Shell() {
             <Route path="/divorces" element={<DivorcesPage />} />
             <Route path="/documents" element={<DocumentsPage />} />
             <Route path="/acts" element={<ActsPage />} />
+            <Route path="/territory" element={<TerritoryPage />} />
             <Route path="/search" element={<SearchPage />} />
           </Routes>
         </main>
