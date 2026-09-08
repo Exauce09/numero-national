@@ -53,3 +53,15 @@ async def declare_death(
     body: DeathDeclare, db: AsyncSession = Depends(get_db)
 ) -> DeathNotificationOut:
     return await service.declare_death(db, body)  # type: ignore[return-value]
+
+
+@router.get("/facilities")
+async def list_facilities(db: AsyncSession = Depends(get_db)) -> list[FacilityOut]:
+    rows = await service.list_facilities(db)
+    return [FacilityOut.model_validate(r) for r in rows]
+
+
+@router.get("/stats/national")
+async def national_health_stats(db: AsyncSession = Depends(get_db)) -> dict:
+    """Statistiques santé nationales agrégées et anonymisées (Ministère de la Santé)."""
+    return await service.health_national_stats(db)

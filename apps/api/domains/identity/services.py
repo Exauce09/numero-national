@@ -277,6 +277,27 @@ async def delete_institution(db: AsyncSession, institution_id: UUID) -> None:
 # --- RBAC -------------------------------------------------------------------
 
 
+async def list_users(db: AsyncSession, *, limit: int = 100, offset: int = 0) -> list[User]:
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.roles).selectinload(Role.permissions))
+        .order_by(User.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    return list(result.scalars().all())
+
+
+async def set_user_active(db: AsyncSession, user_id: UUID, is_active: bool) -> User:
+    user = await get_user_by_id(db, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    user.is_active = is_active
+    await db.commit()
+    await db.refresh(user)
+    return await get_user_by_id(db, user_id)  # type: ignore[return-value]
+
+
 async def list_roles(db: AsyncSession) -> list[Role]:
     result = await db.execute(select(Role).order_by(Role.code))
     return list(result.scalars().all())

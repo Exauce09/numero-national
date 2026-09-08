@@ -149,3 +149,50 @@ async def declare_death(db: AsyncSession, data: DeathDeclare) -> DeathNotificati
     await db.commit()
     await db.refresh(row)
     return row
+
+
+async def list_facilities(db: AsyncSession, *, limit: int = 100) -> list[HealthFacility]:
+    from sqlalchemy import select
+
+    result = await db.execute(select(HealthFacility).limit(limit))
+    return list(result.scalars().all())
+
+
+async def health_national_stats(db: AsyncSession) -> dict[str, Any]:
+    """Aggregated anonymized health indicators (no PII)."""
+    from sqlalchemy import func, select
+
+    births = await db.scalar(select(func.count()).select_from(BirthNotification)) or 0
+    deaths = await db.scalar(select(func.count()).select_from(DeathNotification)) or 0
+    facilities = await db.scalar(select(func.count()).select_from(HealthFacility)) or 0
+    forwarded_births = (
+        await db.scalar(
+            select(func.count()).select_from(BirthNotification).where(
+                BirthNotification.status == NotificationStatus.FORWARDED_CIVIL.value
+            )
+        )
+        or 0
+    )
+    forwarded_deaths = (
+        await db.scalar(
+            select(func.count()).select_from(DeathNotification).where(
+                DeathNotification.status == NotificationStatus.FORWARDED_CIVIL.value
+            )
+        )
+        or 0
+    )
+    return {
+        "pii_policy": "anonymized_aggregates_only",
+        "facilities_count": int(facilities),
+        "birth_notifications": int(births),
+        "death_notifications": int(deaths),
+        "births_forwarded_to_civil": int(forwarded_births),
+        "deaths_forwarded_to_civil": int(forwarded_deaths),
+        "metrics": [
+            {"key": "health.facilities", "value": int(facilities)},
+            {"key": "health.birth_notifications", "value": int(births)},
+            {"key": "health.death_notifications", "value": int(deaths)},
+            {"key": "health.births_forwarded_civil", "value": int(forwarded_births)},
+            {"key": "health.deaths_forwarded_civil", "value": int(forwarded_deaths)},
+        ],
+    }

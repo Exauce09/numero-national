@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.core.config import Settings, get_settings
@@ -314,6 +314,50 @@ async def delete_institution(
 
 
 # --- RBAC -------------------------------------------------------------------
+
+
+@rbac_router.get(
+    "/users",
+    response_model=list[UserMe],
+    dependencies=[Depends(require_permissions("users:manage"))],
+)
+async def list_users(
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+) -> list[UserMe]:
+    await seed_roles_and_permissions(db)
+    users = await identity_services.list_users(db, limit=limit, offset=offset)
+    return [identity_services.user_to_me(u) for u in users]
+
+
+@rbac_router.patch(
+    "/users/{user_id}/active",
+    response_model=UserMe,
+    dependencies=[Depends(require_permissions("users:manage"))],
+)
+async def set_user_active(
+    user_id: UUID,
+    request: Request,
+    is_active: bool = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> UserMe:
+    user = await identity_services.set_user_active(db, user_id, is_active)
+    ip, device = _client_meta(request)
+    await write_audit(
+        db,
+        actor_id=current_user.id,
+        institution_id=current_user.institution_id,
+        action="user.active.set",
+        resource_type="user",
+        resource_id=str(user.id),
+        ip=ip,
+        device=device,
+        result="success",
+        new_value={"is_active": is_active},
+    )
+    return identity_services.user_to_me(user)
 
 
 @rbac_router.get(
