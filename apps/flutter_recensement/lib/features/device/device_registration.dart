@@ -1,10 +1,6 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:uuid/uuid.dart';
 
-import '../../core/config.dart';
+import '../../core/auth_service.dart';
 import '../../core/secure_storage.dart';
 
 class DeviceRegistrationScreen extends StatefulWidget {
@@ -15,7 +11,9 @@ class DeviceRegistrationScreen extends StatefulWidget {
 }
 
 class _DeviceRegistrationScreenState extends State<DeviceRegistrationScreen> {
+  final _auth = AuthService();
   String? _deviceUid;
+  String? _userEmail;
   String? _status;
   bool _busy = false;
 
@@ -27,7 +25,11 @@ class _DeviceRegistrationScreenState extends State<DeviceRegistrationScreen> {
 
   Future<void> _load() async {
     final uid = await SecureStore.instance.deviceUid;
-    setState(() => _deviceUid = uid);
+    final email = await SecureStore.instance.userEmail;
+    setState(() {
+      _deviceUid = uid;
+      _userEmail = email;
+    });
   }
 
   Future<void> _register() async {
@@ -35,31 +37,14 @@ class _DeviceRegistrationScreenState extends State<DeviceRegistrationScreen> {
       _busy = true;
       _status = null;
     });
-    final uid = _deviceUid ?? const Uuid().v4();
     try {
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/census/devices/register');
-      final res = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'device_uid': uid,
-          'platform': 'android',
-          'app_version': AppConfig.appVersion,
-        }),
-      );
-      await SecureStore.instance.saveDeviceUid(uid);
+      final uid = await _auth.ensureDeviceRegistered();
       setState(() {
         _deviceUid = uid;
-        _status = res.statusCode >= 200 && res.statusCode < 300
-            ? 'Appareil enregistré (${res.statusCode})'
-            : 'Réponse serveur ${res.statusCode} — UID conservé localement';
+        _status = 'Appareil enregistré auprès du serveur (ou UID local conservé).';
       });
     } catch (e) {
-      await SecureStore.instance.saveDeviceUid(uid);
-      setState(() {
-        _deviceUid = uid;
-        _status = 'Hors ligne — UID local conservé ($e)';
-      });
+      setState(() => _status = 'Échec: $e');
     } finally {
       setState(() => _busy = false);
     }
@@ -72,6 +57,12 @@ class _DeviceRegistrationScreenState extends State<DeviceRegistrationScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (_userEmail != null) ...[
+            Text('Agent', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(_userEmail!),
+            const SizedBox(height: 16),
+          ],
           Text('Identifiant appareil', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           SelectableText(_deviceUid ?? 'Non enregistré'),

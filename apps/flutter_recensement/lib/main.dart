@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'auth/login_screen.dart';
+import 'core/auth_service.dart';
 import 'core/theme.dart';
 import 'features/census/campaigns_screen.dart';
 import 'features/census/stats_screen.dart';
@@ -43,6 +44,16 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
   final _sync = SyncEngine();
+  final _auth = AuthService();
+
+  Future<void> _logout() async {
+    await _auth.logout();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (_) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +77,11 @@ class _HomeShellState extends State<HomeShell> {
               }
             },
             icon: const Icon(Icons.sync),
+          ),
+          IconButton(
+            tooltip: 'Déconnexion',
+            onPressed: _logout,
+            icon: const Icon(Icons.logout),
           ),
         ],
       ),

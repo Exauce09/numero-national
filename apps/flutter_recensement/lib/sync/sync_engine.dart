@@ -1,27 +1,30 @@
 import 'dart:convert';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:http/http.dart' as http;
+import 'package:sqflite/sqflite.dart';
 
-import '../core/config.dart';
+import '../core/api_client.dart';
 import '../core/secure_storage.dart';
 import 'conflict_manager.dart';
 import 'local_database.dart';
 import 'sync_queue.dart';
 
-/// Coordinates connectivity-aware push/pull against `/api/v1/census/sync/*`.
+/// Coordinates connectivity-aware push/pull against `/census/sync/*`.
 class SyncEngine {
   SyncEngine({
     SyncQueue? queue,
     LocalDatabase? db,
-    http.Client? client,
+    ApiClient? api,
+    SecureStore? store,
   })  : _queue = queue ?? SyncQueue(),
         _db = db ?? LocalDatabase.instance,
-        _client = client ?? http.Client();
+        _api = api ?? ApiClient(),
+        _store = store ?? SecureStore.instance;
 
   final SyncQueue _queue;
   final LocalDatabase _db;
-  final http.Client _client;
+  final ApiClient _api;
+  final SecureStore _store;
 
   Future<bool> get isOnline async {
     final result = await Connectivity().checkConnectivity();
@@ -32,10 +35,21 @@ class SyncEngine {
     if (!await isOnline) {
       return 'Hors ligne — sync reportée.';
     }
-    final deviceUid = await SecureStore.instance.deviceUid ?? 'unregistered-device';
+
+    final token = await _store.accessToken;
+    if (token == null || token.isEmpty) {
+      return 'Non authentifié — reconnectez-vous.';
+    }
+
+    final deviceUid = await _store.deviceUid ?? 'unregistered-device';
+    final agentUserId = await _store.userId;
     final pending = await _queue.pending();
     if (pending.isEmpty && campaignId == null) {
-      return 'Rien à synchroniser.';
+      final cached = await _db.db.query('campaigns_cache', limit: 1);
+      if (cached.isEmpty) {
+        return 'Rien à synchroniser.';
+      }
+      campaignId = cached.first['id']?.toString();
     }
 
     final items = pending
@@ -59,24 +73,28 @@ class SyncEngine {
 
     try {
       if (items.isNotEmpty) {
-        final pushUri = Uri.parse('${AppConfig.apiBaseUrl}/census/sync/push');
-        final pushRes = await _client.post(
-          pushUri,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'device_uid': deviceUid,
-            'campaign_id': cid,
-            'items': items,
-          }),
-        );
+        final pushBody = <String, dynamic>{
+          'device_uid': deviceUid,
+          'campaign_id': cid,
+          'items': items,
+        };
+        if (agentUserId != null && agentUserId.isNotEmpty) {
+          pushBody['agent_user_id'] = agentUserId;
+        }
+
+        final pushRes = await _api.post('/census/sync/push', body: pushBody);
+        if (pushRes.statusCode == 401) {
+          return 'Session expirée — reconnectez-vous.';
+        }
         if (pushRes.statusCode >= 200 && pushRes.statusCode < 300) {
-          final body = jsonDecode(pushRes.body) as Map<String, dynamic>;
+          final body = _api.decodeMap(pushRes);
           final details = (body['details'] as List?) ?? [];
           for (var i = 0; i < pending.length && i < details.length; i++) {
             final detail = details[i] as Map<String, dynamic>;
             final status = detail['status']?.toString() ?? '';
             if (status == 'ACCEPTED') {
               await _queue.remove(pending[i]['id'] as int);
+              await _markSynced(pending[i]['local_id'] as String);
             } else if (status == 'CONFLICT') {
               await _markConflict(pending[i]['local_id'] as String);
               await _queue.remove(pending[i]['id'] as int);
@@ -84,24 +102,27 @@ class SyncEngine {
               await _queue.bumpAttempts(pending[i]['id'] as int);
             }
           }
+        } else {
+          return 'Échec push (${pushRes.statusCode})';
         }
       }
 
-      final pullUri = Uri.parse('${AppConfig.apiBaseUrl}/census/sync/pull');
-      final pullRes = await _client.post(
-        pullUri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'device_uid': deviceUid,
-          'campaign_id': cid,
-        }),
-      );
+      final pullBody = <String, dynamic>{
+        'device_uid': deviceUid,
+        'campaign_id': cid,
+      };
+      final pullRes = await _api.post('/census/sync/pull', body: pullBody);
+      if (pullRes.statusCode == 401) {
+        return 'Session expirée — reconnectez-vous.';
+      }
       if (pullRes.statusCode >= 200 && pullRes.statusCode < 300) {
-        final body = jsonDecode(pullRes.body) as Map<String, dynamic>;
+        final body = _api.decodeMap(pullRes);
         await _applyPull(body);
       }
 
       return 'Synchronisation terminée (${items.length} envois).';
+    } on ApiException catch (e) {
+      return 'Échec sync: ${e.message}';
     } catch (e) {
       return 'Échec sync: $e';
     }
@@ -111,6 +132,15 @@ class SyncEngine {
     await _db.db.update(
       'census_records',
       {'status': 'CONFLICT'},
+      where: 'local_id = ?',
+      whereArgs: [localId],
+    );
+  }
+
+  Future<void> _markSynced(String localId) async {
+    await _db.db.update(
+      'census_records',
+      {'status': 'SYNCED'},
       where: 'local_id = ?',
       whereArgs: [localId],
     );
@@ -162,10 +192,28 @@ class SyncEngine {
             where: 'local_id = ?',
             whereArgs: [localId],
           );
-        } else if (outcome == ConflictOutcome.localWins) {
-          // keep local; will re-push
         }
       }
+    }
+
+    final campaigns = (body['campaigns'] as List?) ?? [];
+    if (campaigns.isNotEmpty) {
+      final batch = _db.db.batch();
+      for (final raw in campaigns) {
+        final c = Map<String, dynamic>.from(raw as Map);
+        batch.insert(
+          'campaigns_cache',
+          {
+            'id': c['id'].toString(),
+            'code': c['code']?.toString() ?? '',
+            'name': c['name']?.toString() ?? '',
+            'status': c['status']?.toString() ?? '',
+            'payload': jsonEncode(c),
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
     }
   }
 }

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../auth/offline_auth_policy.dart';
+import '../core/api_client.dart';
+import '../core/auth_service.dart';
 import '../core/secure_storage.dart';
 
-/// Simple agent login screen. Online login stores tokens; offline continues
-/// within [OfflineAuthPolicy] grace window.
+/// Agent login: online JWT against API; offline within [OfflineAuthPolicy] window.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -16,8 +17,22 @@ class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _policy = OfflineAuthPolicy();
+  final _auth = AuthService();
   bool _busy = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _prefillEmail();
+  }
+
+  Future<void> _prefillEmail() async {
+    final email = await SecureStore.instance.userEmail;
+    if (email != null && email.isNotEmpty && mounted) {
+      _email.text = email;
+    }
+  }
 
   Future<void> _submit() async {
     setState(() {
@@ -25,21 +40,25 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
-      // MVP: accept any non-empty credentials and store a local session marker.
-      // Wire to POST /api/v1/auth/login when IAM phase is deployed.
-      if (_email.text.isEmpty || _password.text.isEmpty) {
-        setState(() => _error = 'Identifiants requis');
+      final email = _email.text.trim();
+      final password = _password.text;
+      if (email.isEmpty || password.isEmpty) {
+        setState(() => _error = 'Email et mot de passe requis');
         return;
       }
-      await SecureStore.instance.saveTokens(
-        access: 'local-dev-access',
-        refresh: 'local-dev-refresh',
-      );
+
+      await _auth.login(email, password);
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed('/home');
+    } on ApiException catch (e) {
+      // Offline fallback: existing session still valid.
+      if (await _policy.mayCollect() && mounted) {
+        Navigator.of(context).pushReplacementNamed('/home');
+        return;
+      }
+      setState(() => _error = e.message);
     } catch (e) {
-      final offlineOk = await _policy.canWorkOffline();
-      if (offlineOk && mounted) {
+      if (await _policy.mayCollect() && mounted) {
         Navigator.of(context).pushReplacementNamed('/home');
         return;
       }
@@ -54,8 +73,15 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed('/home');
     } else {
-      setState(() => _error = 'Session hors-ligne expirée — reconnectez-vous.');
+      setState(() => _error = 'Session hors-ligne expirée — reconnectez-vous en ligne.');
     }
+  }
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
   }
 
   @override
@@ -97,8 +123,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 28),
                       TextField(
                         controller: _email,
+                        keyboardType: TextInputType.emailAddress,
+                        autocorrect: false,
                         decoration: const InputDecoration(
-                          labelText: "Nom d'utilisateur",
+                          labelText: 'Email agent',
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -107,9 +135,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         controller: _password,
                         obscureText: true,
                         decoration: const InputDecoration(
-                          labelText: 'Mot de Passe',
+                          labelText: 'Mot de passe',
                           border: OutlineInputBorder(),
                         ),
+                        onSubmitted: (_) => _busy ? null : _submit(),
                       ),
                       if (_error != null) ...[
                         const SizedBox(height: 12),

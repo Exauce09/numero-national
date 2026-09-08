@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/api_client.dart';
+import '../../core/secure_storage.dart';
 import '../../sync/local_database.dart';
 
 class StatsScreen extends StatefulWidget {
@@ -14,6 +16,10 @@ class _StatsScreenState extends State<StatsScreen> {
   int records = 0;
   int queued = 0;
   int conflicts = 0;
+  int? serverHouseholds;
+  int? serverRecords;
+  int? serverSynced;
+  String? serverError;
 
   @override
   void initState() {
@@ -30,11 +36,39 @@ class _StatsScreenState extends State<StatsScreen> {
           await db.rawQuery("SELECT COUNT(*) AS c FROM census_records WHERE status = 'CONFLICT'"),
         ) ??
         0;
+
+    int? sHh;
+    int? sRec;
+    int? sSynced;
+    String? err;
+    final userId = await SecureStore.instance.userId;
+    if (userId != null && userId.isNotEmpty) {
+      try {
+        final api = ApiClient();
+        final res = await api.get('/census/agents/$userId/stats');
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          final body = api.decodeMap(res);
+          sHh = (body['households_collected'] as num?)?.toInt();
+          sRec = (body['records_collected'] as num?)?.toInt();
+          sSynced = (body['synced_records'] as num?)?.toInt();
+        } else {
+          err = 'Stats serveur ${res.statusCode}';
+        }
+      } catch (e) {
+        err = 'Stats serveur indisponibles';
+      }
+    }
+
+    if (!mounted) return;
     setState(() {
       households = hh;
       records = rec;
       queued = q;
       conflicts = conf;
+      serverHouseholds = sHh;
+      serverRecords = sRec;
+      serverSynced = sSynced;
+      serverError = err;
     });
   }
 
@@ -45,10 +79,21 @@ class _StatsScreenState extends State<StatsScreen> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Text('Local', style: Theme.of(context).textTheme.titleMedium),
           _tile(context, 'Ménages locaux', households),
           _tile(context, 'Fiches citoyens', records),
           _tile(context, 'File de sync', queued),
           _tile(context, 'Conflits', conflicts),
+          const SizedBox(height: 16),
+          Text('Serveur', style: Theme.of(context).textTheme.titleMedium),
+          if (serverError != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(serverError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            ),
+          _tile(context, 'Ménages (agent)', serverHouseholds ?? 0),
+          _tile(context, 'Fiches (agent)', serverRecords ?? 0),
+          _tile(context, 'Fiches synchronisées', serverSynced ?? 0),
         ],
       ),
     );

@@ -11,6 +11,8 @@ class SecureStore {
   static const _kRefresh = 'refresh_token';
   static const _kDevice = 'device_uid';
   static const _kLastAuth = 'last_auth_at';
+  static const _kUserId = 'user_id';
+  static const _kUserEmail = 'user_email';
 
   Future<void> saveTokens({required String access, required String refresh}) async {
     await _storage.write(key: _kAccess, value: access);
@@ -18,9 +20,16 @@ class SecureStore {
     await _storage.write(key: _kLastAuth, value: DateTime.now().toUtc().toIso8601String());
   }
 
+  Future<void> saveUser({required String id, required String email}) async {
+    await _storage.write(key: _kUserId, value: id);
+    await _storage.write(key: _kUserEmail, value: email);
+  }
+
   Future<String?> get accessToken => _storage.read(key: _kAccess);
   Future<String?> get refreshToken => _storage.read(key: _kRefresh);
   Future<String?> get lastAuthAt => _storage.read(key: _kLastAuth);
+  Future<String?> get userId => _storage.read(key: _kUserId);
+  Future<String?> get userEmail => _storage.read(key: _kUserEmail);
 
   Future<void> saveDeviceUid(String uid) => _storage.write(key: _kDevice, value: uid);
   Future<String?> get deviceUid => _storage.read(key: _kDevice);
@@ -28,5 +37,13 @@ class SecureStore {
   Future<void> clearSession() async {
     await _storage.delete(key: _kAccess);
     await _storage.delete(key: _kRefresh);
+    await _storage.delete(key: _kUserId);
+    await _storage.delete(key: _kUserEmail);
+  }
+
+  Future<void> clearAll() async {
+    await clearSession();
+    await _storage.delete(key: _kDevice);
+    await _storage.delete(key: _kLastAuth);
   }
 }

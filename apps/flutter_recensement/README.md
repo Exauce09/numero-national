@@ -9,61 +9,55 @@ connexion permanente**, avec synchronisation différée vers l’API nationale.
 ┌─────────────────────────────────────────────────────────┐
 │  UI (campaigns / households / citizens / stats)         │
 ├─────────────────────────────────────────────────────────┤
-│  Auth policy (offline login window + secure storage)    │
+│  Auth JWT (login API) + offline grace 72h               │
 ├─────────────────────────────────────────────────────────┤
 │  Sync engine                                            │
 │   ├─ local SQLite (sqflite)                             │
 │   ├─ sync queue (outbox)                                │
 │   └─ conflict manager (version / last-write rules)      │
 ├─────────────────────────────────────────────────────────┤
-│  connectivity_plus → HTTP push/pull `/api/v1/census`    │
+│  Bearer HTTP → `/api/v1/auth/*` + `/api/v1/census/*`    │
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Principes
-
-1. **Écriture locale d’abord** — ménages et fiches citoyens sont persistés dans
-   SQLite immédiatement, même hors ligne.
-2. **File d’attente (outbox)** — chaque mutation produit un item de sync avec
-   `local_id` + `version`.
-3. **Push / Pull** — dès que `connectivity_plus` signale une connexion, le
-   `SyncEngine` appelle `POST /api/v1/census/sync/push` puis `sync/pull`.
-4. **Conflits** — si le serveur a une version supérieure, le `ConflictManager`
-   marque l’enregistrement `CONFLICT` pour revue agent / superviseur.
-5. **Secrets** — jetons et device credentials dans `flutter_secure_storage`,
-   jamais en clair dans SQLite.
-6. **Device ID** — enregistrement unique via `/api/v1/census/devices/register`.
-
-### Lancer (avec Flutter SDK)
-
-```bash
-cd apps/flutter_recensement
-flutter pub get
-flutter run
-```
-
-**Téléphone Android branché (Windows) :**
+### Identifiants démo (après seed)
 
 ```powershell
-# Débogage USB activé — API Docker sur le PC
-.\scripts\run-android-device.ps1
-# ou APK seul :
-.\scripts\build-android-apk.ps1 -ApiHost 192.168.x.x
+py -3 scripts/seed_census_agent.py
 ```
 
-L’app pointe vers `API_BASE_URL` (IP LAN du PC + `:8000/api/v1`).  
-**iOS** : build uniquement sur macOS (Xcode) — pas possible depuis Windows.
+| Champ | Valeur |
+|-------|--------|
+| Email | `agent.recensement@example.gov` |
+| Mot de passe | `CensusAgent123!` |
 
-Sans SDK Flutter, ce dépôt fournit le scaffold sous `lib/` + `android/`.
+### Lancer sur téléphone
+
+```powershell
+# API Docker + seed
+docker compose up -d
+py -3 scripts/seed_census_agent.py
+
+# Debug (hot reload)
+.\scripts\run-android-device.ps1
+
+# APK release signé + install
+.\scripts\build-android-apk.ps1 -Install
+```
+
+Signature locale : copier `android/key.properties.example` → `android/key.properties`
+(ne pas committer le `.jks` ni `key.properties`).
+
+L’app pointe vers `API_BASE_URL` (IP LAN du PC + `:8000/api/v1`).  
+**iOS** : build uniquement sur macOS (Xcode).
 
 ### API backend
 
 | Endpoint | Rôle |
 |----------|------|
-| `GET/POST /api/v1/census/campaigns` | CRUD campagnes |
+| `POST /api/v1/auth/login` | JWT agent |
+| `GET /api/v1/census/campaigns` | Campagnes |
 | `POST /api/v1/census/sync/push` | Envoi outbox |
 | `POST /api/v1/census/sync/pull` | Téléchargement deltas |
 | `GET /api/v1/census/agents/{id}/stats` | Stats agent |
 | `POST /api/v1/census/devices/register` | Device UID |
-
-Configurer `lib/core/config.dart` (`apiBaseUrl`) selon l’environnement.
