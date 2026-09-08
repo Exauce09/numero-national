@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { clearSession, getSession } from "./auth";
 import AnomaliesPage from "./pages/AnomaliesPage";
 import CampaignsPage from "./pages/CampaignsPage";
@@ -21,31 +21,42 @@ function Shell() {
   }
 
   return (
-    <div className="shell">
-      <header className="top">
-        <div className="brand-block">
-          <img className="brand-logo" src="/logo-rdc.jpg" alt="RDC" />
-          <div className="brand">
-            ONIP
-            <small>E-GOUV · {session?.username ?? "Session"}</small>
-          </div>
+    <div className="page-wrapper">
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <img src="/logo-rdc.jpg" alt="RDC" />
+          <strong>ONIP</strong>
+          <span>E-GOUV</span>
         </div>
-        <nav>
-          <Link to="/">Vue nationale</Link>
-          <Link to="/campaigns">Campagnes</Link>
-          <Link to="/anomalies">Anomalies</Link>
-          <button type="button" className="btn-logout" onClick={logout}>
+        <nav className="sidebar-nav">
+          <NavLink to="/" end>
+            Vue nationale
+          </NavLink>
+          <NavLink to="/campaigns">Campagnes</NavLink>
+          <NavLink to="/anomalies">Anomalies</NavLink>
+        </nav>
+        <div className="sidebar-foot">
+          <button type="button" className="btn-logout" style={{ width: "100%" }} onClick={logout}>
             Déconnexion
           </button>
-        </nav>
-      </header>
-      <main>
-        <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/campaigns" element={<CampaignsPage />} />
-          <Route path="/anomalies" element={<AnomaliesPage />} />
-        </Routes>
-      </main>
+        </div>
+      </aside>
+
+      <div className="body-wrap">
+        <header className="topbar">
+          <h1 className="topbar-title">Tableau de bord ONIP</h1>
+          <div>
+            <span className="topbar-user">{session?.username}</span>
+          </div>
+        </header>
+        <main className="shell">
+          <Routes>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/campaigns" element={<CampaignsPage />} />
+            <Route path="/anomalies" element={<AnomaliesPage />} />
+          </Routes>
+        </main>
+      </div>
     </div>
   );
 }

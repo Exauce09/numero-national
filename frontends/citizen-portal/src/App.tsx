@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { clearSession, getSession } from "./auth";
 import AccessLogPage from "./pages/AccessLog";
 import CardPage from "./pages/Card";
@@ -22,34 +22,43 @@ function Shell() {
   }
 
   return (
-    <div className="shell">
-      <header className="top">
-        <div className="brand-block">
-          <img className="brand-logo" src="/logo-rdc.jpg" alt="RDC" />
-          <div className="brand">
-            Numéro National
-            <small>E-GOUV · {session?.username ?? "Citoyen"}</small>
-          </div>
+    <div className="page-wrapper">
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <img src="/logo-rdc.jpg" alt="RDC" />
+          <strong>Numéro National</strong>
+          <span>E-GOUV · Citoyen</span>
         </div>
-        <nav>
-          <Link to="/identity">Identité</Link>
-          <Link to="/card">Carte</Link>
-          <Link to="/documents">Documents</Link>
-          <Link to="/access-log">Accès</Link>
-          <button type="button" className="btn-logout" onClick={logout}>
+        <nav className="sidebar-nav">
+          <NavLink to="/identity">Identité</NavLink>
+          <NavLink to="/card">Carte</NavLink>
+          <NavLink to="/documents">Documents</NavLink>
+          <NavLink to="/access-log">Accès</NavLink>
+        </nav>
+        <div className="sidebar-foot">
+          <button type="button" className="btn-logout" style={{ width: "100%" }} onClick={logout}>
             Déconnexion
           </button>
-        </nav>
-      </header>
-      <main>
-        <Routes>
-          <Route path="/" element={<Navigate to="/identity" replace />} />
-          <Route path="/identity" element={<IdentityPage />} />
-          <Route path="/card" element={<CardPage />} />
-          <Route path="/documents" element={<DocumentsPage />} />
-          <Route path="/access-log" element={<AccessLogPage />} />
-        </Routes>
-      </main>
+        </div>
+      </aside>
+
+      <div className="body-wrap">
+        <header className="topbar">
+          <h1 className="topbar-title">Portail citoyen</h1>
+          <div>
+            <span className="topbar-user">{session?.username}</span>
+          </div>
+        </header>
+        <main className="shell">
+          <Routes>
+            <Route path="/" element={<Navigate to="/identity" replace />} />
+            <Route path="/identity" element={<IdentityPage />} />
+            <Route path="/card" element={<CardPage />} />
+            <Route path="/documents" element={<DocumentsPage />} />
+            <Route path="/access-log" element={<AccessLogPage />} />
+          </Routes>
+        </main>
+      </div>
     </div>
   );
 }
