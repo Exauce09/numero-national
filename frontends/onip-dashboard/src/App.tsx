@@ -27,7 +27,7 @@ function Shell() {
           <img className="brand-logo" src="/logo-rdc.jpg" alt="RDC" />
           <div className="brand">
             ONIP
-            <small>E-GOUV · {session?.accountType ?? "Session"}</small>
+            <small>E-GOUV · {session?.username ?? "Session"}</small>
           </div>
         </div>
         <nav>

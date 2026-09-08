@@ -1,17 +1,10 @@
 import { FormEvent, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { getSession, login } from "../auth";
-
-const ACCOUNT_TYPES = [
-  { value: "ONIP_OPS", label: "ONIP — Opérations" },
-  { value: "ADMIN", label: "Direction de la Population" },
-  { value: "CENTRAL_ADMIN", label: "Administration centrale" },
-];
+import { DEMO_PASSWORD, DEMO_USER, getSession, login } from "../auth";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const existing = getSession();
-  const [accountType, setAccountType] = useState(ACCOUNT_TYPES[0].value);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +17,7 @@ export default function LoginPage() {
     setError(null);
     setBusy(true);
     try {
-      await login(username, password, accountType);
+      await login(username, password);
       navigate("/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Connexion impossible.");
@@ -41,22 +34,6 @@ export default function LoginPage() {
         <p className="login-subtitle">Office National d&apos;Identification de la Population</p>
         <form onSubmit={onSubmit}>
           {error ? <div className="login-error">{error}</div> : null}
-          <label className="form-label" htmlFor="accountType">
-            Type de compte
-          </label>
-          <select
-            id="accountType"
-            className="form-control"
-            name="type"
-            value={accountType}
-            onChange={(ev) => setAccountType(ev.target.value)}
-          >
-            {ACCOUNT_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
 
           <label className="form-label" htmlFor="username">
             Nom d&apos;utilisateur
@@ -94,6 +71,9 @@ export default function LoginPage() {
             {busy ? "Connexion…" : "Se connecter"}
           </button>
         </form>
+        <p className="login-subtitle" style={{ marginTop: "1.25rem", marginBottom: 0 }}>
+          Démo : <strong>{DEMO_USER}</strong> / <strong>{DEMO_PASSWORD}</strong>
+        </p>
       </div>
     </div>
   );

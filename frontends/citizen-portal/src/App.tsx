@@ -28,7 +28,7 @@ function Shell() {
           <img className="brand-logo" src="/logo-rdc.jpg" alt="RDC" />
           <div className="brand">
             Numéro National
-            <small>E-GOUV · {session?.accountType ?? "Citoyen"}</small>
+            <small>E-GOUV · {session?.username ?? "Citoyen"}</small>
           </div>
         </div>
         <nav>

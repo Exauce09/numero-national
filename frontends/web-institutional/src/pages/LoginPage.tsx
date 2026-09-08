@@ -1,37 +1,24 @@
 import { FormEvent, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { getSession, homeForAccountType, login } from "../auth";
-
-const ACCOUNT_TYPES = [
-  { value: "COMMUNE", label: "Communale" },
-  { value: "MINISTERE", label: "Ministère" },
-  { value: "AUTRES", label: "Autre Organisation" },
-  { value: "CIVIL", label: "État civil" },
-  { value: "AGENT", label: "Agent de Recensement" },
-  { value: "ADMIN", label: "Direction de la Population" },
-  { value: "PRESIDENCY", label: "Présidence" },
-  { value: "PRIMATURE", label: "Primature" },
-  { value: "INTERIOR", label: "Intérieur" },
-];
+import { DEMO_PASSWORD, DEMO_USER, getSession, login } from "../auth";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const existing = getSession();
-  const [accountType, setAccountType] = useState(ACCOUNT_TYPES[0].value);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (existing) return <Navigate to={homeForAccountType(existing.accountType)} replace />;
+  if (existing) return <Navigate to="/" replace />;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setBusy(true);
     try {
-      const session = await login(username, password, accountType);
-      navigate(homeForAccountType(session.accountType), { replace: true });
+      await login(username, password);
+      navigate("/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Connexion impossible.");
     } finally {
@@ -47,22 +34,6 @@ export default function LoginPage() {
         <p className="login-subtitle">Identité Nationale · Portails institutionnels</p>
         <form onSubmit={onSubmit}>
           {error ? <div className="login-error">{error}</div> : null}
-          <label className="form-label" htmlFor="accountType">
-            Type de compte
-          </label>
-          <select
-            id="accountType"
-            className="form-control"
-            name="type"
-            value={accountType}
-            onChange={(ev) => setAccountType(ev.target.value)}
-          >
-            {ACCOUNT_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
 
           <label className="form-label" htmlFor="username">
             Nom d&apos;utilisateur
@@ -100,6 +71,9 @@ export default function LoginPage() {
             {busy ? "Connexion…" : "Se connecter"}
           </button>
         </form>
+        <p className="login-subtitle" style={{ marginTop: "1.25rem", marginBottom: 0 }}>
+          Démo : <strong>{DEMO_USER}</strong> / <strong>{DEMO_PASSWORD}</strong>
+        </p>
       </div>
     </div>
   );
