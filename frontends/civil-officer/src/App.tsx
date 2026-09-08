@@ -27,6 +27,13 @@ import DivorcesPage from "./pages/DivorcesPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import ActsPage from "./pages/ActsPage";
 import SearchPage from "./pages/SearchPage";
+import ManageDecesPage from "./pages/ManageDecesPage";
+import ManageDivorcePage from "./pages/ManageDivorcePage";
+import ManageAdoptionPage from "./pages/ManageAdoptionPage";
+import ManageDeplacementPage from "./pages/ManageDeplacementPage";
+import ManageDocumentPage from "./pages/ManageDocumentPage";
+import ManageMariagePage from "./pages/ManageMariagePage";
+import ManageNaissancePage from "./pages/ManageNaissancePage";
 import TerritoryPage from "./pages/TerritoryPage";
 import {
   IconBaby,
@@ -162,28 +169,28 @@ function Shell() {
           <NavLink to="/newborns">
             <IconBaby size={18} /> Nouveaux-nés
           </NavLink>
-          <NavLink to="/births">
+          <NavLink to="/manage/naissance">
             <IconBaby size={18} /> Naissances
           </NavLink>
           <NavLink to="/census">
             <IconClipboard size={18} /> Recensement
           </NavLink>
-          <NavLink to="/deaths">
+          <NavLink to="/manage/deces">
             <IconCross size={18} /> Décès
           </NavLink>
-          <NavLink to="/marriages">
+          <NavLink to="/manage/mariage">
             <IconRing size={18} /> Mariages
           </NavLink>
-          <NavLink to="/adoptions">
+          <NavLink to="/manage/adoption">
             <IconHome size={18} /> Adoption
           </NavLink>
-          <NavLink to="/displacements">
+          <NavLink to="/manage/deplacement">
             <IconCar size={18} /> Déplacement
           </NavLink>
-          <NavLink to="/divorces">
+          <NavLink to="/manage/divorce">
             <IconSplit size={18} /> Divorce
           </NavLink>
-          <NavLink to="/documents">
+          <NavLink to="/manage/document">
             <IconFile size={18} /> Documents
           </NavLink>
           <NavLink to="/acts">
@@ -275,6 +282,13 @@ function Shell() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/population" element={<PopulationPage />} />
             <Route path="/newborns" element={<NewbornsPage />} />
+            <Route path="/manage/deces" element={<ManageDecesPage />} />
+            <Route path="/manage/divorce" element={<ManageDivorcePage />} />
+            <Route path="/manage/adoption" element={<ManageAdoptionPage />} />
+            <Route path="/manage/deplacement" element={<ManageDeplacementPage />} />
+            <Route path="/manage/document" element={<ManageDocumentPage />} />
+            <Route path="/manage/mariage" element={<ManageMariagePage />} />
+            <Route path="/manage/naissance" element={<ManageNaissancePage />} />
             <Route path="/births" element={<BirthsPage />} />
             <Route path="/census" element={<CensusPage />} />
             <Route path="/deaths" element={<DeathsPage />} />

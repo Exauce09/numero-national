@@ -92,7 +92,7 @@ export default function DashboardPage() {
       value: acts.filter((a) => a.type === "BIRTH").length,
       subtitle: "Actes de naissance",
       tone: "success",
-      href: "/births",
+      href: "/manage/naissance",
       icon: <IconBaby size={26} />,
     },
     {
@@ -101,7 +101,7 @@ export default function DashboardPage() {
       value: acts.filter((a) => a.type === "DEATH").length,
       subtitle: "Actes de décès",
       tone: "danger",
-      href: "/deaths",
+      href: "/manage/deces",
       icon: <IconCross size={26} />,
     },
     {
@@ -110,7 +110,7 @@ export default function DashboardPage() {
       value: acts.filter((a) => a.type === "MARRIAGE").length,
       subtitle: "Unions",
       tone: "warning",
-      href: "/marriages",
+      href: "/manage/mariage",
       icon: <IconRing size={26} />,
     },
     {
@@ -119,7 +119,7 @@ export default function DashboardPage() {
       value: acts.filter((a) => a.type === "DIVORCE").length,
       subtitle: "Dissolutions",
       tone: "secondary",
-      href: "/divorces",
+      href: "/manage/divorce",
       icon: <IconSplit size={26} />,
     },
     {
@@ -128,7 +128,7 @@ export default function DashboardPage() {
       value: acts.filter((a) => a.type === "ADOPTION").length,
       subtitle: "Actes d'adoption",
       tone: "indigo",
-      href: "/adoptions",
+      href: "/manage/adoption",
       icon: <IconUsers size={26} />,
     },
     {
@@ -137,7 +137,7 @@ export default function DashboardPage() {
       value: acts.filter((a) => a.type === "DISPLACEMENT").length,
       subtitle: "Mouvements",
       tone: "info",
-      href: "/displacements",
+      href: "/manage/deplacement",
       icon: <IconCar size={26} />,
     },
     {
@@ -155,7 +155,7 @@ export default function DashboardPage() {
       value: acts.filter((a) => a.type === "DOCUMENT").length,
       subtitle: "Pièces émises",
       tone: "secondary",
-      href: "/documents",
+      href: "/manage/document",
       icon: <IconFile size={26} />,
     },
   ];
