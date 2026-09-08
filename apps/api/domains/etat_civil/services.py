@@ -143,6 +143,23 @@ async def list_acts(
     return list((await db.execute(stmt)).scalars().all())
 
 
+async def list_declarations(
+    db: AsyncSession,
+    *,
+    status: str | None = None,
+    declaration_type: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[CivilDeclaration]:
+    stmt = select(CivilDeclaration).order_by(CivilDeclaration.created_at.desc())
+    if status:
+        stmt = stmt.where(CivilDeclaration.status == status)
+    if declaration_type:
+        stmt = stmt.where(CivilDeclaration.declaration_type == declaration_type)
+    stmt = stmt.limit(limit).offset(offset)
+    return list((await db.execute(stmt)).scalars().all())
+
+
 async def create_declaration(
     db: AsyncSession,
     data: DeclarationCreate,

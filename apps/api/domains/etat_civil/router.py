@@ -142,6 +142,26 @@ async def list_residence(
     return [ResidenceRead.model_validate(r) for r in rows]
 
 
+@router.get("/declarations", response_model=list[DeclarationRead])
+async def list_declarations(
+    status_filter: str | None = Query(None, alias="status"),
+    declaration_type: str | None = None,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    _: Principal = Depends(require_permissions(PERM_CIVIL_READ)),
+) -> list[DeclarationRead]:
+    """File d'attente des déclarations pour l'officier d'état civil."""
+    rows = await services.list_declarations(
+        db,
+        status=status_filter,
+        declaration_type=declaration_type,
+        limit=limit,
+        offset=offset,
+    )
+    return [DeclarationRead.model_validate(r) for r in rows]
+
+
 @router.post("/declarations", response_model=DeclarationRead, status_code=status.HTTP_201_CREATED)
 async def post_declaration(
     body: DeclarationCreate,

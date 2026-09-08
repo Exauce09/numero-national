@@ -1,0 +1,88 @@
+@import "../../shared/egouv.css";
+
+.form-grid {
+  display: grid;
+  gap: 0.85rem 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.form-grid .full {
+  grid-column: 1 / -1;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--egouv-line);
+}
+
+.data-table th {
+  color: var(--egouv-muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.toolbar .form-control {
+  margin-bottom: 0;
+  min-width: 160px;
+}
+
+.btn-secondary {
+  border: 1px solid var(--egouv-line);
+  background: #fff;
+  color: var(--egouv-ink);
+  border-radius: 8px;
+  padding: 0.65rem 1rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  border-color: var(--egouv-primary);
+  color: var(--egouv-primary);
+}
+
+.btn-sm {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.82rem;
+  width: auto;
+}
+
+.success-banner {
+  background: #e8f7ef;
+  color: #0f5132;
+  border: 1px solid #b7e4c7;
+  border-radius: 8px;
+  padding: 0.65rem 0.8rem;
+  margin-bottom: 1rem;
+  font-size: 0.88rem;
+}
+
+.page-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.25rem;
+}
+
+.page-lead {
+  margin: 0 0 1.25rem;
+  color: var(--egouv-muted);
+  font-size: 0.92rem;
+}
