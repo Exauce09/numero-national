@@ -15,6 +15,8 @@ import {
 } from "./prefs";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
+import PopulationPage from "./pages/PopulationPage";
+import NewbornsPage from "./pages/NewbornsPage";
 import BirthsPage from "./pages/BirthsPage";
 import CensusPage from "./pages/CensusPage";
 import DeathsPage from "./pages/DeathsPage";
@@ -26,6 +28,20 @@ import DocumentsPage from "./pages/DocumentsPage";
 import ActsPage from "./pages/ActsPage";
 import SearchPage from "./pages/SearchPage";
 import TerritoryPage from "./pages/TerritoryPage";
+import {
+  IconBaby,
+  IconCar,
+  IconClipboard,
+  IconCross,
+  IconDashboard,
+  IconFile,
+  IconHome,
+  IconMap,
+  IconRing,
+  IconSearch,
+  IconSplit,
+  IconUsers,
+} from "./components/Icons";
 
 function RequireAuth({ children }: { children: ReactNode }) {
   if (!getSession()) return <Navigate to="/login" replace />;
@@ -138,19 +154,47 @@ function Shell() {
         </div>
         <nav className="sidebar-nav">
           <NavLink to="/" end>
-            Tableau de bord
+            <IconDashboard size={18} /> Tableau de bord
           </NavLink>
-          <NavLink to="/births">Naissances</NavLink>
-          <NavLink to="/census">Recensement</NavLink>
-          <NavLink to="/deaths">Décès</NavLink>
-          <NavLink to="/marriages">Mariages</NavLink>
-          <NavLink to="/adoptions">Adoption</NavLink>
-          <NavLink to="/displacements">Déplacement</NavLink>
-          <NavLink to="/divorces">Divorce</NavLink>
-          <NavLink to="/documents">Documents</NavLink>
-          <NavLink to="/acts">Actes</NavLink>
-          <NavLink to="/territory">Territoire RDC</NavLink>
-          <NavLink to="/search">Recherche</NavLink>
+          <NavLink to="/population">
+            <IconUsers size={18} /> Population
+          </NavLink>
+          <NavLink to="/newborns">
+            <IconBaby size={18} /> Nouveaux-nés
+          </NavLink>
+          <NavLink to="/births">
+            <IconBaby size={18} /> Naissances
+          </NavLink>
+          <NavLink to="/census">
+            <IconClipboard size={18} /> Recensement
+          </NavLink>
+          <NavLink to="/deaths">
+            <IconCross size={18} /> Décès
+          </NavLink>
+          <NavLink to="/marriages">
+            <IconRing size={18} /> Mariages
+          </NavLink>
+          <NavLink to="/adoptions">
+            <IconHome size={18} /> Adoption
+          </NavLink>
+          <NavLink to="/displacements">
+            <IconCar size={18} /> Déplacement
+          </NavLink>
+          <NavLink to="/divorces">
+            <IconSplit size={18} /> Divorce
+          </NavLink>
+          <NavLink to="/documents">
+            <IconFile size={18} /> Documents
+          </NavLink>
+          <NavLink to="/acts">
+            <IconFile size={18} /> Actes
+          </NavLink>
+          <NavLink to="/territory">
+            <IconMap size={18} /> Territoire RDC
+          </NavLink>
+          <NavLink to="/search">
+            <IconSearch size={18} /> Recherche
+          </NavLink>
         </nav>
         <div className="sidebar-foot">
           <button type="button" className="btn-logout" style={{ width: "100%" }} onClick={logout}>
@@ -229,6 +273,8 @@ function Shell() {
         <main className="shell">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
+            <Route path="/population" element={<PopulationPage />} />
+            <Route path="/newborns" element={<NewbornsPage />} />
             <Route path="/births" element={<BirthsPage />} />
             <Route path="/census" element={<CensusPage />} />
             <Route path="/deaths" element={<DeathsPage />} />

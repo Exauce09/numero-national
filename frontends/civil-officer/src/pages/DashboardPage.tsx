@@ -1,404 +1,230 @@
+import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import ActPrintCard from "../components/ActPrintCard";
-import DataToolbar from "../components/DataToolbar";
+import { useNavigate } from "react-router-dom";
 import {
-  actTypeLabel,
-  ageDays,
-  getAct,
-  listActs,
-  listPersons,
-  type Act,
-  type ActType,
-} from "../registry";
+  IconBaby,
+  IconCar,
+  IconClipboard,
+  IconCross,
+  IconFile,
+  IconHeart,
+  IconRing,
+  IconSplit,
+  IconUsers,
+} from "../components/Icons";
+import { ageDays, listActs, listPersons } from "../registry";
 
-type StatKey =
-  | "PERSONS"
-  | "ACTS"
-  | "BIRTH"
-  | "DEATH"
-  | "MARRIAGE"
-  | "ADOPTION"
-  | "DISPLACEMENT"
-  | "DIVORCE"
-  | "CENSUS"
-  | "DOCUMENT"
-  | "NEWBORN_M"
-  | "NEWBORN_F";
+type Tone = "primary" | "success" | "danger" | "warning" | "info" | "secondary" | "pink" | "indigo";
 
-type StatCard = {
-  key: StatKey;
-  label: string;
+type DashItem = {
+  id: string;
+  title: string;
   value: number;
-  hint: string;
-  tone: string;
+  subtitle: string;
+  tone: Tone;
   href: string;
-  filterType?: ActType | "PERSONS" | "NEWBORN_M" | "NEWBORN_F";
-};
-
-const CREATE_LINKS: Record<string, string> = {
-  BIRTH: "/births",
-  DEATH: "/deaths",
-  CENSUS: "/census",
-  MARRIAGE: "/marriages",
-  ADOPTION: "/adoptions",
-  DISPLACEMENT: "/displacements",
-  DIVORCE: "/divorces",
-  DOCUMENT: "/documents",
+  icon: ReactNode;
 };
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const persons = listPersons();
   const acts = listActs();
-  const [viewAct, setViewAct] = useState<Act | null>(null);
-  const [detail, setDetail] = useState<StatCard | null>(null);
+  const [query, setQuery] = useState("");
 
   const newborn = useMemo(() => {
     const birthActs = listActs("BIRTH");
     const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
     let garcons = 0;
     let filles = 0;
-    const recentBirths: Act[] = [];
     for (const act of birthActs) {
       const dob = String(act.payload.date_naissance ?? "");
       const createdOk = new Date(act.created_at).getTime() >= cutoff;
       const ageOk = dob ? ageDays(dob) <= 90 : false;
       if (!createdOk && !ageOk) continue;
-      recentBirths.push(act);
       const sexe = String(act.payload.sexe ?? "").toUpperCase();
       if (sexe === "M") garcons += 1;
       else if (sexe === "F") filles += 1;
     }
-    return { garcons, filles, total: garcons + filles, recentBirths };
+    return { garcons, filles, total: garcons + filles };
   }, [acts.length]);
 
-  const cards: StatCard[] = [
+  const items: DashItem[] = [
     {
-      key: "PERSONS",
-      label: "Personnes",
+      id: "pop",
+      title: "Population",
       value: persons.length,
-      hint: "Registre communal",
-      tone: "tone-blue",
-      href: "/search",
-      filterType: "PERSONS",
+      subtitle: "Habitants enregistrés",
+      tone: "primary",
+      href: "/population",
+      icon: <IconUsers size={26} />,
     },
     {
-      key: "ACTS",
-      label: "Tous les actes",
-      value: acts.length,
-      hint: "État civil",
-      tone: "tone-indigo",
-      href: "/acts",
+      id: "ne",
+      title: "Nouveaux-nés",
+      value: newborn.total,
+      subtitle: "90 derniers jours",
+      tone: "success",
+      href: "/newborns",
+      icon: <IconBaby size={26} />,
     },
     {
-      key: "BIRTH",
-      label: "Naissances",
-      value: acts.filter((a) => a.type === "BIRTH").length,
-      hint: "Actes de naissance",
-      tone: "tone-green",
-      href: "/births",
-      filterType: "BIRTH",
-    },
-    {
-      key: "DEATH",
-      label: "Décès",
-      value: acts.filter((a) => a.type === "DEATH").length,
-      hint: "Actes de décès",
-      tone: "tone-red",
-      href: "/deaths",
-      filterType: "DEATH",
-    },
-    {
-      key: "MARRIAGE",
-      label: "Mariages",
-      value: acts.filter((a) => a.type === "MARRIAGE").length,
-      hint: "Unions enregistrées",
-      tone: "tone-pink",
-      href: "/marriages",
-      filterType: "MARRIAGE",
-    },
-    {
-      key: "ADOPTION",
-      label: "Adoptions",
-      value: acts.filter((a) => a.type === "ADOPTION").length,
-      hint: "Actes d'adoption",
-      tone: "tone-teal",
-      href: "/adoptions",
-      filterType: "ADOPTION",
-    },
-    {
-      key: "DISPLACEMENT",
-      label: "Déplacements",
-      value: acts.filter((a) => a.type === "DISPLACEMENT").length,
-      hint: "Mouvements",
-      tone: "tone-orange",
-      href: "/displacements",
-      filterType: "DISPLACEMENT",
-    },
-    {
-      key: "DIVORCE",
-      label: "Divorces",
-      value: acts.filter((a) => a.type === "DIVORCE").length,
-      hint: "Dissolutions",
-      tone: "tone-purple",
-      href: "/divorces",
-      filterType: "DIVORCE",
-    },
-    {
-      key: "CENSUS",
-      label: "Recensement",
-      value: acts.filter((a) => a.type === "CENSUS").length,
-      hint: "Fiches recensées",
-      tone: "tone-cyan",
-      href: "/census",
-      filterType: "CENSUS",
-    },
-    {
-      key: "DOCUMENT",
-      label: "Documents",
-      value: acts.filter((a) => a.type === "DOCUMENT").length,
-      hint: "Pièces émises",
-      tone: "tone-slate",
-      href: "/documents",
-      filterType: "DOCUMENT",
-    },
-    {
-      key: "NEWBORN_M",
-      label: "Nouveaux-nés (G)",
+      id: "ne-m",
+      title: "Nouveaux-nés (G)",
       value: newborn.garcons,
-      hint: "90 derniers jours",
-      tone: "tone-sky",
-      href: "/births",
-      filterType: "NEWBORN_M",
+      subtitle: "Garçons",
+      tone: "info",
+      href: "/newborns?sexe=M",
+      icon: <IconBaby size={26} />,
     },
     {
-      key: "NEWBORN_F",
-      label: "Nouveaux-nés (F)",
+      id: "ne-f",
+      title: "Nouveaux-nés (F)",
       value: newborn.filles,
-      hint: "90 derniers jours",
-      tone: "tone-rose",
+      subtitle: "Filles",
+      tone: "pink",
+      href: "/newborns?sexe=F",
+      icon: <IconHeart size={26} />,
+    },
+    {
+      id: "birth",
+      title: "Naissances",
+      value: acts.filter((a) => a.type === "BIRTH").length,
+      subtitle: "Actes de naissance",
+      tone: "success",
       href: "/births",
-      filterType: "NEWBORN_F",
+      icon: <IconBaby size={26} />,
+    },
+    {
+      id: "death",
+      title: "Décès",
+      value: acts.filter((a) => a.type === "DEATH").length,
+      subtitle: "Actes de décès",
+      tone: "danger",
+      href: "/deaths",
+      icon: <IconCross size={26} />,
+    },
+    {
+      id: "marriage",
+      title: "Mariages",
+      value: acts.filter((a) => a.type === "MARRIAGE").length,
+      subtitle: "Unions",
+      tone: "warning",
+      href: "/marriages",
+      icon: <IconRing size={26} />,
+    },
+    {
+      id: "divorce",
+      title: "Divorces",
+      value: acts.filter((a) => a.type === "DIVORCE").length,
+      subtitle: "Dissolutions",
+      tone: "secondary",
+      href: "/divorces",
+      icon: <IconSplit size={26} />,
+    },
+    {
+      id: "adoption",
+      title: "Adoptions",
+      value: acts.filter((a) => a.type === "ADOPTION").length,
+      subtitle: "Actes d'adoption",
+      tone: "indigo",
+      href: "/adoptions",
+      icon: <IconUsers size={26} />,
+    },
+    {
+      id: "move",
+      title: "Déplacements",
+      value: acts.filter((a) => a.type === "DISPLACEMENT").length,
+      subtitle: "Mouvements",
+      tone: "info",
+      href: "/displacements",
+      icon: <IconCar size={26} />,
+    },
+    {
+      id: "census",
+      title: "Recensement",
+      value: acts.filter((a) => a.type === "CENSUS").length,
+      subtitle: "Fiches",
+      tone: "primary",
+      href: "/census",
+      icon: <IconClipboard size={26} />,
+    },
+    {
+      id: "docs",
+      title: "Documents",
+      value: acts.filter((a) => a.type === "DOCUMENT").length,
+      subtitle: "Pièces émises",
+      tone: "secondary",
+      href: "/documents",
+      icon: <IconFile size={26} />,
     },
   ];
 
-  const detailRows = useMemo(() => {
-    if (!detail) return [] as Act[];
-    if (detail.filterType === "PERSONS") return [];
-    if (detail.filterType === "NEWBORN_M") {
-      return newborn.recentBirths.filter((a) => String(a.payload.sexe ?? "").toUpperCase() === "M");
-    }
-    if (detail.filterType === "NEWBORN_F") {
-      return newborn.recentBirths.filter((a) => String(a.payload.sexe ?? "").toUpperCase() === "F");
-    }
-    if (detail.filterType) return listActs(detail.filterType);
-    return listActs();
-  }, [detail, newborn.recentBirths]);
-
-  const recent = acts.slice(0, 12);
-  const toolbarRows = recent.map((a) => ({
-    act_number: a.act_number,
-    type: a.type,
-    national_id: a.national_id,
-    created_at: a.created_at,
-  }));
+  const filtered = items.filter(
+    (i) =>
+      !query.trim() ||
+      i.title.toLowerCase().includes(query.trim().toLowerCase()) ||
+      i.subtitle.toLowerCase().includes(query.trim().toLowerCase()),
+  );
 
   return (
     <div>
-      <div className="dash-hero">
+      <div className="eg-page-head">
         <div>
-          <h2 className="page-title">Tableau de bord communal</h2>
-          <p className="page-lead" style={{ marginBottom: 0 }}>
-            Style e-gov — chaque indicateur est cliquable pour afficher le détail (comme{" "}
+          <h2 className="page-title">Tableau de bord</h2>
+          <p className="page-lead">
+            Accueil communal style{" "}
             <a href="https://www.justicia.website/egouv/COMMUNE/accueil.php" target="_blank" rel="noreferrer">
-              Justicia COMMUNE
-            </a>
-            ).
+              e-gov Justicia
+            </a>{" "}
+            — cliquez une carte pour ouvrir le détail.
           </p>
+        </div>
+        <div className="eg-page-tools">
+          <input
+            className="form-control"
+            style={{ marginBottom: 0, minWidth: 220 }}
+            placeholder="Filtrer les indicateurs…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
         </div>
       </div>
 
-      <div className="dash-grid">
-        {cards.map((c) => (
+      <div className="eg-widget-grid">
+        {filtered.map((item) => (
           <button
-            key={c.key}
+            key={item.id}
             type="button"
-            className={`dash-card ${c.tone}`}
-            onClick={() => setDetail(c)}
+            className="eg-widget"
+            onClick={() => navigate(item.href)}
           >
-            <span className="dash-card-label">{c.label}</span>
-            <strong className="dash-card-value">{c.value}</strong>
-            <span className="dash-card-hint">{c.hint}</span>
-            <span className="dash-card-action">Voir le détail →</span>
+            <div className="eg-widget-body">
+              <div className="eg-widget-text">
+                <span className="eg-widget-value">{item.value}</span>
+                <span className="eg-widget-title">{item.title}</span>
+                <span className="eg-widget-sub">{item.subtitle}</span>
+              </div>
+              <span className={`eg-widget-icon tone-${item.tone}`}>{item.icon}</span>
+            </div>
+            <span className="eg-widget-foot">
+              Voir le détail <span aria-hidden="true">→</span>
+            </span>
           </button>
         ))}
       </div>
 
-      <div className="panel" style={{ marginTop: "1.25rem" }}>
-        <div className="panel-head">
-          <h3 className="panel-title">Actes récents</h3>
-          <DataToolbar filename="actes_recents" rows={toolbarRows} />
-        </div>
-        <div className="table-scroll">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>N°</th>
-                <th>Type</th>
-                <th>NIC</th>
-                <th>Date</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recent.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="muted">
-                    Aucun acte enregistré — cliquez une carte pour ouvrir le module.
-                  </td>
-                </tr>
-              ) : (
-                recent.map((a) => (
-                  <tr key={a.id}>
-                    <td>{a.act_number}</td>
-                    <td>{actTypeLabel(a.type)}</td>
-                    <td>{a.national_id}</td>
-                    <td>{new Date(a.created_at).toLocaleString("fr-CD")}</td>
-                    <td className="table-actions">
-                      <button type="button" className="btn-add btn-sm" onClick={() => setViewAct(getAct(a.id) ?? a)}>
-                        Voir
-                      </button>
-                      <Link className="btn-add btn-sm" to={CREATE_LINKS[a.type] ?? "/acts"}>
-                        Ajouter
-                      </Link>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="eg-quick-row">
+        <button type="button" className="btn-add" onClick={() => navigate("/population")}>
+          Gérer la population
+        </button>
+        <button type="button" className="btn-next" onClick={() => navigate("/newborns")}>
+          Gérer les nouveaux-nés
+        </button>
+        <button type="button" className="btn-primary" style={{ width: "auto" }} onClick={() => navigate("/births")}>
+          Enregistrer une naissance
+        </button>
       </div>
-
-      {detail ? (
-        <div className="modal-backdrop" onClick={() => setDetail(null)}>
-          <div className="modal-panel modal-wide" onClick={(e) => e.stopPropagation()}>
-            <div className="panel-head">
-              <div>
-                <h3 className="panel-title" style={{ margin: 0 }}>
-                  {detail.label}
-                </h3>
-                <p className="muted small" style={{ margin: "0.25rem 0 0" }}>
-                  {detail.value} élément(s) · {detail.hint}
-                </p>
-              </div>
-              <div className="modal-actions" style={{ margin: 0 }}>
-                <button type="button" className="btn-add" onClick={() => navigate(detail.href)}>
-                  Ouvrir le module
-                </button>
-                <button type="button" className="btn-secondary" onClick={() => setDetail(null)}>
-                  Fermer
-                </button>
-              </div>
-            </div>
-
-            {detail.filterType === "PERSONS" ? (
-              <div className="table-scroll">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Nom</th>
-                      <th>NIC</th>
-                      <th>Sexe</th>
-                      <th>Naissance</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {persons.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="muted">
-                          Aucune personne.
-                        </td>
-                      </tr>
-                    ) : (
-                      persons.slice(0, 50).map((p) => (
-                        <tr key={p.id}>
-                          <td>
-                            {p.nom} {p.postnom} {p.prenom}
-                          </td>
-                          <td>{p.nic}</td>
-                          <td>{p.sexe}</td>
-                          <td>{p.date_naissance}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="table-scroll">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>N°</th>
-                      <th>Type</th>
-                      <th>NIC</th>
-                      <th>Date</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {detailRows.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="muted">
-                          Aucun enregistrement pour cet indicateur.
-                        </td>
-                      </tr>
-                    ) : (
-                      detailRows.map((a) => (
-                        <tr key={a.id}>
-                          <td>{a.act_number}</td>
-                          <td>{actTypeLabel(a.type)}</td>
-                          <td>{a.national_id}</td>
-                          <td>{new Date(a.created_at).toLocaleString("fr-CD")}</td>
-                          <td>
-                            <button
-                              type="button"
-                              className="btn-add btn-sm"
-                              onClick={() => {
-                                setViewAct(a);
-                              }}
-                            >
-                              Détail
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      ) : null}
-
-      {viewAct ? (
-        <div className="modal-backdrop" onClick={() => setViewAct(null)}>
-          <div className="modal-panel modal-wide" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-actions" style={{ marginBottom: "1rem" }}>
-              <button type="button" className="btn-secondary" onClick={() => window.print()}>
-                Imprimer
-              </button>
-              <button type="button" className="btn-secondary" onClick={() => setViewAct(null)}>
-                Fermer
-              </button>
-            </div>
-            <ActPrintCard act={viewAct} />
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
