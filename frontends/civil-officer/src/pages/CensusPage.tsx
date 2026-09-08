@@ -248,8 +248,8 @@ export default function CensusPage() {
               <input className="form-control" type="number" value={poids} onChange={(e) => setPoids(e.target.value)} />
             </div>
             <div className="full">
-              <button type="button" className="btn-primary" style={{ width: "auto", minWidth: 160 }} onClick={goStep2}>
-                Étape suivante
+              <button type="button" className="btn-next" style={{ width: "auto", minWidth: 160 }} onClick={goStep2}>
+                Suivant
               </button>
             </div>
           </div>
@@ -305,7 +305,7 @@ export default function CensusPage() {
                 Retour
               </button>
               <button type="submit" className="btn-primary" style={{ width: "auto", minWidth: 180 }}>
-                Valider le recensement
+                Enregistrer
               </button>
             </div>
           </form>

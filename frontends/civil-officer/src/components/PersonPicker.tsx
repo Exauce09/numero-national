@@ -103,7 +103,7 @@ export default function PersonPicker({
             }}
             onFocus={() => setOpen(true)}
           />
-          <button type="button" className="btn-secondary" onClick={() => setModal(true)}>
+          <button type="button" className="btn-add" onClick={() => setModal(true)}>
             Ajouter
           </button>
         </div>
