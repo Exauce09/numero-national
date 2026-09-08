@@ -3,11 +3,16 @@ import { NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom"
 import { clearSession, getSession } from "./auth";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
+import BirthsPage from "./pages/BirthsPage";
+import CensusPage from "./pages/CensusPage";
+import DeathsPage from "./pages/DeathsPage";
+import MarriagesPage from "./pages/MarriagesPage";
+import AdoptionsPage from "./pages/AdoptionsPage";
+import DisplacementsPage from "./pages/DisplacementsPage";
+import DivorcesPage from "./pages/DivorcesPage";
+import DocumentsPage from "./pages/DocumentsPage";
+import ActsPage from "./pages/ActsPage";
 import SearchPage from "./pages/SearchPage";
-import ActPage from "./pages/ActPage";
-import DeclarationsPage from "./pages/DeclarationsPage";
-import ResidencePage from "./pages/ResidencePage";
-import StatsPage from "./pages/StatsPage";
 
 function RequireAuth({ children }: { children: ReactNode }) {
   if (!getSession()) return <Navigate to="/login" replace />;
@@ -35,16 +40,16 @@ function Shell() {
           <NavLink to="/" end>
             Tableau de bord
           </NavLink>
-          <NavLink to="/search">Recherche population</NavLink>
           <NavLink to="/births">Naissances</NavLink>
-          <NavLink to="/marriages">Mariages</NavLink>
-          <NavLink to="/divorces">Divorces</NavLink>
+          <NavLink to="/census">Recensement</NavLink>
           <NavLink to="/deaths">Décès</NavLink>
-          <NavLink to="/recognitions">Reconnaissances</NavLink>
-          <NavLink to="/rectifications">Rectifications</NavLink>
-          <NavLink to="/declarations">Déclarations</NavLink>
-          <NavLink to="/residence">Résidence</NavLink>
-          <NavLink to="/statistics">Statistiques</NavLink>
+          <NavLink to="/marriages">Mariages</NavLink>
+          <NavLink to="/adoptions">Adoption</NavLink>
+          <NavLink to="/displacements">Déplacement</NavLink>
+          <NavLink to="/divorces">Divorce</NavLink>
+          <NavLink to="/documents">Documents</NavLink>
+          <NavLink to="/acts">Actes</NavLink>
+          <NavLink to="/search">Recherche</NavLink>
         </nav>
         <div className="sidebar-foot">
           <button type="button" className="btn-logout" style={{ width: "100%" }} onClick={logout}>
@@ -61,22 +66,16 @@ function Shell() {
         <main className="shell">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
+            <Route path="/births" element={<BirthsPage />} />
+            <Route path="/census" element={<CensusPage />} />
+            <Route path="/deaths" element={<DeathsPage />} />
+            <Route path="/marriages" element={<MarriagesPage />} />
+            <Route path="/adoptions" element={<AdoptionsPage />} />
+            <Route path="/displacements" element={<DisplacementsPage />} />
+            <Route path="/divorces" element={<DivorcesPage />} />
+            <Route path="/documents" element={<DocumentsPage />} />
+            <Route path="/acts" element={<ActsPage />} />
             <Route path="/search" element={<SearchPage />} />
-            <Route path="/births" element={<ActPage kind="births" title="Naissances" />} />
-            <Route path="/marriages" element={<ActPage kind="marriages" title="Mariages" />} />
-            <Route path="/divorces" element={<ActPage kind="divorces" title="Divorces" />} />
-            <Route path="/deaths" element={<ActPage kind="deaths" title="Décès" />} />
-            <Route
-              path="/recognitions"
-              element={<ActPage kind="recognitions" title="Reconnaissances" />}
-            />
-            <Route
-              path="/rectifications"
-              element={<ActPage kind="rectifications" title="Rectifications" />}
-            />
-            <Route path="/declarations" element={<DeclarationsPage />} />
-            <Route path="/residence" element={<ResidencePage />} />
-            <Route path="/statistics" element={<StatsPage />} />
           </Routes>
         </main>
       </div>

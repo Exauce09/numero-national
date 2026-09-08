@@ -1,92 +1,69 @@
 import { FormEvent, useState } from "react";
-import { api, type PopulationHit } from "../api";
+import DataToolbar from "../components/DataToolbar";
+import { displayName, searchPersons, type Person } from "../registry";
 
 export default function SearchPage() {
   const [q, setQ] = useState("");
-  const [family, setFamily] = useState("");
-  const [given, setGiven] = useState("");
-  const [commune, setCommune] = useState("");
-  const [hits, setHits] = useState<PopulationHit[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [hits, setHits] = useState<Person[]>(() => searchPersons(""));
 
-  async function onSubmit(e: FormEvent) {
+  function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (q) params.set("q", q);
-      if (family) params.set("family_name", family);
-      if (given) params.set("given_names", given);
-      if (commune) params.set("commune_code", commune);
-      const data = await api.searchPopulation(params);
-      setHits(data);
-    } catch (err) {
-      setHits([]);
-      setError(
-        err instanceof Error
-          ? `${err.message} — connectez l'API ou utilisez la saisie d'actes en mode démo.`
-          : "Recherche impossible."
-      );
-    } finally {
-      setBusy(false);
-    }
+    setHits(searchPersons(q));
   }
+
+  const rows = hits.map((p) => ({
+    nic: p.nic,
+    nom: displayName(p),
+    sexe: p.sexe,
+    date_naissance: p.date_naissance,
+    etat_civil: p.etat_civil,
+  }));
 
   return (
     <div>
-      <h2 className="page-title">Recherche population</h2>
-      <p className="page-lead">Recherche dans le registre / références citoyens (périmètre officier).</p>
+      <h2 className="page-title">Recherche</h2>
+      <p className="page-lead">Recherche dans le registre local (personnes).</p>
       <div className="panel">
-        <form className="form-grid" onSubmit={onSubmit}>
-          <div>
+        <form className="toolbar" onSubmit={onSubmit}>
+          <div style={{ flex: 1, minWidth: 220 }}>
             <label className="form-label">Recherche libre</label>
-            <input className="form-control" value={q} onChange={(e) => setQ(e.target.value)} />
+            <input
+              className="form-control"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Nom, NIC, lieu…"
+            />
           </div>
-          <div>
-            <label className="form-label">Nom de famille</label>
-            <input className="form-control" value={family} onChange={(e) => setFamily(e.target.value)} />
-          </div>
-          <div>
-            <label className="form-label">Prénoms</label>
-            <input className="form-control" value={given} onChange={(e) => setGiven(e.target.value)} />
-          </div>
-          <div>
-            <label className="form-label">Code commune</label>
-            <input className="form-control" value={commune} onChange={(e) => setCommune(e.target.value)} />
-          </div>
-          <div className="full">
-            <button className="btn-primary" style={{ width: "auto", minWidth: 180 }} disabled={busy}>
-              {busy ? "Recherche…" : "Rechercher"}
-            </button>
-          </div>
+          <button className="btn-primary" style={{ width: "auto", minWidth: 140 }} type="submit">
+            Rechercher
+          </button>
         </form>
-        {error ? <div className="login-error" style={{ marginTop: "1rem" }}>{error}</div> : null}
-        {hits.length > 0 ? (
-          <table className="data-table" style={{ marginTop: "1rem" }}>
-            <thead>
-              <tr>
-                <th>NIC</th>
-                <th>Nom</th>
-                <th>Prénoms</th>
-                <th>Naissance</th>
-                <th>Statut</th>
+        <div className="panel-head" style={{ marginTop: "1rem" }}>
+          <h3 className="panel-title">{hits.length} résultat(s)</h3>
+          <DataToolbar filename="recherche_personnes" rows={rows} />
+        </div>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>NIC</th>
+              <th>Nom</th>
+              <th>Sexe</th>
+              <th>Naissance</th>
+              <th>État civil</th>
+            </tr>
+          </thead>
+          <tbody>
+            {hits.map((p) => (
+              <tr key={p.id}>
+                <td>{p.nic}</td>
+                <td>{displayName(p)}</td>
+                <td>{p.sexe}</td>
+                <td>{p.date_naissance}</td>
+                <td>{p.etat_civil}</td>
               </tr>
-            </thead>
-            <tbody>
-              {hits.map((h, i) => (
-                <tr key={h.citizen_id ?? String(i)}>
-                  <td>{h.nic ?? "—"}</td>
-                  <td>{h.family_name ?? "—"}</td>
-                  <td>{h.given_names ?? "—"}</td>
-                  <td>{h.date_of_birth ?? "—"}</td>
-                  <td>{h.status ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : null}
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

@@ -1,0 +1,94 @@
+import { FormEvent, useState } from "react";
+import ActPrintCard from "../components/ActPrintCard";
+import PersonPicker from "../components/PersonPicker";
+import { addAct, displayName, type Act, type Person } from "../registry";
+
+export default function DisplacementsPage() {
+  const [personne, setPersonne] = useState<Person | null>(null);
+  const [officier, setOfficier] = useState<Person | null>(null);
+  const [lieuAller, setLieuAller] = useState("");
+  const [motif, setMotif] = useState("");
+  const [dateDeplacement, setDateDeplacement] = useState("");
+  const [dateRetour, setDateRetour] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<Act | null>(null);
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!personne) {
+      setError("La personne est obligatoire.");
+      return;
+    }
+    const payload = {
+      person_id: personne.id,
+      person_name: displayName(personne),
+      lieu_a_aller: lieuAller,
+      motif,
+      date_deplacement: dateDeplacement,
+      date_retour: dateRetour,
+      officier_id: officier?.id ?? null,
+      officier_name: officier ? displayName(officier) : null,
+    };
+    const act = addAct("DISPLACEMENT", payload, personne.nic);
+    setCreated(act);
+  }
+
+  return (
+    <div>
+      <h2 className="page-title">Déplacement</h2>
+      <p className="page-lead">Enregistrement d&apos;un déplacement de personne.</p>
+
+      <div className="panel">
+        <form className="form-grid" onSubmit={onSubmit}>
+          {error ? <div className="login-error full">{error}</div> : null}
+          <div className="full">
+            <PersonPicker label="Personne" value={personne} onChange={setPersonne} required />
+          </div>
+          <div>
+            <label className="form-label">Lieu à aller</label>
+            <input className="form-control" value={lieuAller} onChange={(e) => setLieuAller(e.target.value)} required />
+          </div>
+          <div>
+            <label className="form-label">Motif</label>
+            <input className="form-control" value={motif} onChange={(e) => setMotif(e.target.value)} />
+          </div>
+          <div>
+            <label className="form-label">Date de déplacement</label>
+            <input
+              className="form-control"
+              type="date"
+              value={dateDeplacement}
+              onChange={(e) => setDateDeplacement(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <label className="form-label">Date de retour</label>
+            <input
+              className="form-control"
+              type="date"
+              value={dateRetour}
+              onChange={(e) => setDateRetour(e.target.value)}
+            />
+          </div>
+          <div className="full">
+            <PersonPicker label="Officier" value={officier} onChange={setOfficier} />
+          </div>
+          <div className="full">
+            <button className="btn-primary" style={{ width: "auto", minWidth: 180 }} type="submit">
+              Enregistrer le déplacement
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {created ? (
+        <div className="panel" style={{ marginTop: "1rem" }}>
+          <div className="success-banner">Acte de déplacement créé</div>
+          <ActPrintCard act={created} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
