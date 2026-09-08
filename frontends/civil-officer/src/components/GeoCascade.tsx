@@ -329,7 +329,7 @@ export default function GeoCascade({ value, onChange, label = "Adresse territori
           {addKindBtn ? (
             <button
               type="button"
-              className="btn-secondary btn-sm"
+              className="btn-add btn-sm"
               disabled={!canAdd(addKindBtn)}
               onClick={() => openAdd(addKindBtn)}
               title={!canAdd(addKindBtn) ? "Sélectionnez d'abord le niveau parent" : "Ajouter si absent"}

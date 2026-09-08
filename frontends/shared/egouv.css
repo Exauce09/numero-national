@@ -2,10 +2,12 @@
 :root {
   --egouv-primary: #5d87ff;
   --egouv-primary-hover: #4a74e8;
+  --egouv-save: #ce1126;
   --egouv-ink: #2a3547;
   --egouv-muted: #5a6a85;
   --egouv-line: #e5eaf2;
   --egouv-card: #ffffff;
+  --egouv-page: #f5f7fb;
   --egouv-bg1: rgb(210, 241, 223);
   --egouv-bg2: rgb(211, 229, 250);
   --egouv-danger: #fa896b;
@@ -14,7 +16,54 @@
   --egouv-rdc-blue: #007fff;
   font-family: "Plus Jakarta Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   color: var(--egouv-ink);
-  background: #f5f7fb;
+  background: var(--egouv-page);
+}
+
+html[data-theme="dark"] {
+  --egouv-ink: #e8eef8;
+  --egouv-muted: #9aa8c0;
+  --egouv-line: #2d3a4f;
+  --egouv-card: #1a2332;
+  --egouv-page: #0f1621;
+  --egouv-bg1: #1a2e28;
+  --egouv-bg2: #1a2740;
+  color: var(--egouv-ink);
+  background: var(--egouv-page);
+}
+
+html[data-theme="dark"] body,
+html[data-theme="dark"] .page-wrapper {
+  background: var(--egouv-page);
+}
+
+html[data-theme="dark"] .sidebar,
+html[data-theme="dark"] .topbar,
+html[data-theme="dark"] .panel,
+html[data-theme="dark"] .login-card,
+html[data-theme="dark"] .metric-card,
+html[data-theme="dark"] .modal-panel,
+html[data-theme="dark"] .topbar-dropdown,
+html[data-theme="dark"] .form-control,
+html[data-theme="dark"] .btn-secondary,
+html[data-theme="dark"] .btn-logout,
+html[data-theme="dark"] .topbar-icon-btn,
+html[data-theme="dark"] .menu-toggle {
+  background: var(--egouv-card);
+  color: var(--egouv-ink);
+  border-color: var(--egouv-line);
+}
+
+html[data-theme="dark"] .sidebar-nav a {
+  color: var(--egouv-ink);
+}
+
+html[data-theme="dark"] .sidebar-nav a:hover {
+  background: #243247;
+}
+
+html[data-theme="dark"] .data-table th,
+html[data-theme="dark"] .data-table td {
+  border-color: var(--egouv-line);
 }
 
 * {
@@ -125,7 +174,7 @@ a:hover {
   padding: 0.8rem 1rem;
   border: none;
   border-radius: 8px;
-  background: var(--egouv-primary);
+  background: var(--egouv-save, #ce1126);
   color: #fff;
   font: inherit;
   font-size: 1.05rem;
@@ -134,11 +183,60 @@ a:hover {
 }
 
 .btn-primary:hover {
-  background: var(--egouv-primary-hover);
+  background: #b10e20;
 }
 
 .btn-primary:disabled {
   opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.btn-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  padding: 0.65rem 1rem;
+  background: var(--egouv-primary);
+  color: #fff;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn-add:hover {
+  background: var(--egouv-primary-hover);
+  color: #fff;
+  text-decoration: none;
+}
+
+.btn-add:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-next {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  padding: 0.65rem 1rem;
+  background: var(--egouv-rdc-yellow);
+  color: #1f2937;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-next:hover {
+  filter: brightness(0.95);
+}
+
+.btn-next:disabled {
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
@@ -156,7 +254,7 @@ a:hover {
 .page-wrapper {
   display: flex;
   min-height: 100vh;
-  background: #f5f7fb;
+  background: var(--egouv-page);
 }
 
 .sidebar {

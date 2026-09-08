@@ -86,6 +86,117 @@
   width: auto;
 }
 
+.dash-hero {
+  margin-bottom: 1rem;
+}
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.9rem;
+}
+
+.dash-card {
+  border: 0;
+  border-radius: 12px;
+  padding: 1.1rem 1.15rem;
+  text-align: left;
+  cursor: pointer;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 132px;
+  box-shadow: 0 8px 24px rgba(42, 53, 71, 0.12);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  font: inherit;
+}
+
+.dash-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(42, 53, 71, 0.16);
+}
+
+.dash-card-label {
+  font-size: 0.88rem;
+  font-weight: 650;
+  opacity: 0.95;
+}
+
+.dash-card-value {
+  font-size: 2rem;
+  line-height: 1.1;
+  font-weight: 750;
+}
+
+.dash-card-hint {
+  font-size: 0.78rem;
+  opacity: 0.88;
+}
+
+.dash-card-action {
+  margin-top: auto;
+  font-size: 0.8rem;
+  font-weight: 650;
+  opacity: 0.95;
+}
+
+.tone-blue { background: linear-gradient(135deg, #5d87ff, #4570ef); }
+.tone-indigo { background: linear-gradient(135deg, #6610f2, #4c0dc0); }
+.tone-green { background: linear-gradient(135deg, #13deb9, #0f9f87); }
+.tone-red { background: linear-gradient(135deg, #fa896b, #ce1126); }
+.tone-pink { background: linear-gradient(135deg, #ff6b9d, #d63384); }
+.tone-teal { background: linear-gradient(135deg, #20c997, #0f9f7a); }
+.tone-orange { background: linear-gradient(135deg, #ffae1f, #e69100); }
+.tone-purple { background: linear-gradient(135deg, #8b5cf6, #6d28d9); }
+.tone-cyan { background: linear-gradient(135deg, #22d3ee, #0891b2); }
+.tone-slate { background: linear-gradient(135deg, #64748b, #334155); }
+.tone-sky { background: linear-gradient(135deg, #38bdf8, #0284c7); }
+.tone-rose { background: linear-gradient(135deg, #fb7185, #e11d48); }
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.profile-photo {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--egouv-line);
+  background: #eef2f8;
+}
+
+.profile-photo-lg {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.notif-item {
+  border-bottom: 1px solid var(--egouv-line);
+  padding: 0.85rem 0;
+}
+
+.notif-item:last-child {
+  border-bottom: 0;
+}
+
+.notif-item.unread .notif-title {
+  color: var(--egouv-primary);
+}
+
+.notif-title {
+  margin: 0 0 0.25rem;
+  font-weight: 700;
+}
+
+.theme-switch {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .success-banner {
   background: #e8f7ef;
   color: #0f5132;

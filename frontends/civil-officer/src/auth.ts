@@ -3,6 +3,7 @@ export type Session = {
   displayName?: string;
   roleTitle?: string;
   accessToken?: string;
+  photoDataUrl?: string;
 };
 
 const KEY = "nn_session_civil_officer";
@@ -34,6 +35,14 @@ export function getSession(): Session | null {
   }
 }
 
+export function updateSession(patch: Partial<Session>): Session | null {
+  const current = getSession();
+  if (!current) return null;
+  const next = { ...current, ...patch };
+  sessionStorage.setItem(KEY, JSON.stringify(next));
+  return next;
+}
+
 export function clearSession(): void {
   sessionStorage.removeItem(KEY);
 }
@@ -45,6 +54,19 @@ export async function login(username: string, password: string): Promise<Session
   }
 
   const labels = sessionLabel(user);
+  let photoDataUrl: string | undefined;
+  let passwordOverride: string | undefined;
+  try {
+    const prefsRaw = localStorage.getItem("nn_civil_officer_prefs");
+    if (prefsRaw) {
+      const prefs = JSON.parse(prefsRaw) as { photoDataUrl?: string; passwordOverride?: string };
+      photoDataUrl = prefs.photoDataUrl;
+      passwordOverride = prefs.passwordOverride;
+    }
+  } catch {
+    /* ignore */
+  }
+
   const base = import.meta.env.VITE_API_BASE ?? "/api/v1";
   try {
     const res = await fetch(`${base}/auth/login`, {
@@ -57,6 +79,7 @@ export async function login(username: string, password: string): Promise<Session
       const session: Session = {
         username: user,
         accessToken: data.access_token,
+        photoDataUrl,
         ...labels,
       };
       sessionStorage.setItem(KEY, JSON.stringify(session));
@@ -66,11 +89,12 @@ export async function login(username: string, password: string): Promise<Session
     /* API indisponible */
   }
 
-  if (user !== DEMO_USER || password !== DEMO_PASSWORD) {
+  const expected = passwordOverride || DEMO_PASSWORD;
+  if (user !== DEMO_USER || password !== expected) {
     throw new Error("Identifiants incorrects. Utilisez le compte de démo officier.");
   }
 
-  const session: Session = { username: user, ...labels };
+  const session: Session = { username: user, photoDataUrl, ...labels };
   sessionStorage.setItem(KEY, JSON.stringify(session));
   return session;
 }
