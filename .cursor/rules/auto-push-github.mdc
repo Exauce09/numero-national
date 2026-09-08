@@ -1,0 +1,17 @@
+---
+description: Toujours committer et pousser vers GitHub après chaque développement
+alwaysApply: true
+---
+
+# Sync GitHub obligatoire
+
+Remote canonique : `https://github.com/Exauce09/numero-national.git`
+
+Après **toute** modification ou livrable de code dans ce projet :
+
+1. Vérifier `git status` / `git diff` / `git log`
+2. Committer les fichiers pertinents (jamais `.env`, secrets, `.venv`)
+3. Pousser immédiatement : `git push -u origin HEAD`
+4. Ne pas attendre que l'utilisateur redemande le push
+
+Si le push échoue (auth), indiquer clairement la commande `gh auth login` ou la config du credential manager.
