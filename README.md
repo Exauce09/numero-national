@@ -2,9 +2,23 @@
 
 Infrastructure numérique d'État autour du **NIC** (Numéro d'Identification Citoyen).
 
+**Dépôt GitHub :** [https://github.com/Exauce09/numero-national](https://github.com/Exauce09/numero-national)
+
 > **Phases livrées : 1 → 9 (domaine)**  
 > Fondation · IAM · Core Registry · Recensement Flutter · État civil · Cartes ·  
 > Biométrie · ONIP · Santé · Analytics / portails institutionnels
+
+### Sync Git automatique
+
+Chaque commit pousse vers `origin` via le hook `.githooks/post-commit`  
+(installé localement dans `.git/hooks`). Cursor rappelle aussi un commit+push
+en fin de session agent (`.cursor/hooks` + règle `auto-push-github`).
+
+```bash
+# Sur un nouveau clone, réactiver le hook local :
+copy .githooks\post-commit .git\hooks\post-commit   # Windows
+# cp .githooks/post-commit .git/hooks/post-commit   # Linux/macOS
+```
 
 ---
 
