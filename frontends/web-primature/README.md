@@ -27,5 +27,18 @@ Ouvrir : http://localhost:5179/login
 | `/dossiers` | Dossiers de coordination Primature |
 | `/alertes` | Alertes remontées par les modules |
 | `/briefing` | Briefing exécutif consolidé |
+| `/systeme` | Cartographie des portails E-GOUV (lecture) |
 
 Exports : **CSV · Excel · PDF · Imprimer · SQL**.
+
+## Portails liés
+
+| Portail | URL |
+|---------|-----|
+| Présidence | http://localhost:5174 |
+| Primature | http://localhost:5179 |
+| Intérieur | http://localhost:5178 |
+| Santé (gov) | http://localhost:5177/sante |
+| État civil | http://localhost:5176 |
+| Citoyen | http://localhost:5175 |
+| ONIP | http://localhost:5173 |

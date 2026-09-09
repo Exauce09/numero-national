@@ -525,3 +525,82 @@ export const SEVERITY_LABELS: Record<AlertSeverity, string> = {
 };
 
 export const TREND_LABELS = { up: "↑", down: "↓", flat: "→" } as const;
+
+/** Cartographie des portails E-GOUV visibles en lecture par la Primature. */
+export type SystemPortal = {
+  id: string;
+  name: string;
+  role: string;
+  url: string;
+  port: number;
+  scope: string;
+  access: "lecture" | "metier";
+};
+
+export function systemPortals(): SystemPortal[] {
+  return [
+    {
+      id: "presidence",
+      name: "Présidence",
+      role: "Supervision nationale",
+      url: "http://localhost:5174/login",
+      port: 5174,
+      scope: "Population, synoptique, actes, structures",
+      access: "lecture",
+    },
+    {
+      id: "primature",
+      name: "Primature",
+      role: "Coordination gouvernementale",
+      url: "http://localhost:5179/login",
+      port: 5179,
+      scope: "Indicateurs transversaux, dossiers, alertes, briefing",
+      access: "lecture",
+    },
+    {
+      id: "interieur",
+      name: "Ministère de l'Intérieur",
+      role: "Mouvements & parcours",
+      url: "http://localhost:5178/login",
+      port: 5178,
+      scope: "Mouvements, déplacements, documents manquants, parcours",
+      access: "metier",
+    },
+    {
+      id: "sante",
+      name: "Ministère de la Santé",
+      role: "Santé publique",
+      url: "http://localhost:5177/sante/login",
+      port: 5177,
+      scope: "Structures, déclarations, synoptique santé",
+      access: "metier",
+    },
+    {
+      id: "civil",
+      name: "État civil",
+      role: "Actes communaux",
+      url: "http://localhost:5176/login",
+      port: 5176,
+      scope: "Naissances, décès, mariages, déplacements",
+      access: "metier",
+    },
+    {
+      id: "citoyen",
+      name: "Portail citoyen",
+      role: "Services usagers",
+      url: "http://localhost:5175/login",
+      port: 5175,
+      scope: "Demandes documents, situation personnelle",
+      access: "metier",
+    },
+    {
+      id: "onip",
+      name: "ONIP",
+      role: "Identité nationale",
+      url: "http://localhost:5173/",
+      port: 5173,
+      scope: "Cartes, doublons, couverture",
+      access: "metier",
+    },
+  ];
+}
