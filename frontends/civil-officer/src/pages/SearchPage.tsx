@@ -1,11 +1,12 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import DataToolbar from "../components/DataToolbar";
+import { getSession } from "../auth";
+import { searchEveryone } from "../nationalSearch";
 import {
   displayName,
   getPerson,
   personOrigin,
-  searchPersons,
   type Person,
 } from "../registry";
 
@@ -13,20 +14,44 @@ export default function SearchPage() {
   const [params, setParams] = useSearchParams();
   const initial = params.get("q") ?? "";
   const [q, setQ] = useState(initial);
-  const [hits, setHits] = useState<Person[]>(() => searchPersons(initial));
+  const [hits, setHits] = useState<Person[]>([]);
   const [selected, setSelected] = useState<Person | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [hint, setHint] = useState<string | null>(null);
+  const hasApi = Boolean(getSession()?.accessToken);
+
+  const runSearch = useCallback(async (value: string) => {
+    const needle = value.trim();
+    setBusy(true);
+    setHint(null);
+    try {
+      const rows = await searchEveryone(needle);
+      setHits(rows);
+      if (!needle) {
+        setHint(null);
+      } else if (!rows.length && !getSession()?.accessToken) {
+        setHint(
+          "Connectez-vous avec un compte API (ex. officier) pour chercher dans le registre national. Mode local uniquement pour l’instant.",
+        );
+      } else if (!rows.length) {
+        setHint("Aucun résultat national ni local pour cette recherche.");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }, []);
 
   useEffect(() => {
     const next = params.get("q") ?? "";
     setQ(next);
-    setHits(searchPersons(next));
-  }, [params]);
+    void runSearch(next);
+  }, [params, runSearch]);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     const value = q.trim();
     setParams(value ? { q: value } : {});
-    setHits(searchPersons(value));
+    void runSearch(value);
   }
 
   const rows = hits.map((p) => {
@@ -50,8 +75,9 @@ export default function SearchPage() {
     <div>
       <h2 className="page-title">Recherche</h2>
       <p className="page-lead">
-        Recherche intelligente par NIC, nom, postnom, prénom, date de naissance, province et ville. Pour un
-        enfant / nouveau-né, l&apos;origine affichée vient du père, sinon de la mère.
+        Recherche nationale (registre + NIC) et locale : NIC, nom, postnom, prénom, date de naissance,
+        province et ville.
+        {hasApi ? " · Connecté au registre national." : " · Sans jeton API : résultats locaux seulement."}
       </p>
       <div className="panel">
         <form className="toolbar" onSubmit={onSubmit}>
@@ -61,13 +87,14 @@ export default function SearchPage() {
               className="form-control"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Ex. Kabila 1990 Kinshasa — ou un NIC"
+              placeholder="Ex. Azerty — ou un NIC"
             />
           </div>
-          <button className="btn-primary" style={{ width: "auto", minWidth: 140 }} type="submit">
-            Rechercher
+          <button className="btn-primary" style={{ width: "auto", minWidth: 140 }} type="submit" disabled={busy}>
+            {busy ? "…" : "Rechercher"}
           </button>
         </form>
+        {hint ? <p className="muted" style={{ marginTop: 8 }}>{hint}</p> : null}
         <div className="panel-head" style={{ marginTop: "1rem" }}>
           <h3 className="panel-title">{hits.length} résultat(s)</h3>
           <DataToolbar filename="recherche_personnes" rows={rows} />
@@ -83,38 +110,47 @@ export default function SearchPage() {
               <th>Province</th>
               <th>Ville</th>
               <th>Origine</th>
-              <th />
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {hits.map((p) => {
               const origin = personOrigin(p);
-              const src =
-                origin.source === "father"
-                  ? "Père"
-                  : origin.source === "mother"
-                    ? "Mère"
-                    : origin.source === "self"
-                      ? "Propre"
-                      : "—";
               return (
                 <tr key={p.id}>
-                  <td>{p.nic}</td>
+                  <td>
+                    <code>{p.nic}</code>
+                  </td>
                   <td>{p.nom}</td>
-                  <td>{p.postnom || "—"}</td>
+                  <td>{p.postnom}</td>
                   <td>{p.prenom}</td>
                   <td>{p.date_naissance || "—"}</td>
                   <td>{origin.province || "—"}</td>
                   <td>{origin.ville || "—"}</td>
-                  <td>{src}</td>
                   <td>
-                    <button type="button" className="btn-secondary btn-sm" onClick={() => setSelected(p)}>
+                    {origin.source === "father"
+                      ? "Père"
+                      : origin.source === "mother"
+                        ? "Mère"
+                        : origin.source === "self"
+                          ? "Propre"
+                          : "—"}
+                  </td>
+                  <td>
+                    <button type="button" className="btn-secondary" onClick={() => setSelected(getPerson(p.id) ?? p)}>
                       Détail
                     </button>
                   </td>
                 </tr>
               );
             })}
+            {!hits.length ? (
+              <tr>
+                <td colSpan={9} className="muted">
+                  Aucune personne trouvée.
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>
@@ -161,24 +197,6 @@ export default function SearchPage() {
                               : ""}
                       </dd>
                     </div>
-                    {origin.territoire ? (
-                      <div>
-                        <dt>Territoire</dt>
-                        <dd>{origin.territoire}</dd>
-                      </div>
-                    ) : null}
-                    {origin.secteur ? (
-                      <div>
-                        <dt>Secteur / Commune</dt>
-                        <dd>{origin.secteur}</dd>
-                      </div>
-                    ) : null}
-                    {origin.village ? (
-                      <div>
-                        <dt>Village</dt>
-                        <dd>{origin.village}</dd>
-                      </div>
-                    ) : null}
                   </>
                 );
               })()}

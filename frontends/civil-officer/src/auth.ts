@@ -16,6 +16,9 @@ const KEY = "nn_session_civil_officer";
 
 export const DEMO_USER = "officier";
 export const DEMO_PASSWORD = "DemoCivil2026!";
+/** Compte API lié au login démo « officier » (registre national / NIC). */
+export const DEMO_API_EMAIL = "officier.etatcivil@example.gov";
+export const DEMO_API_PASSWORD = "CivilOfficer123!";
 export const MODULE_ROLE_TITLE = "Responsable — Officier d'état civil";
 
 function sessionLabel(username: string): { displayName: string; roleTitle: string } {
@@ -85,39 +88,52 @@ export async function login(username: string, password: string): Promise<Session
   }
 
   const base = import.meta.env.VITE_API_BASE ?? "/api/v1";
-  try {
-    const ctrl = new AbortController();
-    const timer = window.setTimeout(() => ctrl.abort(), 2500);
-    const res = await fetch(`${base}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: user, password }),
-      signal: ctrl.signal,
-    });
-    window.clearTimeout(timer);
-    if (res.ok) {
-      const data = (await res.json()) as { access_token?: string };
-      const session = attachCommune(
-        {
-          username: user,
-          accessToken: data.access_token,
-          photoDataUrl,
-          ...labels,
-        },
-        user,
-      );
-      sessionStorage.setItem(KEY, JSON.stringify(session));
-      return session;
+
+  /** Login API : email saisi, ou alias démo officier → compte CIVIL_OFFICER. */
+  const apiAttempts: Array<{ email: string; password: string }> = [];
+  if (user.includes("@")) {
+    apiAttempts.push({ email: user, password });
+  } else if (user === DEMO_USER && (password === DEMO_PASSWORD || password === passwordOverride)) {
+    apiAttempts.push({ email: DEMO_API_EMAIL, password: DEMO_API_PASSWORD });
+  } else {
+    apiAttempts.push({ email: user, password });
+  }
+
+  for (const attempt of apiAttempts) {
+    try {
+      const ctrl = new AbortController();
+      const timer = window.setTimeout(() => ctrl.abort(), 2500);
+      const res = await fetch(`${base}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: attempt.email, password: attempt.password }),
+        signal: ctrl.signal,
+      });
+      window.clearTimeout(timer);
+      if (res.ok) {
+        const data = (await res.json()) as { access_token?: string };
+        const session = attachCommune(
+          {
+            username: user === DEMO_USER ? DEMO_USER : attempt.email,
+            accessToken: data.access_token,
+            photoDataUrl,
+            ...labels,
+          },
+          user === DEMO_USER ? DEMO_USER : attempt.email,
+        );
+        sessionStorage.setItem(KEY, JSON.stringify(session));
+        return session;
+      }
+    } catch {
+      /* API indisponible — essai suivant / mode démo */
     }
-  } catch {
-    /* API indisponible — mode démo local */
   }
 
   const demoOk =
     user === DEMO_USER && (password === DEMO_PASSWORD || password === passwordOverride);
   if (!demoOk) {
     throw new Error(
-      `Identifiants incorrects. Utilisez exactement : ${DEMO_USER} / ${DEMO_PASSWORD}`,
+      `Identifiants incorrects. Utilisez : ${DEMO_USER} / ${DEMO_PASSWORD} (ou ${DEMO_API_EMAIL})`,
     );
   }
 

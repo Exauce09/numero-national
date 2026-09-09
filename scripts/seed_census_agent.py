@@ -68,9 +68,22 @@ def main() -> None:
             client, SUPERVISOR_EMAIL, SUPERVISOR_PASSWORD, ["CENSUS_SUPERVISOR"]
         )
         agent = ensure_user(client, EMAIL, PASSWORD, ["CENSUS_AGENT"])
+        civil = ensure_user(
+            client,
+            os.getenv("CIVIL_OFFICER_EMAIL", "officier.etatcivil@example.gov"),
+            os.getenv("CIVIL_OFFICER_PASSWORD", "CivilOfficer123!"),
+            ["CIVIL_OFFICER"],
+        )
         admin_headers = {"Authorization": f"Bearer {admin['tokens']['access_token']}"}
         agent_id = agent["me"]["id"]
-        print("OK users", ADMIN_EMAIL, SUPERVISOR_EMAIL, EMAIL, agent_id)
+        print(
+            "OK users",
+            ADMIN_EMAIL,
+            SUPERVISOR_EMAIL,
+            EMAIL,
+            civil["me"]["email"],
+            agent_id,
+        )
         _ = supervisor  # seeded for approve/reject API
 
         campaigns = client.get("/api/v1/census/campaigns", headers=admin_headers)

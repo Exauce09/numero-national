@@ -1,18 +1,14 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { displayName, personOrigin, searchPersons, type Person } from "../registry";
+import { searchEveryone } from "../nationalSearch";
+import { displayName, personOrigin, type Person } from "../registry";
 
 export default function TopbarSearch() {
   const navigate = useNavigate();
   const rootRef = useRef<HTMLDivElement>(null);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
-
-  const hits = useMemo(() => {
-    const needle = q.trim();
-    if (needle.length < 1) return [] as Person[];
-    return searchPersons(needle).slice(0, 8);
-  }, [q]);
+  const [hits, setHits] = useState<Person[]>([]);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -21,6 +17,24 @@ export default function TopbarSearch() {
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
+
+  useEffect(() => {
+    const needle = q.trim();
+    if (needle.length < 1) {
+      setHits([]);
+      return;
+    }
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      void searchEveryone(needle).then((rows) => {
+        if (!cancelled) setHits(rows.slice(0, 8));
+      });
+    }, 220);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [q]);
 
   function goSearch(query: string) {
     const value = query.trim();
@@ -81,11 +95,6 @@ export default function TopbarSearch() {
                     {loc.ville || loc.province
                       ? ` · ${[loc.ville, loc.province].filter(Boolean).join(", ")}`
                       : ""}
-                    {loc.source === "father"
-                      ? " (père)"
-                      : loc.source === "mother"
-                        ? " (mère)"
-                        : ""}
                   </span>
                 </button>
               );
