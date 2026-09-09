@@ -6,7 +6,7 @@ import {
   demoValidateDeclaration,
   type Declaration,
 } from "../api";
-import GeoCascade, { type GeoSelection } from "../components/GeoCascade";
+import GeoCascade, { GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
 
 export default function DeclarationsPage() {
   const [rows, setRows] = useState<Declaration[]>([]);
@@ -87,6 +87,8 @@ export default function DeclarationsPage() {
           </div>
           <div className="full">
             <GeoCascade
+              embedded
+              levels={GEO_PRESETS.place}
               value={geo}
               onChange={(g) => {
                 setGeo(g);
@@ -94,10 +96,6 @@ export default function DeclarationsPage() {
               }}
               label="Commune de la déclaration"
             />
-          </div>
-          <div>
-            <label className="form-label">Code commune</label>
-            <input className="form-control" value={commune} onChange={(e) => setCommune(e.target.value)} />
           </div>
           <div className="full">
             <label className="form-label">Notes / payload</label>

@@ -513,6 +513,17 @@
   margin-bottom: 0.1rem;
 }
 
+.geo-embedded {
+  width: 100%;
+}
+
+.geo-embedded .geo-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .topbar-search {
   position: relative;
   flex: 1 1 220px;

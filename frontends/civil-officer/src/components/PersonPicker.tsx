@@ -1,4 +1,5 @@
 import { FormEvent, useMemo, useState } from "react";
+import GeoCascade, { GEO_PRESETS, type GeoSelection } from "./GeoCascade";
 import {
   ETAT_CIVIL_OPTIONS,
   addPerson,
@@ -23,7 +24,6 @@ const emptyForm = {
   prenom: "",
   sexe: "M" as Sexe,
   date_naissance: "",
-  lieu_naissance: "",
   etat_civil: "CELIBATAIRE" as EtatCivil,
 };
 
@@ -38,6 +38,7 @@ export default function PersonPicker({
   const [open, setOpen] = useState(false);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [geoNaissance, setGeoNaissance] = useState<GeoSelection>({});
   const [error, setError] = useState<string | null>(null);
 
   const results = useMemo(() => searchPersons(query).slice(0, 12), [query, open, modal, value]);
@@ -62,11 +63,12 @@ export default function PersonPicker({
         prenom: form.prenom.trim(),
         sexe: form.sexe,
         date_naissance: form.date_naissance,
-        lieu_naissance: form.lieu_naissance.trim(),
+        lieu_naissance: geoNaissance.label || "",
         etat_civil: form.etat_civil,
       });
       onChange(person);
       setForm(emptyForm);
+      setGeoNaissance({});
       setModal(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ajout impossible.");
@@ -183,12 +185,14 @@ export default function PersonPicker({
                   required
                 />
               </div>
-              <div>
+              <div className="full">
                 <label className="form-label">Lieu de naissance</label>
-                <input
-                  className="form-control"
-                  value={form.lieu_naissance}
-                  onChange={(e) => setForm({ ...form, lieu_naissance: e.target.value })}
+                <GeoCascade
+                  embedded
+                  levels={GEO_PRESETS.place}
+                  value={geoNaissance}
+                  onChange={setGeoNaissance}
+                  label="Lieu de naissance"
                 />
               </div>
               <div>

@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { api } from "../api";
-import GeoCascade, { type GeoSelection } from "../components/GeoCascade";
+import GeoCascade, { GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
 
 export default function StatsPage() {
   const [commune, setCommune] = useState("KIN-GOMBE");
@@ -32,6 +32,8 @@ export default function StatsPage() {
       <p className="page-lead">Indicateurs agrégés par type d&apos;acte pour la commune.</p>
       <div className="panel">
         <GeoCascade
+          embedded
+          levels={GEO_PRESETS.place}
           value={geo}
           onChange={(g) => {
             setGeo(g);
@@ -40,11 +42,7 @@ export default function StatsPage() {
           label="Sélectionner la commune"
         />
         <form className="toolbar" onSubmit={onSubmit} style={{ marginTop: "1rem" }}>
-          <div>
-            <label className="form-label">Code commune</label>
-            <input className="form-control" value={commune} onChange={(e) => setCommune(e.target.value)} />
-          </div>
-          <button className="btn-primary" style={{ width: "auto" }} disabled={busy}>
+          <button className="btn-primary" style={{ width: "auto" }} disabled={busy || !commune}>
             {busy ? "Chargement…" : "Charger"}
           </button>
         </form>

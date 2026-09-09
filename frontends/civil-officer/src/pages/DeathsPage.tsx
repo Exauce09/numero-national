@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
+import GeoCascade, { GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
 import PersonPicker from "../components/PersonPicker";
 import { getOfficerCommune } from "../commune";
 import { addAct, displayName, type Act, type Person } from "../registry";
@@ -8,10 +9,10 @@ export default function DeathsPage() {
   const [deceased, setDeceased] = useState<Person | null>(null);
   const [responsable, setResponsable] = useState<Person | null>(null);
   const [cause, setCause] = useState("");
-  const [lieuDeces, setLieuDeces] = useState("");
-  const [lieuEnterrement, setLieuEnterrement] = useState("");
+  const [geoDeces, setGeoDeces] = useState<GeoSelection>({});
+  const [geoEnterrement, setGeoEnterrement] = useState<GeoSelection>({});
   const [cimetiere, setCimetiere] = useState("");
-  const [lieuEnregistrement, setLieuEnregistrement] = useState("");
+  const [geoEnregistrement, setGeoEnregistrement] = useState<GeoSelection>({});
   const [dateDeces, setDateDeces] = useState("");
   const [dateEnterrement, setDateEnterrement] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -37,11 +38,14 @@ export default function DeathsPage() {
       deceased_id: deceased.id,
       deceased_name: displayName(deceased),
       cause_deces: cause.trim(),
-      lieu_deces: lieuDeces.trim(),
-      lieu_enterrement: lieuEnterrement.trim(),
+      lieu_deces: geoDeces.label || "",
+      geo_deces: geoDeces,
+      lieu_enterrement: geoEnterrement.label || "",
+      geo_enterrement: geoEnterrement,
       cimetiere: cimetiere.trim(),
-      lieu_enregistrement: lieuEnregistrement.trim(),
-      commune_code: commune.code,
+      lieu_enregistrement: geoEnregistrement.label || "",
+      geo_enregistrement: geoEnregistrement,
+      commune_code: geoEnregistrement.commune_code || geoDeces.commune_code || commune.code,
       date_deces: dateDeces,
       date_enterrement: dateEnterrement,
       responsable_id: responsable?.id ?? null,
@@ -77,21 +81,23 @@ export default function DeathsPage() {
 
           <div className="full">
             <label className="form-label">Lieu du Décès</label>
-            <input
-              className="form-control"
-              value={lieuDeces}
-              onChange={(e) => setLieuDeces(e.target.value)}
-              placeholder="Ex. Kinshasa, Gombe"
+            <GeoCascade
+              embedded
+              levels={GEO_PRESETS.place}
+              value={geoDeces}
+              onChange={setGeoDeces}
+              label="Lieu du décès"
             />
           </div>
 
-          <div>
+          <div className="full">
             <label className="form-label">Lieu d&apos;enterrement</label>
-            <input
-              className="form-control"
-              value={lieuEnterrement}
-              onChange={(e) => setLieuEnterrement(e.target.value)}
-              placeholder="Lieu d'enterrement"
+            <GeoCascade
+              embedded
+              levels={GEO_PRESETS.place}
+              value={geoEnterrement}
+              onChange={setGeoEnterrement}
+              label="Lieu d'enterrement"
             />
           </div>
           <div>
@@ -106,11 +112,12 @@ export default function DeathsPage() {
 
           <div className="full">
             <label className="form-label">Lieu d&apos;enregistrement</label>
-            <input
-              className="form-control"
-              value={lieuEnregistrement}
-              onChange={(e) => setLieuEnregistrement(e.target.value)}
-              placeholder="Ex. Commune de Gombe"
+            <GeoCascade
+              embedded
+              levels={GEO_PRESETS.place}
+              value={geoEnregistrement}
+              onChange={setGeoEnregistrement}
+              label="Lieu d'enregistrement"
             />
           </div>
 

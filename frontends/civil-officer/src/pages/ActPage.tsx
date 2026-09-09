@@ -5,6 +5,7 @@ import {
   demoListActs,
   type CivilAct,
 } from "../api";
+import GeoCascade, { GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
 
 type Props = { kind: string; title: string };
 
@@ -14,7 +15,6 @@ const FIELDS: Record<string, { key: string; label: string }[]> = {
     { key: "child_given_names", label: "Prénoms" },
     { key: "sex", label: "Sexe (M/F)" },
     { key: "date_of_birth", label: "Date de naissance" },
-    { key: "place_of_birth", label: "Lieu de naissance" },
     { key: "mother_name", label: "Nom de la mère" },
     { key: "father_name", label: "Nom du père" },
   ],
@@ -22,7 +22,6 @@ const FIELDS: Record<string, { key: string; label: string }[]> = {
     { key: "spouse1_name", label: "Conjoint 1" },
     { key: "spouse2_name", label: "Conjoint 2" },
     { key: "marriage_date", label: "Date du mariage" },
-    { key: "marriage_place", label: "Lieu" },
   ],
   divorces: [
     { key: "spouse1_name", label: "Conjoint 1" },
@@ -33,7 +32,6 @@ const FIELDS: Record<string, { key: string; label: string }[]> = {
   deaths: [
     { key: "deceased_name", label: "Nom du défunt" },
     { key: "date_of_death", label: "Date du décès" },
-    { key: "place_of_death", label: "Lieu du décès" },
     { key: "cause", label: "Cause (optionnel)" },
   ],
   recognitions: [
@@ -52,6 +50,7 @@ const FIELDS: Record<string, { key: string; label: string }[]> = {
 export default function ActPage({ kind, title }: Props) {
   const fields = FIELDS[kind] ?? [{ key: "notes", label: "Notes" }];
   const [commune, setCommune] = useState("KIN-GOMBE");
+  const [geo, setGeo] = useState<GeoSelection>({});
   const [actNumber, setActNumber] = useState("");
   const [values, setValues] = useState<Record<string, string>>({});
   const [rows, setRows] = useState<CivilAct[]>([]);
@@ -71,16 +70,23 @@ export default function ActPage({ kind, title }: Props) {
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kind]);
+  }, [kind, commune]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     setMessage(null);
-    const payload = { ...values };
+    const placeLabel = geo.label || "";
+    const payload = {
+      ...values,
+      ...(kind === "births" ? { place_of_birth: placeLabel } : {}),
+      ...(kind === "marriages" ? { marriage_place: placeLabel } : {}),
+      ...(kind === "deaths" ? { place_of_death: placeLabel } : {}),
+      geo,
+    };
     const body = {
-      commune_code: commune,
+      commune_code: geo.commune_code || commune,
       act_number: actNumber || undefined,
       payload,
       status: "DRAFT",
@@ -89,7 +95,7 @@ export default function ActPage({ kind, title }: Props) {
       await api.createAct(kind, body);
       setMessage("Acte enregistré via l'API nationale.");
     } catch {
-      demoCreateAct(kind, payload, commune);
+      demoCreateAct(kind, payload, geo.commune_code || commune);
       setMessage("Acte enregistré en mode démo local (API indisponible).");
     }
     setValues({});
@@ -108,13 +114,16 @@ export default function ActPage({ kind, title }: Props) {
         {message ? <div className="success-banner">{message}</div> : null}
         {error ? <div className="login-error">{error}</div> : null}
         <form className="form-grid" onSubmit={onSubmit}>
-          <div>
-            <label className="form-label">Code commune *</label>
-            <input
-              className="form-control"
-              required
-              value={commune}
-              onChange={(e) => setCommune(e.target.value)}
+          <div className="full">
+            <GeoCascade
+              embedded
+              levels={GEO_PRESETS.place}
+              value={geo}
+              onChange={(g) => {
+                setGeo(g);
+                if (g.commune_code) setCommune(g.commune_code);
+              }}
+              label="Lieu / commune (base géographie)"
             />
           </div>
           <div>
@@ -145,10 +154,6 @@ export default function ActPage({ kind, title }: Props) {
 
       <div className="panel">
         <div className="toolbar">
-          <div>
-            <label className="form-label">Filtrer commune</label>
-            <input className="form-control" value={commune} onChange={(e) => setCommune(e.target.value)} />
-          </div>
           <button type="button" className="btn-secondary" onClick={() => void refresh()}>
             Actualiser
           </button>
@@ -160,27 +165,17 @@ export default function ActPage({ kind, title }: Props) {
               <th>Type</th>
               <th>Commune</th>
               <th>Statut</th>
-              <th>Créé</th>
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="muted">
-                  Aucun acte pour le moment.
-                </td>
+            {rows.map((r) => (
+              <tr key={r.id}>
+                <td>{r.act_number}</td>
+                <td>{r.act_type}</td>
+                <td>{r.commune_code}</td>
+                <td>{r.status}</td>
               </tr>
-            ) : (
-              rows.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.act_number}</td>
-                  <td>{r.act_type}</td>
-                  <td>{r.commune_code}</td>
-                  <td>{r.status}</td>
-                  <td>{new Date(r.created_at).toLocaleString("fr-FR")}</td>
-                </tr>
-              ))
-            )}
+            ))}
           </tbody>
         </table>
       </div>

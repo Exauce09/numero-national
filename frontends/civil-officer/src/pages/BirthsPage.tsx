@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
 import DataToolbar from "../components/DataToolbar";
+import GeoCascade, { GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
 import PersonPicker from "../components/PersonPicker";
 import {
   addAct,
@@ -20,7 +21,7 @@ export default function BirthsPage() {
   const [prenom, setPrenom] = useState("");
   const [sexe, setSexe] = useState<Sexe>("M");
   const [dateNaissance, setDateNaissance] = useState("");
-  const [lieuNaissance, setLieuNaissance] = useState("");
+  const [geoNaissance, setGeoNaissance] = useState<GeoSelection>({});
   const [mother, setMother] = useState<Person | null>(null);
   const [father, setFather] = useState<Person | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -44,13 +45,14 @@ export default function BirthsPage() {
       return;
     }
     try {
+      const lieuNaissance = geoNaissance.label || "";
       const child = addPerson({
         nom: nom.trim(),
         postnom: postnom.trim(),
         prenom: prenom.trim(),
         sexe,
         date_naissance: dateNaissance,
-        lieu_naissance: lieuNaissance.trim(),
+        lieu_naissance: lieuNaissance,
         etat_civil: "CELIBATAIRE",
         mother_id: mother.id,
         father_id: father?.id,
@@ -64,7 +66,8 @@ export default function BirthsPage() {
         sexe: child.sexe,
         date_naissance: child.date_naissance,
         lieu_naissance: child.lieu_naissance,
-        commune_code: commune.code,
+        geo_naissance: geoNaissance,
+        commune_code: geoNaissance.commune_code || commune.code,
         mother_id: mother.id,
         mother_name: `${mother.nom} ${mother.prenom}`,
         father_id: father?.id ?? null,
@@ -77,7 +80,7 @@ export default function BirthsPage() {
       setPostnom("");
       setPrenom("");
       setDateNaissance("");
-      setLieuNaissance("");
+      setGeoNaissance({});
       setMother(null);
       setFather(null);
       bump((n) => n + 1);
@@ -145,13 +148,14 @@ export default function BirthsPage() {
               required
             />
           </div>
-          <div>
+          <div className="full">
             <label className="form-label">Lieu de naissance</label>
-            <input
-              className="form-control"
-              value={lieuNaissance}
-              onChange={(e) => setLieuNaissance(e.target.value)}
-              placeholder="Ex. Kinshasa, Gombe"
+            <GeoCascade
+              embedded
+              levels={GEO_PRESETS.place}
+              value={geoNaissance}
+              onChange={setGeoNaissance}
+              label="Lieu de naissance"
             />
           </div>
           <div className="full">
@@ -183,12 +187,12 @@ export default function BirthsPage() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>N°</th>
+              <th>N° acte</th>
               <th>NIC</th>
               <th>Nom</th>
               <th>Sexe</th>
               <th>Naissance</th>
-              <th>Actions</th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -197,18 +201,18 @@ export default function BirthsPage() {
                 <td>{a.act_number}</td>
                 <td>{a.national_id}</td>
                 <td>
-                  {[a.payload.nom, a.payload.postnom, a.payload.prenom].filter(Boolean).join(" ")}
+                  {String(a.payload.nom ?? "")} {String(a.payload.prenom ?? "")}
                 </td>
                 <td>{String(a.payload.sexe ?? "")}</td>
                 <td>{String(a.payload.date_naissance ?? "")}</td>
-                <td className="table-actions">
+                <td>
                   <button
                     type="button"
                     className="btn-secondary btn-sm"
                     onClick={() => setViewAct(getAct(a.id) ?? a)}
                   >
                     Voir
-                  </button>
+                  </button>{" "}
                   <button
                     type="button"
                     className="btn-secondary btn-sm"
@@ -217,7 +221,7 @@ export default function BirthsPage() {
                       setEditJson(JSON.stringify(a.payload, null, 2));
                     }}
                   >
-                    Modifier
+                    Éditer
                   </button>
                 </td>
               </tr>
@@ -227,21 +231,24 @@ export default function BirthsPage() {
       </div>
 
       {viewAct ? (
-        <div className="modal-backdrop" onClick={() => setViewAct(null)}>
-          <div className="modal-panel modal-wide" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="btn-secondary" onClick={() => setViewAct(null)}>
-              Fermer
-            </button>
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal-panel" style={{ maxWidth: 640 }}>
+            <h3>Acte {viewAct.act_number}</h3>
             <ActPrintCard act={viewAct} />
+            <div className="modal-actions">
+              <button type="button" className="btn-secondary" onClick={() => setViewAct(null)}>
+                Fermer
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
 
       {editAct ? (
-        <div className="modal-backdrop" onClick={() => setEditAct(null)}>
-          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
-            <h3>Modifier l&apos;acte {editAct.act_number}</h3>
-            <textarea className="form-control code-area" value={editJson} onChange={(e) => setEditJson(e.target.value)} />
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal-panel" style={{ maxWidth: 640 }}>
+            <h3>Éditer {editAct.act_number}</h3>
+            <textarea className="form-control" rows={12} value={editJson} onChange={(e) => setEditJson(e.target.value)} />
             <div className="modal-actions">
               <button type="button" className="btn-secondary" onClick={() => setEditAct(null)}>
                 Annuler

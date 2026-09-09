@@ -1,5 +1,10 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
+import GeoCascade, {
+  GEO_PRESETS,
+  ORIGIN_FIELD_LABELS,
+  type GeoSelection,
+} from "../components/GeoCascade";
 import PersonPicker from "../components/PersonPicker";
 import {
   ETAT_CIVIL_OPTIONS,
@@ -14,36 +19,6 @@ import {
   type Sexe,
 } from "../registry";
 import { getOfficerCommune } from "../commune";
-
-/** Provinces RDC — formulaire Originaire. */
-const RDC_PROVINCES = [
-  "Bas-Uélé",
-  "Équateur",
-  "Haut-Katanga",
-  "Haut-Lomami",
-  "Haut-Uélé",
-  "Ituri",
-  "Kasaï",
-  "Kasaï Central",
-  "Kasaï Oriental",
-  "Kinshasa",
-  "Kongo Central",
-  "Kwango",
-  "Kwilu",
-  "Lomami",
-  "Lualaba",
-  "Mai-Ndombe",
-  "Maniema",
-  "Mongala",
-  "Nord-Kivu",
-  "Nord-Ubangi",
-  "Sankuru",
-  "Sud-Kivu",
-  "Sud-Ubangi",
-  "Tanganyika",
-  "Tshopo",
-  "Tshuapa",
-] as const;
 
 const STEPS = [
   { id: 1, label: "1. Identité" },
@@ -66,7 +41,7 @@ export default function CensusPage() {
   const [sexe, setSexe] = useState<Sexe>("M");
   const [etatCivil, setEtatCivil] = useState<EtatCivil>("CELIBATAIRE");
   const [profession, setProfession] = useState("");
-  const [lieuNaissance, setLieuNaissance] = useState("");
+  const [geoNaissance, setGeoNaissance] = useState<GeoSelection>({});
   const [dateNaissance, setDateNaissance] = useState("");
   const [hopitalNaissance, setHopitalNaissance] = useState("");
   const [languesParlees, setLanguesParlees] = useState("");
@@ -74,20 +49,12 @@ export default function CensusPage() {
   const [mere, setMere] = useState<Person | null>(null);
   const [nationalite, setNationalite] = useState("Congolaise");
   const [paysResidence, setPaysResidence] = useState("RDC");
-  const [provinceActuelle, setProvinceActuelle] = useState("");
-  const [villeActuelle, setVilleActuelle] = useState("");
-  const [communeActuelle, setCommuneActuelle] = useState("");
-  const [quartierActuel, setQuartierActuel] = useState("");
-  const [avenueActuelle, setAvenueActuelle] = useState("");
+  const [geoActuelle, setGeoActuelle] = useState<GeoSelection>({});
   const [numeroAvenue, setNumeroAvenue] = useState("");
   const [telephone, setTelephone] = useState("");
   const [email, setEmail] = useState("");
   const [boitePostale, setBoitePostale] = useState("");
-  const [provinceOrigine, setProvinceOrigine] = useState("");
-  const [villeOrigine, setVilleOrigine] = useState("");
-  const [territoireOrigine, setTerritoireOrigine] = useState("");
-  const [secteurOrigine, setSecteurOrigine] = useState("");
-  const [villageOrigine, setVillageOrigine] = useState("");
+  const [geoOrigine, setGeoOrigine] = useState<GeoSelection>({});
   const [tribu, setTribu] = useState("");
   const [photo, setPhoto] = useState<string | undefined>();
   const [empreinteGauche, setEmpreinteGauche] = useState("");
@@ -172,15 +139,15 @@ export default function CensusPage() {
   }
 
   function buildAdresse(): string {
-    return [
-      avenueActuelle.trim() && `Av. ${avenueActuelle.trim()}${numeroAvenue.trim() ? ` N° ${numeroAvenue.trim()}` : ""}`,
-      quartierActuel.trim(),
-      communeActuelle.trim(),
-      villeActuelle.trim(),
-      provinceActuelle.trim(),
-    ]
-      .filter(Boolean)
-      .join(", ");
+    const parts = [
+      geoActuelle.avenue_name &&
+        `Av. ${geoActuelle.avenue_name}${numeroAvenue.trim() ? ` N° ${numeroAvenue.trim()}` : ""}`,
+      geoActuelle.quartier_name,
+      geoActuelle.commune_name,
+      geoActuelle.ville_name,
+      geoActuelle.province_name,
+    ].filter(Boolean);
+    return parts.join(", ") || geoActuelle.label || "";
   }
 
   function onSubmit(e: FormEvent) {
@@ -190,13 +157,14 @@ export default function CensusPage() {
     try {
       const commune = getOfficerCommune();
       const adresse = buildAdresse();
+      const lieuNaissance = geoNaissance.label || "";
       const person = addPerson({
         nom: nom.trim(),
         postnom: postnom.trim(),
         prenom: prenom.trim(),
         sexe,
         date_naissance: dateNaissance,
-        lieu_naissance: lieuNaissance.trim(),
+        lieu_naissance: lieuNaissance,
         etat_civil: etatCivil,
         handicap_type: handicap,
         mother_id: mere?.id,
@@ -233,17 +201,18 @@ export default function CensusPage() {
         mere_id: mere?.id ?? null,
         nationalite: nationalite.trim() || null,
         pays_residence: paysResidence.trim() || null,
-        province_actuelle: provinceActuelle.trim() || null,
-        ville_actuelle: villeActuelle.trim() || null,
-        commune_actuelle: communeActuelle.trim() || null,
-        quartier_actuel: quartierActuel.trim() || null,
-        avenue_actuelle: avenueActuelle.trim() || null,
+        province_actuelle: geoActuelle.province_name || null,
+        ville_actuelle: geoActuelle.ville_name || null,
+        commune_actuelle: geoActuelle.commune_name || null,
+        quartier_actuel: geoActuelle.quartier_name || null,
+        avenue_actuelle: geoActuelle.avenue_name || null,
         numero_avenue: numeroAvenue.trim() || null,
         telephone: telephone.trim() || null,
         email: email.trim() || null,
         boite_postale: boitePostale.trim() || null,
         adresse_actuelle: adresse || null,
-        commune_code: commune.code,
+        geo_actuelle: geoActuelle,
+        commune_code: geoActuelle.commune_code || commune.code,
         handicap_type: person.handicap_type,
         has_photo: Boolean(photo),
         fingerprint_note: person.fingerprint_note ?? null,
@@ -252,11 +221,13 @@ export default function CensusPage() {
         parcours_universitaire: person.parcours_universitaire ?? null,
         parcours_professionnel: person.parcours_professionnel ?? null,
         situation_familiale: person.situation_familiale ?? null,
-        province_origine: provinceOrigine.trim() || null,
-        ville_origine: villeOrigine.trim() || null,
-        territoire_origine: territoireOrigine.trim() || null,
-        secteur_chefferie_commune: secteurOrigine.trim() || null,
-        village_origine: villageOrigine.trim() || null,
+        province_origine: geoOrigine.province_name || null,
+        ville_origine: geoOrigine.ville_name || null,
+        territoire_origine: geoOrigine.district_name || null,
+        secteur_chefferie_commune: geoOrigine.commune_name || null,
+        village_origine: geoOrigine.localite_name || null,
+        geo_origine: geoOrigine,
+        geo_naissance: geoNaissance,
         tribu: tribu.trim() || null,
         numero_admin: numeroAdmin.trim() || null,
       };
@@ -337,12 +308,14 @@ export default function CensusPage() {
                   <label className="form-label">Profession</label>
                   <input className="form-control" value={profession} onChange={(e) => setProfession(e.target.value)} />
                 </div>
-                <div>
+                <div className="full">
                   <label className="form-label">Lieu de naissance</label>
-                  <input
-                    className="form-control"
-                    value={lieuNaissance}
-                    onChange={(e) => setLieuNaissance(e.target.value)}
+                  <GeoCascade
+                    embedded
+                    label="Lieu de naissance"
+                    levels={GEO_PRESETS.place}
+                    value={geoNaissance}
+                    onChange={setGeoNaissance}
                   />
                 </div>
                 <div>
@@ -412,48 +385,14 @@ export default function CensusPage() {
 
             <fieldset className="id-fieldset">
               <legend>Adresse actuelle</legend>
-              <div className="form-grid">
-                <div>
-                  <label className="form-label">Province actuelle</label>
-                  <input
-                    className="form-control"
-                    value={provinceActuelle}
-                    onChange={(e) => setProvinceActuelle(e.target.value)}
-                    placeholder="— Choisissez / saisissez —"
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Ville actuelle</label>
-                  <input
-                    className="form-control"
-                    value={villeActuelle}
-                    onChange={(e) => setVilleActuelle(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Commune</label>
-                  <input
-                    className="form-control"
-                    value={communeActuelle}
-                    onChange={(e) => setCommuneActuelle(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Quartier</label>
-                  <input
-                    className="form-control"
-                    value={quartierActuel}
-                    onChange={(e) => setQuartierActuel(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Avenue</label>
-                  <input
-                    className="form-control"
-                    value={avenueActuelle}
-                    onChange={(e) => setAvenueActuelle(e.target.value)}
-                  />
-                </div>
+              <GeoCascade
+                embedded
+                label="Adresse actuelle"
+                levels={GEO_PRESETS.address}
+                value={geoActuelle}
+                onChange={setGeoActuelle}
+              />
+              <div className="form-grid" style={{ marginTop: "0.75rem" }}>
                 <div>
                   <label className="form-label">N°</label>
                   <input
@@ -493,75 +432,15 @@ export default function CensusPage() {
             <h3 className="id-form-title" style={{ color: "var(--egouv-primary)" }}>
               3. Originaire
             </h3>
-            <div className="form-grid">
-              <div>
-                <label className="form-label">Province d&apos;origine :</label>
-                <select
-                  className="form-control"
-                  value={provinceOrigine}
-                  onChange={(e) => setProvinceOrigine(e.target.value)}
-                >
-                  <option value="">-- choisissez --</option>
-                  {RDC_PROVINCES.map((p) => (
-                    <option key={p} value={p}>
-                      {p.toUpperCase()}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">Ville d&apos;origine :</label>
-                <input
-                  className="form-control"
-                  list="villes-origine"
-                  value={villeOrigine}
-                  onChange={(e) => setVilleOrigine(e.target.value)}
-                  placeholder="-- choisissez --"
-                />
-                <datalist id="villes-origine">
-                  <option value="Kinshasa" />
-                  <option value="Lubumbashi" />
-                  <option value="Mbuji-Mayi" />
-                  <option value="Kananga" />
-                  <option value="Kisangani" />
-                  <option value="Bukavu" />
-                  <option value="Goma" />
-                  <option value="Kolwezi" />
-                  <option value="Likasi" />
-                  <option value="Tshikapa" />
-                  <option value="Bunia" />
-                  <option value="Matadi" />
-                  <option value="Mbandaka" />
-                  <option value="Bandundu" />
-                </datalist>
-              </div>
-              <div>
-                <label className="form-label">Territoire :</label>
-                <input
-                  className="form-control"
-                  value={territoireOrigine}
-                  onChange={(e) => setTerritoireOrigine(e.target.value)}
-                  placeholder="-- choisissez --"
-                />
-              </div>
-              <div>
-                <label className="form-label">Secteur / Chefferie / Commune :</label>
-                <input
-                  className="form-control"
-                  value={secteurOrigine}
-                  onChange={(e) => setSecteurOrigine(e.target.value)}
-                  placeholder="-- choisissez --"
-                />
-              </div>
-              <div>
-                <label className="form-label">Village :</label>
-                <input
-                  className="form-control"
-                  value={villageOrigine}
-                  onChange={(e) => setVillageOrigine(e.target.value)}
-                  placeholder="-- choisissez --"
-                />
-              </div>
+            <GeoCascade
+              embedded
+              label="Origine"
+              levels={GEO_PRESETS.origin}
+              fieldLabels={ORIGIN_FIELD_LABELS}
+              value={geoOrigine}
+              onChange={setGeoOrigine}
+            />
+            <div className="form-grid" style={{ marginTop: "0.75rem" }}>
               <div>
                 <label className="form-label">Tribu :</label>
                 <input

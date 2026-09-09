@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api, type Residence } from "../api";
-import GeoCascade, { type GeoSelection } from "../components/GeoCascade";
+import GeoCascade, { GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
 
 export default function ResidencePage() {
   const [commune, setCommune] = useState("KIN-GOMBE");
@@ -74,6 +74,8 @@ export default function ResidencePage() {
           </div>
           <div className="full">
             <GeoCascade
+              embedded
+              levels={GEO_PRESETS.address}
               value={geo}
               onChange={(g) => {
                 setGeo(g);
@@ -82,14 +84,6 @@ export default function ResidencePage() {
               }}
               label="Adresse territoriale"
             />
-          </div>
-          <div>
-            <label className="form-label">Code commune</label>
-            <input className="form-control" required value={commune} onChange={(e) => setCommune(e.target.value)} />
-          </div>
-          <div className="full">
-            <label className="form-label">Adresse (complément)</label>
-            <input className="form-control" value={address} onChange={(e) => setAddress(e.target.value)} />
           </div>
           <div className="full">
             <button className="btn-primary" style={{ width: "auto", minWidth: 220 }} disabled={busy}>

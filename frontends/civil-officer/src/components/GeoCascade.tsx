@@ -23,6 +23,44 @@ export type GeoSelection = {
   label?: string;
 };
 
+export type GeoLevel =
+  | "province"
+  | "ville"
+  | "district"
+  | "commune"
+  | "localite"
+  | "quartier"
+  | "avenue"
+  | "rue";
+
+/** Profils courants pour réutiliser la base géo partout. */
+export const GEO_PRESETS = {
+  full: ["province", "ville", "district", "commune", "localite", "quartier", "avenue", "rue"] as GeoLevel[],
+  /** Adresse urbaine (actuelle). */
+  address: ["province", "ville", "commune", "quartier", "avenue"] as GeoLevel[],
+  /** Origine / territoire rural. */
+  origin: ["province", "ville", "district", "commune", "localite"] as GeoLevel[],
+  /** Lieu simple (naissance, décès, enregistrement…). */
+  place: ["province", "ville", "commune"] as GeoLevel[],
+} as const;
+
+const DEFAULT_FIELD_LABELS: Record<GeoLevel, string> = {
+  province: "Province",
+  ville: "Ville",
+  district: "District",
+  commune: "Commune",
+  localite: "Localité",
+  quartier: "Quartier",
+  avenue: "Avenue",
+  rue: "Rue",
+};
+
+export const ORIGIN_FIELD_LABELS: Partial<Record<GeoLevel, string>> = {
+  district: "Territoire",
+  commune: "Secteur / Chefferie / Commune",
+  localite: "Village",
+};
+
 type Item = { id: string; code: string; name: string; voie_type?: string; chef_lieu?: string };
 
 type AddKind = "district" | "commune" | "localite" | "quartier" | "avenue" | "rue";
@@ -39,7 +77,10 @@ async function fetchItems(path: string): Promise<Item[]> {
   }
 }
 
-async function postJson(path: string, body: Record<string, unknown>): Promise<{ ok: true; data: Item } | { ok: false; error: string }> {
+async function postJson(
+  path: string,
+  body: Record<string, unknown>,
+): Promise<{ ok: true; data: Item } | { ok: false; error: string }> {
   try {
     const res = await fetch(`${BASE}${path}`, {
       method: "POST",
@@ -70,9 +111,27 @@ type Props = {
   value?: GeoSelection;
   onChange: (v: GeoSelection) => void;
   label?: string;
+  /** Niveaux affichés (défaut : cascade complète). */
+  levels?: GeoLevel[];
+  /** Intégré dans un fieldset (sans encadré panel). */
+  embedded?: boolean;
+  /** Afficher les boutons + Ajouter (défaut true). */
+  allowAdd?: boolean;
+  fieldLabels?: Partial<Record<GeoLevel, string>>;
 };
 
-export default function GeoCascade({ value, onChange, label = "Adresse territoriale RDC" }: Props) {
+export default function GeoCascade({
+  value,
+  onChange,
+  label = "Adresse territoriale RDC",
+  levels = GEO_PRESETS.full,
+  embedded = false,
+  allowAdd = true,
+  fieldLabels,
+}: Props) {
+  const show = (level: GeoLevel) => levels.includes(level);
+  const lbl = (level: GeoLevel) => fieldLabels?.[level] ?? DEFAULT_FIELD_LABELS[level];
+
   const [provinces, setProvinces] = useState<Item[]>([]);
   const [districts, setDistricts] = useState<Item[]>([]);
   const [villes, setVilles] = useState<Item[]>([]);
@@ -121,8 +180,8 @@ export default function GeoCascade({ value, onChange, label = "Adresse territori
   async function onProvince(id: string) {
     const p = provinces.find((x) => x.id === id);
     emit({ province_id: id, province_name: p?.name });
-    setDistricts(await fetchItems(`/geo/districts?province_id=${id}`));
-    setVilles(await fetchItems(`/geo/villes?province_id=${id}`));
+    setDistricts(show("district") ? await fetchItems(`/geo/districts?province_id=${id}`) : []);
+    setVilles(show("ville") ? await fetchItems(`/geo/villes?province_id=${id}`) : []);
     setCommunes([]);
     setLocalites([]);
     setQuartiers([]);
@@ -148,7 +207,7 @@ export default function GeoCascade({ value, onChange, label = "Adresse territori
       localite_id: undefined,
       localite_name: undefined,
     });
-    setCommunes(await fetchItems(`/geo/communes?ville_id=${id}`));
+    setCommunes(show("commune") ? await fetchItems(`/geo/communes?ville_id=${id}`) : []);
     setQuartiers([]);
     setAvenues([]);
     setRues([]);
@@ -157,10 +216,19 @@ export default function GeoCascade({ value, onChange, label = "Adresse territori
 
   async function onDistrict(id: string) {
     const d = districts.find((x) => x.id === id);
-    emit({ ...sel, district_id: id, district_name: d?.name });
-    const byDist = await fetchItems(`/geo/communes?district_id=${id}`);
+    emit({
+      ...sel,
+      district_id: id,
+      district_name: d?.name,
+      commune_id: undefined,
+      commune_name: undefined,
+      commune_code: undefined,
+      localite_id: undefined,
+      localite_name: undefined,
+    });
+    const byDist = show("commune") ? await fetchItems(`/geo/communes?district_id=${id}`) : [];
     if (byDist.length) setCommunes(byDist);
-    setLocalites(await fetchItems(`/geo/localites?district_id=${id}`));
+    setLocalites(show("localite") ? await fetchItems(`/geo/localites?district_id=${id}`) : []);
   }
 
   async function onCommune(id: string) {
@@ -176,9 +244,11 @@ export default function GeoCascade({ value, onChange, label = "Adresse territori
       avenue_name: undefined,
       rue_id: undefined,
       rue_name: undefined,
+      localite_id: undefined,
+      localite_name: undefined,
     });
-    setQuartiers(await fetchItems(`/geo/quartiers?commune_id=${id}`));
-    setLocalites(await fetchItems(`/geo/localites?commune_id=${id}`));
+    setQuartiers(show("quartier") ? await fetchItems(`/geo/quartiers?commune_id=${id}`) : []);
+    setLocalites(show("localite") ? await fetchItems(`/geo/localites?commune_id=${id}`) : []);
     setAvenues([]);
     setRues([]);
   }
@@ -199,6 +269,7 @@ export default function GeoCascade({ value, onChange, label = "Adresse territori
       rue_id: undefined,
       rue_name: undefined,
     });
+    if (!show("avenue") && !show("rue")) return;
     const voies = await fetchItems(`/geo/voies?quartier_id=${id}`);
     setAvenues(voies.filter((v) => v.voie_type === "AVENUE"));
     setRues(voies.filter((v) => v.voie_type === "RUE"));
@@ -216,7 +287,7 @@ export default function GeoCascade({ value, onChange, label = "Adresse territori
       case "district":
         return Boolean(sel.province_id);
       case "commune":
-        return Boolean(sel.ville_id);
+        return Boolean(sel.ville_id || sel.district_id);
       case "localite":
         return Boolean(sel.commune_id || sel.district_id);
       case "quartier":
@@ -247,7 +318,7 @@ export default function GeoCascade({ value, onChange, label = "Adresse territori
       result = await postJson("/geo/districts", { province_id: sel.province_id, name });
     } else if (addKind === "commune") {
       result = await postJson("/geo/communes", {
-        ville_id: sel.ville_id,
+        ville_id: sel.ville_id || null,
         district_id: sel.district_id || null,
         name,
       });
@@ -299,17 +370,17 @@ export default function GeoCascade({ value, onChange, label = "Adresse territori
   }
 
   const addTitles: Record<AddKind, string> = {
-    district: "Ajouter un district",
-    commune: "Ajouter une commune",
-    localite: "Ajouter une localité",
-    quartier: "Ajouter un quartier",
-    avenue: "Ajouter une avenue",
-    rue: "Ajouter une rue",
+    district: `Ajouter — ${lbl("district")}`,
+    commune: `Ajouter — ${lbl("commune")}`,
+    localite: `Ajouter — ${lbl("localite")}`,
+    quartier: `Ajouter — ${lbl("quartier")}`,
+    avenue: `Ajouter — ${lbl("avenue")}`,
+    rue: `Ajouter — ${lbl("rue")}`,
   };
 
   function Field({
     labelText,
-    value,
+    value: fieldValue,
     disabled,
     options,
     onPick,
@@ -326,7 +397,7 @@ export default function GeoCascade({ value, onChange, label = "Adresse territori
       <div>
         <div className="geo-field-head">
           <label className="form-label">{labelText}</label>
-          {addKindBtn ? (
+          {allowAdd && addKindBtn ? (
             <button
               type="button"
               className="btn-add btn-sm"
@@ -340,7 +411,7 @@ export default function GeoCascade({ value, onChange, label = "Adresse territori
         </div>
         <select
           className="form-control"
-          value={value}
+          value={fieldValue}
           disabled={disabled}
           onChange={(e) => void onPick(e.target.value)}
         >
@@ -355,92 +426,106 @@ export default function GeoCascade({ value, onChange, label = "Adresse territori
     );
   }
 
-  return (
-    <div className="panel" style={{ marginTop: 0 }}>
-      <h3 className="panel-title" style={{ marginTop: 0 }}>
-        {label}
-      </h3>
+  const body = (
+    <>
       {hint ? <p className="muted">{hint}</p> : null}
-      <p className="muted small">
-        Si un district, une commune, une localité, un quartier, une avenue ou une rue manque, utilisez{" "}
-        <strong>+ Ajouter</strong>. Un doublon (même nom, autre orthographe) est refusé.
-      </p>
+      {!embedded ? (
+        <p className="muted small">
+          Données chargées depuis la base géographie. Si une entrée manque, utilisez <strong>+ Ajouter</strong>.
+        </p>
+      ) : null}
       <div className="form-grid">
-        <Field
-          labelText="Province"
-          value={sel.province_id ?? ""}
-          options={provinces}
-          onPick={(id) => void onProvince(id)}
-        />
-        <Field
-          labelText="Ville"
-          value={sel.ville_id ?? ""}
-          disabled={!sel.province_id}
-          options={villes}
-          onPick={(id) => void onVille(id)}
-        />
-        <Field
-          labelText="District"
-          value={sel.district_id ?? ""}
-          disabled={!sel.province_id}
-          options={districts}
-          onPick={(id) => void onDistrict(id)}
-          addKindBtn="district"
-        />
-        <Field
-          labelText="Commune"
-          value={sel.commune_id ?? ""}
-          disabled={!sel.ville_id && !sel.district_id}
-          options={communes}
-          onPick={(id) => void onCommune(id)}
-          addKindBtn="commune"
-        />
-        <Field
-          labelText="Localité"
-          value={sel.localite_id ?? ""}
-          disabled={!sel.commune_id && !sel.district_id}
-          options={localites}
-          onPick={(id) => void onLocalite(id)}
-          addKindBtn="localite"
-        />
-        <Field
-          labelText="Quartier"
-          value={sel.quartier_id ?? ""}
-          disabled={!sel.commune_id}
-          options={quartiers}
-          onPick={(id) => void onQuartier(id)}
-          addKindBtn="quartier"
-        />
-        <Field
-          labelText="Avenue"
-          value={sel.avenue_id ?? ""}
-          disabled={!sel.quartier_id}
-          options={avenues}
-          onPick={(id) => {
-            const a = avenues.find((x) => x.id === id);
-            emit({ ...sel, avenue_id: id, avenue_name: a?.name });
-          }}
-          addKindBtn="avenue"
-        />
-        <Field
-          labelText="Rue"
-          value={sel.rue_id ?? ""}
-          disabled={!sel.quartier_id}
-          options={rues}
-          onPick={(id) => {
-            const r = rues.find((x) => x.id === id);
-            emit({ ...sel, rue_id: id, rue_name: r?.name });
-          }}
-          addKindBtn="rue"
-        />
+        {show("province") ? (
+          <Field
+            labelText={lbl("province")}
+            value={sel.province_id ?? ""}
+            options={provinces}
+            onPick={(id) => void onProvince(id)}
+          />
+        ) : null}
+        {show("ville") ? (
+          <Field
+            labelText={lbl("ville")}
+            value={sel.ville_id ?? ""}
+            disabled={!sel.province_id}
+            options={villes}
+            onPick={(id) => void onVille(id)}
+          />
+        ) : null}
+        {show("district") ? (
+          <Field
+            labelText={lbl("district")}
+            value={sel.district_id ?? ""}
+            disabled={!sel.province_id}
+            options={districts}
+            onPick={(id) => void onDistrict(id)}
+            addKindBtn="district"
+          />
+        ) : null}
+        {show("commune") ? (
+          <Field
+            labelText={lbl("commune")}
+            value={sel.commune_id ?? ""}
+            disabled={!sel.ville_id && !sel.district_id}
+            options={communes}
+            onPick={(id) => void onCommune(id)}
+            addKindBtn="commune"
+          />
+        ) : null}
+        {show("localite") ? (
+          <Field
+            labelText={lbl("localite")}
+            value={sel.localite_id ?? ""}
+            disabled={!sel.commune_id && !sel.district_id}
+            options={localites}
+            onPick={(id) => void onLocalite(id)}
+            addKindBtn="localite"
+          />
+        ) : null}
+        {show("quartier") ? (
+          <Field
+            labelText={lbl("quartier")}
+            value={sel.quartier_id ?? ""}
+            disabled={!sel.commune_id}
+            options={quartiers}
+            onPick={(id) => void onQuartier(id)}
+            addKindBtn="quartier"
+          />
+        ) : null}
+        {show("avenue") ? (
+          <Field
+            labelText={lbl("avenue")}
+            value={sel.avenue_id ?? ""}
+            disabled={!sel.quartier_id}
+            options={avenues}
+            onPick={(id) => {
+              const a = avenues.find((x) => x.id === id);
+              emit({ ...sel, avenue_id: id, avenue_name: a?.name });
+            }}
+            addKindBtn="avenue"
+          />
+        ) : null}
+        {show("rue") ? (
+          <Field
+            labelText={lbl("rue")}
+            value={sel.rue_id ?? ""}
+            disabled={!sel.quartier_id}
+            options={rues}
+            onPick={(id) => {
+              const r = rues.find((x) => x.id === id);
+              emit({ ...sel, rue_id: id, rue_name: r?.name });
+            }}
+            addKindBtn="rue"
+          />
+        ) : null}
       </div>
       {sel.label ? (
-        <p className="muted" style={{ marginBottom: 0 }}>
-          Adresse : <strong>{sel.label}</strong>
+        <p className="muted" style={{ marginBottom: 0, marginTop: "0.65rem" }}>
+          Sélection : <strong>{sel.label}</strong>
           {sel.commune_code ? (
             <>
               {" "}
-              · code commune <code>{sel.commune_code}</code>
+              · code <code>{sel.commune_code}</code>
             </>
           ) : null}
         </p>
@@ -451,8 +536,7 @@ export default function GeoCascade({ value, onChange, label = "Adresse territori
           <form className="modal-panel" onSubmit={(e) => void submitAdd(e)}>
             <h3>{addTitles[addKind]}</h3>
             <p className="muted small">
-              Le nom est enregistré en base. Une variante déjà présente (accents, majuscules, « Av. » / « Rue »)
-              sera refusée.
+              Enregistrement en base. Un doublon (même nom, autre orthographe) est refusé.
             </p>
             {addError ? <div className="login-error">{addError}</div> : null}
             {addOk ? <div className="success-banner">{addOk}</div> : null}
@@ -476,6 +560,19 @@ export default function GeoCascade({ value, onChange, label = "Adresse territori
           </form>
         </div>
       ) : null}
+    </>
+  );
+
+  if (embedded) {
+    return <div className="geo-embedded">{body}</div>;
+  }
+
+  return (
+    <div className="panel" style={{ marginTop: 0 }}>
+      <h3 className="panel-title" style={{ marginTop: 0 }}>
+        {label}
+      </h3>
+      {body}
     </div>
   );
 }

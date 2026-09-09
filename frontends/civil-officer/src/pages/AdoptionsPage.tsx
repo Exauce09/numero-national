@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
-import GeoCascade, { type GeoSelection } from "../components/GeoCascade";
+import GeoCascade, { GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
 import PersonPicker from "../components/PersonPicker";
 import { addAct, displayName, type Act, type Person } from "../registry";
 
@@ -9,8 +9,6 @@ export default function AdoptionsPage() {
   const [enfant, setEnfant] = useState<Person | null>(null);
   const [officier, setOfficier] = useState<Person | null>(null);
   const [motif, setMotif] = useState("");
-  const [lieuAdoption, setLieuAdoption] = useState("");
-  const [lieuComplement, setLieuComplement] = useState("");
   const [geo, setGeo] = useState<GeoSelection>({});
   const [dateAdoption, setDateAdoption] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -31,8 +29,8 @@ export default function AdoptionsPage() {
       motif,
       officier_id: officier?.id ?? null,
       officier_name: officier ? displayName(officier) : null,
-      lieu_adoption: (geo.label || lieuAdoption).trim(),
-      lieu_complement: lieuComplement,
+      lieu_adoption: geo.label || "",
+      geo,
       commune_code: geo.commune_code ?? null,
       date_adoption: dateAdoption,
     };
@@ -63,20 +61,11 @@ export default function AdoptionsPage() {
           </div>
           <div className="full">
             <GeoCascade
+              embedded
+              levels={GEO_PRESETS.place}
               value={geo}
-              onChange={(g) => {
-                setGeo(g);
-                if (g.label) setLieuAdoption(g.label);
-              }}
-              label="Lieu d'adoption — territoire RDC"
-            />
-          </div>
-          <div className="full">
-            <label className="form-label">Complément lieu</label>
-            <input
-              className="form-control"
-              value={lieuComplement}
-              onChange={(e) => setLieuComplement(e.target.value)}
+              onChange={setGeo}
+              label="Lieu d'adoption"
             />
           </div>
           <div>

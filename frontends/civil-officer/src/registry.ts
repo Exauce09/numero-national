@@ -212,11 +212,20 @@ export function personLocation(personId: string, nic?: string): { province: stri
       String(a.payload.person_id ?? a.payload.child_id ?? a.payload.deceased_id ?? "") === personId,
   );
   for (const a of acts) {
+    const nested = (a.payload.geo_actuelle ??
+      a.payload.geo_origine ??
+      a.payload.geo_naissance ??
+      a.payload.geo ??
+      {}) as Record<string, unknown>;
     const province = String(
-      a.payload.province_actuelle ?? a.payload.province_origine ?? a.payload.province ?? "",
+      a.payload.province_actuelle ??
+        a.payload.province_origine ??
+        a.payload.province ??
+        nested.province_name ??
+        "",
     ).trim();
     const ville = String(
-      a.payload.ville_actuelle ?? a.payload.ville_origine ?? a.payload.ville ?? "",
+      a.payload.ville_actuelle ?? a.payload.ville_origine ?? a.payload.ville ?? nested.ville_name ?? "",
     ).trim();
     if (province || ville) return { province, ville };
   }

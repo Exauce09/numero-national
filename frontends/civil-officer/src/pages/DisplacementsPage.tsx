@@ -1,13 +1,12 @@
 import { FormEvent, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
-import GeoCascade, { type GeoSelection } from "../components/GeoCascade";
+import GeoCascade, { GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
 import PersonPicker from "../components/PersonPicker";
 import { addAct, displayName, type Act, type Person } from "../registry";
 
 export default function DisplacementsPage() {
   const [personne, setPersonne] = useState<Person | null>(null);
   const [officier, setOfficier] = useState<Person | null>(null);
-  const [lieuAller, setLieuAller] = useState("");
   const [geo, setGeo] = useState<GeoSelection>({});
   const [motif, setMotif] = useState("");
   const [dateDeplacement, setDateDeplacement] = useState("");
@@ -25,7 +24,8 @@ export default function DisplacementsPage() {
     const payload = {
       person_id: personne.id,
       person_name: displayName(personne),
-      lieu_a_aller: (geo.label || lieuAller).trim(),
+      lieu_a_aller: geo.label || "",
+      geo,
       commune_code: geo.commune_code ?? null,
       motif,
       date_deplacement: dateDeplacement,
@@ -50,17 +50,12 @@ export default function DisplacementsPage() {
           </div>
           <div className="full">
             <GeoCascade
+              embedded
+              levels={GEO_PRESETS.address}
               value={geo}
-              onChange={(g) => {
-                setGeo(g);
-                if (g.label) setLieuAller(g.label);
-              }}
-              label="Lieu de destination — territoire RDC"
+              onChange={setGeo}
+              label="Lieu de destination"
             />
-          </div>
-          <div>
-            <label className="form-label">Complément lieu (optionnel)</label>
-            <input className="form-control" value={lieuAller} onChange={(e) => setLieuAller(e.target.value)} />
           </div>
           <div>
             <label className="form-label">Motif</label>
@@ -98,7 +93,7 @@ export default function DisplacementsPage() {
 
       {created ? (
         <div className="panel" style={{ marginTop: "1rem" }}>
-          <div className="success-banner">Acte de déplacement créé</div>
+          <div className="success-banner">Déplacement enregistré</div>
           <ActPrintCard act={created} />
         </div>
       ) : null}
