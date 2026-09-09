@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { clearSession, getSession } from "./auth";
+import { clearSession, getSession, isLocalSession } from "./auth";
 import AccountsPage from "./pages/AccountsPage";
 import AnomaliesPage from "./pages/AnomaliesPage";
 import CampaignsPage from "./pages/CampaignsPage";

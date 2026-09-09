@@ -5,6 +5,8 @@ import {
   CENSUS_ADMIN_PASSWORD,
   DEMO_PASSWORD,
   DEMO_USER,
+  ONIP_OPS2_EMAIL,
+  ONIP_OPS2_PASSWORD,
   getSession,
   login,
 } from "../auth";
@@ -12,12 +14,12 @@ import {
 export default function LoginPage() {
   const navigate = useNavigate();
   const existing = getSession();
-  const [username, setUsername] = useState(CENSUS_ADMIN_EMAIL);
-  const [password, setPassword] = useState(CENSUS_ADMIN_PASSWORD);
+  const [username, setUsername] = useState(DEMO_USER);
+  const [password, setPassword] = useState(DEMO_PASSWORD);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (existing) return <Navigate to="/accounts" replace />;
+  if (existing) return <Navigate to="/" replace />;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -25,7 +27,7 @@ export default function LoginPage() {
     setBusy(true);
     try {
       await login(username, password);
-      navigate("/accounts", { replace: true });
+      navigate("/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Connexion impossible.");
     } finally {
@@ -43,7 +45,7 @@ export default function LoginPage() {
           <br />
           Plateforme E-GOUV — République Démocratique du Congo
         </p>
-        <form onSubmit={onSubmit}>
+        <form onSubmit={(e) => void onSubmit(e)}>
           {error ? <div className="login-error">{error}</div> : null}
 
           <label className="form-label" htmlFor="username">
@@ -78,17 +80,19 @@ export default function LoginPage() {
         </form>
         <div className="login-hints">
           <p>
-            <strong>Admin API</strong> — {CENSUS_ADMIN_EMAIL}
+            <strong>Démo locale (sans API)</strong> — {DEMO_USER} / {DEMO_PASSWORD}
+            <br />
+            Fonctionne même si le backend (:8000) est arrêté.
+          </p>
+          <p>
+            <strong>Admin recensement</strong> — {CENSUS_ADMIN_EMAIL}
             <br />
             {CENSUS_ADMIN_PASSWORD}
           </p>
           <p>
-            <strong>2ᵉ accès ONIP</strong> — onip.ops2@example.gov
+            <strong>2ᵉ accès ONIP</strong> — {ONIP_OPS2_EMAIL}
             <br />
-            OnipOps2123!
-          </p>
-          <p>
-            <strong>Démo hors API</strong> — {DEMO_USER} / {DEMO_PASSWORD}
+            {ONIP_OPS2_PASSWORD}
           </p>
         </div>
       </div>
