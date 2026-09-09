@@ -1,0 +1,37 @@
+{
+  "source": "OpenStreetMap",
+  "city_avenues": 1188,
+  "exact_communes": {
+    "Gombe": 209,
+    "Kalamu": 252,
+    "Kasa-Vubu": 91,
+    "Kintambo": 94
+  },
+  "resolved_counts": {
+    "Gombe": 209,
+    "Kinshasa": 1188,
+    "Barumbu": 1188,
+    "Kintambo": 94,
+    "Lingwala": 1188,
+    "Ngaliema": 1188,
+    "Kasa-Vubu": 91,
+    "Kalamu": 252,
+    "Ngiri-Ngiri": 1188,
+    "Bandalungwa": 1188,
+    "Bumbu": 1188,
+    "Makala": 1188,
+    "Selembao": 1188,
+    "Lemba": 1188,
+    "Mont-Ngafula": 1188,
+    "Kisenso": 1188,
+    "Limete": 1188,
+    "Matete": 1188,
+    "Ngaba": 1188,
+    "Ndjili": 1188,
+    "Kimbanseke": 1188,
+    "Masina": 1188,
+    "Nsele": 1188,
+    "Maluku": 1188
+  },
+  "note": "Exact=polygon OSM; others use city fallback capped at seed MAX_VOIES_PER_QUARTIER=180"
+}

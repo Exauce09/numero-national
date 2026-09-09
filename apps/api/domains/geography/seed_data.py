@@ -41,7 +41,7 @@ KIN_DISTRICTS: dict[str, list[str]] = {
 }
 
 # Quartiers officiels Kinshasa (liste fournie — commune → quartiers).
-# Les avenues restent génériques si non fournies ; bouton « + Ajouter avenue » complète.
+# Avenues : OpenStreetMap par commune (kinshasa_avenues_data.py) ; sinon génériques.
 KINSHASA_QUARTIERS: dict[str, list[str]] = {
     "Barumbu": [
         "Bitshaku-Tshaku",

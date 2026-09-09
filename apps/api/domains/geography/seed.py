@@ -22,13 +22,16 @@ from apps.api.domains.geography.seed_data import (
     PROVINCES,
     QUARTIERS_VOIES,
 )
+from apps.api.domains.geography.kinshasa_avenues_data import avenues_for_commune
 
 # Seuil : au-dessous → rechargement automatique (données anciennes trop pauvres)
 MIN_COMMUNES = 150
 MIN_QUARTIERS = 700
 MIN_VOIES = 2500
 MIN_LOCALITES = 1500
-SEED_VERSION = 5
+SEED_VERSION = 6
+# Cap UI : trop d’avenues OSM rendent le sélecteur illisible
+MAX_VOIES_PER_QUARTIER = 180
 
 
 def _slug(name: str) -> str:
@@ -71,7 +74,7 @@ async def clear_geography(db: AsyncSession) -> None:
 
 
 def _default_voies_for_quartier(qname: str) -> list[tuple[str, str]]:
-    """Avenues de base tant que la liste officielle avenues n’est pas fournie."""
+    """Avenues de base tant que la liste OSM / officielle n’est pas fournie."""
     return [
         ("AVENUE", qname),
         ("AVENUE", "Principale"),
@@ -80,9 +83,23 @@ def _default_voies_for_quartier(qname: str) -> list[tuple[str, str]]:
     ]
 
 
+def _voies_for_kinshasa_commune(commune: str, qname: str) -> list[tuple[str, str]]:
+    """Avenues OSM de la commune (carte), sinon fallback générique."""
+    osm = avenues_for_commune(commune)
+    if osm:
+        return list(osm[:MAX_VOIES_PER_QUARTIER])
+    return _default_voies_for_quartier(qname)
+
+
 def _quartier_defs(ville: str, commune: str) -> list[tuple[str, list[tuple[str, str]]]]:
-    if ville == "Kinshasa" and commune in KINSHASA_QUARTIERS:
-        return [(q, _default_voies_for_quartier(q)) for q in KINSHASA_QUARTIERS[commune]]
+    if ville == "Kinshasa":
+        osm = _voies_for_kinshasa_commune(commune, "Centre")
+        if commune in KINSHASA_QUARTIERS:
+            return [(q, list(osm)) for q in KINSHASA_QUARTIERS[commune]]
+        base = QUARTIERS_VOIES.get(f"{ville}|{commune}", DEFAULT_QUARTIERS)
+        if osm and osm != _default_voies_for_quartier("Centre"):
+            return [(qname, list(osm)) for qname, _unused in base]
+        return base
     return QUARTIERS_VOIES.get(f"{ville}|{commune}", DEFAULT_QUARTIERS)
 
 

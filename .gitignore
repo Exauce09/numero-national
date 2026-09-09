@@ -48,3 +48,7 @@ frontends/**/_npm_out.txt
 npm-debug.log*
 *.tsbuildinfo
 .DS_Store
+
+# OSM raw dumps (regenerate via scripts/fetch_kinshasa_avenues_osm.py)
+scripts/_osm_*.json
+scripts/kinshasa_avenues_osm.json
