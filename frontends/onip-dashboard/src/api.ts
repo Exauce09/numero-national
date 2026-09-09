@@ -117,6 +117,32 @@ export type CampaignStats = {
   pending_review: number;
 };
 
+export type CitizenHit = {
+  id: string;
+  nic: string | null;
+  status: string;
+  family_name: string;
+  given_names: string;
+  date_of_birth: string;
+  sex?: string;
+};
+
+export type PaginatedCitizens = {
+  items: CitizenHit[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
+export const registryApi = {
+  searchCitizens: (q?: string, page = 1, pageSize = 50) => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+    if (q?.trim()) params.set("q", q.trim());
+    return request<PaginatedCitizens>(`/registry/citizens?${params}`);
+  },
+  getCitizen: (id: string) => request<CitizenHit & { nic: string | null }>(`/registry/citizens/${id}`),
+};
+
 export type PromoteResult = {
   citizen_id?: string | null;
   nic?: string | null;

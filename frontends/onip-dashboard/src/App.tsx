@@ -7,6 +7,7 @@ import AnomaliesPage from "./pages/AnomaliesPage";
 import CampaignsPage from "./pages/CampaignsPage";
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
+import NicNumbersPage from "./pages/NicNumbersPage";
 
 function RequireAuth({ children }: { children: ReactNode }) {
   if (!getSession()) return <Navigate to="/login" replace />;
@@ -50,12 +51,20 @@ function Shell() {
           </button>
         </div>
         <nav className="sidebar-nav">
-          <NavLink to="/accounts">Comptes</NavLink>
+          <div className="nav-group-label">Vue d’ensemble</div>
           <NavLink to="/" end>
-            Vue nationale
+            Tableau de bord
           </NavLink>
-          <NavLink to="/campaigns">Campagnes</NavLink>
+
+          <div className="nav-group-label">Agents</div>
+          <NavLink to="/accounts">Comptes agents</NavLink>
+
+          <div className="nav-group-label">Recensement</div>
+          <NavLink to="/campaigns">Campagnes &amp; contrôle</NavLink>
           <NavLink to="/anomalies">Anomalies</NavLink>
+
+          <div className="nav-group-label">Registre</div>
+          <NavLink to="/nic">Numéros NIC</NavLink>
         </nav>
         <div className="sidebar-foot">
           <button type="button" className="btn-logout" style={{ width: "100%" }} onClick={logout}>
@@ -87,6 +96,7 @@ function Shell() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/campaigns" element={<CampaignsPage />} />
             <Route path="/anomalies" element={<AnomaliesPage />} />
+            <Route path="/nic" element={<NicNumbersPage />} />
           </Routes>
         </main>
       </div>

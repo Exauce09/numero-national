@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Assignment,
   Campaign,
@@ -8,6 +9,7 @@ import {
   Team,
   Zone,
   censusApi,
+  registryApi,
 } from "../api";
 import { getSession } from "../auth";
 
@@ -32,11 +34,15 @@ export default function CampaignsPage() {
     try {
       const rows = await censusApi.listCampaigns();
       setCampaigns(rows);
-      if (!selectedId && rows.length) setSelectedId(rows[0].id);
+      setSelectedId((cur) => {
+        if (cur && rows.some((r) => r.id === cur)) return cur;
+        const active = rows.find((r) => r.status === "ACTIVE");
+        return active?.id ?? rows[0]?.id ?? "";
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Impossible de charger les campagnes");
     }
-  }, [selectedId]);
+  }, []);
 
   useEffect(() => {
     if (hasToken) void reloadCampaigns();
@@ -45,10 +51,11 @@ export default function CampaignsPage() {
   return (
     <div>
       <div className="hero-banner">
-        <h1>Campagnes de recensement</h1>
+        <h1>Campagnes &amp; contrôle</h1>
         <p>
-          Étapes 2–4 : créer / activer la campagne → Affectations (zones, équipes, agents) → Contrôle
-          fiches → Stats. (Étape 1 = menu Comptes.)
+          Flux : <strong>Comptes</strong> → cette page (campagne / zones / contrôle) →{" "}
+          <strong>Numéros NIC</strong> pour voir le numéro attribué. Choisissez bien la campagne{" "}
+          <em>ACTIVE</em> (ex. TEST123), pas une campagne fermée.
         </p>
       </div>
 
@@ -244,10 +251,18 @@ function ReviewTab({
 }) {
   const [zones, setZones] = useState<Zone[]>([]);
   const [zoneId, setZoneId] = useState("");
-  const [status, setStatus] = useState("SYNCED");
+  const [status, setStatus] = useState("PROMOTED");
   const [rows, setRows] = useState<CensusRecord[]>([]);
+  const [nicByCitizen, setNicByCitizen] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  const STATUS_MENU: Array<{ value: string; label: string; hint: string }> = [
+    { value: "SYNCED", label: "1. À contrôler", hint: "Fiches sync, pas encore approuvées" },
+    { value: "APPROVED", label: "2. Approuvées", hint: "Prêtes pour Promouvoir NIC" },
+    { value: "PROMOTED", label: "3. Promues (NIC)", hint: "Déjà dans le registre" },
+    { value: "REJECTED", label: "Rejetées", hint: "À corriger côté agent" },
+  ];
 
   const load = useCallback(async () => {
     setError(null);
@@ -256,6 +271,24 @@ function ReviewTab({
       setZones(z);
       const recs = await censusApi.listRecords(campaign.id, status, zoneId || undefined);
       setRows(recs);
+      if (status === "PROMOTED") {
+        const map: Record<string, string> = {};
+        await Promise.all(
+          recs
+            .filter((r) => r.citizen_id)
+            .map(async (r) => {
+              try {
+                const c = await registryApi.getCitizen(r.citizen_id!);
+                if (c.nic) map[r.citizen_id!] = c.nic;
+              } catch {
+                /* ignore */
+              }
+            }),
+        );
+        setNicByCitizen(map);
+      } else {
+        setNicByCitizen({});
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Chargement fiches impossible");
     }
@@ -269,7 +302,7 @@ function ReviewTab({
     setBusyId(id);
     try {
       await censusApi.approve(id, note || undefined);
-      setMsg("Fiche approuvée");
+      setMsg("Fiche approuvée — passez au menu « 2. Approuvées » puis Promouvoir NIC");
       setNote("");
       await load();
     } catch (e) {
@@ -304,7 +337,7 @@ function ReviewTab({
       if (result.already_promoted) {
         setMsg(`Déjà promue${result.nic ? ` — NIC ${result.nic}` : ""}`);
       } else if (result.nic_assigned && result.nic) {
-        setMsg(`Promue — NIC attribué : ${result.nic}`);
+        setMsg(`Promue — NIC attribué : ${result.nic} (voir aussi menu Numéros NIC)`);
       } else if (result.nic_error) {
         setError(`Citoyen créé mais NIC non attribué : ${result.nic_error}`);
         setMsg(result.citizen_id ? `Citoyen ${result.citizen_id}` : null);
@@ -315,6 +348,7 @@ function ReviewTab({
             : "Promue vers le registre (sans NIC pour l’instant)",
         );
       }
+      setStatus("PROMOTED");
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Promotion échouée");
@@ -326,13 +360,27 @@ function ReviewTab({
   return (
     <div className="panel">
       <h2>File de contrôle — {campaign.code}</h2>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Chaque étape a son propre menu. Les fiches <strong>promues</strong> n’apparaissent plus dans
+        « À contrôler ».
+      </p>
+      <div className="status-menu" role="tablist" aria-label="Étape des fiches">
+        {STATUS_MENU.map((s) => (
+          <button
+            key={s.value}
+            type="button"
+            role="tab"
+            aria-selected={status === s.value}
+            className={status === s.value ? "status-chip active" : "status-chip"}
+            title={s.hint}
+            onClick={() => setStatus(s.value)}
+          >
+            <strong>{s.label}</strong>
+            <span>{s.hint}</span>
+          </button>
+        ))}
+      </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-        <select value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="SYNCED">À contrôler (SYNCED)</option>
-          <option value="APPROVED">Approuvées</option>
-          <option value="REJECTED">Rejetées</option>
-          <option value="PROMOTED">Promues</option>
-        </select>
         <select value={zoneId} onChange={(e) => setZoneId(e.target.value)}>
           <option value="">Toutes zones</option>
           {zones.map((z) => (
@@ -344,6 +392,9 @@ function ReviewTab({
         <button type="button" className="btn-secondary" onClick={() => void load()}>
           Rafraîchir
         </button>
+        <Link className="btn-secondary" to="/nic" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
+          Voir tous les NIC →
+        </Link>
       </div>
       <label className="form-label">Motif (obligatoire pour rejet)</label>
       <textarea
@@ -359,6 +410,7 @@ function ReviewTab({
             <th>Nom</th>
             <th>Naissance</th>
             <th>Statut</th>
+            <th>NIC</th>
             <th>Note</th>
             <th>Actions</th>
           </tr>
@@ -371,6 +423,13 @@ function ReviewTab({
               </td>
               <td>{r.date_of_birth}</td>
               <td>{r.status}</td>
+              <td>
+                {r.citizen_id && nicByCitizen[r.citizen_id] ? (
+                  <code className="nic-code">{nicByCitizen[r.citizen_id]}</code>
+                ) : (
+                  "—"
+                )}
+              </td>
               <td>{r.review_note || "—"}</td>
               <td style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {r.status === "SYNCED" || r.status === "REJECTED" ? (
@@ -396,7 +455,7 @@ function ReviewTab({
                 {r.status === "APPROVED" ? (
                   <button
                     type="button"
-                    className="btn-secondary"
+                    className="btn-primary"
                     disabled={busyId === r.id}
                     onClick={() => void promote(r.id)}
                   >
@@ -408,8 +467,9 @@ function ReviewTab({
           ))}
           {!rows.length ? (
             <tr>
-              <td colSpan={5} className="muted">
-                Aucune fiche pour ce filtre.
+              <td colSpan={6} className="muted">
+                Aucune fiche pour « {STATUS_MENU.find((s) => s.value === status)?.label} ». Changez
+                d’étape dans le menu ci-dessus.
               </td>
             </tr>
           ) : null}
