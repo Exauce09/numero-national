@@ -264,6 +264,10 @@
   color: var(--egouv-ink);
 }
 
+.eg-list-stats-note {
+  margin: -0.45rem 0 0.85rem;
+}
+
 .eg-list-stats-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -291,10 +295,22 @@
   color: var(--egouv-primary);
 }
 
+.eg-stat-section {
+  border-top: 1px solid var(--egouv-line);
+}
+
+.eg-stat-section-head {
+  padding: 0.4rem 0.85rem 0.15rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--egouv-muted);
+}
+
 .eg-stat-col ul {
   list-style: none;
   margin: 0;
-  padding: 0.55rem 0.85rem 0.7rem;
+  padding: 0.35rem 0.85rem 0.65rem;
 }
 
 .eg-stat-col li {

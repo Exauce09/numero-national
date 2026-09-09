@@ -153,23 +153,49 @@ export function personNationalite(p: Person): Nationalite {
 }
 
 export function populationBreakdown(persons: Person[]) {
-  const empty = { congolais: 0, etranger: 0, total: 0 };
-  const hommes = { ...empty };
-  const femmes = { ...empty };
+  const emptyNat = () => ({ congolais: 0, etranger: 0, total: 0 });
+  const emptySex = () => ({
+    ...emptyNat(),
+    mineurs: emptyNat(),
+    majeurs: emptyNat(),
+  });
+
+  const hommes = emptySex();
+  const femmes = emptySex();
+
   for (const p of persons) {
     const nat = personNationalite(p);
     const bucket = p.sexe === "F" ? femmes : hommes;
-    if (nat === "ETRANGER") bucket.etranger += 1;
-    else bucket.congolais += 1;
+    const age = ageYears(p.date_naissance);
+    const ageBucket = age < 18 ? bucket.mineurs : bucket.majeurs;
+
+    if (nat === "ETRANGER") {
+      bucket.etranger += 1;
+      ageBucket.etranger += 1;
+    } else {
+      bucket.congolais += 1;
+      ageBucket.congolais += 1;
+    }
     bucket.total += 1;
+    ageBucket.total += 1;
   }
+
+  const sumNat = (
+    a: { congolais: number; etranger: number; total: number },
+    b: { congolais: number; etranger: number; total: number },
+  ) => ({
+    congolais: a.congolais + b.congolais,
+    etranger: a.etranger + b.etranger,
+    total: a.total + b.total,
+  });
+
   return {
     hommes,
     femmes,
     total: {
-      congolais: hommes.congolais + femmes.congolais,
-      etranger: hommes.etranger + femmes.etranger,
-      total: hommes.total + femmes.total,
+      ...sumNat(hommes, femmes),
+      mineurs: sumNat(hommes.mineurs, femmes.mineurs),
+      majeurs: sumNat(hommes.majeurs, femmes.majeurs),
     },
   };
 }

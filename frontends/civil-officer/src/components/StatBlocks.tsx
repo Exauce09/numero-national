@@ -1,6 +1,19 @@
-/** Blocs récapitulatifs Hommes / Femmes / Total (style Justicia). */
+/** Blocs récapitulatifs Hommes / Femmes / Total — nationalité × mineur/majeur. */
 
 export type NatCounts = { congolais: number; etranger: number; total: number };
+
+export type SexAgeNatCounts = NatCounts & {
+  mineurs: NatCounts;
+  majeurs: NatCounts;
+};
+
+function natRows(prefixCong: string, counts: NatCounts, strongTotal = false) {
+  return [
+    { label: prefixCong, value: counts.congolais },
+    { label: "ETRANGER", value: counts.etranger },
+    { label: "TOTAL", value: counts.total, strong: strongTotal },
+  ];
+}
 
 export function PopulationStatBlocks({
   hommes,
@@ -8,39 +21,42 @@ export function PopulationStatBlocks({
   total,
   listTitle = "LISTE DE LA POPULATION",
 }: {
-  hommes: NatCounts;
-  femmes: NatCounts;
-  total: NatCounts;
+  hommes: SexAgeNatCounts;
+  femmes: SexAgeNatCounts;
+  total: SexAgeNatCounts;
   listTitle?: string;
 }) {
   return (
     <div className="eg-list-stats">
       <h3 className="eg-list-stats-title">{listTitle}</h3>
+      <p className="eg-list-stats-note muted small">
+        Majeur = 18 ans et plus · Mineur = moins de 18 ans · Congolais ou étranger
+      </p>
       <div className="eg-list-stats-grid">
         <StatColumn
           title="HOMMES"
-          rows={[
-            { label: "CONGOLAIS", value: hommes.congolais },
-            { label: "ETRANGER", value: hommes.etranger },
-            { label: "TOTAL", value: hommes.total, strong: true },
+          sections={[
+            { heading: "MINEURS", rows: natRows("CONGOLAIS", hommes.mineurs) },
+            { heading: "MAJEURS", rows: natRows("CONGOLAIS", hommes.majeurs) },
+            { heading: "TOTAL HOMMES", rows: natRows("CONGOLAIS", hommes, true) },
           ]}
         />
         <StatColumn
           title="FEMMES"
-          rows={[
-            { label: "CONGOLAISE", value: femmes.congolais },
-            { label: "ETRANGER", value: femmes.etranger },
-            { label: "TOTAL", value: femmes.total, strong: true },
+          sections={[
+            { heading: "MINEURES", rows: natRows("CONGOLAISE", femmes.mineurs) },
+            { heading: "MAJEURES", rows: natRows("CONGOLAISE", femmes.majeurs) },
+            { heading: "TOTAL FEMMES", rows: natRows("CONGOLAISE", femmes, true) },
           ]}
         />
         <StatColumn
           title="TOTAL GEN"
-          rows={[
-            { label: "CONGOLAIS(E)", value: total.congolais },
-            { label: "ETRANGER", value: total.etranger },
-            { label: "TOTAL", value: total.total, strong: true },
-          ]}
           highlight
+          sections={[
+            { heading: "MINEURS", rows: natRows("CONGOLAIS(E)", total.mineurs) },
+            { heading: "MAJEURS", rows: natRows("CONGOLAIS(E)", total.majeurs) },
+            { heading: "TOTAL GÉNÉRAL", rows: natRows("CONGOLAIS(E)", total, true) },
+          ]}
         />
       </div>
     </div>
@@ -49,24 +65,32 @@ export function PopulationStatBlocks({
 
 function StatColumn({
   title,
-  rows,
+  sections,
   highlight,
 }: {
   title: string;
-  rows: Array<{ label: string; value: number; strong?: boolean }>;
+  sections: Array<{
+    heading: string;
+    rows: Array<{ label: string; value: number; strong?: boolean }>;
+  }>;
   highlight?: boolean;
 }) {
   return (
     <div className={`eg-stat-col${highlight ? " is-highlight" : ""}`}>
       <div className="eg-stat-col-head">{title}</div>
-      <ul>
-        {rows.map((r) => (
-          <li key={r.label} className={r.strong ? "is-total" : undefined}>
-            <span>{r.label}:</span>
-            <strong>{r.value}</strong>
-          </li>
-        ))}
-      </ul>
+      {sections.map((sec) => (
+        <div key={sec.heading} className="eg-stat-section">
+          <div className="eg-stat-section-head">{sec.heading}</div>
+          <ul>
+            {sec.rows.map((r) => (
+              <li key={`${sec.heading}-${r.label}`} className={r.strong ? "is-total" : undefined}>
+                <span>{r.label}:</span>
+                <strong>{r.value}</strong>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
     </div>
   );
 }

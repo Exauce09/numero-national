@@ -63,11 +63,19 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
     { label: "Congolais(e)", value: stats.total.congolais, color: "#13deb9" },
     { label: "Étranger", value: stats.total.etranger, color: "#ffae1f" },
   ];
+  const pieAge = [
+    { label: "Mineurs", value: stats.total.mineurs.total, color: "#763ebd" },
+    { label: "Majeurs", value: stats.total.majeurs.total, color: "#49beff" },
+  ];
   const histo = [
-    { label: "H Cong.", value: stats.hommes.congolais, color: "#5d87ff" },
-    { label: "H Étr.", value: stats.hommes.etranger, color: "#539bff" },
-    { label: "F Cong.", value: stats.femmes.congolais, color: "#fa896b" },
-    { label: "F Étr.", value: stats.femmes.etranger, color: "#fdd835" },
+    { label: "H min. C", value: stats.hommes.mineurs.congolais, color: "#5d87ff" },
+    { label: "H min. É", value: stats.hommes.mineurs.etranger, color: "#539bff" },
+    { label: "H maj. C", value: stats.hommes.majeurs.congolais, color: "#13deb9" },
+    { label: "H maj. É", value: stats.hommes.majeurs.etranger, color: "#0aad8a" },
+    { label: "F min. C", value: stats.femmes.mineurs.congolais, color: "#fa896b" },
+    { label: "F min. É", value: stats.femmes.mineurs.etranger, color: "#fdd835" },
+    { label: "F maj. C", value: stats.femmes.majeurs.congolais, color: "#ffae1f" },
+    { label: "F maj. É", value: stats.femmes.majeurs.etranger, color: "#fc4b6c" },
   ];
 
   return (
@@ -108,7 +116,8 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
           <div className="eg-charts-row">
             <PieChart title="Répartition par sexe (camembert)" data={pieSexe} />
             <PieChart title="Nationalité (camembert)" data={pieNat} />
-            <BarChart title="Histogramme sexe × nationalité" data={histo} />
+            <PieChart title="Mineurs / majeurs (camembert)" data={pieAge} />
+            <BarChart title="Histogramme sexe × âge × nationalité" data={histo} height={180} />
           </div>
         </>
       ) : null}
