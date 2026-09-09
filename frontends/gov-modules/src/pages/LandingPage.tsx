@@ -9,12 +9,12 @@ const PORTALS = [
   {
     to: "/interieur/login",
     title: "Ministère de l'Intérieur",
-    desc: "Supervision état civil, cartes nationales et audit de sécurité.",
+    desc: "Mouvements, déplacements, documents manquants et parcours citoyens (portail dédié : localhost:5178).",
   },
   {
     to: "/presidence/login",
     title: "Présidence",
-    desc: "Tableaux stratégiques, domaines et briefings agrégés.",
+    desc: "Vue nationale — portail dédié recommandé : localhost:5174.",
   },
   {
     to: "/admin/login",

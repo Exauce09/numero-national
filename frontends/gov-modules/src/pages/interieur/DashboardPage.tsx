@@ -25,6 +25,15 @@ export default function DashboardPage() {
 
   return (
     <div>
+      <div className="panel" style={{ marginBottom: "1rem", borderLeft: "4px solid var(--egouv-primary, #1a5f4a)" }}>
+        <strong>Portail Intérieur dédié</strong>
+        <p className="muted" style={{ margin: "0.35rem 0 0.65rem" }}>
+          Mouvements, déplacements, documents manquants et parcours citoyen — même logique que la Présidence.
+        </p>
+        <a className="btn-primary btn-sm" href="http://localhost:5178/login" target="_blank" rel="noreferrer">
+          Ouvrir le portail Intérieur (5178)
+        </a>
+      </div>
       <h2 className="page-title">Tableau de bord — Intérieur</h2>
       <p className="page-lead">
         Vue ONIP et indicateurs gouvernementaux (intérieur / overview). Généré :{" "}
