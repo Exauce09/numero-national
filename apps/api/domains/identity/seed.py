@@ -12,6 +12,7 @@ from apps.api.domains.identity.models import Permission, Role
 SEED_ROLES: list[dict[str, str]] = [
     {"code": "CENTRAL_ADMIN", "name": "Administrateur central", "description": "Administration complète"},
     {"code": "CENSUS_AGENT", "name": "Agent de recensement", "description": "Recensement terrain"},
+    {"code": "CENSUS_SUPERVISOR", "name": "Superviseur recensement", "description": "Validation fiches terrain"},
     {"code": "CIVIL_OFFICER", "name": "Officier d'état civil", "description": "Actes d'état civil"},
     {"code": "HEALTH_AGENT", "name": "Agent de santé", "description": "Déclarations sanitaires"},
     {"code": "MINISTRY_HEALTH", "name": "Ministère de la Santé", "description": "Statistiques santé nationales anonymisées"},
@@ -38,8 +39,12 @@ IAM_PERMISSIONS: list[dict[str, str]] = [
 ROLE_PERMISSION_MAP: dict[str, tuple[str, ...]] = {
     "CENSUS_AGENT": (
         "census:sync",
-        "census:manage",
         "registry:citizen:create",
+        "registry:citizen:read",
+    ),
+    "CENSUS_SUPERVISOR": (
+        "census:sync",
+        "census:manage",
         "registry:citizen:read",
     ),
     "CIVIL_OFFICER": (

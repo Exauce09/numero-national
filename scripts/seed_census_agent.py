@@ -18,6 +18,8 @@ EMAIL = os.getenv("CENSUS_AGENT_EMAIL", "agent.recensement@example.gov")
 PASSWORD = os.getenv("CENSUS_AGENT_PASSWORD", "CensusAgent123!")
 ADMIN_EMAIL = os.getenv("CENSUS_ADMIN_EMAIL", "admin.recensement@example.gov")
 ADMIN_PASSWORD = os.getenv("CENSUS_ADMIN_PASSWORD", "CensusAdmin123!")
+SUPERVISOR_EMAIL = os.getenv("CENSUS_SUPERVISOR_EMAIL", "supervisor.recensement@example.gov")
+SUPERVISOR_PASSWORD = os.getenv("CENSUS_SUPERVISOR_PASSWORD", "CensusSupervisor123!")
 CAMPAIGN_CODE = os.getenv("CENSUS_CAMPAIGN_CODE", "RGPH-2026")
 ZONE_CODE = os.getenv("CENSUS_ZONE_CODE", "KIN-GOMBE-Z1")
 TEAM_CODE = os.getenv("CENSUS_TEAM_CODE", "EQ-GOMBE-01")
@@ -62,10 +64,14 @@ def main() -> None:
             die("API/database not up", health)
 
         admin = ensure_user(client, ADMIN_EMAIL, ADMIN_PASSWORD, ["CENTRAL_ADMIN"])
+        supervisor = ensure_user(
+            client, SUPERVISOR_EMAIL, SUPERVISOR_PASSWORD, ["CENSUS_SUPERVISOR"]
+        )
         agent = ensure_user(client, EMAIL, PASSWORD, ["CENSUS_AGENT"])
         admin_headers = {"Authorization": f"Bearer {admin['tokens']['access_token']}"}
         agent_id = agent["me"]["id"]
-        print("OK users", ADMIN_EMAIL, EMAIL, agent_id)
+        print("OK users", ADMIN_EMAIL, SUPERVISOR_EMAIL, EMAIL, agent_id)
+        _ = supervisor  # seeded for approve/reject API
 
         campaigns = client.get("/api/v1/census/campaigns", headers=admin_headers)
         campaigns.raise_for_status()

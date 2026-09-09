@@ -29,6 +29,14 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 - [x] Tests API `tests/test_census_sync.py`
 
 ## Phase 4 — Superviseur
-- [ ] Workflow APPROVE/REJECT
+- [x] File d'attente `GET /campaigns/{id}/records?status=SYNCED`
+- [x] `POST /records/{id}/approve` (+ note optionnelle)
+- [x] `POST /records/{id}/reject` (note obligatoire)
+- [x] Migration `014_census_review` (APPROVED + audit review)
+- [x] Tests `tests/test_census_review.py`
+- [x] Mobile: affichage APPROVED / REJECTED
 
-Prochaine session Agent : Phase 4 (superviseur).
+## Phase 5 — Promotion NIC
+- [ ] Fiches APPROVED → `core_registry`
+
+Prochaine session Agent : Phase 5 (promotion registre).

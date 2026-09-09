@@ -12,7 +12,7 @@ from apps.api.core.security import get_current_user, require_permissions
 from apps.api.db.session import get_db
 from apps.api.domains.identity.models import User
 from apps.api.domains.recensement import service
-from apps.api.domains.recensement.models import CampaignStatus
+from apps.api.domains.recensement.models import CampaignStatus, CensusRecordStatus
 from apps.api.domains.recensement.schemas import (
     AgentStatsOut,
     AssignmentCreate,
@@ -20,9 +20,12 @@ from apps.api.domains.recensement.schemas import (
     CampaignCreate,
     CampaignOut,
     CampaignUpdate,
+    CensusRecordOut,
     DeviceOut,
     DeviceRegister,
     MyAssignmentOut,
+    RecordRejectRequest,
+    RecordReviewRequest,
     SyncPullRequest,
     SyncPullResponse,
     SyncPushRequest,
@@ -194,3 +197,78 @@ async def get_agent_stats(
     agent_user_id: uuid.UUID, db: AsyncSession = Depends(get_db)
 ) -> AgentStatsOut:
     return await service.agent_stats(db, agent_user_id)
+
+
+@router.get(
+    "/campaigns/{campaign_id}/records",
+    response_model=list[CensusRecordOut],
+    dependencies=[Depends(require_permissions(PERM_CENSUS_MANAGE))],
+)
+async def list_campaign_records(
+    campaign_id: uuid.UUID,
+    status_filter: CensusRecordStatus | None = Query(default=CensusRecordStatus.SYNCED, alias="status"),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+) -> list[CensusRecordOut]:
+    campaign = await service.get_campaign(db, campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    rows = await service.list_campaign_records(
+        db, campaign_id, status_filter=status_filter, limit=limit, offset=offset
+    )
+    return [CensusRecordOut.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/records/{record_id}/approve",
+    response_model=CensusRecordOut,
+    dependencies=[Depends(require_permissions(PERM_CENSUS_MANAGE))],
+)
+async def approve_record(
+    record_id: uuid.UUID,
+    body: RecordReviewRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> CensusRecordOut:
+    rec = await service.get_record(db, record_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="Record not found")
+    try:
+        updated = await service.approve_record(
+            db, rec, current_user.id, body or RecordReviewRequest()
+        )
+    except ValueError as exc:
+        if str(exc) == "not_reviewable":
+            raise HTTPException(
+                status_code=409,
+                detail=f"Record status {rec.status.value} cannot be approved",
+            ) from exc
+        raise
+    return CensusRecordOut.model_validate(updated)
+
+
+@router.post(
+    "/records/{record_id}/reject",
+    response_model=CensusRecordOut,
+    dependencies=[Depends(require_permissions(PERM_CENSUS_MANAGE))],
+)
+async def reject_record(
+    record_id: uuid.UUID,
+    body: RecordRejectRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> CensusRecordOut:
+    rec = await service.get_record(db, record_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="Record not found")
+    try:
+        updated = await service.reject_record(db, rec, current_user.id, body)
+    except ValueError as exc:
+        if str(exc) == "not_reviewable":
+            raise HTTPException(
+                status_code=409,
+                detail=f"Record status {rec.status.value} cannot be rejected",
+            ) from exc
+        raise
+    return CensusRecordOut.model_validate(updated)

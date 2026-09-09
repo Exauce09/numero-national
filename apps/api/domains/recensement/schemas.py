@@ -109,10 +109,26 @@ class CensusRecordOut(BaseModel):
     local_id: str | None
     given_names: str | None
     family_name: str | None
+    sex: str | None = None
+    date_of_birth: str | None = None
     status: CensusRecordStatus
     version: int
+    collected_by: uuid.UUID | None = None
+    reviewed_by: uuid.UUID | None = None
+    reviewed_at: datetime | None = None
+    review_note: str | None = None
+    synced_at: datetime | None = None
+    updated_at: datetime | None = None
 
     model_config = {"from_attributes": True}
+
+
+class RecordReviewRequest(BaseModel):
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class RecordRejectRequest(BaseModel):
+    note: str = Field(min_length=3, max_length=2000)
 
 
 class ZoneCreate(BaseModel):

@@ -29,6 +29,8 @@ from apps.api.domains.recensement.schemas import (
     CampaignUpdate,
     DeviceRegister,
     MyAssignmentOut,
+    RecordRejectRequest,
+    RecordReviewRequest,
     SyncPullRequest,
     SyncPullResponse,
     SyncPushRequest,
@@ -351,6 +353,8 @@ async def sync_pull(db: AsyncSession, req: SyncPullRequest) -> SyncPullResponse:
                 "date_of_birth": r.date_of_birth,
                 "status": r.status.value,
                 "version": r.version,
+                "review_note": r.review_note,
+                "reviewed_at": r.reviewed_at.isoformat() if r.reviewed_at else None,
             }
             for r in records
         ],
@@ -544,3 +548,59 @@ async def list_my_assignments(db: AsyncSession, agent_user_id: uuid.UUID) -> lis
             )
         )
     return out
+
+
+async def list_campaign_records(
+    db: AsyncSession,
+    campaign_id: uuid.UUID,
+    status_filter: CensusRecordStatus | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[CensusRecord]:
+    stmt = select(CensusRecord).where(CensusRecord.campaign_id == campaign_id)
+    if status_filter is not None:
+        stmt = stmt.where(CensusRecord.status == status_filter)
+    stmt = stmt.order_by(CensusRecord.updated_at.desc()).offset(offset).limit(min(limit, 500))
+    return list((await db.execute(stmt)).scalars().all())
+
+
+async def get_record(db: AsyncSession, record_id: uuid.UUID) -> CensusRecord | None:
+    return await db.get(CensusRecord, record_id)
+
+
+def _assert_reviewable(rec: CensusRecord) -> None:
+    if rec.status not in {CensusRecordStatus.SYNCED, CensusRecordStatus.REJECTED}:
+        raise ValueError("not_reviewable")
+
+
+async def approve_record(
+    db: AsyncSession,
+    rec: CensusRecord,
+    reviewer_id: uuid.UUID,
+    body: RecordReviewRequest,
+) -> CensusRecord:
+    _assert_reviewable(rec)
+    rec.status = CensusRecordStatus.APPROVED
+    rec.reviewed_by = reviewer_id
+    rec.reviewed_at = datetime.now(timezone.utc)
+    rec.review_note = body.note
+    await db.commit()
+    await db.refresh(rec)
+    return rec
+
+
+async def reject_record(
+    db: AsyncSession,
+    rec: CensusRecord,
+    reviewer_id: uuid.UUID,
+    body: RecordRejectRequest,
+) -> CensusRecord:
+    if rec.status not in {CensusRecordStatus.SYNCED, CensusRecordStatus.APPROVED}:
+        raise ValueError("not_reviewable")
+    rec.status = CensusRecordStatus.REJECTED
+    rec.reviewed_by = reviewer_id
+    rec.reviewed_at = datetime.now(timezone.utc)
+    rec.review_note = body.note
+    await db.commit()
+    await db.refresh(rec)
+    return rec

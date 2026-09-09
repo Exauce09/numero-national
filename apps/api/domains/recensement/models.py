@@ -44,6 +44,7 @@ class CensusRecordStatus(str, enum.Enum):
     QUEUED = "QUEUED"
     SYNCED = "SYNCED"
     CONFLICT = "CONFLICT"
+    APPROVED = "APPROVED"
     REJECTED = "REJECTED"
 
 
@@ -204,6 +205,9 @@ class CensusRecord(Base):
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     collected_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    review_note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

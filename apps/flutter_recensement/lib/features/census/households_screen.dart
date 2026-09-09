@@ -215,24 +215,31 @@ class _HouseholdMembersScreenState extends State<HouseholdMembersScreen> {
                 final name =
                     '${m['given_names'] ?? ''} ${m['family_name'] ?? ''}'.trim();
                 final status = m['status']?.toString() ?? '';
+                final IconData icon;
+                final Color color;
+                if (status == 'APPROVED') {
+                  icon = Icons.verified;
+                  color = Colors.green.shade700;
+                } else if (status == 'SYNCED') {
+                  icon = Icons.cloud_done;
+                  color = Colors.green;
+                } else if (status == 'REJECTED') {
+                  icon = Icons.cancel;
+                  color = Colors.red;
+                } else if (status == 'CONFLICT') {
+                  icon = Icons.warning_amber;
+                  color = Colors.orange;
+                } else {
+                  icon = Icons.cloud_upload;
+                  color = const Color(0xFF5D87FF);
+                }
                 return Card(
                   child: ListTile(
                     title: Text(name.isEmpty ? 'Sans nom' : name),
                     subtitle: Text(
                       '${m['sex'] ?? ''} · ${m['date_of_birth'] ?? ''} · $status',
                     ),
-                    leading: Icon(
-                      status == 'SYNCED'
-                          ? Icons.cloud_done
-                          : status == 'CONFLICT'
-                              ? Icons.warning_amber
-                              : Icons.cloud_upload,
-                      color: status == 'SYNCED'
-                          ? Colors.green
-                          : status == 'CONFLICT'
-                              ? Colors.orange
-                              : const Color(0xFF5D87FF),
-                    ),
+                    leading: Icon(icon, color: color),
                     onTap: status == 'CONFLICT'
                         ? () {
                             Navigator.of(context).pushNamed('/conflicts');
