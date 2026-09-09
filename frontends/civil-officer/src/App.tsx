@@ -49,6 +49,7 @@ import HealthDashboardPage from "./pages/HealthDashboardPage";
 import HealthBirthsPage from "./pages/HealthBirthsPage";
 import HealthDeathsPage from "./pages/HealthDeathsPage";
 import HealthLoginPage from "./pages/HealthLoginPage";
+import HealthSynopticPage from "./pages/HealthSynopticPage";
 import ManageDecesPage from "./pages/ManageDecesPage";
 import ManageDivorcePage from "./pages/ManageDivorcePage";
 import ManageAdoptionPage from "./pages/ManageAdoptionPage";
@@ -190,6 +191,15 @@ function HealthShell() {
           <NavLink to="/sante" end onClick={() => setNavOpen(false)}>
             <IconDashboard size={18} /> Tableau de bord
           </NavLink>
+          <NavLink
+            to="/sante/synoptique/naissances"
+            className={({ isActive }) =>
+              isActive || location.pathname.startsWith("/sante/synoptique") ? "active" : undefined
+            }
+            onClick={() => setNavOpen(false)}
+          >
+            <IconTable size={18} /> Tableau synoptique
+          </NavLink>
           <NavLink to="/sante/births" onClick={() => setNavOpen(false)}>
             <IconBaby size={18} /> Nouveau-né
           </NavLink>
@@ -277,6 +287,8 @@ function HealthShell() {
         <main className="shell">
           <Routes>
             <Route path="/" element={<HealthDashboardPage />} />
+            <Route path="/synoptique" element={<HealthSynopticPage />} />
+            <Route path="/synoptique/:section" element={<HealthSynopticPage />} />
             <Route path="/births" element={<HealthBirthsPage />} />
             <Route path="/deaths" element={<HealthDeathsPage />} />
             <Route path="*" element={<Navigate to="/sante" replace />} />

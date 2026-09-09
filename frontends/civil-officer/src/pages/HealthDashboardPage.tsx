@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconBaby, IconClipboard, IconCross } from "../components/Icons";
+import { IconBaby, IconClipboard, IconCross, IconTable } from "../components/Icons";
 import { getHealthSession } from "../healthAuth";
 import { listFacilityDeclarations } from "../civilDeclarations";
+import { healthSynopticBirths, healthSynopticDeaths } from "../healthSynoptic";
 
-type Tone = "primary" | "success" | "danger" | "warning";
+type Tone = "primary" | "success" | "danger" | "warning" | "info";
 
 type DashItem = {
   id: string;
@@ -24,6 +25,8 @@ export default function HealthDashboardPage() {
   const births = rows.filter((d) => d.declaration_type === "BIRTH").length;
   const deaths = rows.filter((d) => d.declaration_type === "DEATH").length;
   const validated = rows.filter((d) => d.status === "VALIDATED").length;
+  const synBirths = healthSynopticBirths().totalNaissances.t;
+  const synDeaths = healthSynopticDeaths().totalAB;
 
   const items: DashItem[] = [
     {
@@ -59,8 +62,26 @@ export default function HealthDashboardPage() {
       value: validated,
       subtitle: "Pris en compte par l'officier",
       tone: "primary",
-      href: "/sante",
+      href: "/sante/synoptique/naissances",
       icon: <IconClipboard size={26} />,
+    },
+    {
+      id: "syn-birth",
+      title: "Synoptique naissances",
+      value: synBirths,
+      subtitle: "Tableau officiel de la structure",
+      tone: "info",
+      href: "/sante/synoptique/naissances",
+      icon: <IconTable size={26} />,
+    },
+    {
+      id: "syn-death",
+      title: "Synoptique décès",
+      value: synDeaths,
+      subtitle: "Tableau officiel de la structure",
+      tone: "info",
+      href: "/sante/synoptique/deces",
+      icon: <IconTable size={26} />,
     },
   ];
 
@@ -70,8 +91,8 @@ export default function HealthDashboardPage() {
         <div>
           <h2 className="page-title">Tableau de bord</h2>
           <p className="page-lead">
-            {session.facilityName} · {session.commune_name}. Cliquez une carte pour gérer les enregistrements ;
-            chaque saisie notifie l&apos;état civil.
+            {session.facilityName} · {session.commune_name}. Cliquez une carte pour gérer les enregistrements ou
+            ouvrir les tableaux synoptiques ; chaque saisie notifie l&apos;état civil.
           </p>
         </div>
       </div>
