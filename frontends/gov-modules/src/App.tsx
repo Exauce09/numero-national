@@ -3,7 +3,6 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { getSession, setActivePortal, type Portal } from "./auth";
 import LoginForm from "./components/LoginForm";
 import PortalShell, { type NavItem } from "./components/PortalShell";
-import LandingPage from "./pages/LandingPage";
 
 import SanteDashboard from "./pages/sante/DashboardPage";
 import SanteIndicators from "./pages/sante/IndicatorsPage";
@@ -68,7 +67,7 @@ const ADMIN_NAV: NavItem[] = [
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
+      <Route path="/" element={<Navigate to="/sante/login" replace />} />
 
       <Route
         path="/sante/login"
@@ -205,7 +204,7 @@ export default function App() {
         }
       />
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/sante/login" replace />} />
     </Routes>
   );
 }

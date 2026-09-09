@@ -32,6 +32,7 @@ import DeclarationsPage from "./pages/DeclarationsPage";
 import HealthDashboardPage from "./pages/HealthDashboardPage";
 import HealthBirthsPage from "./pages/HealthBirthsPage";
 import HealthDeathsPage from "./pages/HealthDeathsPage";
+import HealthLoginPage from "./pages/HealthLoginPage";
 import ManageDecesPage from "./pages/ManageDecesPage";
 import ManageDivorcePage from "./pages/ManageDivorcePage";
 import ManageAdoptionPage from "./pages/ManageAdoptionPage";
@@ -64,7 +65,7 @@ function RequireCivil({ children }: { children: ReactNode }) {
 }
 
 function RequireHealth({ children }: { children: ReactNode }) {
-  if (!getHealthSession()) return <Navigate to="/login" replace />;
+  if (!getHealthSession()) return <Navigate to="/sante/login" replace />;
   return <>{children}</>;
 }
 
@@ -570,6 +571,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/sante/login" element={<HealthLoginPage />} />
       <Route
         path="/sante/*"
         element={
