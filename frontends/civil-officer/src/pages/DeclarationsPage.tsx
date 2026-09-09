@@ -1,21 +1,19 @@
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   api,
-  demoCreateDeclaration,
   demoListDeclarations,
   demoValidateDeclaration,
   type Declaration,
 } from "../api";
-import GeoCascade, { GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
+import { addAct, addPerson, getPersonByNic, type Sexe } from "../registry";
+import { pushNotification } from "../prefs";
+import { setDeclarationStatus } from "../civilDeclarations";
 
 export default function DeclarationsPage() {
   const [rows, setRows] = useState<Declaration[]>([]);
-  const [commune, setCommune] = useState("KIN-GOMBE");
-  const [geo, setGeo] = useState<GeoSelection>({});
-  const [type, setType] = useState("BIRTH");
-  const [notes, setNotes] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [selected, setSelected] = useState<Declaration | null>(null);
 
   async function refresh() {
     try {
@@ -29,85 +27,106 @@ export default function DeclarationsPage() {
     void refresh();
   }, []);
 
-  async function onCreate(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setMessage(null);
-    const body = {
-      source: "COMMUNE",
-      declaration_type: type,
-      payload: { notes, commune_code: commune },
-    };
-    try {
-      await api.createDeclaration(body);
-      setMessage("Déclaration créée (API).");
-    } catch {
-      demoCreateDeclaration(body.payload, type);
-      setMessage("Déclaration créée en mode démo.");
+  function applyToRegistry(d: Declaration) {
+    const commune = String(d.payload.commune_code ?? "KIN-GOMBE");
+    if (d.declaration_type === "BIRTH") {
+      const sexe = (String(d.payload.sexe ?? "M").toUpperCase() === "F" ? "F" : "M") as Sexe;
+      const child = addPerson({
+        nom: String(d.payload.child_nom ?? "INCONNU"),
+        postnom: String(d.payload.child_postnom ?? ""),
+        prenom: String(d.payload.child_prenom ?? ""),
+        sexe,
+        date_naissance: String(d.payload.date_naissance ?? ""),
+        lieu_naissance: String(d.payload.lieu_naissance ?? d.payload.facility_name ?? ""),
+        etat_civil: "CELIBATAIRE",
+      });
+      addAct(
+        "BIRTH",
+        {
+          ...d.payload,
+          child_id: child.id,
+          nom: child.nom,
+          postnom: child.postnom,
+          prenom: child.prenom,
+          sexe: child.sexe,
+          date_naissance: child.date_naissance,
+          lieu_naissance: child.lieu_naissance,
+          commune_code: commune,
+          source: "HOSPITAL",
+          declaration_id: d.id,
+        },
+        child.nic,
+      );
+      return child.nic;
     }
-    setNotes("");
-    await refresh();
-    setBusy(false);
+    if (d.declaration_type === "DEATH") {
+      const name = String(d.payload.deceased_name ?? "INCONNU");
+      const existing = getPersonByNic(String(d.payload.deceased_nic ?? ""));
+      addAct(
+        "DEATH",
+        {
+          ...d.payload,
+          deceased_id: existing?.id ?? null,
+          deceased_name: name,
+          commune_code: commune,
+          source: "HOSPITAL",
+          declaration_id: d.id,
+        },
+        existing?.nic ?? `HOSP-${d.id.slice(0, 8)}`,
+      );
+      return name;
+    }
+    return null;
   }
 
   async function onValidate(id: string, reject: boolean) {
     setBusy(true);
+    setMessage(null);
     try {
       await api.validateDeclaration(id, {
-        commune_code: commune,
+        commune_code: String(rows.find((r) => r.id === id)?.payload.commune_code ?? "KIN-GOMBE"),
         reject,
         rejection_reason: reject ? "Rejeté par l'officier" : undefined,
       });
-      setMessage(reject ? "Déclaration rejetée." : "Déclaration validée → acte créé.");
+      setMessage(reject ? "Déclaration rejetée." : "Déclaration validée via API.");
     } catch {
+      const d = rows.find((x) => x.id === id);
+      if (!reject && d) {
+        try {
+          applyToRegistry(d);
+        } catch (err) {
+          setMessage(err instanceof Error ? err.message : "Validation locale partielle.");
+        }
+      }
       demoValidateDeclaration(id, reject);
-      setMessage(reject ? "Rejet démo." : "Validation démo.");
+      setDeclarationStatus(id, reject ? "REJECTED" : "VALIDATED");
+      setMessage(
+        reject
+          ? "Déclaration rejetée (mode local)."
+          : "Déclaration validée — registre mis à jour (naissance/décès).",
+      );
+      pushNotification({
+        title: reject ? "Déclaration rejetée" : "Déclaration validée",
+        body: reject
+          ? "La structure sanitaire a été informée du rejet (statut local)."
+          : "Le registre communal a été mis à jour suite à la validation hôpital.",
+        href: d?.declaration_type === "DEATH" ? "/deaths" : "/births",
+      });
     }
+    setSelected(null);
     await refresh();
     setBusy(false);
   }
 
   return (
     <div>
-      <h2 className="page-title">Déclarations (file officier)</h2>
+      <h2 className="page-title">Déclarations structures sanitaires</h2>
       <p className="page-lead">
-        Déclarations hôpital / commune en attente de validation (`PENDING_OFFICER`).
+        File d&apos;attente des naissances et décès notifiés par les hôpitaux / cliniques — à valider pour mise à
+        jour du système.
       </p>
 
-      <div className="panel">
-        <h3 style={{ marginTop: 0 }}>Nouvelle déclaration (intake)</h3>
-        {message ? <div className="success-banner">{message}</div> : null}
-        <form className="form-grid" onSubmit={onCreate}>
-          <div>
-            <label className="form-label">Type</label>
-            <select className="form-control" value={type} onChange={(e) => setType(e.target.value)}>
-              <option value="BIRTH">Naissance</option>
-              <option value="DEATH">Décès</option>
-            </select>
-          </div>
-          <div className="full">
-            <GeoCascade
-              embedded
-              levels={GEO_PRESETS.place}
-              value={geo}
-              onChange={(g) => {
-                setGeo(g);
-                if (g.commune_code) setCommune(g.commune_code);
-              }}
-              label="Commune de la déclaration"
-            />
-          </div>
-          <div className="full">
-            <label className="form-label">Notes / payload</label>
-            <input className="form-control" value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </div>
-          <div className="full">
-            <button className="btn-primary" style={{ width: "auto", minWidth: 200 }} disabled={busy}>
-              Créer la déclaration
-            </button>
-          </div>
-        </form>
-      </div>
+      {message ? <div className="success-banner">{message}</div> : null}
 
       <div className="panel">
         <div className="toolbar">
@@ -119,8 +138,8 @@ export default function DeclarationsPage() {
           <thead>
             <tr>
               <th>Type</th>
-              <th>Source</th>
-              <th>Statut</th>
+              <th>Structure</th>
+              <th>Résumé</th>
               <th>Créée</th>
               <th>Actions</th>
             </tr>
@@ -135,20 +154,26 @@ export default function DeclarationsPage() {
             ) : (
               rows.map((d) => (
                 <tr key={d.id}>
-                  <td>{d.declaration_type}</td>
-                  <td>{d.source}</td>
-                  <td>{d.status}</td>
-                  <td>{new Date(d.created_at).toLocaleString("fr-FR")}</td>
+                  <td>{d.declaration_type === "BIRTH" ? "Naissance" : "Décès"}</td>
+                  <td>{String(d.payload.facility_name ?? d.source)}</td>
                   <td>
+                    {d.declaration_type === "BIRTH"
+                      ? `${d.payload.child_nom ?? ""} ${d.payload.child_prenom ?? ""}`.trim() || "—"
+                      : String(d.payload.deceased_name ?? "—")}
+                  </td>
+                  <td>{new Date(d.created_at).toLocaleString("fr-FR")}</td>
+                  <td className="table-actions">
+                    <button type="button" className="btn-secondary btn-sm" onClick={() => setSelected(d)}>
+                      Voir
+                    </button>{" "}
                     <button
                       type="button"
                       className="btn-primary btn-sm"
-                      style={{ marginRight: 8 }}
                       disabled={busy}
                       onClick={() => void onValidate(d.id, false)}
                     >
                       Valider
-                    </button>
+                    </button>{" "}
                     <button
                       type="button"
                       className="btn-secondary btn-sm"
@@ -164,6 +189,33 @@ export default function DeclarationsPage() {
           </tbody>
         </table>
       </div>
+
+      {selected ? (
+        <div className="modal-backdrop" onClick={() => setSelected(null)}>
+          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
+            <h3>
+              Déclaration {selected.declaration_type === "BIRTH" ? "naissance" : "décès"}
+            </h3>
+            <pre style={{ whiteSpace: "pre-wrap", fontSize: "0.85rem" }}>
+              {JSON.stringify(selected.payload, null, 2)}
+            </pre>
+            <div className="modal-actions">
+              <button type="button" className="btn-secondary" onClick={() => setSelected(null)}>
+                Fermer
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ width: "auto" }}
+                disabled={busy}
+                onClick={() => void onValidate(selected.id, false)}
+              >
+                Valider et mettre à jour
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

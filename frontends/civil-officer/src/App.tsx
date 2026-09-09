@@ -2,6 +2,7 @@ import type { FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { clearSession, DEMO_PASSWORD, getSession, updateSession } from "./auth";
+import { clearHealthSession, getHealthSession } from "./healthAuth";
 import {
   applyTheme,
   getPrefs,
@@ -27,6 +28,10 @@ import DivorcesPage from "./pages/DivorcesPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import ActsPage from "./pages/ActsPage";
 import SearchPage from "./pages/SearchPage";
+import DeclarationsPage from "./pages/DeclarationsPage";
+import HealthDashboardPage from "./pages/HealthDashboardPage";
+import HealthBirthsPage from "./pages/HealthBirthsPage";
+import HealthDeathsPage from "./pages/HealthDeathsPage";
 import ManageDecesPage from "./pages/ManageDecesPage";
 import ManageDivorcePage from "./pages/ManageDivorcePage";
 import ManageAdoptionPage from "./pages/ManageAdoptionPage";
@@ -52,9 +57,85 @@ import {
   IconUsers,
 } from "./components/Icons";
 
-function RequireAuth({ children }: { children: ReactNode }) {
+function RequireCivil({ children }: { children: ReactNode }) {
+  if (getHealthSession()) return <Navigate to="/sante" replace />;
   if (!getSession()) return <Navigate to="/login" replace />;
   return <>{children}</>;
+}
+
+function RequireHealth({ children }: { children: ReactNode }) {
+  if (!getHealthSession()) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+function HealthShell() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const session = getHealthSession()!;
+  const [navOpen, setNavOpen] = useState(false);
+
+  useEffect(() => {
+    setNavOpen(false);
+  }, [location.pathname]);
+
+  function logout() {
+    clearHealthSession();
+    navigate("/login", { replace: true });
+  }
+
+  return (
+    <div className={`app-layout ${navOpen ? "nav-open" : ""}`}>
+      <div className="sidebar-backdrop" onClick={() => setNavOpen(false)} />
+      <aside className="sidebar" id="app-sidebar">
+        <div className="sidebar-brand">
+          <strong>Structure sanitaire</strong>
+          <button type="button" className="sidebar-close" onClick={() => setNavOpen(false)}>
+            ×
+          </button>
+        </div>
+        <nav className="sidebar-nav">
+          <NavLink to="/sante" end>
+            <IconDashboard size={18} /> Tableau de bord
+          </NavLink>
+          <NavLink to="/sante/births">
+            <IconBaby size={18} /> Nouveaux-nés
+          </NavLink>
+          <NavLink to="/sante/deaths">
+            <IconCross size={18} /> Décès
+          </NavLink>
+        </nav>
+        <div className="sidebar-foot">
+          <button type="button" className="btn-logout" style={{ width: "100%" }} onClick={logout}>
+            Déconnexion
+          </button>
+        </div>
+      </aside>
+      <div className="body-wrap">
+        <header className="topbar topbar-3">
+          <div className="topbar-left">
+            <button type="button" className="menu-toggle" aria-label="Menu" onClick={() => setNavOpen((o) => !o)}>
+              <span />
+            </button>
+            <h1 className="topbar-title">Santé</h1>
+          </div>
+          <div className="topbar-center">
+            <span className="topbar-role">{session.roleTitle}</span>
+            <span className="topbar-commune">{session.commune_name}</span>
+            <strong className="topbar-responsable">{session.facilityName}</strong>
+          </div>
+          <div className="topbar-right" />
+        </header>
+        <main className="shell">
+          <Routes>
+            <Route path="/" element={<HealthDashboardPage />} />
+            <Route path="/births" element={<HealthBirthsPage />} />
+            <Route path="/deaths" element={<HealthDeathsPage />} />
+            <Route path="*" element={<Navigate to="/sante" replace />} />
+          </Routes>
+        </main>
+      </div>
+    </div>
+  );
 }
 
 function Shell() {
@@ -89,6 +170,7 @@ function Shell() {
 
   function logout() {
     clearSession();
+    clearHealthSession();
     navigate("/login", { replace: true });
   }
 
@@ -203,6 +285,9 @@ function Shell() {
           <NavLink to="/acts">
             <IconFile size={18} /> Actes & documents
           </NavLink>
+          <NavLink to="/declarations">
+            <IconClipboard size={18} /> Déclarations santé
+          </NavLink>
         </nav>
         <div className="sidebar-foot">
           <button type="button" className="btn-logout" style={{ width: "100%" }} onClick={logout}>
@@ -311,6 +396,7 @@ function Shell() {
             <Route path="/divorces" element={<DivorcesPage />} />
             <Route path="/documents" element={<DocumentsPage />} />
             <Route path="/acts" element={<ActsPage />} />
+            <Route path="/declarations" element={<DeclarationsPage />} />
             <Route path="/territory" element={<TerritoryPage />} />
             <Route path="/search" element={<SearchPage />} />
           </Routes>
@@ -485,11 +571,19 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route
+        path="/sante/*"
+        element={
+          <RequireHealth>
+            <HealthShell />
+          </RequireHealth>
+        }
+      />
+      <Route
         path="/*"
         element={
-          <RequireAuth>
+          <RequireCivil>
             <Shell />
-          </RequireAuth>
+          </RequireCivil>
         }
       />
     </Routes>

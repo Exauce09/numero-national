@@ -27,7 +27,7 @@ const DEFAULT_NOTIFS: AppNotification[] = [
     body: "Une déclaration de naissance hôpital attend la validation de l'officier pour la commune.",
     created_at: new Date(Date.now() - 3600_000).toISOString(),
     read: false,
-    href: "/births",
+    href: "/declarations",
   },
   {
     id: "n2",
@@ -98,4 +98,22 @@ export function markAllNotificationsRead(): AppNotification[] {
   const rows = listNotifications().map((n) => ({ ...n, read: true }));
   saveNotifications(rows);
   return rows;
+}
+
+export function pushNotification(input: {
+  title: string;
+  body: string;
+  href?: string;
+}): AppNotification {
+  const row: AppNotification = {
+    id: crypto.randomUUID(),
+    title: input.title,
+    body: input.body,
+    created_at: new Date().toISOString(),
+    read: false,
+    href: input.href,
+  };
+  const rows = [row, ...listNotifications()].slice(0, 50);
+  saveNotifications(rows);
+  return row;
 }
