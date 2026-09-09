@@ -434,7 +434,7 @@ export default function AccountsPage() {
               placeholder="Min. 8 caractères, politique API"
             />
             <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-              Exemple valide : <code>CensusAgent123!</code>
+              Minimum 8 caractères (ex. <code>Agent123</code>).
             </p>
           </div>
           <div>

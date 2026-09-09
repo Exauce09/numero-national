@@ -357,7 +357,7 @@ async def update_user(
         ip=ip,
         device=device,
         result="success",
-        new_value=payload.model_dump(exclude_unset=True, exclude={"password"}),
+        new_value=payload.model_dump(mode="json", exclude_unset=True, exclude={"password"}),
     )
     return identity_services.user_to_me(user)
 

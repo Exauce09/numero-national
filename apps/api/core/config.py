@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     # Auth hardening
     allow_dev_auth_headers: bool = Field(default=False, alias="ALLOW_DEV_AUTH_HEADERS")
     allow_open_registration: bool = Field(default=False, alias="ALLOW_OPEN_REGISTRATION")
-    password_min_length: int = Field(default=12, alias="PASSWORD_MIN_LENGTH")
+    password_min_length: int = Field(default=8, alias="PASSWORD_MIN_LENGTH")
     bcrypt_rounds: int = Field(default=12, alias="BCRYPT_ROUNDS")
 
     # HTTP / edge

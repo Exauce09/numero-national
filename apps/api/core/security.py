@@ -31,25 +31,20 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def validate_password_strength(password: str, settings: Settings | None = None) -> None:
-    """Enforce minimum password policy; raise HTTP 400 on failure."""
+    """Enforce minimum password policy; raise HTTP 400 on failure.
+
+    Policy: at least PASSWORD_MIN_LENGTH characters (default 8).
+    """
     cfg = settings or get_settings()
     if len(password) < cfg.password_min_length:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Password must be at least {cfg.password_min_length} characters",
+            detail=f"Le mot de passe doit contenir au moins {cfg.password_min_length} caractères",
         )
-    classes = sum(
-        [
-            any(c.islower() for c in password),
-            any(c.isupper() for c in password),
-            any(c.isdigit() for c in password),
-            any(not c.isalnum() for c in password),
-        ]
-    )
-    if classes < 3:
+    if len(password) > 128:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must include at least 3 of: lower, upper, digit, symbol",
+            detail="Le mot de passe ne peut pas dépasser 128 caractères",
         )
 
 
