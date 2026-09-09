@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FACILITY_TYPE_LABELS, getMinistryDashboard } from "../../santeData";
+import { BarChart, GroupedBarChart, HorizontalBarChart, PieChart } from "../../components/Charts";
+import { FACILITY_TYPE_LABELS, getMinistryDashboard, listMinistryDeclarations } from "../../santeData";
 
 function Metric({
   label,
@@ -21,8 +22,45 @@ function Metric({
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const [, bump] = useState(0);
-  const dash = useMemo(() => getMinistryDashboard(), [bump]);
+  const [tick, setTick] = useState(0);
+  const dash = useMemo(() => getMinistryDashboard(), [tick]);
+  const decls = useMemo(() => listMinistryDeclarations(), [tick]);
+
+  const typePie = Object.entries(dash.by_type).map(([type, value]) => ({
+    label: FACILITY_TYPE_LABELS[type] ?? type,
+    value,
+  }));
+
+  const statusPie = [
+    { label: "En attente", value: dash.pending, color: "#c9a227" },
+    { label: "Validés", value: dash.validated, color: "#1a5f4a" },
+    { label: "Rejetés", value: dash.rejected, color: "#b03a3a" },
+  ];
+
+  const eventsBar = [
+    { label: "Naissances", value: dash.births, color: "#2d7a5f" },
+    { label: "Décès", value: dash.deaths, color: "#8a4b1a" },
+    { label: "Structures", value: dash.facilities_total, color: "#3b6ea5" },
+  ];
+
+  const birthSex = [
+    {
+      label: "Garçons",
+      value: decls.filter((d) => d.declaration_type === "BIRTH" && String(d.sexe ?? "M").toUpperCase() !== "F").length,
+      color: "#3b6ea5",
+    },
+    {
+      label: "Filles",
+      value: decls.filter((d) => d.declaration_type === "BIRTH" && String(d.sexe ?? "").toUpperCase() === "F").length,
+      color: "#c45d8a",
+    },
+  ];
+
+  const provinces = dash.by_province.slice(0, 8);
+  const facilityBars = Object.entries(dash.by_type).map(([type, value]) => ({
+    label: FACILITY_TYPE_LABELS[type] ?? type,
+    value,
+  }));
 
   return (
     <div>
@@ -30,10 +68,10 @@ export default function DashboardPage() {
         <div>
           <h2 className="page-title">Tableau de bord — Santé</h2>
           <p className="page-lead">
-            Vue nationale dynamique : structures sanitaires du système, naissances et décès déclarés.
+            Vue nationale dynamique avec indicateurs et graphiques (histogrammes, camemberts, barres).
           </p>
         </div>
-        <button type="button" className="btn-secondary btn-sm" onClick={() => bump((n) => n + 1)}>
+        <button type="button" className="btn-secondary btn-sm" onClick={() => setTick((n) => n + 1)}>
           Actualiser
         </button>
       </div>
@@ -71,55 +109,23 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="panel" style={{ marginTop: "1rem" }}>
-        <h3 className="panel-title">Répartition par type de structure</h3>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Nombre</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Object.entries(dash.by_type).map(([type, n]) => (
-              <tr key={type}>
-                <td>{FACILITY_TYPE_LABELS[type] ?? type}</td>
-                <td>{n}</td>
-              </tr>
-            ))}
-            {!Object.keys(dash.by_type).length ? (
-              <tr>
-                <td colSpan={2} className="muted">
-                  Aucune structure.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
+      <div className="chart-grid" style={{ marginTop: "1rem" }}>
+        <PieChart title="Répartition des structures (camembert)" data={typePie} />
+        <PieChart title="Statut des déclarations (donut)" data={statusPie} donut />
+        <BarChart title="Histogramme — activité nationale" data={eventsBar} />
+        <PieChart title="Naissances par sexe" data={birthSex} />
       </div>
 
-      <div className="panel" style={{ marginTop: "1rem" }}>
-        <h3 className="panel-title">Par province</h3>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Province</th>
-              <th>Structures</th>
-              <th>Naissances</th>
-              <th>Décès</th>
-            </tr>
-          </thead>
-          <tbody>
-            {dash.by_province.map((r) => (
-              <tr key={r.province}>
-                <td>{r.province}</td>
-                <td>{r.facilities}</td>
-                <td>{r.births}</td>
-                <td>{r.deaths}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="chart-grid" style={{ marginTop: "1rem" }}>
+        <GroupedBarChart
+          title="Histogramme groupé — naissances & décès par province"
+          categories={provinces.map((p) => p.province)}
+          series={[
+            { name: "Naissances", color: "#1a5f4a", values: provinces.map((p) => p.births) },
+            { name: "Décès", color: "#8a4b1a", values: provinces.map((p) => p.deaths) },
+          ]}
+        />
+        <HorizontalBarChart title="Structures par type (barres horizontales)" data={facilityBars} />
       </div>
 
       <div className="panel" style={{ marginTop: "1rem" }}>

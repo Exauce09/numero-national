@@ -8,7 +8,6 @@ import SantePortalShell, { type NavItem as SanteNavItem } from "./components/San
 import SanteDashboard from "./pages/sante/DashboardPage";
 import SanteIndicators from "./pages/sante/IndicatorsPage";
 import SanteFacilities from "./pages/sante/FacilitiesPage";
-import SanteExport from "./pages/sante/ExportPage";
 import SanteSynoptic from "./pages/sante/SynopticPage";
 import SanteDeclarations from "./pages/sante/DeclarationsPage";
 
@@ -42,7 +41,6 @@ const SANTE_NAV: SanteNavItem[] = [
   { to: "/sante/structures", label: "Structures" },
   { to: "/sante/declarations", label: "Déclarations" },
   { to: "/sante/indicateurs", label: "Indicateurs" },
-  { to: "/sante/export", label: "Export" },
 ];
 
 const INTERIEUR_NAV: NavItem[] = [
@@ -96,7 +94,6 @@ export default function App() {
                 <Route path="structures" element={<SanteFacilities />} />
                 <Route path="declarations" element={<SanteDeclarations />} />
                 <Route path="indicateurs" element={<SanteIndicators />} />
-                <Route path="export" element={<SanteExport />} />
                 <Route path="*" element={<Navigate to="/sante" replace />} />
               </Routes>
             </SantePortalShell>
