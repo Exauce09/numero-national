@@ -33,32 +33,65 @@ export const HEALTH_DEMO_USER = "hopital";
 export const HEALTH_DEMO_PASSWORD = "DemoSante2026!";
 export const HEALTH_ROLE_TITLE = "Responsable — Structure sanitaire";
 
-function normalizeAccount(raw: FacilityAccount & { active?: boolean }): FacilityAccount {
+function normalizeAccount(raw: Partial<FacilityAccount> & {
+  id?: string;
+  username?: string;
+  password?: string;
+}): FacilityAccount | null {
+  if (!raw.id || !raw.username || !raw.password) return null;
   return {
-    ...raw,
+    id: String(raw.id),
+    username: String(raw.username).trim().toLowerCase(),
+    password: String(raw.password),
+    facilityName: String(raw.facilityName ?? "").trim() || "Structure sanitaire",
+    facilityType: (["HOPITAL", "CLINIQUE", "CS", "MATERNITE"] as const).includes(
+      raw.facilityType as FacilityAccount["facilityType"],
+    )
+      ? (raw.facilityType as FacilityAccount["facilityType"])
+      : "HOPITAL",
+    commune_code: String(raw.commune_code ?? "KIN-GOMBE").trim() || "KIN-GOMBE",
+    commune_name: String(raw.commune_name ?? "Gombe").trim() || "Gombe",
+    province: String(raw.province ?? "Kinshasa").trim() || "Kinshasa",
+    ville: String(raw.ville ?? "Kinshasa").trim() || "Kinshasa",
     active: raw.active !== false,
+    created_at: String(raw.created_at ?? new Date().toISOString()),
+    updated_at: raw.updated_at ? String(raw.updated_at) : undefined,
   };
 }
 
 function loadAccounts(): FacilityAccount[] {
   try {
     const raw = localStorage.getItem(ACCOUNTS_KEY);
-    if (raw) {
-      const list = JSON.parse(raw) as FacilityAccount[];
-      return list.map(normalizeAccount);
-    }
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((row) => normalizeAccount(row as Partial<FacilityAccount>))
+      .filter((row): row is FacilityAccount => row !== null);
   } catch {
-    /* ignore */
+    return [];
   }
-  return [];
 }
 
 function saveAccounts(list: FacilityAccount[]) {
-  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list.map(normalizeAccount)));
+  const normalized = list
+    .map((row) => normalizeAccount(row))
+    .filter((row): row is FacilityAccount => row !== null);
+  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(normalized));
+}
+
+/** Migre / réécrit le store pour garantir le champ `active` et des ids valides. */
+function persistNormalizedAccounts(list: FacilityAccount[]): FacilityAccount[] {
+  saveAccounts(list);
+  return loadAccounts();
 }
 
 function ensureDemoAccount(): FacilityAccount {
-  const list = loadAccounts();
+  let list = loadAccounts();
+  // Persiste la normalisation (ex. comptes anciens sans `active`).
+  if (list.length > 0) {
+    list = persistNormalizedAccounts(list);
+  }
   const hit = list.find((a) => a.username === HEALTH_DEMO_USER);
   if (hit) return hit;
   const demo: FacilityAccount = {
@@ -200,15 +233,24 @@ export function setFacilityAccountActive(id: string, active: boolean): FacilityA
   const list = loadAccounts();
   const idx = list.findIndex((a) => a.id === id);
   if (idx < 0) throw new Error("Compte introuvable.");
-  list[idx] = { ...list[idx], active, updated_at: new Date().toISOString() };
+  const next: FacilityAccount = {
+    ...list[idx],
+    active: Boolean(active),
+    updated_at: new Date().toISOString(),
+  };
+  list[idx] = next;
   saveAccounts(list);
 
-  if (!active) {
+  if (!next.active) {
     const session = getHealthSession();
-    if (session?.facilityId === id) clearHealthSession();
+    if (session?.facilityId === id || session?.username === next.username) {
+      clearHealthSession();
+    }
   }
 
-  return list[idx];
+  const saved = loadAccounts().find((a) => a.id === id);
+  if (!saved) throw new Error("Échec de mise à jour du statut.");
+  return saved;
 }
 
 export function deleteFacilityAccount(id: string): void {
@@ -217,11 +259,24 @@ export function deleteFacilityAccount(id: string): void {
   const hit = list.find((a) => a.id === id);
   if (!hit) throw new Error("Compte introuvable.");
   if (hit.username === HEALTH_DEMO_USER) {
-    throw new Error("Le compte démo ne peut pas être supprimé.");
+    throw new Error("Le compte démo ne peut pas être supprimé (vous pouvez le désactiver).");
   }
-  saveAccounts(list.filter((a) => a.id !== id));
+  const remaining = list.filter((a) => a.id !== id);
+  saveAccounts(remaining);
+  if (loadAccounts().some((a) => a.id === id)) {
+    throw new Error("Échec de la suppression.");
+  }
   const session = getHealthSession();
-  if (session?.facilityId === id) clearHealthSession();
+  if (session?.facilityId === id || session?.username === hit.username) {
+    clearHealthSession();
+  }
+}
+
+/** Vérifie qu'un compte santé existe encore et est actif (garde de session). */
+export function isHealthAccountActive(facilityId: string): boolean {
+  ensureDemoAccount();
+  const hit = loadAccounts().find((a) => a.id === facilityId);
+  return Boolean(hit?.active);
 }
 
 export function getHealthSession(): HealthSession | null {

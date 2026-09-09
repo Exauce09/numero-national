@@ -38,17 +38,24 @@ const emptyAccountForm = {
   confirmPassword: "",
 };
 
+type PendingAction =
+  | { type: "activate" | "deactivate" | "delete"; account: FacilityAccountPublic }
+  | null;
+
 export default function DeclarationsPage() {
   const [rows, setRows] = useState<Declaration[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<Declaration | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<FacilityAccountPublic[]>(() => listFacilityAccounts());
   const [form, setForm] = useState(emptyAccountForm);
   const [formError, setFormError] = useState<string | null>(null);
   const [formOk, setFormOk] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingAction>(null);
+  const [actionBusy, setActionBusy] = useState(false);
 
   async function refresh() {
     try {
@@ -58,13 +65,14 @@ export default function DeclarationsPage() {
     }
   }
 
-  useEffect(() => {
-    void refresh();
-  }, []);
-
   function refreshAccounts() {
     setAccounts(listFacilityAccounts());
   }
+
+  useEffect(() => {
+    void refresh();
+    refreshAccounts();
+  }, []);
 
   function applyToRegistry(d: Declaration) {
     const commune = String(d.payload.commune_code ?? "KIN-GOMBE");
@@ -121,6 +129,7 @@ export default function DeclarationsPage() {
   async function onValidate(id: string, reject: boolean) {
     setBusy(true);
     setMessage(null);
+    setError(null);
     try {
       await api.validateDeclaration(id, {
         commune_code: String(rows.find((r) => r.id === id)?.payload.commune_code ?? "KIN-GOMBE"),
@@ -134,7 +143,7 @@ export default function DeclarationsPage() {
         try {
           applyToRegistry(d);
         } catch (err) {
-          setMessage(err instanceof Error ? err.message : "Validation locale partielle.");
+          setError(err instanceof Error ? err.message : "Validation locale partielle.");
         }
       }
       demoValidateDeclaration(id, reject);
@@ -162,29 +171,30 @@ export default function DeclarationsPage() {
     setForm(emptyAccountForm);
     setFormError(null);
     setFormOk(null);
-    refreshAccounts();
-    setCreateOpen(true);
+    setFormOpen(true);
   }
 
   function startEdit(account: FacilityAccountPublic) {
+    setPending(null);
     setEditingId(account.id);
     setForm({
       facilityName: account.facilityName,
       facilityType: account.facilityType,
-      province: account.province,
-      ville: account.ville,
-      communeName: account.commune_name,
-      communeCode: account.commune_code,
+      province: account.province || "Kinshasa",
+      ville: account.ville || "Kinshasa",
+      communeName: account.commune_name || "Gombe",
+      communeCode: account.commune_code || "KIN-GOMBE",
       username: account.username,
       password: "",
       confirmPassword: "",
     });
     setFormError(null);
     setFormOk(null);
-    setCreateOpen(true);
+    setFormOpen(true);
   }
 
-  function cancelEdit() {
+  function closeForm() {
+    setFormOpen(false);
     setEditingId(null);
     setForm(emptyAccountForm);
     setFormError(null);
@@ -195,10 +205,17 @@ export default function DeclarationsPage() {
     e.preventDefault();
     setFormError(null);
     setFormOk(null);
+    setError(null);
 
-    if (form.password || form.confirmPassword) {
-      if (form.password !== form.confirmPassword) {
+    const pwd = form.password.trim();
+    const confirm = form.confirmPassword.trim();
+    if (pwd || confirm) {
+      if (pwd !== confirm) {
         setFormError("La confirmation du mot de passe ne correspond pas.");
+        return;
+      }
+      if (pwd.length < 8) {
+        setFormError("Le mot de passe doit contenir au moins 8 caractères.");
         return;
       }
     }
@@ -207,7 +224,7 @@ export default function DeclarationsPage() {
       if (editingId) {
         const account = updateFacilityAccount(editingId, {
           username: form.username,
-          password: form.password || undefined,
+          password: pwd || undefined,
           facilityName: form.facilityName,
           facilityType: form.facilityType,
           commune_code: form.communeCode,
@@ -216,27 +233,21 @@ export default function DeclarationsPage() {
           ville: form.ville,
         });
         refreshAccounts();
-        setFormOk(`Compte « ${account.facilityName} » modifié (@${account.username}).`);
         setMessage(`Compte modifié : ${account.facilityName} (@${account.username}).`);
         pushNotification({
           title: "Compte structure sanitaire modifié",
           body: `${account.facilityName} — identifiant ${account.username}.`,
           href: "/declarations",
         });
-        setEditingId(null);
-        setForm(emptyAccountForm);
+        closeForm();
       } else {
-        if (!form.password) {
+        if (!pwd) {
           setFormError("Le mot de passe est requis pour un nouveau compte.");
-          return;
-        }
-        if (form.password !== form.confirmPassword) {
-          setFormError("La confirmation du mot de passe ne correspond pas.");
           return;
         }
         const account = createFacilityAccount({
           username: form.username,
-          password: form.password,
+          password: pwd,
           facilityName: form.facilityName,
           facilityType: form.facilityType,
           commune_code: form.communeCode,
@@ -245,71 +256,68 @@ export default function DeclarationsPage() {
           ville: form.ville,
         });
         refreshAccounts();
-        setFormOk(
-          `Compte créé pour « ${account.facilityName} ». Identifiant : ${account.username} — connexion : /sante/login`,
+        setMessage(
+          `Compte créé : ${account.facilityName} (@${account.username}). Connexion : /sante/login`,
         );
-        setMessage(`Compte administrateur sanitaire créé : ${account.facilityName} (@${account.username}).`);
         pushNotification({
           title: "Compte structure sanitaire créé",
           body: `${account.facilityName} — identifiant ${account.username}. L'administrateur peut se connecter sur /sante/login.`,
           href: "/declarations",
         });
-        setForm(emptyAccountForm);
+        closeForm();
       }
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Enregistrement impossible.");
     }
   }
 
-  function onToggleActive(account: FacilityAccountPublic) {
-    const next = !account.active;
-    const label = next ? "activer" : "désactiver";
-    if (!window.confirm(`Voulez-vous ${label} le compte « ${account.facilityName} » (@${account.username}) ?`)) {
+  function requestAction(type: "activate" | "deactivate" | "delete", account: FacilityAccountPublic) {
+    setError(null);
+    setMessage(null);
+    if (type === "delete" && account.username === HEALTH_DEMO_USER) {
+      setError("Le compte démo ne peut pas être supprimé (désactivez-le si besoin).");
       return;
     }
-    try {
-      setFacilityAccountActive(account.id, next);
-      refreshAccounts();
-      setMessage(
-        next
-          ? `Compte activé : ${account.facilityName} (@${account.username}).`
-          : `Compte désactivé : ${account.facilityName} (@${account.username}).`,
-      );
-      pushNotification({
-        title: next ? "Compte sanitaire activé" : "Compte sanitaire désactivé",
-        body: `${account.facilityName} (@${account.username}).`,
-        href: "/declarations",
-      });
-      if (editingId === account.id && !next) cancelEdit();
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Action impossible.");
-    }
+    setPending({ type, account });
   }
 
-  function onDelete(account: FacilityAccountPublic) {
-    if (account.username === HEALTH_DEMO_USER) {
-      setMessage("Le compte démo ne peut pas être supprimé.");
-      return;
-    }
-    if (
-      !window.confirm(
-        `Supprimer définitivement le compte « ${account.facilityName} » (@${account.username}) ? Cette action est irréversible.`,
-      )
-    ) {
-      return;
-    }
+  function runPendingAction() {
+    if (!pending) return;
+    setActionBusy(true);
+    setError(null);
+    setMessage(null);
+    const { type, account } = pending;
     try {
-      deleteFacilityAccount(account.id);
+      if (type === "delete") {
+        deleteFacilityAccount(account.id);
+        if (editingId === account.id) closeForm();
+        setMessage(`Compte supprimé : ${account.facilityName} (@${account.username}).`);
+        pushNotification({
+          title: "Compte structure sanitaire supprimé",
+          body: `${account.facilityName} (@${account.username}).`,
+          href: "/declarations",
+        });
+      } else {
+        const active = type === "activate";
+        const updated = setFacilityAccountActive(account.id, active);
+        if (!updated.active && editingId === account.id) closeForm();
+        setMessage(
+          active
+            ? `Compte activé : ${updated.facilityName} (@${updated.username}).`
+            : `Compte désactivé : ${updated.facilityName} (@${updated.username}).`,
+        );
+        pushNotification({
+          title: active ? "Compte sanitaire activé" : "Compte sanitaire désactivé",
+          body: `${updated.facilityName} (@${updated.username}).`,
+          href: "/declarations",
+        });
+      }
       refreshAccounts();
-      if (editingId === account.id) cancelEdit();
-      setMessage(`Compte supprimé : ${account.facilityName} (@${account.username}).`);
-      pushNotification({
-        title: "Compte structure sanitaire supprimé",
-        body: `${account.facilityName} (@${account.username}).`,
-        href: "/declarations",
-      });
+      setPending(null);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Suppression impossible.");
+      setError(err instanceof Error ? err.message : "Action impossible.");
+    } finally {
+      setActionBusy(false);
     }
   }
 
@@ -318,18 +326,112 @@ export default function DeclarationsPage() {
       <h2 className="page-title">Déclarations structures sanitaires</h2>
       <p className="page-lead">
         File d&apos;attente des naissances et décès notifiés par les hôpitaux / cliniques — à valider pour mise à
-        jour du système. Créez et gérez aussi les comptes administrateurs des structures sanitaires.
+        jour du système. Gérez aussi les comptes administrateurs des structures sanitaires.
       </p>
 
       {message ? <div className="success-banner">{message}</div> : null}
+      {error ? <div className="login-error">{error}</div> : null}
+
+      <div className="panel">
+        <div className="panel-head">
+          <h3 className="panel-title" style={{ margin: 0 }}>
+            Comptes structures sanitaires
+          </h3>
+          <div className="toolbar" style={{ margin: 0 }}>
+            <button type="button" className="btn-secondary btn-sm" onClick={refreshAccounts}>
+              Actualiser
+            </button>
+            <button type="button" className="btn-primary btn-sm" onClick={openCreate}>
+              Créer un compte
+            </button>
+          </div>
+        </div>
+        <p className="muted small" style={{ marginTop: 0 }}>
+          Modifier, activer, désactiver ou supprimer un compte. Un compte désactivé ne peut plus se connecter
+          sur <code>/sante/login</code>.
+        </p>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Structure</th>
+              <th>Type</th>
+              <th>Identifiant</th>
+              <th>Commune</th>
+              <th>Statut</th>
+              <th>Créé</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {accounts.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="muted">
+                  Aucun compte.
+                </td>
+              </tr>
+            ) : (
+              accounts.map((a) => (
+                <tr key={a.id}>
+                  <td>{a.facilityName}</td>
+                  <td>{FACILITY_TYPES.find((t) => t.value === a.facilityType)?.label ?? a.facilityType}</td>
+                  <td>
+                    <code>{a.username}</code>
+                  </td>
+                  <td>{a.commune_name}</td>
+                  <td>
+                    <strong style={{ color: a.active ? "#1a5f4a" : "#8a4b1a" }}>
+                      {a.active ? "Actif" : "Désactivé"}
+                    </strong>
+                  </td>
+                  <td>{new Date(a.created_at).toLocaleString("fr-FR")}</td>
+                  <td>
+                    <div className="table-actions">
+                      <button type="button" className="btn-secondary btn-sm" onClick={() => startEdit(a)}>
+                        Modifier
+                      </button>
+                      {a.active ? (
+                        <button
+                          type="button"
+                          className="btn-secondary btn-sm"
+                          onClick={() => requestAction("deactivate", a)}
+                        >
+                          Désactiver
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn-primary btn-sm"
+                          onClick={() => requestAction("activate", a)}
+                        >
+                          Activer
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="btn-secondary btn-sm"
+                        disabled={a.username === HEALTH_DEMO_USER}
+                        title={
+                          a.username === HEALTH_DEMO_USER
+                            ? "Le compte démo ne peut pas être supprimé"
+                            : "Supprimer"
+                        }
+                        onClick={() => requestAction("delete", a)}
+                      >
+                        Supprimer
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
 
       <div className="panel">
         <div className="toolbar">
           <button type="button" className="btn-secondary" onClick={() => void refresh()}>
             Actualiser la file
-          </button>
-          <button type="button" className="btn-primary" style={{ width: "auto" }} onClick={openCreate}>
-            Créer un compte
           </button>
         </div>
         <table className="data-table">
@@ -360,26 +462,28 @@ export default function DeclarationsPage() {
                       : String(d.payload.deceased_name ?? "—")}
                   </td>
                   <td>{new Date(d.created_at).toLocaleString("fr-FR")}</td>
-                  <td className="table-actions">
-                    <button type="button" className="btn-secondary btn-sm" onClick={() => setSelected(d)}>
-                      Voir
-                    </button>{" "}
-                    <button
-                      type="button"
-                      className="btn-primary btn-sm"
-                      disabled={busy}
-                      onClick={() => void onValidate(d.id, false)}
-                    >
-                      Valider
-                    </button>{" "}
-                    <button
-                      type="button"
-                      className="btn-secondary btn-sm"
-                      disabled={busy}
-                      onClick={() => void onValidate(d.id, true)}
-                    >
-                      Rejeter
-                    </button>
+                  <td>
+                    <div className="table-actions">
+                      <button type="button" className="btn-secondary btn-sm" onClick={() => setSelected(d)}>
+                        Voir
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-primary btn-sm"
+                        disabled={busy}
+                        onClick={() => void onValidate(d.id, false)}
+                      >
+                        Valider
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary btn-sm"
+                        disabled={busy}
+                        onClick={() => void onValidate(d.id, true)}
+                      >
+                        Rejeter
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -388,49 +492,68 @@ export default function DeclarationsPage() {
         </table>
       </div>
 
-      {selected ? (
-        <div className="modal-backdrop" onClick={() => setSelected(null)}>
+      {pending ? (
+        <div className="modal-backdrop" onClick={() => !actionBusy && setPending(null)}>
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
             <h3>
-              Déclaration {selected.declaration_type === "BIRTH" ? "naissance" : "décès"}
+              {pending.type === "delete"
+                ? "Supprimer le compte"
+                : pending.type === "activate"
+                  ? "Activer le compte"
+                  : "Désactiver le compte"}
             </h3>
-            <pre style={{ whiteSpace: "pre-wrap", fontSize: "0.85rem" }}>
-              {JSON.stringify(selected.payload, null, 2)}
-            </pre>
+            <p>
+              {pending.type === "delete"
+                ? "Cette action est irréversible."
+                : pending.type === "deactivate"
+                  ? "L'administrateur ne pourra plus se connecter au module santé."
+                  : "L'administrateur pourra à nouveau se connecter au module santé."}
+            </p>
+            <p>
+              <strong>{pending.account.facilityName}</strong> — <code>@{pending.account.username}</code>
+            </p>
             <div className="modal-actions">
-              <button type="button" className="btn-secondary" onClick={() => setSelected(null)}>
-                Fermer
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={actionBusy}
+                onClick={() => setPending(null)}
+              >
+                Annuler
               </button>
               <button
                 type="button"
                 className="btn-primary"
                 style={{ width: "auto" }}
-                disabled={busy}
-                onClick={() => void onValidate(selected.id, false)}
+                disabled={actionBusy}
+                onClick={runPendingAction}
               >
-                Valider et mettre à jour
+                {actionBusy
+                  ? "En cours…"
+                  : pending.type === "delete"
+                    ? "Confirmer la suppression"
+                    : pending.type === "activate"
+                      ? "Confirmer l'activation"
+                      : "Confirmer la désactivation"}
               </button>
             </div>
           </div>
         </div>
       ) : null}
 
-      {createOpen ? (
-        <div className="modal-backdrop" onClick={() => setCreateOpen(false)}>
+      {formOpen ? (
+        <div className="modal-backdrop" onClick={() => !actionBusy && closeForm()}>
           <div className="modal-panel modal-wide" onClick={(e) => e.stopPropagation()}>
             <div className="panel-head">
               <h3 className="panel-title" style={{ margin: 0 }}>
-                {editingId
-                  ? "Modifier le compte — structure sanitaire"
-                  : "Compte administrateur — structure sanitaire"}
+                {editingId ? "Modifier le compte" : "Créer un compte administrateur"}
               </h3>
-              <button type="button" className="btn-secondary btn-sm" onClick={() => setCreateOpen(false)}>
+              <button type="button" className="btn-secondary btn-sm" onClick={closeForm}>
                 Fermer
               </button>
             </div>
             <p className="muted" style={{ marginTop: 0 }}>
-              Ce compte permet à l&apos;administrateur de se connecter au module santé (
-              <code>/sante/login</code>) pour déclarer naissances et décès.
+              Accès module santé : <code>/sante/login</code>
             </p>
 
             <form className="form-grid" onSubmit={onSaveAccount} autoComplete="off">
@@ -515,8 +638,7 @@ export default function DeclarationsPage() {
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   required={!editingId}
-                  minLength={editingId && !form.password ? undefined : 8}
-                  placeholder={editingId ? "Laisser vide pour ne pas changer" : undefined}
+                  placeholder={editingId ? "Laisser vide pour conserver" : undefined}
                 />
               </div>
               <div>
@@ -528,94 +650,44 @@ export default function DeclarationsPage() {
                   type="password"
                   value={form.confirmPassword}
                   onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-                  required={!editingId || Boolean(form.password)}
-                  minLength={editingId && !form.password ? undefined : 8}
+                  required={!editingId || Boolean(form.password.trim())}
                 />
               </div>
               <div className="full" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button type="submit" className="btn-primary" style={{ width: "auto", minWidth: 180 }}>
-                  {editingId ? "Enregistrer les modifications" : "Créer le compte"}
+                  {editingId ? "Enregistrer" : "Créer le compte"}
                 </button>
-                {editingId ? (
-                  <button type="button" className="btn-secondary" onClick={cancelEdit}>
-                    Annuler la modification
-                  </button>
-                ) : (
-                  <button type="button" className="btn-secondary" onClick={() => setCreateOpen(false)}>
-                    Annuler
-                  </button>
-                )}
+                <button type="button" className="btn-secondary" onClick={closeForm}>
+                  Annuler
+                </button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
 
-            <div className="panel" style={{ marginTop: "1rem" }}>
-              <h4 className="panel-title">Comptes déjà créés</h4>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Structure</th>
-                    <th>Type</th>
-                    <th>Identifiant</th>
-                    <th>Commune</th>
-                    <th>Statut</th>
-                    <th>Créé</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {accounts.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="muted">
-                        Aucun compte.
-                      </td>
-                    </tr>
-                  ) : (
-                    accounts.map((a) => (
-                      <tr key={a.id} style={editingId === a.id ? { outline: "2px solid var(--accent, #1a5f4a)" } : undefined}>
-                        <td>{a.facilityName}</td>
-                        <td>{FACILITY_TYPES.find((t) => t.value === a.facilityType)?.label ?? a.facilityType}</td>
-                        <td>
-                          <code>{a.username}</code>
-                        </td>
-                        <td>{a.commune_name}</td>
-                        <td>
-                          <strong style={{ color: a.active ? "#1a5f4a" : "#8a4b1a" }}>
-                            {a.active ? "Actif" : "Désactivé"}
-                          </strong>
-                        </td>
-                        <td>{new Date(a.created_at).toLocaleString("fr-FR")}</td>
-                        <td className="table-actions">
-                          <button type="button" className="btn-secondary btn-sm" onClick={() => startEdit(a)}>
-                            Modifier
-                          </button>{" "}
-                          {a.active ? (
-                            <button type="button" className="btn-secondary btn-sm" onClick={() => onToggleActive(a)}>
-                              Désactiver
-                            </button>
-                          ) : (
-                            <button type="button" className="btn-primary btn-sm" onClick={() => onToggleActive(a)}>
-                              Activer
-                            </button>
-                          )}{" "}
-                          <button
-                            type="button"
-                            className="btn-secondary btn-sm"
-                            disabled={a.username === HEALTH_DEMO_USER}
-                            title={
-                              a.username === HEALTH_DEMO_USER
-                                ? "Le compte démo ne peut pas être supprimé"
-                                : "Supprimer"
-                            }
-                            onClick={() => onDelete(a)}
-                          >
-                            Supprimer
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+      {selected ? (
+        <div className="modal-backdrop" onClick={() => setSelected(null)}>
+          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
+            <h3>
+              Déclaration {selected.declaration_type === "BIRTH" ? "naissance" : "décès"}
+            </h3>
+            <pre style={{ whiteSpace: "pre-wrap", fontSize: "0.85rem" }}>
+              {JSON.stringify(selected.payload, null, 2)}
+            </pre>
+            <div className="modal-actions">
+              <button type="button" className="btn-secondary" onClick={() => setSelected(null)}>
+                Fermer
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ width: "auto" }}
+                disabled={busy}
+                onClick={() => void onValidate(selected.id, false)}
+              >
+                Valider et mettre à jour
+              </button>
             </div>
           </div>
         </div>

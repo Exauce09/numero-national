@@ -2,7 +2,12 @@ import type { FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { clearSession, DEMO_PASSWORD, getSession, updateSession } from "./auth";
-import { clearHealthSession, getHealthSession, updateHealthPassword } from "./healthAuth";
+import {
+  clearHealthSession,
+  getHealthSession,
+  isHealthAccountActive,
+  updateHealthPassword,
+} from "./healthAuth";
 import {
   applyHealthTheme,
   getHealthPrefs,
@@ -76,7 +81,12 @@ function RequireCivil({ children }: { children: ReactNode }) {
 }
 
 function RequireHealth({ children }: { children: ReactNode }) {
-  if (!getHealthSession()) return <Navigate to="/sante/login" replace />;
+  const session = getHealthSession();
+  if (!session) return <Navigate to="/sante/login" replace />;
+  if (!isHealthAccountActive(session.facilityId)) {
+    clearHealthSession();
+    return <Navigate to="/sante/login" replace />;
+  }
   return <>{children}</>;
 }
 
