@@ -29,7 +29,6 @@ class CitizensFormScreen extends StatefulWidget {
 
 class _CitizensFormScreenState extends State<CitizensFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  int _step = 1;
 
   late final TextEditingController _nom;
   late final TextEditingController _postnom;
@@ -70,16 +69,6 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   String? _rejectNote;
 
   bool get _isEdit => widget.existing != null;
-
-  static const _steps = <(int, String)>[
-    (1, 'Identité'),
-    (2, 'Origine'),
-    (3, 'Biométrie'),
-    (4, 'Études'),
-    (5, 'Expérience'),
-    (6, 'Admin'),
-    (7, 'Famille'),
-  ];
 
   static const _etatCivilOptions = <(String, String)>[
     ('CELIBATAIRE', 'Célibataire'),
@@ -311,10 +300,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   }
 
   Future<void> _save() async {
-    if (!_validateStep1()) {
-      setState(() => _step = 1);
-      return;
-    }
+    if (!_validateStep1()) return;
     setState(() => _busy = true);
     try {
       final db = LocalDatabase.instance.db;
@@ -458,76 +444,28 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     );
   }
 
-  Widget _stepChip(int id, String label) {
-    final active = _step == id;
-    final done = _step > id;
-    return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: ChoiceChip(
-        label: Text('$id. $label', style: const TextStyle(fontSize: 12)),
-        selected: active,
-        onSelected: (_) {
-          if (id > 1 && !_validateStep1()) return;
-          setState(() => _step = id);
-        },
-        selectedColor: const Color(0xFF5D87FF),
-        labelStyle: TextStyle(
-          color: active ? Colors.white : (done ? const Color(0xFF5D87FF) : null),
-          fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-        ),
+  Widget _saveButton() {
+    return FilledButton(
+      style: FilledButton.styleFrom(
+        backgroundColor: const Color(0xFFE11D48),
+        padding: const EdgeInsets.symmetric(vertical: 14),
       ),
+      onPressed: _busy ? null : _save,
+      child: _busy
+          ? const SizedBox(
+              height: 18,
+              width: 18,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            )
+          : Text(_isEdit ? 'Corriger et renvoyer' : 'Enregistrer toute la fiche'),
     );
   }
 
-  Widget _navBar({required bool isLast}) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Row(
-        children: [
-          if (_step > 1)
-            OutlinedButton(
-              onPressed: _busy ? null : () => setState(() => _step -= 1),
-              child: const Text('Retour'),
-            )
-          else
-            const SizedBox.shrink(),
-          const Spacer(),
-          if (!isLast)
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF5D87FF)),
-              onPressed: _busy
-                  ? null
-                  : () {
-                      if (_step == 1 && !_validateStep1()) return;
-                      setState(() => _step += 1);
-                    },
-              child: const Text('Suivant'),
-            )
-          else
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF5D87FF),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              ),
-              onPressed: _busy ? null : _save,
-              child: _busy
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : Text(_isEdit ? 'Corriger et renvoyer' : 'Enregistrer'),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStep1() {
+  Widget _buildIdentityBlock() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _section('Identité de la personne', [
+        _section('1. Identité de la personne', [
           TextFormField(
             controller: _nom,
             decoration: _dec('Nom de la personne *'),
@@ -639,7 +577,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             onChanged: (v) => setState(() => _handicap = v ?? 'NORMAL'),
           ),
         ]),
-        _section('Adresse actuelle', [
+        _section('1b. Adresse actuelle', [
           GeoCascadeField(
             preset: GeoCascadePreset.address,
             title: 'Adresse actuelle',
@@ -677,73 +615,66 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             onChanged: (v) => setState(() => _relation = v ?? 'AUTRE'),
           ),
         ]),
-        _navBar(isLast: false),
       ],
     );
   }
 
-  Widget _buildStep2() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _section('Originaire', [
-          GeoCascadeField(
-            preset: GeoCascadePreset.origin,
-            title: 'Origine',
-            onLabelChanged: (_) {},
-            onSelectionChanged: (sel) => _geoOrigine = sel,
-          ),
-          const SizedBox(height: 10),
-          Autocomplete<String>(
-            optionsBuilder: (TextEditingValue tev) {
-              final q = tev.text.trim().toLowerCase();
-              if (q.isEmpty) return kRdcTribus.take(40);
-              return kRdcTribus.where((t) => t.toLowerCase().contains(q)).take(60);
-            },
-            onSelected: (v) {
-              _tribu.text = v;
-              setState(() {});
-            },
-            fieldViewBuilder: (context, controller, focus, onSubmit) {
-              if (controller.text.isEmpty && _tribu.text.isNotEmpty) {
-                controller.text = _tribu.text;
-              }
-              return TextFormField(
-                controller: controller,
-                focusNode: focus,
-                decoration: _dec(
-                  'Tribu / ethnie',
-                  hint: '${kRdcTribus.length} références — ou Autre',
-                ),
-                onChanged: (v) => _tribu.text = v,
-                onFieldSubmitted: (_) => onSubmit(),
-              );
-            },
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(
-              kRdcTribusNote,
-              style: const TextStyle(fontSize: 11, color: Color(0xFF5A6A85)),
+  Widget _buildOriginBlock() {
+    return _section('2. Origine / Originaire', [
+      GeoCascadeField(
+        preset: GeoCascadePreset.origin,
+        title: 'Origine',
+        onLabelChanged: (_) {},
+        onSelectionChanged: (sel) => _geoOrigine = sel,
+      ),
+      const SizedBox(height: 10),
+      Autocomplete<String>(
+        optionsBuilder: (TextEditingValue tev) {
+          final q = tev.text.trim().toLowerCase();
+          if (q.isEmpty) return kRdcTribus.take(40);
+          return kRdcTribus.where((t) => t.toLowerCase().contains(q)).take(60);
+        },
+        onSelected: (v) {
+          _tribu.text = v;
+          setState(() {});
+        },
+        fieldViewBuilder: (context, controller, focus, onSubmit) {
+          if (controller.text.isEmpty && _tribu.text.isNotEmpty) {
+            controller.text = _tribu.text;
+          }
+          return TextFormField(
+            controller: controller,
+            focusNode: focus,
+            decoration: _dec(
+              'Tribu / ethnie',
+              hint: '${kRdcTribus.length} références — ou Autre',
             ),
-          ),
-        ]),
-        _navBar(isLast: false),
-      ],
-    );
+            onChanged: (v) => _tribu.text = v,
+            onFieldSubmitted: (_) => onSubmit(),
+          );
+        },
+      ),
+      Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Text(
+          kRdcTribusNote,
+          style: const TextStyle(fontSize: 11, color: Color(0xFF5A6A85)),
+        ),
+      ),
+    ]);
   }
 
-  Widget _buildStep3() {
+  Widget _buildBioBlock() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _section('Photo / reconnaissance faciale', [
+        _section('3. Biométrie — Photo', [
           PhotoCaptureWidget(
             initialRef: _photoRef,
             onCaptured: (ref) => setState(() => _photoRef = ref),
           ),
         ]),
-        _section('Empreintes', [
+        _section('3. Biométrie — Empreintes & iris', [
           TextFormField(
             controller: _empreinteGauche,
             decoration: _dec('Empreinte gauche (réf.)'),
@@ -753,7 +684,8 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             alignment: Alignment.centerLeft,
             child: OutlinedButton(
               onPressed: () {
-                final ref = 'CAP-G-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
+                final ref =
+                    'CAP-G-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
                 setState(() => _empreinteGauche.text = ref);
               },
               child: const Text('Capturer gauche'),
@@ -769,7 +701,8 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             alignment: Alignment.centerLeft,
             child: OutlinedButton(
               onPressed: () {
-                final ref = 'CAP-D-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
+                final ref =
+                    'CAP-D-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
                 setState(() => _empreinteDroite.text = ref);
               },
               child: const Text('Capturer droite'),
@@ -783,107 +716,8 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             onCaptured: (ref) => setState(() => _fingerprintRef = ref),
           ),
         ]),
-        _navBar(isLast: false),
       ],
     );
-  }
-
-  Widget _buildStep4() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _section('Études', [
-          TextFormField(
-            controller: _scolaire,
-            decoration: _dec('Parcours scolaire'),
-            maxLines: 4,
-          ),
-          const SizedBox(height: 10),
-          TextFormField(
-            controller: _universitaire,
-            decoration: _dec('Parcours universitaire'),
-            maxLines: 4,
-          ),
-        ]),
-        _navBar(isLast: false),
-      ],
-    );
-  }
-
-  Widget _buildStep5() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _section('Expérience professionnelle', [
-          TextFormField(
-            controller: _professionnel,
-            decoration: _dec('Expérience professionnelle'),
-            maxLines: 6,
-          ),
-        ]),
-        _navBar(isLast: false),
-      ],
-    );
-  }
-
-  Widget _buildStep6() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _section('Identité administrative', [
-          TextFormField(
-            controller: _numeroAdmin,
-            decoration: _dec('N° administratif / référence dossier'),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'L’identité, la profession, l’état civil et l’adresse sont saisis à l’étape Identité.',
-            style: TextStyle(fontSize: 12, color: Color(0xFF5A6A85)),
-          ),
-        ]),
-        _navBar(isLast: false),
-      ],
-    );
-  }
-
-  Widget _buildStep7() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _section('Situation familiale', [
-          TextFormField(
-            controller: _situation,
-            decoration: _dec(
-              'Situation familiale',
-              hint: 'Conjoint(e), enfants, personnes à charge…',
-            ),
-            maxLines: 6,
-          ),
-        ]),
-        _navBar(isLast: true),
-      ],
-    );
-  }
-
-  Widget _stepBody() {
-    switch (_step) {
-      case 1:
-        return _buildStep1();
-      case 2:
-        return _buildStep2();
-      case 3:
-        return _buildStep3();
-      case 4:
-        return _buildStep4();
-      case 5:
-        return _buildStep5();
-      case 6:
-        return _buildStep6();
-      case 7:
-        return _buildStep7();
-      default:
-        return _buildStep1();
-    }
   }
 
   @override
@@ -908,36 +742,61 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               ),
               const SizedBox(height: 8),
             ],
-            const Text(
-              'Formulaire complet — 7 étapes (comme le site Recensement)',
-              style: TextStyle(color: Color(0xFF5A6A85), fontSize: 13, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Étape $_step / 7 — ${_steps[_step - 1].$2}',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF2A3547),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF1F2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE11D48).withValues(alpha: 0.35)),
               ),
-            ),
-            const SizedBox(height: 10),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [for (final s in _steps) _stepChip(s.$1, s.$2)],
+              child: const Text(
+                'Faites défiler vers le bas : toutes les sections sont sur cette page '
+                '(Identité, Adresse, Origine, Biométrie, Études, Expérience, Admin, Famille).',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, height: 1.35),
               ),
             ),
             const SizedBox(height: 12),
-            LinearProgressIndicator(
-              value: _step / 7,
-              minHeight: 6,
-              borderRadius: BorderRadius.circular(8),
-              backgroundColor: const Color(0xFFE8EEF7),
-              color: const Color(0xFF5D87FF),
-            ),
-            const SizedBox(height: 14),
-            _stepBody(),
+            _buildIdentityBlock(),
+            _buildOriginBlock(),
+            _buildBioBlock(),
+            _section('4. Études', [
+              TextFormField(
+                controller: _scolaire,
+                decoration: _dec('Parcours scolaire'),
+                maxLines: 4,
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _universitaire,
+                decoration: _dec('Parcours universitaire'),
+                maxLines: 4,
+              ),
+            ]),
+            _section('5. Expérience professionnelle', [
+              TextFormField(
+                controller: _professionnel,
+                decoration: _dec('Expérience professionnelle'),
+                maxLines: 6,
+              ),
+            ]),
+            _section('6. Identité administrative', [
+              TextFormField(
+                controller: _numeroAdmin,
+                decoration: _dec('N° administratif / référence dossier'),
+              ),
+            ]),
+            _section('7. Situation familiale', [
+              TextFormField(
+                controller: _situation,
+                decoration: _dec(
+                  'Situation familiale',
+                  hint: 'Conjoint(e), enfants, personnes à charge…',
+                ),
+                maxLines: 6,
+              ),
+            ]),
+            const SizedBox(height: 8),
+            _saveButton(),
           ],
         ),
       ),
