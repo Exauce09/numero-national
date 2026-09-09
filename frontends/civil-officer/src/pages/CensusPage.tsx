@@ -1,13 +1,16 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
+import PersonPicker from "../components/PersonPicker";
 import {
   ETAT_CIVIL_OPTIONS,
   HANDICAP_OPTIONS,
   addAct,
   addPerson,
+  displayName,
   type Act,
   type EtatCivil,
   type HandicapType,
+  type Person,
   type Sexe,
 } from "../registry";
 import { getOfficerCommune } from "../commune";
@@ -37,8 +40,8 @@ export default function CensusPage() {
   const [dateNaissance, setDateNaissance] = useState("");
   const [hopitalNaissance, setHopitalNaissance] = useState("");
   const [languesParlees, setLanguesParlees] = useState("");
-  const [nomPere, setNomPere] = useState("");
-  const [nomMere, setNomMere] = useState("");
+  const [pere, setPere] = useState<Person | null>(null);
+  const [mere, setMere] = useState<Person | null>(null);
   const [nationalite, setNationalite] = useState("Congolaise");
   const [paysResidence, setPaysResidence] = useState("RDC");
   const [provinceActuelle, setProvinceActuelle] = useState("");
@@ -163,6 +166,8 @@ export default function CensusPage() {
         lieu_naissance: lieuNaissance.trim(),
         etat_civil: etatCivil,
         handicap_type: handicap,
+        mother_id: mere?.id,
+        father_id: pere?.id,
         photo_data_url: photo,
         fingerprint_note: [empreinteGauche && `Gauche: ${empreinteGauche}`, empreinteDroite && `Droite: ${empreinteDroite}`]
           .filter(Boolean)
@@ -189,8 +194,10 @@ export default function CensusPage() {
         date_naissance: person.date_naissance,
         hopital_naissance: hopitalNaissance.trim() || null,
         langues_parlees: languesParlees.trim() || null,
-        nom_pere: nomPere.trim() || null,
-        nom_mere: nomMere.trim() || null,
+        nom_pere: pere ? displayName(pere) : null,
+        nom_mere: mere ? displayName(mere) : null,
+        pere_id: pere?.id ?? null,
+        mere_id: mere?.id ?? null,
         nationalite: nationalite.trim() || null,
         pays_residence: paysResidence.trim() || null,
         province_actuelle: provinceActuelle.trim() || null,
@@ -329,12 +336,10 @@ export default function CensusPage() {
                   />
                 </div>
                 <div className="full">
-                  <label className="form-label">Nom du père</label>
-                  <input className="form-control" value={nomPere} onChange={(e) => setNomPere(e.target.value)} />
+                  <PersonPicker label="Nom du père" value={pere} onChange={setPere} />
                 </div>
                 <div className="full">
-                  <label className="form-label">Nom de la mère</label>
-                  <input className="form-control" value={nomMere} onChange={(e) => setNomMere(e.target.value)} />
+                  <PersonPicker label="Nom de la mère" value={mere} onChange={setMere} />
                 </div>
                 <div>
                   <label className="form-label">Nationalité</label>
