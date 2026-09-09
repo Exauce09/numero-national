@@ -246,6 +246,23 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           ),
           const SizedBox(height: 12),
           _ActionTile(
+            title: 'Fiche d’identification',
+            subtitle: 'Nom · Post-nom · Prénom (formulaire officiel)',
+            icon: Icons.badge_outlined,
+            color: const Color(0xFFE11D48),
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Zones → campagne → ménage → bouton + Personne',
+                  ),
+                ),
+              );
+              widget.onOpenTab(1);
+            },
+          ),
+          const SizedBox(height: 10),
+          _ActionTile(
             title: 'Mes zones',
             subtitle: '$_assignments affectation(s)',
             icon: Icons.map_outlined,
