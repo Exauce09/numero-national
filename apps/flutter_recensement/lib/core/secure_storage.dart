@@ -39,6 +39,8 @@ class SecureStore {
     await _storage.delete(key: _kRefresh);
     await _storage.delete(key: _kUserId);
     await _storage.delete(key: _kUserEmail);
+    // Empêche la reprise « hors-ligne » après une déconnexion volontaire.
+    await _storage.delete(key: _kLastAuth);
   }
 
   Future<void> clearAll() async {

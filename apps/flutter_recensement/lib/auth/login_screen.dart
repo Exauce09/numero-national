@@ -8,7 +8,10 @@ import '../core/theme.dart';
 
 /// Agent login: online JWT against API; offline within [OfflineAuthPolicy] window.
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.allowAutoLogin = true});
+
+  /// When false (après déconnexion manuelle), ne pas relancer AUTO_LOGIN.
+  final bool allowAutoLogin;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -31,7 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _prefillEmail();
-    if (_autoLogin) {
+    if (_autoLogin && widget.allowAutoLogin) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || _busy) return;
         _email.text = _demoEmail;

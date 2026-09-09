@@ -54,7 +54,9 @@ class _HomeShellState extends State<HomeShell> {
     await _auth.logout();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(
+        builder: (_) => const LoginScreen(allowAutoLogin: false),
+      ),
       (_) => false,
     );
   }
