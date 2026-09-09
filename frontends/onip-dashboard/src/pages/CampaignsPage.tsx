@@ -533,6 +533,10 @@ function AssignmentsTab({
   return (
     <div className="panel">
       <h2>Affectations — {campaign.code}</h2>
+      <p className="muted">
+        Étape 3 : créez zone + équipe, puis affectez un agent (créé à l’étape 1 — Comptes). L’agent
+        pourra ensuite se connecter sur le téléphone.
+      </p>
       <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))" }}>
         <form onSubmit={addZone}>
           <h3>Nouvelle zone</h3>
