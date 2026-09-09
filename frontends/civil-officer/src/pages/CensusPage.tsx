@@ -15,6 +15,36 @@ import {
 } from "../registry";
 import { getOfficerCommune } from "../commune";
 
+/** Provinces RDC — formulaire Originaire. */
+const RDC_PROVINCES = [
+  "Bas-Uélé",
+  "Équateur",
+  "Haut-Katanga",
+  "Haut-Lomami",
+  "Haut-Uélé",
+  "Ituri",
+  "Kasaï",
+  "Kasaï Central",
+  "Kasaï Oriental",
+  "Kinshasa",
+  "Kongo Central",
+  "Kwango",
+  "Kwilu",
+  "Lomami",
+  "Lualaba",
+  "Mai-Ndombe",
+  "Maniema",
+  "Mongala",
+  "Nord-Kivu",
+  "Nord-Ubangi",
+  "Sankuru",
+  "Sud-Kivu",
+  "Sud-Ubangi",
+  "Tanganyika",
+  "Tshopo",
+  "Tshuapa",
+] as const;
+
 const STEPS = [
   { id: 1, label: "1. Identité" },
   { id: 2, label: "2. Origine" },
@@ -54,8 +84,11 @@ export default function CensusPage() {
   const [email, setEmail] = useState("");
   const [boitePostale, setBoitePostale] = useState("");
   const [provinceOrigine, setProvinceOrigine] = useState("");
+  const [villeOrigine, setVilleOrigine] = useState("");
   const [territoireOrigine, setTerritoireOrigine] = useState("");
-  const [ethnie, setEthnie] = useState("");
+  const [secteurOrigine, setSecteurOrigine] = useState("");
+  const [villageOrigine, setVillageOrigine] = useState("");
+  const [tribu, setTribu] = useState("");
   const [photo, setPhoto] = useState<string | undefined>();
   const [empreinteGauche, setEmpreinteGauche] = useState("");
   const [empreinteDroite, setEmpreinteDroite] = useState("");
@@ -220,8 +253,11 @@ export default function CensusPage() {
         parcours_professionnel: person.parcours_professionnel ?? null,
         situation_familiale: person.situation_familiale ?? null,
         province_origine: provinceOrigine.trim() || null,
+        ville_origine: villeOrigine.trim() || null,
         territoire_origine: territoireOrigine.trim() || null,
-        ethnie: ethnie.trim() || null,
+        secteur_chefferie_commune: secteurOrigine.trim() || null,
+        village_origine: villageOrigine.trim() || null,
+        tribu: tribu.trim() || null,
         numero_admin: numeroAdmin.trim() || null,
       };
       const act = addAct("CENSUS", payload, person.nic);
@@ -453,26 +489,106 @@ export default function CensusPage() {
         ) : null}
 
         {step === 2 ? (
-          <div className="form-grid">
-            <div>
-              <label className="form-label">Province d&apos;origine</label>
-              <input
-                className="form-control"
-                value={provinceOrigine}
-                onChange={(e) => setProvinceOrigine(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="form-label">Territoire / ville d&apos;origine</label>
-              <input
-                className="form-control"
-                value={territoireOrigine}
-                onChange={(e) => setTerritoireOrigine(e.target.value)}
-              />
-            </div>
-            <div className="full">
-              <label className="form-label">Ethnie / tribu</label>
-              <input className="form-control" value={ethnie} onChange={(e) => setEthnie(e.target.value)} />
+          <div className="id-form">
+            <h3 className="id-form-title" style={{ color: "var(--egouv-primary)" }}>
+              3. Originaire
+            </h3>
+            <div className="form-grid">
+              <div>
+                <label className="form-label">Province d&apos;origine :</label>
+                <select
+                  className="form-control"
+                  value={provinceOrigine}
+                  onChange={(e) => setProvinceOrigine(e.target.value)}
+                >
+                  <option value="">-- choisissez --</option>
+                  {RDC_PROVINCES.map((p) => (
+                    <option key={p} value={p}>
+                      {p.toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Ville d&apos;origine :</label>
+                <input
+                  className="form-control"
+                  list="villes-origine"
+                  value={villeOrigine}
+                  onChange={(e) => setVilleOrigine(e.target.value)}
+                  placeholder="-- choisissez --"
+                />
+                <datalist id="villes-origine">
+                  <option value="Kinshasa" />
+                  <option value="Lubumbashi" />
+                  <option value="Mbuji-Mayi" />
+                  <option value="Kananga" />
+                  <option value="Kisangani" />
+                  <option value="Bukavu" />
+                  <option value="Goma" />
+                  <option value="Kolwezi" />
+                  <option value="Likasi" />
+                  <option value="Tshikapa" />
+                  <option value="Bunia" />
+                  <option value="Matadi" />
+                  <option value="Mbandaka" />
+                  <option value="Bandundu" />
+                </datalist>
+              </div>
+              <div>
+                <label className="form-label">Territoire :</label>
+                <input
+                  className="form-control"
+                  value={territoireOrigine}
+                  onChange={(e) => setTerritoireOrigine(e.target.value)}
+                  placeholder="-- choisissez --"
+                />
+              </div>
+              <div>
+                <label className="form-label">Secteur / Chefferie / Commune :</label>
+                <input
+                  className="form-control"
+                  value={secteurOrigine}
+                  onChange={(e) => setSecteurOrigine(e.target.value)}
+                  placeholder="-- choisissez --"
+                />
+              </div>
+              <div>
+                <label className="form-label">Village :</label>
+                <input
+                  className="form-control"
+                  value={villageOrigine}
+                  onChange={(e) => setVillageOrigine(e.target.value)}
+                  placeholder="-- choisissez --"
+                />
+              </div>
+              <div>
+                <label className="form-label">Tribu :</label>
+                <input
+                  className="form-control"
+                  list="tribus-rdc"
+                  value={tribu}
+                  onChange={(e) => setTribu(e.target.value)}
+                  placeholder="-- choisissez --"
+                />
+                <datalist id="tribus-rdc">
+                  <option value="Luba" />
+                  <option value="Kongo" />
+                  <option value="Mongo" />
+                  <option value="Rwanda" />
+                  <option value="Lunda" />
+                  <option value="Tetela" />
+                  <option value="Yaka" />
+                  <option value="Chokwe" />
+                  <option value="Nande" />
+                  <option value="Hema" />
+                  <option value="Lendu" />
+                  <option value="Alur" />
+                  <option value="Shi" />
+                  <option value="Rega" />
+                  <option value="Zande" />
+                </datalist>
+              </div>
             </div>
           </div>
         ) : null}
