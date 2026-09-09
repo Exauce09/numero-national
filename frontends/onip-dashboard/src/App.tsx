@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { clearSession, getSession, isLocalSession } from "./auth";
+import { clearSession, getSession } from "./auth";
 import AccountsPage from "./pages/AccountsPage";
 import AnomaliesPage from "./pages/AnomaliesPage";
 import CampaignsPage from "./pages/CampaignsPage";
@@ -100,10 +100,7 @@ function Shell() {
             </button>
             <h1 className="topbar-title">{pageTitle}</h1>
           </div>
-          <span className="topbar-user">
-            {session?.username}
-            {isLocalSession() ? " · démo locale" : ""}
-          </span>
+          <span className="topbar-user">{session?.username}</span>
         </header>
         <main className="shell">
           <Routes>

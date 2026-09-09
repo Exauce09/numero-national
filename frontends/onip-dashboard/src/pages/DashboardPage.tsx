@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getSession, isLocalSession } from "../auth";
+import { getSession } from "../auth";
 
 type Dashboard = {
   generated_at: string;
@@ -13,62 +13,21 @@ type Dashboard = {
 
 const API = import.meta.env.VITE_API_BASE ?? "/api/v1";
 
-function demoDashboard(): Dashboard {
-  return {
-    generated_at: new Date().toISOString(),
-    population: { total: 2_900_000, active: 2_640_000, coverage_percent: 91.2 },
-    campaigns: { total: 4, active: 2 },
-    duplicates_open: 128,
-    cards: { active: 1_240_000, pending: 18_400 },
-    anomalies: [
-      {
-        code: "DUP_BATCH",
-        severity: "warning",
-        count: 42,
-        message: "Doublons potentiels en attente de revue (mode démo)",
-      },
-      {
-        code: "CARD_PENDING",
-        severity: "info",
-        count: 18400,
-        message: "Cartes en file de production (agrégat démo)",
-      },
-    ],
-  };
-}
-
 export default function DashboardPage() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [localMode, setLocalMode] = useState(false);
   const session = getSession();
 
   useEffect(() => {
-    if (isLocalSession() || !session?.accessToken) {
-      setLocalMode(true);
-      setData(demoDashboard());
-      setError(null);
-      return;
-    }
-
-    const headers: HeadersInit = {
-      Authorization: `Bearer ${session.accessToken}`,
-    };
+    const headers: HeadersInit = {};
+    if (session?.accessToken) headers.Authorization = `Bearer ${session.accessToken}`;
     fetch(`${API}/onip/dashboard`, { headers })
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json() as Promise<Dashboard>;
+        return r.json();
       })
-      .then((d) => {
-        setLocalMode(false);
-        setData(d);
-        setError(null);
-      })
-      .catch(() => {
-        setLocalMode(true);
-        setData(demoDashboard());
-        setError(null);
-      });
+      .then(setData)
+      .catch((e) => setError(String(e)));
   }, [session?.accessToken]);
 
   if (error) {
@@ -95,16 +54,6 @@ export default function DashboardPage() {
           {new Date(data.generated_at).toLocaleString("fr-FR")}
         </p>
       </div>
-
-      {localMode ? (
-        <div className="panel" style={{ borderLeft: "4px solid #8a4b1a", marginBottom: "1rem" }}>
-          <strong>Mode démo local</strong>
-          <p className="muted" style={{ margin: "0.35rem 0 0" }}>
-            API (:8000) indisponible ou session sans JWT — affichage d&apos;agrégats de démonstration. Les actions
-            Campagnes / Comptes nécessitent l&apos;API démarrée et un compte seedé.
-          </p>
-        </div>
-      ) : null}
 
       <div className="grid">
         <Metric label="Population totale" value={data.population.total} />
