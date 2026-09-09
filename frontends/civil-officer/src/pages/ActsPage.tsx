@@ -38,6 +38,13 @@ export default function ActsPage() {
   );
 
   useEffect(() => {
+    const type = params.get("type");
+    if (type && TYPES.includes(type as ActType)) {
+      setFilter(type as ActType);
+    }
+  }, [params]);
+
+  useEffect(() => {
     const editId = params.get("edit");
     if (!editId) return;
     const act = getAct(editId);
@@ -71,8 +78,10 @@ export default function ActsPage() {
 
   return (
     <div>
-      <h2 className="page-title">Actes</h2>
-      <p className="page-lead">Liste complète des actes du registre local.</p>
+      <h2 className="page-title">Actes & documents</h2>
+      <p className="page-lead">
+        Registre local des actes d&apos;état civil et des documents délivrés. Filtrez par type (ex. Document).
+      </p>
 
       <div className="panel">
         <div className="panel-head">

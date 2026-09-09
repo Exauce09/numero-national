@@ -43,7 +43,6 @@ import {
   IconDashboard,
   IconFile,
   IconHome,
-  IconMap,
   IconRing,
   IconSearch,
   IconSplit,
@@ -166,9 +165,6 @@ function Shell() {
           <NavLink to="/population">
             <IconUsers size={18} /> Population
           </NavLink>
-          <NavLink to="/newborns">
-            <IconBaby size={18} /> Nouveaux-nés
-          </NavLink>
           <NavLink to="/manage/naissance">
             <IconBaby size={18} /> Naissances
           </NavLink>
@@ -190,14 +186,8 @@ function Shell() {
           <NavLink to="/manage/divorce">
             <IconSplit size={18} /> Divorce
           </NavLink>
-          <NavLink to="/manage/document">
-            <IconFile size={18} /> Documents
-          </NavLink>
           <NavLink to="/acts">
-            <IconFile size={18} /> Actes
-          </NavLink>
-          <NavLink to="/territory">
-            <IconMap size={18} /> Territoire RDC
+            <IconFile size={18} /> Actes & documents
           </NavLink>
           <NavLink to="/search">
             <IconSearch size={18} /> Recherche

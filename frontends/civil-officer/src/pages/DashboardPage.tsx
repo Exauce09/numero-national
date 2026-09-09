@@ -7,7 +7,6 @@ import {
   IconClipboard,
   IconCross,
   IconFile,
-  IconHeart,
   IconRing,
   IconSplit,
   IconUsers,
@@ -32,7 +31,7 @@ export default function DashboardPage() {
   const acts = listActs();
   const [query, setQuery] = useState("");
 
-  const newborn = useMemo(() => {
+  const births = useMemo(() => {
     const birthActs = listActs("BIRTH");
     const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
     let garcons = 0;
@@ -46,7 +45,12 @@ export default function DashboardPage() {
       if (sexe === "M") garcons += 1;
       else if (sexe === "F") filles += 1;
     }
-    return { garcons, filles, total: garcons + filles };
+    return {
+      total: birthActs.length,
+      newborns: garcons + filles,
+      garcons,
+      filles,
+    };
   }, [acts.length]);
 
   const items: DashItem[] = [
@@ -60,37 +64,10 @@ export default function DashboardPage() {
       icon: <IconUsers size={26} />,
     },
     {
-      id: "ne",
-      title: "Nouveaux-nés",
-      value: newborn.total,
-      subtitle: "90 derniers jours",
-      tone: "success",
-      href: "/newborns",
-      icon: <IconBaby size={26} />,
-    },
-    {
-      id: "ne-m",
-      title: "Nouveaux-nés (G)",
-      value: newborn.garcons,
-      subtitle: "Garçons",
-      tone: "info",
-      href: "/newborns?sexe=M",
-      icon: <IconBaby size={26} />,
-    },
-    {
-      id: "ne-f",
-      title: "Nouveaux-nés (F)",
-      value: newborn.filles,
-      subtitle: "Filles",
-      tone: "pink",
-      href: "/newborns?sexe=F",
-      icon: <IconHeart size={26} />,
-    },
-    {
       id: "birth",
       title: "Naissances",
-      value: acts.filter((a) => a.type === "BIRTH").length,
-      subtitle: "Actes de naissance",
+      value: births.total,
+      subtitle: `Nouveaux-nés 90 j : ${births.newborns} (G ${births.garcons} · F ${births.filles})`,
       tone: "success",
       href: "/manage/naissance",
       icon: <IconBaby size={26} />,
@@ -151,11 +128,11 @@ export default function DashboardPage() {
     },
     {
       id: "docs",
-      title: "Documents",
-      value: acts.filter((a) => a.type === "DOCUMENT").length,
-      subtitle: "Pièces émises",
+      title: "Actes & documents",
+      value: acts.length,
+      subtitle: `${acts.filter((a) => a.type === "DOCUMENT").length} documents émis`,
       tone: "secondary",
-      href: "/manage/document",
+      href: "/acts",
       icon: <IconFile size={26} />,
     },
   ];
@@ -218,8 +195,8 @@ export default function DashboardPage() {
         <button type="button" className="btn-add" onClick={() => navigate("/population")}>
           Gérer la population
         </button>
-        <button type="button" className="btn-next" onClick={() => navigate("/newborns")}>
-          Gérer les nouveaux-nés
+        <button type="button" className="btn-next" onClick={() => navigate("/manage/naissance")}>
+          Gérer les naissances
         </button>
         <button type="button" className="btn-primary" style={{ width: "auto" }} onClick={() => navigate("/births")}>
           Enregistrer une naissance
