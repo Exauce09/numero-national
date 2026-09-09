@@ -26,12 +26,8 @@ class GeoItem {
   }
 }
 
-/// Cascade urbaine RDC (même ordre que le site `GeoCascade` preset `address`) :
-/// Province → Ville → Commune → Quartier → Avenue.
-///
-/// Contexte d’appellation (habitat urbain) :
-/// - Province, Ville, Commune, Quartier, Avenue/Rue
-/// (le profil rural Territoire / Secteur / Village est sur le portail web `origin`).
+/// Cascade urbaine RDC (alignée site `GeoCascade` preset `address`) :
+/// Province → Ville → Commune → Quartier → Avenue (+ bouton Ajouter).
 class GeoCascadeField extends StatefulWidget {
   const GeoCascadeField({super.key, required this.onLabelChanged});
 
@@ -54,6 +50,7 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
   String? _quartierId;
   String? _avenueId;
   String? _error;
+  String? _hint;
   bool _loading = true;
 
   @override
@@ -131,12 +128,16 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
       _communes = [];
       _quartiers = [];
       _avenues = [];
+      _hint = null;
     });
     _emit();
     if (id == null) return;
     final rows = await _getList('/geo/villes?province_id=$id');
     if (!mounted) return;
-    setState(() => _villes = rows);
+    setState(() {
+      _villes = rows;
+      _hint = '${rows.length} ville(s)';
+    });
   }
 
   Future<void> _onVille(String? id) async {
@@ -148,12 +149,16 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
       _communes = [];
       _quartiers = [];
       _avenues = [];
+      _hint = null;
     });
     _emit();
     if (id == null) return;
     final rows = await _getList('/geo/communes?ville_id=$id');
     if (!mounted) return;
-    setState(() => _communes = rows);
+    setState(() {
+      _communes = rows;
+      _hint = '${rows.length} commune(s)';
+    });
   }
 
   Future<void> _onCommune(String? id) async {
@@ -163,12 +168,18 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
       _avenueId = null;
       _quartiers = [];
       _avenues = [];
+      _hint = null;
     });
     _emit();
     if (id == null) return;
     final rows = await _getList('/geo/quartiers?commune_id=$id');
     if (!mounted) return;
-    setState(() => _quartiers = rows);
+    setState(() {
+      _quartiers = rows;
+      _hint = rows.isEmpty
+          ? 'Aucun quartier — utilisez + Ajouter'
+          : '${rows.length} quartier(s)';
+    });
   }
 
   Future<void> _onQuartier(String? id) async {
@@ -176,20 +187,123 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
       _quartierId = id;
       _avenueId = null;
       _avenues = [];
+      _hint = null;
     });
     _emit();
     if (id == null) return;
-    var rows = await _getList('/geo/voies?quartier_id=$id&voie_type=AVENUE');
-    if (rows.isEmpty) {
-      rows = await _getList('/geo/voies?quartier_id=$id');
-    }
+    // Toutes les voies (avenues + rues) — pas seulement AVENUE
+    final rows = await _getList('/geo/voies?quartier_id=$id');
     if (!mounted) return;
-    setState(() => _avenues = rows);
+    setState(() {
+      _avenues = rows;
+      _hint = rows.isEmpty
+          ? 'Aucune avenue — utilisez + Ajouter'
+          : '${rows.length} avenue(s)/rue(s)';
+    });
   }
 
   Future<void> _onAvenue(String? id) async {
     setState(() => _avenueId = id);
     _emit();
+  }
+
+  Future<void> _addQuartier() async {
+    if (_communeId == null) {
+      setState(() => _hint = 'Choisissez d’abord une commune');
+      return;
+    }
+    final name = await _askName('Ajouter un quartier', 'Nom du quartier');
+    if (name == null || name.trim().isEmpty) return;
+    try {
+      final res = await _api.post(
+        '/geo/quartiers',
+        body: {'commune_id': _communeId, 'name': name.trim()},
+        auth: false,
+      );
+      if (res.statusCode == 409) {
+        setState(() => _hint = 'Ce quartier existe déjà');
+        return;
+      }
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        setState(() => _hint = 'Ajout quartier impossible (${res.statusCode})');
+        return;
+      }
+      final item = GeoItem.fromJson(Map<String, dynamic>.from(jsonDecode(res.body) as Map));
+      setState(() {
+        _quartiers = [..._quartiers, item]..sort((a, b) => a.name.compareTo(b.name));
+        _quartierId = item.id;
+        _avenueId = null;
+        _avenues = [];
+        _hint = 'Quartier ajouté';
+      });
+      _emit();
+      await _onQuartier(item.id);
+    } catch (e) {
+      setState(() => _hint = 'Erreur réseau: $e');
+    }
+  }
+
+  Future<void> _addAvenue() async {
+    if (_quartierId == null) {
+      setState(() => _hint = 'Choisissez d’abord un quartier');
+      return;
+    }
+    final name = await _askName('Ajouter une avenue', 'Nom de l’avenue (sans le mot Avenue)');
+    if (name == null || name.trim().isEmpty) return;
+    try {
+      final res = await _api.post(
+        '/geo/voies',
+        body: {
+          'quartier_id': _quartierId,
+          'name': name.trim(),
+          'voie_type': 'AVENUE',
+        },
+        auth: false,
+      );
+      if (res.statusCode == 409) {
+        setState(() => _hint = 'Cette avenue existe déjà');
+        return;
+      }
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        setState(() => _hint = 'Ajout avenue impossible (${res.statusCode})');
+        return;
+      }
+      final item = GeoItem.fromJson(Map<String, dynamic>.from(jsonDecode(res.body) as Map));
+      setState(() {
+        _avenues = [..._avenues, item];
+        _avenueId = item.id;
+        _hint = 'Avenue ajoutée';
+      });
+      _emit();
+    } catch (e) {
+      setState(() => _hint = 'Erreur réseau: $e');
+    }
+  }
+
+  Future<String?> _askName(String title, String label) async {
+    final ctrl = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: InputDecoration(labelText: label),
+          textCapitalization: TextCapitalization.words,
+          onSubmitted: (v) => Navigator.of(ctx).pop(v),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Annuler')),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(ctrl.text),
+            child: const Text('Ajouter'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    return result;
   }
 
   Widget _dd({
@@ -202,10 +316,11 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: DropdownButtonFormField<String>(
+        key: ValueKey('$label-${items.length}-$value'),
         value: value,
         isExpanded: true,
         decoration: InputDecoration(
-          labelText: label,
+          labelText: items.isEmpty ? '$label (vide)' : '$label (${items.length})',
           border: const OutlineInputBorder(),
         ),
         items: [
@@ -220,8 +335,16 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
             ),
           ),
         ],
-        onChanged: items.isEmpty && value == null ? null : onChanged,
+        onChanged: onChanged,
       ),
+    );
+  }
+
+  Widget _addBtn(String label, VoidCallback? onPressed) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: const Icon(Icons.add, size: 18),
+      label: Text(label),
     );
   }
 
@@ -248,6 +371,10 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
           const SizedBox(height: 6),
           Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
         ],
+        if (_hint != null) ...[
+          const SizedBox(height: 6),
+          Text(_hint!, style: const TextStyle(color: Color(0xFF5D87FF), fontSize: 13)),
+        ],
         const SizedBox(height: 8),
         _dd(
           label: 'Province',
@@ -273,12 +400,27 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
           items: _quartiers,
           onChanged: _onQuartier,
         ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _addBtn(
+            'Ajouter quartier',
+            _communeId == null ? null : _addQuartier,
+          ),
+        ),
+        const SizedBox(height: 8),
         _dd(
           label: 'Avenue',
           value: _avenueId,
           items: _avenues,
           onChanged: _onAvenue,
           voieLabels: true,
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _addBtn(
+            'Ajouter avenue',
+            _quartierId == null ? null : _addAvenue,
+          ),
         ),
       ],
     );

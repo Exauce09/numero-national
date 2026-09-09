@@ -497,39 +497,31 @@ QUARTIERS_VOIES: dict[str, list[tuple[str, list[tuple[str, str]]]]] = {
         ),
     ],
     "Kinshasa|Bumbu": [
-        (
-            "Mitendi",
-            [("AVENUE", "Bumbu"), ("RUE", "Mitendi"), ("RUE", "Salongo")],
-        ),
-        (
-            "Riango",
-            [("AVENUE", "Riango"), ("RUE", "Marche")],
-        ),
+        ("Mitendi", [("AVENUE", "Bumbu"), ("AVENUE", "Kasavubu"), ("RUE", "Mitendi"), ("RUE", "Salongo")]),
+        ("Riango", [("AVENUE", "Riango"), ("AVENUE", "du Marche"), ("RUE", "Marche"), ("RUE", "Ecole")]),
+        ("Mbudi", [("AVENUE", "Mbudi"), ("AVENUE", "Bumbu"), ("RUE", "Ngafani"), ("RUE", "Lokole")]),
+        ("Matadi-Kibala", [("AVENUE", "Matadi-Kibala"), ("AVENUE", "By Pass"), ("RUE", "Kibala")]),
+        ("Camp Kokolo", [("AVENUE", "Camp Kokolo"), ("AVENUE", "Kasavubu"), ("RUE", "Militaire")]),
+        ("Ngafani", [("AVENUE", "Ngafani"), ("AVENUE", "Salongo"), ("RUE", "Cite")]),
     ],
     "Kinshasa|Makala": [
-        (
-            "Mabulu",
-            [("AVENUE", "Makala"), ("RUE", "Mabulu"), ("RUE", "Ecole")],
-        ),
-        (
-            "Kabila",
-            [("AVENUE", "Kabila"), ("RUE", "Salongo")],
-        ),
+        ("Mabulu", [("AVENUE", "Makala"), ("AVENUE", "Kasavubu"), ("RUE", "Mabulu"), ("RUE", "Ecole")]),
+        ("Kabila", [("AVENUE", "Kabila"), ("AVENUE", "Salongo"), ("RUE", "Marche")]),
+        ("Triomphe", [("AVENUE", "du Triomphe"), ("AVENUE", "Makala"), ("RUE", "Eglise")]),
+        ("Pumbu", [("AVENUE", "Pumbu"), ("AVENUE", "By Pass"), ("RUE", "Lokole")]),
+        ("Camp Luka", [("AVENUE", "Camp Luka"), ("RUE", "Militaire"), ("RUE", "Salongo")]),
     ],
     "Kinshasa|Selembao": [
-        (
-            "Ngansele",
-            [("AVENUE", "Selembao"), ("RUE", "Ngansele"), ("RUE", "Marche")],
-        ),
-        (
-            "Salongo",
-            [("AVENUE", "Salongo"), ("RUE", "Eglise")],
-        ),
+        ("Ngansele", [("AVENUE", "Selembao"), ("AVENUE", "Kasavubu"), ("RUE", "Ngansele"), ("RUE", "Marche")]),
+        ("Salongo", [("AVENUE", "Salongo"), ("AVENUE", "de la Paix"), ("RUE", "Eglise")]),
+        ("Congo", [("AVENUE", "Congo"), ("AVENUE", "Selembao"), ("RUE", "Ecole")]),
+        ("Herady", [("AVENUE", "Herady"), ("RUE", "Cite"), ("RUE", "Lokole")]),
+        ("Ndjili Brasserie", [("AVENUE", "Ndjili Brasserie"), ("AVENUE", "By Pass"), ("RUE", "Brasserie")]),
     ],
     "Kinshasa|Ngiri-Ngiri": [
         (
             "Assossa",
-            [("AVENUE", "Assossa"), ("AVENUE", "Kasa-Vubu"), ("RUE", "Ngiri")],
+            [("AVENUE", "Assossa"), ("AVENUE", "Kasa-Vubu"), ("RUE", "Ngiri"), ("RUE", "Marche")],
         ),
         (
             "Salongo",
@@ -1069,7 +1061,7 @@ QUARTIERS_VOIES: dict[str, list[tuple[str, list[tuple[str, str]]]]] = {
     ],
 }
 
-# Modèle par défaut si commune sans détail spécifique
+# Modèle par défaut si commune sans détail spécifique (toujours ≥6 quartiers, ≥4 avenues)
 DEFAULT_QUARTIERS: list[tuple[str, list[tuple[str, str]]]] = [
     (
         "Centre",
@@ -1077,6 +1069,7 @@ DEFAULT_QUARTIERS: list[tuple[str, list[tuple[str, str]]]] = [
             ("AVENUE", "Principale"),
             ("AVENUE", "du Commerce"),
             ("AVENUE", "de l'Independance"),
+            ("AVENUE", "de la Liberte"),
             ("RUE", "du Marche"),
             ("RUE", "de la Poste"),
         ],
@@ -1086,6 +1079,7 @@ DEFAULT_QUARTIERS: list[tuple[str, list[tuple[str, str]]]] = [
         [
             ("AVENUE", "des Cités"),
             ("AVENUE", "de la Paix"),
+            ("AVENUE", "Lumumba"),
             ("RUE", "Ecole"),
             ("RUE", "Eglise"),
         ],
@@ -1094,8 +1088,36 @@ DEFAULT_QUARTIERS: list[tuple[str, list[tuple[str, str]]]] = [
         "Salongo",
         [
             ("AVENUE", "Salongo"),
+            ("AVENUE", "des Combattants"),
             ("RUE", "Lokole"),
-            ("RUE", "des Combattants"),
+            ("RUE", "Kapela"),
+        ],
+    ),
+    (
+        "Mbudi",
+        [
+            ("AVENUE", "Mbudi"),
+            ("AVENUE", "Kasavubu"),
+            ("RUE", "Mabulu"),
+            ("RUE", "Ngafani"),
+        ],
+    ),
+    (
+        "Masina",
+        [
+            ("AVENUE", "de la Liberte"),
+            ("AVENUE", "Ngwaka"),
+            ("RUE", "Salongo"),
+            ("RUE", "Marche"),
+        ],
+    ),
+    (
+        "Mukulungu",
+        [
+            ("AVENUE", "Mukulungu"),
+            ("AVENUE", "du 30 Juin"),
+            ("RUE", "Ecole"),
+            ("RUE", "Hopital"),
         ],
     ),
 ]

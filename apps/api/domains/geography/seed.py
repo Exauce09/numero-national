@@ -24,9 +24,9 @@ from apps.api.domains.geography.seed_data import (
 
 # Seuil : au-dessous → rechargement automatique (données anciennes trop pauvres)
 MIN_COMMUNES = 150
-MIN_QUARTIERS = 400
-MIN_VOIES = 1200
-SEED_VERSION = 2
+MIN_QUARTIERS = 700
+MIN_VOIES = 2500
+SEED_VERSION = 3
 
 
 def _slug(name: str) -> str:
