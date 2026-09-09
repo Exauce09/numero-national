@@ -48,12 +48,12 @@ export function clearSession(): void {
 }
 
 export async function login(username: string, password: string): Promise<Session> {
-  const user = username.trim();
+  const user = username.trim().toLowerCase();
   if (!user || !password) {
     throw new Error("Identifiant et mot de passe requis.");
   }
 
-  const labels = sessionLabel(user);
+  const labels = sessionLabel(user === DEMO_USER ? DEMO_USER : user);
   let photoDataUrl: string | undefined;
   let passwordOverride: string | undefined;
   try {
@@ -67,13 +67,18 @@ export async function login(username: string, password: string): Promise<Session
     /* ignore */
   }
 
+  // API optionnelle : court timeout puis repli sur le compte démo local.
   const base = import.meta.env.VITE_API_BASE ?? "/api/v1";
   try {
+    const ctrl = new AbortController();
+    const timer = window.setTimeout(() => ctrl.abort(), 2500);
     const res = await fetch(`${base}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: user, password }),
+      signal: ctrl.signal,
     });
+    window.clearTimeout(timer);
     if (res.ok) {
       const data = (await res.json()) as { access_token?: string };
       const session: Session = {
@@ -86,15 +91,24 @@ export async function login(username: string, password: string): Promise<Session
       return session;
     }
   } catch {
-    /* API indisponible */
+    /* API indisponible — mode démo local */
   }
 
-  const expected = passwordOverride || DEMO_PASSWORD;
-  if (user !== DEMO_USER || password !== expected) {
-    throw new Error("Identifiants incorrects. Utilisez le compte de démo officier.");
+  // Compte démo local (pas de base de données requise).
+  // Accepte toujours DEMO_PASSWORD ; sinon le mot de passe modifié dans le profil.
+  const demoOk =
+    user === DEMO_USER && (password === DEMO_PASSWORD || password === passwordOverride);
+  if (!demoOk) {
+    throw new Error(
+      `Identifiants incorrects. Utilisez exactement : ${DEMO_USER} / ${DEMO_PASSWORD}`,
+    );
   }
 
-  const session: Session = { username: user, photoDataUrl, ...labels };
+  const session: Session = {
+    username: DEMO_USER,
+    photoDataUrl,
+    ...sessionLabel(DEMO_USER),
+  };
   sessionStorage.setItem(KEY, JSON.stringify(session));
   return session;
 }
