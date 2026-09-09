@@ -129,10 +129,7 @@ async def sync_push(db: AsyncSession, req: SyncPushRequest) -> SyncPushResult:
                     )
                 )
             ).scalar_one_or_none()
-            if existing and existing.updated_at and item.version < 1:
-                conflicts += 1
-                details.append({"local_id": item.local_id, "status": "CONFLICT"})
-                continue
+            # Idempotent upsert by (campaign, local_id). Last push wins for household fields.
             if existing is None:
                 hh = Household(
                     campaign_id=req.campaign_id,
@@ -146,13 +143,22 @@ async def sync_push(db: AsyncSession, req: SyncPushRequest) -> SyncPushResult:
                     zone_id=_parse_uuid(item.data.get("zone_id")),
                 )
                 db.add(hh)
+                await db.flush()
             else:
                 existing.address_line = item.data.get("address_line", existing.address_line)
+                if "latitude" in item.data:
+                    existing.latitude = item.data.get("latitude")
+                if "longitude" in item.data:
+                    existing.longitude = item.data.get("longitude")
                 existing.member_count = int(
                     item.data.get("member_count") or existing.member_count or 0
                 )
+                if item.data.get("zone_id"):
+                    existing.zone_id = _parse_uuid(item.data.get("zone_id"))
             accepted += 1
-            details.append({"local_id": item.local_id, "status": "ACCEPTED"})
+            details.append(
+                {"local_id": item.local_id, "entity_type": "household", "status": "ACCEPTED"}
+            )
 
         elif item.entity_type == "census_record":
             hh_local = item.data.get("household_local_id")
@@ -171,7 +177,12 @@ async def sync_push(db: AsyncSession, req: SyncPushRequest) -> SyncPushResult:
             if household is None:
                 conflicts += 1
                 details.append(
-                    {"local_id": item.local_id, "status": "CONFLICT", "reason": "missing_household"}
+                    {
+                        "local_id": item.local_id,
+                        "entity_type": "census_record",
+                        "status": "CONFLICT",
+                        "reason": "missing_household",
+                    }
                 )
                 continue
 
@@ -184,12 +195,37 @@ async def sync_push(db: AsyncSession, req: SyncPushRequest) -> SyncPushResult:
                 )
             ).scalar_one_or_none()
             if existing_rec and existing_rec.version > item.version:
-                existing_rec.status = CensusRecordStatus.CONFLICT
                 conflicts += 1
-                details.append({"local_id": item.local_id, "status": "CONFLICT"})
+                details.append(
+                    {
+                        "local_id": item.local_id,
+                        "entity_type": "census_record",
+                        "status": "CONFLICT",
+                        "reason": "stale_version",
+                        "server_version": existing_rec.version,
+                        "client_version": item.version,
+                        "server": {
+                            "given_names": existing_rec.given_names,
+                            "family_name": existing_rec.family_name,
+                            "sex": existing_rec.sex,
+                            "date_of_birth": existing_rec.date_of_birth,
+                            "version": existing_rec.version,
+                            "status": existing_rec.status.value,
+                        },
+                    }
+                )
                 continue
 
             if existing_rec is None:
+                raw_payload = item.data.get("payload")
+                if isinstance(raw_payload, dict):
+                    payload = raw_payload
+                else:
+                    payload = {
+                        k: item.data.get(k)
+                        for k in ("relationship_to_head",)
+                        if item.data.get(k) is not None
+                    } or None
                 rec = CensusRecord(
                     household_id=household.id,
                     campaign_id=req.campaign_id,
@@ -198,10 +234,10 @@ async def sync_push(db: AsyncSession, req: SyncPushRequest) -> SyncPushResult:
                     family_name=item.data.get("family_name"),
                     sex=item.data.get("sex"),
                     date_of_birth=item.data.get("date_of_birth"),
-                    payload=item.data.get("payload"),
+                    payload=payload,
                     photo_ref=item.data.get("photo_ref"),
                     status=CensusRecordStatus.SYNCED,
-                    version=item.version,
+                    version=max(item.version, 1),
                     collected_by=req.agent_user_id,
                     synced_at=datetime.now(timezone.utc),
                 )
@@ -209,16 +245,32 @@ async def sync_push(db: AsyncSession, req: SyncPushRequest) -> SyncPushResult:
             else:
                 existing_rec.given_names = item.data.get("given_names", existing_rec.given_names)
                 existing_rec.family_name = item.data.get("family_name", existing_rec.family_name)
+                existing_rec.sex = item.data.get("sex", existing_rec.sex)
+                existing_rec.date_of_birth = item.data.get(
+                    "date_of_birth", existing_rec.date_of_birth
+                )
                 existing_rec.payload = item.data.get("payload", existing_rec.payload)
-                existing_rec.version = item.version
+                existing_rec.version = max(item.version, existing_rec.version)
                 existing_rec.status = CensusRecordStatus.SYNCED
                 existing_rec.synced_at = datetime.now(timezone.utc)
             accepted += 1
-            details.append({"local_id": item.local_id, "status": "ACCEPTED"})
+            details.append(
+                {
+                    "local_id": item.local_id,
+                    "entity_type": "census_record",
+                    "status": "ACCEPTED",
+                    "version": max(item.version, 1),
+                }
+            )
         else:
             conflicts += 1
             details.append(
-                {"local_id": item.local_id, "status": "REJECTED", "reason": "unknown_entity"}
+                {
+                    "local_id": item.local_id,
+                    "entity_type": item.entity_type,
+                    "status": "REJECTED",
+                    "reason": "unknown_entity",
+                }
             )
 
     batch.accepted_count = accepted
@@ -275,6 +327,7 @@ async def sync_pull(db: AsyncSession, req: SyncPullRequest) -> SyncPullResponse:
             {
                 "id": str(h.id),
                 "local_id": h.local_id,
+                "campaign_id": str(h.campaign_id),
                 "address_line": h.address_line,
                 "member_count": h.member_count,
                 "latitude": h.latitude,
@@ -287,7 +340,11 @@ async def sync_pull(db: AsyncSession, req: SyncPullRequest) -> SyncPullResponse:
             {
                 "id": str(r.id),
                 "local_id": r.local_id,
+                "campaign_id": str(r.campaign_id),
                 "household_id": str(r.household_id),
+                "household_local_id": (
+                    next((h.local_id for h in households if h.id == r.household_id), None)
+                ),
                 "given_names": r.given_names,
                 "family_name": r.family_name,
                 "sex": r.sex,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../core/secure_storage.dart';
 import '../../sync/local_database.dart';
+import 'conflicts_screen.dart';
 
 class StatsScreen extends StatefulWidget {
   const StatsScreen({super.key});
@@ -16,6 +17,7 @@ class _StatsScreenState extends State<StatsScreen> {
   int records = 0;
   int queued = 0;
   int conflicts = 0;
+  String syncStatus = 'UNKNOWN';
   int? serverHouseholds;
   int? serverRecords;
   int? serverSynced;
@@ -36,6 +38,7 @@ class _StatsScreenState extends State<StatsScreen> {
           await db.rawQuery("SELECT COUNT(*) AS c FROM census_records WHERE status = 'CONFLICT'"),
         ) ??
         0;
+    final status = await LocalDatabase.instance.getMeta('sync_status') ?? 'UNKNOWN';
 
     int? sHh;
     int? sRec;
@@ -65,6 +68,7 @@ class _StatsScreenState extends State<StatsScreen> {
       records = rec;
       queued = q;
       conflicts = conf;
+      syncStatus = status;
       serverHouseholds = sHh;
       serverRecords = sRec;
       serverSynced = sSynced;
@@ -80,10 +84,30 @@ class _StatsScreenState extends State<StatsScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           Text('Local', style: Theme.of(context).textTheme.titleMedium),
+          _tile(context, 'Statut sync', null, subtitle: syncStatus),
           _tile(context, 'Ménages locaux', households),
           _tile(context, 'Fiches citoyens', records),
           _tile(context, 'File de sync', queued),
-          _tile(context, 'Conflits', conflicts),
+          Card(
+            child: ListTile(
+              title: const Text('Conflits'),
+              trailing: Text(
+                '$conflicts',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: conflicts > 0 ? Colors.orange : null,
+                    ),
+              ),
+              subtitle: conflicts > 0
+                  ? const Text('Appuyer pour résoudre')
+                  : const Text('Aucun conflit'),
+              onTap: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ConflictsScreen()),
+                );
+                await _load();
+              },
+            ),
+          ),
           const SizedBox(height: 16),
           Text('Serveur', style: Theme.of(context).textTheme.titleMedium),
           if (serverError != null)
@@ -99,14 +123,17 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 
-  Widget _tile(BuildContext context, String label, int value) {
+  Widget _tile(BuildContext context, String label, int? value, {String? subtitle}) {
     return Card(
       child: ListTile(
         title: Text(label),
-        trailing: Text(
-          '$value',
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
+        subtitle: subtitle != null ? Text(subtitle) : null,
+        trailing: value == null
+            ? null
+            : Text(
+                '$value',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
       ),
     );
   }

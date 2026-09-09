@@ -4,6 +4,7 @@ import 'auth/login_screen.dart';
 import 'core/auth_service.dart';
 import 'core/theme.dart';
 import 'features/census/campaigns_screen.dart';
+import 'features/census/conflicts_screen.dart';
 import 'features/census/stats_screen.dart';
 import 'features/device/device_registration.dart';
 import 'sync/local_database.dart';
@@ -29,6 +30,7 @@ class RecensementApp extends StatelessWidget {
         '/campaigns': (_) => const CampaignsScreen(),
         '/stats': (_) => const StatsScreen(),
         '/device': (_) => const DeviceRegistrationScreen(),
+        '/conflicts': (_) => const ConflictsScreen(),
       },
     );
   }
@@ -79,6 +81,13 @@ class _HomeShellState extends State<HomeShell> {
               }
             },
             icon: const Icon(Icons.sync),
+          ),
+          IconButton(
+            tooltip: 'Conflits',
+            onPressed: () {
+              Navigator.of(context).pushNamed('/conflicts');
+            },
+            icon: const Icon(Icons.warning_amber),
           ),
           IconButton(
             tooltip: 'Déconnexion',

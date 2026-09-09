@@ -233,6 +233,11 @@ class _HouseholdMembersScreenState extends State<HouseholdMembersScreen> {
                               ? Colors.orange
                               : const Color(0xFF5D87FF),
                     ),
+                    onTap: status == 'CONFLICT'
+                        ? () {
+                            Navigator.of(context).pushNamed('/conflicts');
+                          }
+                        : null,
                   ),
                 );
               },

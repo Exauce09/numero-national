@@ -24,9 +24,11 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 - [x] 2.7 Liste ménages + membres + statuts
 
 ## Phase 3 — Sync fiable
-- [ ] Push/pull durci + conflits UX + tests
+- [x] Push/pull durci (détails par local_id, raisons, snapshot serveur)
+- [x] Conflits UX (écran résolution: accepter serveur / forcer envoi)
+- [x] Tests API `tests/test_census_sync.py`
 
 ## Phase 4 — Superviseur
 - [ ] Workflow APPROVE/REJECT
 
-Prochaine session Agent : Phase 3 (conflits sync) ou Phase 4.
+Prochaine session Agent : Phase 4 (superviseur).
