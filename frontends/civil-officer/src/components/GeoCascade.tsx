@@ -276,13 +276,12 @@ export default function GeoCascade({
     });
     const markLocal = () =>
       setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
-    setQuartiers(show("quartier") ? await fetchItems(`/geo/quartiers?commune_id=${id}`, markLocal) : []);
+    const qs = show("quartier") ? await fetchItems(`/geo/quartiers?commune_id=${id}`, markLocal) : [];
+    setQuartiers(qs);
     setLocalites(show("localite") ? await fetchItems(`/geo/localites?commune_id=${id}`, markLocal) : []);
     setAvenues([]);
     setRues([]);
     if (show("quartier")) {
-      const qs = await fetchItems(`/geo/quartiers?commune_id=${id}`, markLocal);
-      setQuartiers(qs);
       setHint(
         qs.length
           ? `${qs.length} quartier(s) liés à cette commune`
