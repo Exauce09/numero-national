@@ -247,14 +247,14 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           const SizedBox(height: 12),
           _ActionTile(
             title: 'Fiche d’identification',
-            subtitle: 'Nom · Post-nom · Prénom (formulaire officiel)',
+            subtitle: '7 étapes comme le site — Zones → ménage → + Personne',
             icon: Icons.badge_outlined,
             color: const Color(0xFFE11D48),
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text(
-                    'Zones → campagne → ménage → bouton + Personne',
+                    'Zones → campagne → ménage → bouton + Personne (wizard 7 étapes)',
                   ),
                 ),
               );
