@@ -1,4 +1,4 @@
-/** Commune de l'officier connecté — périmètre exclusif du tableau synoptique. */
+/** Commune de l'officier connecté — issue du compte attribué. */
 
 export type OfficerCommune = {
   code: string;
@@ -9,7 +9,7 @@ export type OfficerCommune = {
 
 const KEY = "nn_civil_officer_commune";
 
-/** Démo : officier affecté à la commune de Gombe (Kinshasa). */
+/** Démo par défaut si aucun compte n'a encore été attribué. */
 export const DEFAULT_OFFICER_COMMUNE: OfficerCommune = {
   code: "KIN-GOMBE",
   name: "Gombe",
@@ -40,6 +40,8 @@ export function actBelongsToOfficerCommune(
   commune = getOfficerCommune(),
 ): boolean {
   const code = String(payload.commune_code ?? "").trim().toUpperCase();
-  if (!code) return true; // démo locale : actes sans code = commune de l'officier
-  return code === commune.code.toUpperCase() || code.includes(commune.name.toUpperCase());
+  if (!code) return true;
+  const c = commune.code.toUpperCase();
+  const n = commune.name.toUpperCase();
+  return code === c || code.includes(n) || code.endsWith(`-${n}`);
 }

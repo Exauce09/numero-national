@@ -1,9 +1,15 @@
+import { applyAccountCommune } from "./accounts";
+
 export type Session = {
   username: string;
   displayName?: string;
   roleTitle?: string;
   accessToken?: string;
   photoDataUrl?: string;
+  commune_code?: string;
+  commune_name?: string;
+  commune_ville?: string;
+  commune_province?: string;
 };
 
 const KEY = "nn_session_civil_officer";
@@ -18,6 +24,17 @@ function sessionLabel(username: string): { displayName: string; roleTitle: strin
       ? "Officier de commune"
       : username.replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   return { displayName: pretty, roleTitle: MODULE_ROLE_TITLE };
+}
+
+function attachCommune(base: Session, username: string): Session {
+  const commune = applyAccountCommune(username);
+  return {
+    ...base,
+    commune_code: commune.code,
+    commune_name: commune.name,
+    commune_ville: commune.ville,
+    commune_province: commune.province,
+  };
 }
 
 export function getSession(): Session | null {
@@ -67,7 +84,6 @@ export async function login(username: string, password: string): Promise<Session
     /* ignore */
   }
 
-  // API optionnelle : court timeout puis repli sur le compte démo local.
   const base = import.meta.env.VITE_API_BASE ?? "/api/v1";
   try {
     const ctrl = new AbortController();
@@ -81,12 +97,15 @@ export async function login(username: string, password: string): Promise<Session
     window.clearTimeout(timer);
     if (res.ok) {
       const data = (await res.json()) as { access_token?: string };
-      const session: Session = {
-        username: user,
-        accessToken: data.access_token,
-        photoDataUrl,
-        ...labels,
-      };
+      const session = attachCommune(
+        {
+          username: user,
+          accessToken: data.access_token,
+          photoDataUrl,
+          ...labels,
+        },
+        user,
+      );
       sessionStorage.setItem(KEY, JSON.stringify(session));
       return session;
     }
@@ -94,8 +113,6 @@ export async function login(username: string, password: string): Promise<Session
     /* API indisponible — mode démo local */
   }
 
-  // Compte démo local (pas de base de données requise).
-  // Accepte toujours DEMO_PASSWORD ; sinon le mot de passe modifié dans le profil.
   const demoOk =
     user === DEMO_USER && (password === DEMO_PASSWORD || password === passwordOverride);
   if (!demoOk) {
@@ -104,11 +121,14 @@ export async function login(username: string, password: string): Promise<Session
     );
   }
 
-  const session: Session = {
-    username: DEMO_USER,
-    photoDataUrl,
-    ...sessionLabel(DEMO_USER),
-  };
+  const session = attachCommune(
+    {
+      username: DEMO_USER,
+      photoDataUrl,
+      ...sessionLabel(DEMO_USER),
+    },
+    DEMO_USER,
+  );
   sessionStorage.setItem(KEY, JSON.stringify(session));
   return session;
 }

@@ -66,10 +66,7 @@ export default function DataToolbar({ filename, rows, columns }: Props) {
         Excel
       </button>
       <button type="button" className="btn-secondary btn-sm" onClick={() => window.print()}>
-        PDF
-      </button>
-      <button type="button" className="btn-secondary btn-sm" onClick={() => window.print()}>
-        Print
+        PDF / Imprimer
       </button>
       <button type="button" className="btn-secondary btn-sm" onClick={exportSql}>
         SQL

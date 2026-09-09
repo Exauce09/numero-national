@@ -37,7 +37,6 @@ import ManageNaissancePage from "./pages/ManageNaissancePage";
 import SynopticPage from "./pages/SynopticPage";
 import ManageActsPage, { MANAGE_CONFIGS } from "./components/ManageActsPage";
 import TerritoryPage from "./pages/TerritoryPage";
-import { getOfficerCommune } from "./commune";
 import {
   IconBaby,
   IconCar,
@@ -135,6 +134,9 @@ function Shell() {
 
   const responsableLabel = session?.displayName ?? session?.username ?? "—";
   const roleTitle = session?.roleTitle ?? "Responsable — Officier d'état civil";
+  const communeLabel = session?.commune_name
+    ? `Commune de ${session.commune_name}`
+    : null;
   const badge = unreadCount();
   const photo = prefs.photoDataUrl || session?.photoDataUrl;
 
@@ -166,20 +168,14 @@ function Shell() {
           <NavLink to="/" end>
             <IconDashboard size={18} /> Tableau de bord
           </NavLink>
-          <div className="nav-group">
-            <NavLink to="/synoptique/naissances" className={({ isActive }) => (isActive || location.pathname.startsWith("/synoptique") ? "active" : "")}>
-              <IconTable size={18} /> Tableau synoptique
-            </NavLink>
-            <div className="nav-sub">
-              <NavLink to="/synoptique/naissances">Nouveaux-nés</NavLink>
-              <NavLink to="/synoptique/matrimonial">État matrimonial</NavLink>
-              <NavLink to="/synoptique/deces">Décès</NavLink>
-              <NavLink to="/synoptique/documents">Documents</NavLink>
-            </div>
-            <p className="nav-commune muted small">
-              Commune : <strong>{getOfficerCommune().name}</strong>
-            </p>
-          </div>
+          <NavLink
+            to="/synoptique/naissances"
+            className={({ isActive }) =>
+              isActive || location.pathname.startsWith("/synoptique") ? "active" : undefined
+            }
+          >
+            <IconTable size={18} /> Tableau synoptique
+          </NavLink>
           <NavLink to="/population">
             <IconUsers size={18} /> Population
           </NavLink>
@@ -236,6 +232,7 @@ function Shell() {
 
           <div className="topbar-center" title={roleTitle}>
             <span className="topbar-role">{roleTitle}</span>
+            {communeLabel ? <span className="topbar-commune">{communeLabel}</span> : null}
             <strong className="topbar-responsable">{responsableLabel}</strong>
           </div>
 
