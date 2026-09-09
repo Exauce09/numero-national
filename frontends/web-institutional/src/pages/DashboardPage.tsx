@@ -1,7 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BarChart, GroupedBarChart, HorizontalBarChart, PieChart } from "../components/Charts";
-import { TYPE_LABELS, getNationalSnapshot } from "../nationalData";
+import ExportToolbar from "../components/ExportToolbar";
+import {
+  TYPE_LABELS,
+  dashboardKpiRows,
+  getNationalSnapshot,
+  monthlyTrends,
+} from "../nationalData";
 
 function Metric({ label, value, onClick }: { label: string; value: string | number; onClick?: () => void }) {
   return (
@@ -15,7 +21,15 @@ function Metric({ label, value, onClick }: { label: string; value: string | numb
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [tick, setTick] = useState(0);
+  const [live, setLive] = useState(true);
   const snap = useMemo(() => getNationalSnapshot(), [tick]);
+  const trends = useMemo(() => monthlyTrends(), [tick]);
+
+  useEffect(() => {
+    if (!live) return;
+    const id = window.setInterval(() => setTick((n) => n + 1), 45000);
+    return () => window.clearInterval(id);
+  }, [live]);
 
   const typePie = Object.entries(
     snap.health_facilities.reduce<Record<string, number>>((acc, f) => {
@@ -38,19 +52,48 @@ export default function DashboardPage() {
 
   const provinces = snap.population_by_province.slice(0, 8);
 
+  const monthlyRows = trends.months.map((m, i) => ({
+    mois: m,
+    naissances: trends.births[i],
+    deces: trends.deaths[i],
+    mariages: trends.marriages[i],
+    divorces: trends.divorces[i],
+  }));
+
+  const provinceRows = snap.population_by_province.map((p) => ({
+    province: p.province,
+    total: p.total,
+    hommes: p.m,
+    femmes: p.f,
+  }));
+
   return (
-    <div>
+    <div className="print-area">
       <div className="eg-page-head">
         <div>
           <h2 className="page-title">Tableau de bord — Présidence</h2>
           <p className="page-lead">
-            Lecture nationale du système : population, état civil, structures sanitaires et actes.
+            Pilotage national dynamique : population, état civil, santé et actes — actualisation et exports.
           </p>
         </div>
-        <button type="button" className="btn-secondary btn-sm" onClick={() => setTick((n) => n + 1)}>
-          Actualiser
-        </button>
+        <div className="page-actions no-print">
+          <label className="live-toggle">
+            <input type="checkbox" checked={live} onChange={(e) => setLive(e.target.checked)} />
+            Auto-actualiser
+          </label>
+          <button type="button" className="btn-secondary btn-sm" onClick={() => setTick((n) => n + 1)}>
+            Actualiser
+          </button>
+        </div>
       </div>
+
+      <ExportToolbar
+        filename="presidence_dashboard_kpi"
+        title="Indicateurs nationaux — Présidence"
+        rows={dashboardKpiRows()}
+        columns={["indicateur", "valeur"]}
+        tableName="presidence_kpi"
+      />
 
       <div className="grid">
         <Metric label="Population" value={snap.population_total.toLocaleString("fr-FR")} onClick={() => navigate("/population")} />
@@ -75,6 +118,25 @@ export default function DashboardPage() {
 
       <div className="chart-grid" style={{ marginTop: "1rem" }}>
         <GroupedBarChart
+          title="Évolution mensuelle — naissances & décès"
+          categories={trends.months}
+          series={[
+            { name: "Naissances", color: "#1a5f4a", values: trends.births },
+            { name: "Décès", color: "#8a4b1a", values: trends.deaths },
+          ]}
+        />
+        <GroupedBarChart
+          title="Évolution mensuelle — mariages & divorces"
+          categories={trends.months}
+          series={[
+            { name: "Mariages", color: "#3b6ea5", values: trends.marriages },
+            { name: "Divorces", color: "#6b4c9a", values: trends.divorces },
+          ]}
+        />
+      </div>
+
+      <div className="chart-grid" style={{ marginTop: "1rem" }}>
+        <GroupedBarChart
           title="Histogramme groupé — population H/F par province"
           categories={provinces.map((p) => p.province)}
           series={[
@@ -92,9 +154,27 @@ export default function DashboardPage() {
         />
       </div>
 
+      <div className="panel" style={{ marginTop: "1rem" }}>
+        <h3 className="panel-title">Série mensuelle (export)</h3>
+        <ExportToolbar
+          filename="presidence_serie_mensuelle"
+          title="Série mensuelle nationale"
+          rows={monthlyRows}
+          columns={["mois", "naissances", "deces", "mariages", "divorces"]}
+          tableName="presidence_mensuel"
+        />
+        <ExportToolbar
+          filename="presidence_population_provinces"
+          title="Population par province"
+          rows={provinceRows}
+          columns={["province", "total", "hommes", "femmes"]}
+          tableName="presidence_pop_province"
+        />
+      </div>
+
       <p className="muted small" style={{ marginTop: "1rem" }}>
-        Dernière consolidation : {new Date(snap.updated_at).toLocaleString("fr-CD")} — accès lecture Présidence
-        uniquement.
+        Dernière consolidation : {new Date(snap.updated_at).toLocaleString("fr-CD")}
+        {live ? " · auto-actualisation 45 s" : ""} — accès lecture Présidence uniquement.
       </p>
     </div>
   );

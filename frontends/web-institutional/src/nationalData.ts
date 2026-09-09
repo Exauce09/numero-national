@@ -94,15 +94,24 @@ function seedSnapshot(): NationalSnapshot {
   ];
 
   const now = Date.now();
+  const day = 86400000;
   const acts: ActRow[] = [
-    { id: "a1", type: "BIRTH", commune: "Gombe", province: "Kinshasa", summary: "Nouveau-né — MUKENDI", sexe: "M", created_at: new Date(now - 86400000).toISOString() },
-    { id: "a2", type: "BIRTH", commune: "Gombe", province: "Kinshasa", summary: "Nouveau-né — KABASELE", sexe: "F", created_at: new Date(now - 172800000).toISOString() },
-    { id: "a3", type: "DEATH", commune: "Lingwala", province: "Kinshasa", summary: "Décès — ILUNGA", sexe: "M", created_at: new Date(now - 259200000).toISOString() },
-    { id: "a4", type: "MARRIAGE", commune: "Matadi", province: "Kongo-Central", summary: "Mariage — NGOMA / MWAMBA", created_at: new Date(now - 345600000).toISOString() },
-    { id: "a5", type: "DIVORCE", commune: "Lubumbashi", province: "Haut-Katanga", summary: "Divorce — KASONGO / NZUZI", created_at: new Date(now - 432000000).toISOString() },
-    { id: "a6", type: "BIRTH", commune: "Goma", province: "Nord-Kivu", summary: "Nouveau-né — BAHATI", sexe: "M", created_at: new Date(now - 518400000).toISOString() },
-    { id: "a7", type: "DEATH", commune: "Gombe", province: "Kinshasa", summary: "Décès — TSHISEKEDI", sexe: "F", created_at: new Date(now - 604800000).toISOString() },
-    { id: "a8", type: "DOCUMENT", commune: "Gombe", province: "Kinshasa", summary: "Extrait d'acte — délivrance", created_at: new Date(now - 691200000).toISOString() },
+    { id: "a1", type: "BIRTH", commune: "Gombe", province: "Kinshasa", summary: "Nouveau-né — MUKENDI", sexe: "M", created_at: new Date(now - day).toISOString() },
+    { id: "a2", type: "BIRTH", commune: "Gombe", province: "Kinshasa", summary: "Nouveau-né — KABASELE", sexe: "F", created_at: new Date(now - 2 * day).toISOString() },
+    { id: "a3", type: "DEATH", commune: "Lingwala", province: "Kinshasa", summary: "Décès — ILUNGA", sexe: "M", created_at: new Date(now - 3 * day).toISOString() },
+    { id: "a4", type: "MARRIAGE", commune: "Matadi", province: "Kongo-Central", summary: "Mariage — NGOMA / MWAMBA", created_at: new Date(now - 4 * day).toISOString() },
+    { id: "a5", type: "DIVORCE", commune: "Lubumbashi", province: "Haut-Katanga", summary: "Divorce — KASONGO / NZUZI", created_at: new Date(now - 5 * day).toISOString() },
+    { id: "a6", type: "BIRTH", commune: "Goma", province: "Nord-Kivu", summary: "Nouveau-né — BAHATI", sexe: "M", created_at: new Date(now - 6 * day).toISOString() },
+    { id: "a7", type: "DEATH", commune: "Gombe", province: "Kinshasa", summary: "Décès — KABANGE", sexe: "F", created_at: new Date(now - 7 * day).toISOString() },
+    { id: "a8", type: "DOCUMENT", commune: "Gombe", province: "Kinshasa", summary: "Extrait d'acte — délivrance", created_at: new Date(now - 8 * day).toISOString() },
+    { id: "a9", type: "BIRTH", commune: "Matadi", province: "Kongo-Central", summary: "Nouveau-né — LUZOLO", sexe: "F", created_at: new Date(now - 9 * day).toISOString() },
+    { id: "a10", type: "BIRTH", commune: "Lubumbashi", province: "Haut-Katanga", summary: "Nouveau-né — KALALA", sexe: "M", created_at: new Date(now - 10 * day).toISOString() },
+    { id: "a11", type: "DEATH", commune: "Goma", province: "Nord-Kivu", summary: "Décès — BIZIMANA", sexe: "M", created_at: new Date(now - 11 * day).toISOString() },
+    { id: "a12", type: "MARRIAGE", commune: "Gombe", province: "Kinshasa", summary: "Mariage — LUKUSA / MBAYA", created_at: new Date(now - 12 * day).toISOString() },
+    { id: "a13", type: "DIVORCE", commune: "Matadi", province: "Kongo-Central", summary: "Divorce — NZAU / PANDI", created_at: new Date(now - 13 * day).toISOString() },
+    { id: "a14", type: "BIRTH", commune: "Bukavu", province: "Sud-Kivu", summary: "Nouveau-né — CIRIMWAMI", sexe: "F", created_at: new Date(now - 14 * day).toISOString() },
+    { id: "a15", type: "DEATH", commune: "Bukavu", province: "Sud-Kivu", summary: "Décès — MUSHAGALUSA", sexe: "F", created_at: new Date(now - 15 * day).toISOString() },
+    { id: "a16", type: "MARRIAGE", commune: "Goma", province: "Nord-Kivu", summary: "Mariage — KAMBALE / KAVIRA", created_at: new Date(now - 16 * day).toISOString() },
   ];
 
   const births = health_facilities.reduce((s, f) => s + f.births, 0) + 1280;
@@ -331,3 +340,51 @@ export const TYPE_LABELS: Record<string, string> = {
   DIVORCE: "Divorce",
   DOCUMENT: "Document",
 };
+
+/** Série mensuelle dynamique (12 mois) pour graphiques avancés. */
+export function monthlyTrends() {
+  const snap = getNationalSnapshot();
+  const months: string[] = [];
+  const now = new Date();
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(`${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(2)}`);
+  }
+  const seed = (snap.births + snap.deaths + snap.civil_offices.length) % 97;
+  const wave = (i: number, base: number, amp: number) =>
+    Math.max(0, Math.round(base + amp * Math.sin((i + seed) / 2.2) + ((seed + i * 3) % 7)));
+
+  return {
+    months,
+    births: months.map((_, i) => wave(i, Math.max(8, Math.floor(snap.births / 14)), 12)),
+    deaths: months.map((_, i) => wave(i + 2, Math.max(3, Math.floor(snap.deaths / 16)), 6)),
+    marriages: months.map((_, i) => wave(i + 1, Math.max(2, Math.floor(snap.marriages / 18)), 5)),
+    divorces: months.map((_, i) => wave(i + 3, Math.max(1, Math.floor(snap.divorces / 20)), 2)),
+  };
+}
+
+export function dashboardKpiRows() {
+  const s = getNationalSnapshot();
+  return [
+    { indicateur: "Population totale", valeur: s.population_total },
+    { indicateur: "Population masculine", valeur: s.population_m },
+    { indicateur: "Population féminine", valeur: s.population_f },
+    { indicateur: "Bureaux d'état civil", valeur: s.civil_offices.length },
+    { indicateur: "Structures sanitaires", valeur: s.health_facilities.length },
+    { indicateur: "Naissances", valeur: s.births },
+    { indicateur: "Décès", valeur: s.deaths },
+    { indicateur: "Mariages", valeur: s.marriages },
+    { indicateur: "Divorces", valeur: s.divorces },
+    { indicateur: "Documents", valeur: s.documents },
+    { indicateur: "Mis à jour", valeur: s.updated_at },
+  ];
+}
+
+export function listProvinces(): string[] {
+  const s = getNationalSnapshot();
+  const set = new Set<string>();
+  s.population_by_province.forEach((p) => set.add(p.province));
+  s.civil_offices.forEach((o) => set.add(o.province));
+  s.health_facilities.forEach((f) => set.add(f.province));
+  return [...set].sort((a, b) => a.localeCompare(b, "fr"));
+}

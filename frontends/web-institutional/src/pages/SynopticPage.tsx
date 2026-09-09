@@ -1,4 +1,6 @@
+import { useMemo, useState } from "react";
 import { Link, NavLink, Navigate, useParams } from "react-router-dom";
+import ExportToolbar from "../components/ExportToolbar";
 import {
   synopticBirthsNational,
   synopticDeathsNational,
@@ -34,10 +36,40 @@ function GftCells({ v }: { v: Gft }) {
   );
 }
 
+function flatGft(prefix: string, v: Gft) {
+  return {
+    [`${prefix}_g`]: v.g,
+    [`${prefix}_f`]: v.f,
+    [`${prefix}_t`]: v.t,
+  };
+}
+
 function Births() {
   const d = synopticBirthsNational();
+  const rows = [
+    {
+      perimetre: "National",
+      ...flatGft("cong_sans", d.cong.sans),
+      ...flatGft("cong_avec", d.cong.avec),
+      ...flatGft("cong_jugement", d.cong.jugement),
+      ...flatGft("etr_sans", d.etr.sans),
+      ...flatGft("etr_avec", d.etr.avec),
+      ...flatGft("etr_jugement", d.etr.jugement),
+      ...flatGft("tot_sans", d.totSans),
+      ...flatGft("tot_avec", d.totAvec),
+      ...flatGft("dans_delai", d.dansDelai),
+      ...flatGft("tot_jugement", d.totJug),
+      ...flatGft("total", d.totalNaissances),
+    },
+  ];
   return (
     <>
+      <ExportToolbar
+        filename="presidence_synoptique_naissances"
+        title="Synoptique national — Naissances"
+        rows={rows}
+        tableName="presidence_syn_naissances"
+      />
       <h2 className="syn-official-title">
         TABLEAU SYNOPTIQUE NATIONAL DES NAISSANCES
         <br />
@@ -95,8 +127,28 @@ function Births() {
 
 function Deaths() {
   const d = synopticDeathsNational();
+  const rows = [
+    {
+      perimetre: "National",
+      hommes: d.hommes,
+      femmes: d.femmes,
+      garcons: d.garcons,
+      filles: d.filles,
+      total_a: d.totalA,
+      morts_nes_g: d.mortsNesG,
+      morts_nes_f: d.mortsNesF,
+      total_b: d.totalB,
+      total_ab: d.totalAB,
+    },
+  ];
   return (
     <>
+      <ExportToolbar
+        filename="presidence_synoptique_deces"
+        title="Synoptique national — Décès"
+        rows={rows}
+        tableName="presidence_syn_deces"
+      />
       <h2 className="syn-official-title">
         TABLEAU SYNOPTIQUE NATIONAL DES DÉCÈS
         <br />
@@ -144,8 +196,27 @@ function Deaths() {
 
 function Matrimonial() {
   const d = synopticMatrimonialNational();
+  const rows = [
+    {
+      perimetre: "National",
+      mariage_nationaux: d.mariage.nationaux,
+      mariage_etrangers: d.mariage.etrangers,
+      mariage_mixtes: d.mariage.mixtes,
+      mariage_total: d.mariage.total,
+      divorce_nationaux: d.divorce.nationaux,
+      divorce_etrangers: d.divorce.etrangers,
+      divorce_mixtes: d.divorce.mixtes,
+      divorce_total: d.divorce.total,
+    },
+  ];
   return (
     <>
+      <ExportToolbar
+        filename="presidence_synoptique_matrimonial"
+        title="Synoptique national — État matrimonial"
+        rows={rows}
+        tableName="presidence_syn_matrimonial"
+      />
       <h2 className="syn-official-title">
         TABLEAU SYNOPTIQUE NATIONAL — ÉTAT MATRIMONIAL
         <br />
@@ -191,21 +262,31 @@ function Matrimonial() {
 
 export default function SynopticPage() {
   const { section } = useParams<{ section?: string }>();
+  const [tick, setTick] = useState(0);
   if (!section) return <Navigate to="/synoptique/naissances" replace />;
   const tab = (TABS.some((t) => t.slug === section) ? section : "naissances") as TabSlug;
 
+  const content = useMemo(() => {
+    if (tab === "deces") return <Deaths />;
+    if (tab === "matrimonial") return <Matrimonial />;
+    return <Births />;
+  }, [tab, tick]);
+
   return (
-    <div className="syn-page">
+    <div className="syn-page print-area">
       <div className="eg-page-head">
         <div>
           <p className="eg-breadcrumb">
             <Link to="/">Accueil</Link> / Tableau synoptique
           </p>
           <h2 className="page-title">Tableau synoptique national</h2>
-          <p className="page-lead">Consolidation générale du système — lecture Présidence.</p>
+          <p className="page-lead">Consolidation générale du système — exports PDF / CSV / Excel / SQL.</p>
         </div>
+        <button type="button" className="btn-secondary btn-sm no-print" onClick={() => setTick((n) => n + 1)}>
+          Actualiser
+        </button>
       </div>
-      <div className="syn-tabs">
+      <div className="syn-tabs no-print">
         {TABS.map((t) => (
           <NavLink
             key={t.slug}
@@ -216,11 +297,7 @@ export default function SynopticPage() {
           </NavLink>
         ))}
       </div>
-      <div className="syn-official-wrap">
-        {tab === "naissances" ? <Births /> : null}
-        {tab === "deces" ? <Deaths /> : null}
-        {tab === "matrimonial" ? <Matrimonial /> : null}
-      </div>
+      <div className="syn-official-wrap">{content}</div>
     </div>
   );
 }

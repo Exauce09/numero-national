@@ -1,20 +1,49 @@
-import { useMemo, useState } from "react";
-import { TYPE_LABELS, getNationalSnapshot } from "../nationalData";
+import { useMemo, useState, type ReactNode } from "react";
+import ExportToolbar from "../components/ExportToolbar";
+import { TYPE_LABELS, getNationalSnapshot, listProvinces } from "../nationalData";
+
+function PageShell({
+  title,
+  lead,
+  onRefresh,
+  children,
+}: {
+  title: string;
+  lead: string;
+  onRefresh: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="print-area">
+      <div className="eg-page-head">
+        <div>
+          <h2 className="page-title">{title}</h2>
+          <p className="page-lead">{lead}</p>
+        </div>
+        <button type="button" className="btn-secondary btn-sm no-print" onClick={onRefresh}>
+          Actualiser
+        </button>
+      </div>
+      {children}
+    </div>
+  );
+}
 
 export function PopulationPage() {
   const [tick, setTick] = useState(0);
   const snap = useMemo(() => getNationalSnapshot(), [tick]);
+  const rows = snap.population_by_province.map((p) => ({
+    province: p.province,
+    total: p.total,
+    hommes: p.m,
+    femmes: p.f,
+  }));
   return (
-    <div>
-      <div className="eg-page-head">
-        <div>
-          <h2 className="page-title">Population</h2>
-          <p className="page-lead">Effectifs nationaux consolidés (lecture Présidence).</p>
-        </div>
-        <button type="button" className="btn-secondary btn-sm" onClick={() => setTick((n) => n + 1)}>
-          Actualiser
-        </button>
-      </div>
+    <PageShell
+      title="Population"
+      lead="Effectifs nationaux consolidés (lecture Présidence)."
+      onRefresh={() => setTick((n) => n + 1)}
+    >
       <div className="grid" style={{ marginBottom: "1rem" }}>
         <div className="metric">
           <div className="label">Total</div>
@@ -29,6 +58,13 @@ export function PopulationPage() {
           <div className="value">{snap.population_f.toLocaleString("fr-FR")}</div>
         </div>
       </div>
+      <ExportToolbar
+        filename="presidence_population"
+        title="Population nationale par province"
+        rows={rows}
+        columns={["province", "total", "hommes", "femmes"]}
+        tableName="presidence_population"
+      />
       <div className="panel">
         <table className="data-table">
           <thead>
@@ -40,18 +76,18 @@ export function PopulationPage() {
             </tr>
           </thead>
           <tbody>
-            {snap.population_by_province.map((p) => (
+            {rows.map((p) => (
               <tr key={p.province}>
                 <td>{p.province}</td>
                 <td>{p.total.toLocaleString("fr-FR")}</td>
-                <td>{p.m.toLocaleString("fr-FR")}</td>
-                <td>{p.f.toLocaleString("fr-FR")}</td>
+                <td>{p.hommes.toLocaleString("fr-FR")}</td>
+                <td>{p.femmes.toLocaleString("fr-FR")}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-    </div>
+    </PageShell>
   );
 }
 
@@ -59,23 +95,59 @@ export function CivilOfficesPage() {
   const [tick, setTick] = useState(0);
   const snap = useMemo(() => getNationalSnapshot(), [tick]);
   const [q, setQ] = useState("");
-  const rows = snap.civil_offices.filter((o) =>
-    `${o.commune} ${o.province} ${o.officer} ${o.code}`.toLowerCase().includes(q.trim().toLowerCase()),
-  );
+  const [province, setProvince] = useState("");
+  const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
+  const provinces = useMemo(() => listProvinces(), [tick]);
+
+  const rows = snap.civil_offices.filter((o) => {
+    if (province && o.province !== province) return false;
+    if (status === "active" && !o.active) return false;
+    if (status === "inactive" && o.active) return false;
+    return `${o.commune} ${o.province} ${o.officer} ${o.code}`.toLowerCase().includes(q.trim().toLowerCase());
+  });
+
+  const exportRows = rows.map((o) => ({
+    commune: o.commune,
+    code: o.code,
+    province: o.province,
+    ville: o.ville,
+    officier: o.officer,
+    statut: o.active ? "Actif" : "Inactif",
+  }));
+
   return (
-    <div>
-      <div className="eg-page-head">
-        <div>
-          <h2 className="page-title">États civils</h2>
-          <p className="page-lead">Toutes les communes / bureaux d&apos;état civil du système.</p>
-        </div>
-        <button type="button" className="btn-secondary btn-sm" onClick={() => setTick((n) => n + 1)}>
-          Actualiser
-        </button>
-      </div>
-      <div className="toolbar">
+    <PageShell
+      title="États civils"
+      lead="Toutes les communes / bureaux d'état civil — filtres et exports."
+      onRefresh={() => setTick((n) => n + 1)}
+    >
+      <div className="toolbar filters-bar no-print">
         <input className="form-control" placeholder="Rechercher…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <select className="form-control" value={province} onChange={(e) => setProvince(e.target.value)}>
+          <option value="">Toutes provinces</option>
+          {provinces.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
+        <select
+          className="form-control"
+          value={status}
+          onChange={(e) => setStatus(e.target.value as "all" | "active" | "inactive")}
+        >
+          <option value="all">Tous statuts</option>
+          <option value="active">Actifs</option>
+          <option value="inactive">Inactifs</option>
+        </select>
       </div>
+      <ExportToolbar
+        filename="presidence_etats_civils"
+        title="Bureaux d'état civil"
+        rows={exportRows}
+        columns={["commune", "code", "province", "ville", "officier", "statut"]}
+        tableName="presidence_etats_civils"
+      />
       <div className="panel">
         <table className="data-table">
           <thead>
@@ -106,7 +178,7 @@ export function CivilOfficesPage() {
           </tbody>
         </table>
       </div>
-    </div>
+    </PageShell>
   );
 }
 
@@ -114,23 +186,62 @@ export function FacilitiesPage() {
   const [tick, setTick] = useState(0);
   const snap = useMemo(() => getNationalSnapshot(), [tick]);
   const [q, setQ] = useState("");
-  const rows = snap.health_facilities.filter((f) =>
-    `${f.name} ${f.commune} ${f.province} ${f.type}`.toLowerCase().includes(q.trim().toLowerCase()),
+  const [province, setProvince] = useState("");
+  const [type, setType] = useState("");
+  const provinces = useMemo(() => listProvinces(), [tick]);
+  const types = useMemo(
+    () => [...new Set(snap.health_facilities.map((f) => f.type))].sort(),
+    [snap],
   );
+
+  const rows = snap.health_facilities.filter((f) => {
+    if (province && f.province !== province) return false;
+    if (type && f.type !== type) return false;
+    return `${f.name} ${f.commune} ${f.province} ${f.type}`.toLowerCase().includes(q.trim().toLowerCase());
+  });
+
+  const exportRows = rows.map((f) => ({
+    nom: f.name,
+    type: TYPE_LABELS[f.type] ?? f.type,
+    province: f.province,
+    commune: f.commune,
+    statut: f.active ? "Actif" : "Désactivé",
+    naissances: f.births,
+    deces: f.deaths,
+  }));
+
   return (
-    <div>
-      <div className="eg-page-head">
-        <div>
-          <h2 className="page-title">Structures sanitaires</h2>
-          <p className="page-lead">Toutes les structures sanitaires du système national.</p>
-        </div>
-        <button type="button" className="btn-secondary btn-sm" onClick={() => setTick((n) => n + 1)}>
-          Actualiser
-        </button>
-      </div>
-      <div className="toolbar">
+    <PageShell
+      title="Structures sanitaires"
+      lead="Réseau sanitaire national — filtres dynamiques et exports."
+      onRefresh={() => setTick((n) => n + 1)}
+    >
+      <div className="toolbar filters-bar no-print">
         <input className="form-control" placeholder="Rechercher…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <select className="form-control" value={province} onChange={(e) => setProvince(e.target.value)}>
+          <option value="">Toutes provinces</option>
+          {provinces.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
+        <select className="form-control" value={type} onChange={(e) => setType(e.target.value)}>
+          <option value="">Tous types</option>
+          {types.map((t) => (
+            <option key={t} value={t}>
+              {TYPE_LABELS[t] ?? t}
+            </option>
+          ))}
+        </select>
       </div>
+      <ExportToolbar
+        filename="presidence_structures_sante"
+        title="Structures sanitaires nationales"
+        rows={exportRows}
+        columns={["nom", "type", "province", "commune", "statut", "naissances", "deces"]}
+        tableName="presidence_structures"
+      />
       <div className="panel">
         <table className="data-table">
           <thead>
@@ -161,7 +272,7 @@ export function FacilitiesPage() {
           </tbody>
         </table>
       </div>
-    </div>
+    </PageShell>
   );
 }
 
@@ -169,14 +280,25 @@ function ActsPage({
   title,
   lead,
   type,
+  filename,
 }: {
   title: string;
   lead: string;
   type: string;
+  filename: string;
 }) {
   const [tick, setTick] = useState(0);
   const snap = useMemo(() => getNationalSnapshot(), [tick]);
-  const rows = snap.acts.filter((a) => a.type === type);
+  const [q, setQ] = useState("");
+  const [province, setProvince] = useState("");
+  const provinces = useMemo(() => listProvinces(), [tick]);
+
+  const all = snap.acts.filter((a) => a.type === type);
+  const rows = all.filter((a) => {
+    if (province && a.province !== province) return false;
+    return `${a.summary} ${a.commune} ${a.province}`.toLowerCase().includes(q.trim().toLowerCase());
+  });
+
   const total =
     type === "BIRTH"
       ? snap.births
@@ -188,21 +310,38 @@ function ActsPage({
             ? snap.divorces
             : rows.length;
 
+  const exportRows = rows.map((a) => ({
+    resume: a.summary,
+    commune: a.commune,
+    province: a.province,
+    sexe: a.sexe ?? "",
+    date: new Date(a.created_at).toLocaleString("fr-FR"),
+  }));
+
   return (
-    <div>
-      <div className="eg-page-head">
-        <div>
-          <h2 className="page-title">{title}</h2>
-          <p className="page-lead">{lead}</p>
-        </div>
-        <button type="button" className="btn-secondary btn-sm" onClick={() => setTick((n) => n + 1)}>
-          Actualiser
-        </button>
-      </div>
+    <PageShell title={title} lead={lead} onRefresh={() => setTick((n) => n + 1)}>
       <div className="metric" style={{ marginBottom: "1rem", maxWidth: 240 }}>
         <div className="label">Total national</div>
         <div className="value">{total.toLocaleString("fr-FR")}</div>
       </div>
+      <div className="toolbar filters-bar no-print">
+        <input className="form-control" placeholder="Rechercher…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <select className="form-control" value={province} onChange={(e) => setProvince(e.target.value)}>
+          <option value="">Toutes provinces</option>
+          {provinces.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
+      </div>
+      <ExportToolbar
+        filename={filename}
+        title={title}
+        rows={exportRows}
+        columns={["resume", "commune", "province", "sexe", "date"]}
+        tableName={filename}
+      />
       <div className="panel">
         <table className="data-table">
           <thead>
@@ -234,24 +373,50 @@ function ActsPage({
           </tbody>
         </table>
       </div>
-    </div>
+    </PageShell>
   );
 }
 
 export function BirthsPage() {
   return (
-    <ActsPage title="Naissances" lead="Naissances enregistrées / déclarées au niveau national." type="BIRTH" />
+    <ActsPage
+      title="Naissances"
+      lead="Naissances enregistrées / déclarées au niveau national."
+      type="BIRTH"
+      filename="presidence_naissances"
+    />
   );
 }
 
 export function DeathsPage() {
-  return <ActsPage title="Décès" lead="Décès enregistrés / déclarés au niveau national." type="DEATH" />;
+  return (
+    <ActsPage
+      title="Décès"
+      lead="Décès enregistrés / déclarés au niveau national."
+      type="DEATH"
+      filename="presidence_deces"
+    />
+  );
 }
 
 export function MarriagesPage() {
-  return <ActsPage title="Mariages" lead="Mariages enregistrés au niveau national." type="MARRIAGE" />;
+  return (
+    <ActsPage
+      title="Mariages"
+      lead="Mariages enregistrés au niveau national."
+      type="MARRIAGE"
+      filename="presidence_mariages"
+    />
+  );
 }
 
 export function DivorcesPage() {
-  return <ActsPage title="Divorces" lead="Divorces enregistrés au niveau national." type="DIVORCE" />;
+  return (
+    <ActsPage
+      title="Divorces"
+      lead="Divorces enregistrés au niveau national."
+      type="DIVORCE"
+      filename="presidence_divorces"
+    />
+  );
 }
