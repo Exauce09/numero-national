@@ -5,8 +5,8 @@ import { DEMO_PASSWORD, DEMO_USER, getSession, login } from "../auth";
 export default function LoginPage() {
   const navigate = useNavigate();
   const existing = getSession();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState(DEMO_USER);
+  const [password, setPassword] = useState(DEMO_PASSWORD);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -30,44 +30,30 @@ export default function LoginPage() {
     <div className="login-page">
       <div className="login-card">
         <img className="login-logo" src="/logo-rdc.jpg" alt="République Démocratique du Congo" />
-        <h1 className="login-title">E-GOUV</h1>
-        <p className="login-subtitle">Identité Nationale · Portails institutionnels</p>
-        <form onSubmit={onSubmit}>
+        <h1 className="login-title">E-GOUV — Présidence</h1>
+        <p className="login-subtitle">Portail institutionnel · Vue nationale du système</p>
+        <form onSubmit={(e) => void onSubmit(e)} autoComplete="off">
           {error ? <div className="login-error">{error}</div> : null}
-
           <label className="form-label" htmlFor="username">
-            Nom d&apos;utilisateur
+            Identifiant
           </label>
           <input
             id="username"
             className="form-control"
-            name="username"
-            type="text"
-            autoComplete="username"
             value={username}
-            onChange={(ev) => setUsername(ev.target.value)}
+            onChange={(e) => setUsername(e.target.value)}
           />
-
           <label className="form-label" htmlFor="password">
-            Mot de Passe
+            Mot de passe
           </label>
           <input
             id="password"
             className="form-control"
-            name="password"
             type="password"
-            autoComplete="current-password"
             value={password}
-            onChange={(ev) => setPassword(ev.target.value)}
+            onChange={(e) => setPassword(e.target.value)}
           />
-
-          <div className="login-row">
-            <a className="login-forgot" href="#">
-              Mot de Passe oublié ?
-            </a>
-          </div>
-
-          <button className="btn-primary" type="submit" disabled={busy}>
+          <button className="btn-primary" type="submit" disabled={busy} style={{ marginTop: "0.75rem" }}>
             {busy ? "Connexion…" : "Se connecter"}
           </button>
         </form>

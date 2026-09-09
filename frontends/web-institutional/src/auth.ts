@@ -1,12 +1,14 @@
+import { getPresPrefs, savePresPrefs } from "./presPrefs";
+
 export type Session = {
   username: string;
   accessToken?: string;
 };
 
-const KEY = "nn_session_institutional";
+const KEY = "nn_session_presidence";
 
-export const DEMO_USER = "institution";
-export const DEMO_PASSWORD = "DemoEtat2026!";
+export const DEMO_USER = "presidence";
+export const DEMO_PASSWORD = "DemoPresidence2026!";
 
 export function getSession(): Session | null {
   const raw = sessionStorage.getItem(KEY);
@@ -22,11 +24,19 @@ export function clearSession(): void {
   sessionStorage.removeItem(KEY);
 }
 
+function effectivePassword(): string {
+  return getPresPrefs().passwordOverride || DEMO_PASSWORD;
+}
+
+export function updatePresPassword(currentPassword: string, nextPassword: string): void {
+  if (currentPassword !== effectivePassword()) throw new Error("Mot de passe actuel incorrect.");
+  if (nextPassword.length < 8) throw new Error("Le nouveau mot de passe doit contenir au moins 8 caractères.");
+  savePresPrefs({ ...getPresPrefs(), passwordOverride: nextPassword });
+}
+
 export async function login(username: string, password: string): Promise<Session> {
-  const user = username.trim();
-  if (!user || !password) {
-    throw new Error("Identifiant et mot de passe requis.");
-  }
+  const user = username.trim().toLowerCase();
+  if (!user || !password) throw new Error("Identifiant et mot de passe requis.");
 
   const base = import.meta.env.VITE_API_BASE ?? "/api/v1";
   try {
@@ -45,8 +55,8 @@ export async function login(username: string, password: string): Promise<Session
     /* API indisponible */
   }
 
-  if (user !== DEMO_USER || password !== DEMO_PASSWORD) {
-    throw new Error("Identifiants incorrects. Utilisez le compte de démo institutionnel.");
+  if (user !== DEMO_USER || password !== effectivePassword()) {
+    throw new Error(`Identifiants incorrects. Démo : ${DEMO_USER} / ${DEMO_PASSWORD}`);
   }
 
   const session: Session = { username: user };
