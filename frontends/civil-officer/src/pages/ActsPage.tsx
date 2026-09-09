@@ -29,7 +29,7 @@ const TYPES: Array<ActType | ""> = [
 const PAGE_SIZE = 10;
 const COLORS = ["#5d87ff", "#13deb9", "#fa896b", "#ffae1f", "#539bff", "#763ebd", "#49beff", "#fdd835"];
 
-export default function ActsPage() {
+export default function ActsPage({ showAnalytics = false }: { showAnalytics?: boolean }) {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<ActType | "">("");
@@ -120,9 +120,11 @@ export default function ActsPage() {
           <p className="eg-breadcrumb">
             <Link to="/">Accueil</Link> / Actes & documents
           </p>
-          <h2 className="page-title">Liste des actes & documents</h2>
+          <h2 className="page-title">{showAnalytics ? "Liste des actes & documents" : "Actes & documents"}</h2>
           <p className="page-lead">
-            Registre complet — statistiques, camembert, histogramme, recherche et pagination.
+            {showAnalytics
+              ? "Vue statistique depuis le tableau de bord — camembert, histogramme, recherche et pagination."
+              : "Registre opérationnel — filtre par type, recherche, export et fiche détail."}
           </p>
         </div>
         <button type="button" className="btn-add" onClick={() => navigate("/documents")}>
@@ -130,20 +132,30 @@ export default function ActsPage() {
         </button>
       </div>
 
-      <SimpleStatBlocks
-        title="LISTE DES ACTES & DOCUMENTS"
-        items={[
-          { label: "TOTAL ACTES", value: all.length, color: "#5d87ff" },
-          { label: "DOCUMENTS", value: docs, color: "#13deb9" },
-          { label: "AUTRES ACTES", value: all.length - docs, color: "#ffae1f" },
-          { label: "FILTRÉS", value: acts.length, color: "#fa896b" },
-        ]}
-      />
+      {showAnalytics ? (
+        <>
+          <SimpleStatBlocks
+            title="LISTE DES ACTES & DOCUMENTS"
+            items={[
+              { label: "TOTAL ACTES", value: all.length, color: "#5d87ff" },
+              { label: "DOCUMENTS", value: docs, color: "#13deb9" },
+              { label: "AUTRES ACTES", value: all.length - docs, color: "#ffae1f" },
+              { label: "FILTRÉS", value: acts.length, color: "#fa896b" },
+            ]}
+          />
 
-      <div className="eg-charts-row">
-        <PieChart title="Répartition par type (camembert)" data={byType.length ? byType : [{ label: "—", value: 0, color: COLORS[0] }]} />
-        <BarChart title="Histogramme par type" data={byType.length ? byType : [{ label: "—", value: 0, color: COLORS[0] }]} />
-      </div>
+          <div className="eg-charts-row">
+            <PieChart
+              title="Répartition par type (camembert)"
+              data={byType.length ? byType : [{ label: "—", value: 0, color: COLORS[0] }]}
+            />
+            <BarChart
+              title="Histogramme par type"
+              data={byType.length ? byType : [{ label: "—", value: 0, color: COLORS[0] }]}
+            />
+          </div>
+        </>
+      ) : null}
 
       <div className="panel">
         <div className="panel-head">

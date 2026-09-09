@@ -15,7 +15,7 @@ import {
 
 const PAGE_SIZE = 10;
 
-export default function PopulationPage() {
+export default function PopulationPage({ showAnalytics = false }: { showAnalytics?: boolean }) {
   const navigate = useNavigate();
   const persons = listPersons();
   const [q, setQ] = useState("");
@@ -77,17 +77,23 @@ export default function PopulationPage() {
           <p className="eg-breadcrumb">
             <Link to="/">Accueil</Link> / Population
           </p>
-          <h2 className="page-title">Liste de la population</h2>
+          <h2 className="page-title">{showAnalytics ? "Liste de la population" : "Gérer la population"}</h2>
           <p className="page-lead">
-            Détail communal — statistiques, graphiques, recherche et pagination (style{" "}
-            <a
-              href="https://www.justicia.website/egouv/COMMUNE/manage-population.php"
-              target="_blank"
-              rel="noreferrer"
-            >
-              manage-population.php
-            </a>
-            ).
+            {showAnalytics ? (
+              <>
+                Vue statistique depuis le tableau de bord (style{" "}
+                <a
+                  href="https://www.justicia.website/egouv/COMMUNE/manage-population.php"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  manage-population.php
+                </a>
+                ).
+              </>
+            ) : (
+              <>Recherche, filtre, export et fiche détail — sans graphiques (menu opérationnel).</>
+            )}
           </p>
         </div>
         <button type="button" className="btn-add" onClick={() => navigate("/census")}>
@@ -95,13 +101,17 @@ export default function PopulationPage() {
         </button>
       </div>
 
-      <PopulationStatBlocks hommes={stats.hommes} femmes={stats.femmes} total={stats.total} />
+      {showAnalytics ? (
+        <>
+          <PopulationStatBlocks hommes={stats.hommes} femmes={stats.femmes} total={stats.total} />
 
-      <div className="eg-charts-row">
-        <PieChart title="Répartition par sexe (camembert)" data={pieSexe} />
-        <PieChart title="Nationalité (camembert)" data={pieNat} />
-        <BarChart title="Histogramme sexe × nationalité" data={histo} />
-      </div>
+          <div className="eg-charts-row">
+            <PieChart title="Répartition par sexe (camembert)" data={pieSexe} />
+            <PieChart title="Nationalité (camembert)" data={pieNat} />
+            <BarChart title="Histogramme sexe × nationalité" data={histo} />
+          </div>
+        </>
+      ) : null}
 
       <div className="panel">
         <div className="panel-head">

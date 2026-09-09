@@ -34,6 +34,7 @@ import ManageDeplacementPage from "./pages/ManageDeplacementPage";
 import ManageDocumentPage from "./pages/ManageDocumentPage";
 import ManageMariagePage from "./pages/ManageMariagePage";
 import ManageNaissancePage from "./pages/ManageNaissancePage";
+import ManageActsPage, { MANAGE_CONFIGS } from "./components/ManageActsPage";
 import TerritoryPage from "./pages/TerritoryPage";
 import {
   IconBaby,
@@ -271,6 +272,7 @@ function Shell() {
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/population" element={<PopulationPage />} />
+            <Route path="/lists/population" element={<PopulationPage showAnalytics />} />
             <Route path="/newborns" element={<NewbornsPage />} />
             <Route path="/manage/deces" element={<ManageDecesPage />} />
             <Route path="/manage/divorce" element={<ManageDivorcePage />} />
@@ -279,6 +281,13 @@ function Shell() {
             <Route path="/manage/document" element={<ManageDocumentPage />} />
             <Route path="/manage/mariage" element={<ManageMariagePage />} />
             <Route path="/manage/naissance" element={<ManageNaissancePage />} />
+            <Route path="/lists/deces" element={<ManageActsPage config={MANAGE_CONFIGS.deces} showAnalytics />} />
+            <Route path="/lists/divorce" element={<ManageActsPage config={MANAGE_CONFIGS.divorce} showAnalytics />} />
+            <Route path="/lists/adoption" element={<ManageActsPage config={MANAGE_CONFIGS.adoption} showAnalytics />} />
+            <Route path="/lists/deplacement" element={<ManageActsPage config={MANAGE_CONFIGS.deplacement} showAnalytics />} />
+            <Route path="/lists/mariage" element={<ManageActsPage config={MANAGE_CONFIGS.mariage} showAnalytics />} />
+            <Route path="/lists/naissance" element={<ManageActsPage config={MANAGE_CONFIGS.naissance} showAnalytics />} />
+            <Route path="/lists/acts" element={<ActsPage showAnalytics />} />
             <Route path="/births" element={<BirthsPage />} />
             <Route path="/census" element={<CensusPage />} />
             <Route path="/deaths" element={<DeathsPage />} />

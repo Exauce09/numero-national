@@ -60,7 +60,7 @@ export default function DashboardPage() {
       value: persons.length,
       subtitle: "Habitants enregistrés",
       tone: "primary",
-      href: "/population",
+      href: "/lists/population",
       icon: <IconUsers size={26} />,
     },
     {
@@ -69,7 +69,7 @@ export default function DashboardPage() {
       value: births.total,
       subtitle: `Nouveaux-nés 90 j : ${births.newborns} (G ${births.garcons} · F ${births.filles})`,
       tone: "success",
-      href: "/manage/naissance",
+      href: "/lists/naissance",
       icon: <IconBaby size={26} />,
     },
     {
@@ -78,7 +78,7 @@ export default function DashboardPage() {
       value: acts.filter((a) => a.type === "DEATH").length,
       subtitle: "Actes de décès",
       tone: "danger",
-      href: "/manage/deces",
+      href: "/lists/deces",
       icon: <IconCross size={26} />,
     },
     {
@@ -87,7 +87,7 @@ export default function DashboardPage() {
       value: acts.filter((a) => a.type === "MARRIAGE").length,
       subtitle: "Unions",
       tone: "warning",
-      href: "/manage/mariage",
+      href: "/lists/mariage",
       icon: <IconRing size={26} />,
     },
     {
@@ -96,7 +96,7 @@ export default function DashboardPage() {
       value: acts.filter((a) => a.type === "DIVORCE").length,
       subtitle: "Dissolutions",
       tone: "secondary",
-      href: "/manage/divorce",
+      href: "/lists/divorce",
       icon: <IconSplit size={26} />,
     },
     {
@@ -105,7 +105,7 @@ export default function DashboardPage() {
       value: acts.filter((a) => a.type === "ADOPTION").length,
       subtitle: "Actes d'adoption",
       tone: "indigo",
-      href: "/manage/adoption",
+      href: "/lists/adoption",
       icon: <IconUsers size={26} />,
     },
     {
@@ -114,7 +114,7 @@ export default function DashboardPage() {
       value: acts.filter((a) => a.type === "DISPLACEMENT").length,
       subtitle: "Mouvements",
       tone: "info",
-      href: "/manage/deplacement",
+      href: "/lists/deplacement",
       icon: <IconCar size={26} />,
     },
     {
@@ -123,7 +123,7 @@ export default function DashboardPage() {
       value: acts.filter((a) => a.type === "CENSUS").length,
       subtitle: "Fiches",
       tone: "primary",
-      href: "/acts?type=CENSUS",
+      href: "/lists/acts?type=CENSUS",
       icon: <IconClipboard size={26} />,
     },
     {
@@ -132,7 +132,7 @@ export default function DashboardPage() {
       value: acts.length,
       subtitle: `${acts.filter((a) => a.type === "DOCUMENT").length} documents émis`,
       tone: "secondary",
-      href: "/acts",
+      href: "/lists/acts",
       icon: <IconFile size={26} />,
     },
   ];

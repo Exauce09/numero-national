@@ -180,7 +180,13 @@ function monthKey(iso: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-export default function ManageActsPage({ config }: { config: ManageConfig }) {
+export default function ManageActsPage({
+  config,
+  showAnalytics = false,
+}: {
+  config: ManageConfig;
+  showAnalytics?: boolean;
+}) {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
@@ -282,13 +288,24 @@ export default function ManageActsPage({ config }: { config: ManageConfig }) {
           <p className="eg-breadcrumb">
             <Link to="/">Accueil</Link> / {config.breadcrumb}
           </p>
-          <h2 className="page-title">{config.title}</h2>
+          <h2 className="page-title">{showAnalytics ? `Liste — ${config.breadcrumb}` : config.title}</h2>
           <p className="page-lead">
-            Liste détaillée avec statistiques et graphiques — référence{" "}
-            <a href={config.justiciaUrl} target="_blank" rel="noreferrer">
-              {config.justiciaFile}
-            </a>
-            .
+            {showAnalytics ? (
+              <>
+                Vue statistique depuis le tableau de bord — référence{" "}
+                <a href={config.justiciaUrl} target="_blank" rel="noreferrer">
+                  {config.justiciaFile}
+                </a>
+                .
+              </>
+            ) : (
+              <>
+                Gestion opérationnelle — recherche, export et fiche détail.{" "}
+                <a href={config.justiciaUrl} target="_blank" rel="noreferrer">
+                  {config.justiciaFile}
+                </a>
+              </>
+            )}
           </p>
         </div>
         <button type="button" className="btn-add" onClick={() => navigate(config.createPath)}>
@@ -296,30 +313,34 @@ export default function ManageActsPage({ config }: { config: ManageConfig }) {
         </button>
       </div>
 
-      <SimpleStatBlocks
-        title={config.listTitle}
-        items={[
-          { label: "TOTAL", value: all.length, color: "#5d87ff" },
-          { label: "30 DERNIERS JOURS", value: last30, color: "#13deb9" },
-          { label: "90 DERNIERS JOURS", value: last90, color: "#ffae1f" },
-          { label: "FILTRÉS", value: rows.length, color: "#fa896b" },
-        ]}
-      />
+      {showAnalytics ? (
+        <>
+          <SimpleStatBlocks
+            title={config.listTitle}
+            items={[
+              { label: "TOTAL", value: all.length, color: "#5d87ff" },
+              { label: "30 DERNIERS JOURS", value: last30, color: "#13deb9" },
+              { label: "90 DERNIERS JOURS", value: last90, color: "#ffae1f" },
+              { label: "FILTRÉS", value: rows.length, color: "#fa896b" },
+            ]}
+          />
 
-      <div className="eg-charts-row">
-        <PieChart
-          title={breakdownField ? `Répartition (${breakdownField.label})` : "Répartition"}
-          data={pieBreakdown}
-        />
-        <BarChart
-          title="Histogramme mensuel"
-          data={
-            monthBars.length
-              ? monthBars
-              : [{ label: "—", value: 0, color: COLORS[0] }]
-          }
-        />
-      </div>
+          <div className="eg-charts-row">
+            <PieChart
+              title={breakdownField ? `Répartition (${breakdownField.label})` : "Répartition"}
+              data={pieBreakdown}
+            />
+            <BarChart
+              title="Histogramme mensuel"
+              data={
+                monthBars.length
+                  ? monthBars
+                  : [{ label: "—", value: 0, color: COLORS[0] }]
+              }
+            />
+          </div>
+        </>
+      ) : null}
 
       <div className="panel">
         <div className="panel-head">
