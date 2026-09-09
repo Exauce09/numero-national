@@ -1,6 +1,7 @@
 /** Cascading RDC address selector — API /api/v1/geo/* with inline add + anti-doublon. */
 
 import { FormEvent, useEffect, useState } from "react";
+import { fallbackForGeoPath } from "../geoFallback";
 
 export type GeoSelection = {
   province_id?: string;
@@ -67,14 +68,22 @@ type AddKind = "district" | "commune" | "localite" | "quartier" | "avenue" | "ru
 
 const BASE = import.meta.env.VITE_API_BASE ?? "/api/v1";
 
-async function fetchItems(path: string): Promise<Item[]> {
+async function fetchItems(
+  path: string,
+  onFallback?: () => void,
+): Promise<Item[]> {
   try {
     const res = await fetch(`${BASE}${path}`);
-    if (!res.ok) throw new Error(String(res.status));
-    return (await res.json()) as Item[];
+    if (res.ok) {
+      const rows = (await res.json()) as Item[];
+      if (Array.isArray(rows) && rows.length > 0) return rows;
+    }
   } catch {
-    return [];
+    /* API down or unreachable */
   }
+  const local = fallbackForGeoPath(path) as Item[];
+  if (local.length > 0) onFallback?.();
+  return local;
 }
 
 async function postJson(
@@ -151,9 +160,14 @@ export default function GeoCascade({
   useEffect(() => {
     void (async () => {
       await fetch(`${BASE}/geo/seed`, { method: "POST" }).catch(() => undefined);
-      const rows = await fetchItems("/geo/provinces");
+      let usedFallback = false;
+      const rows = await fetchItems("/geo/provinces", () => {
+        usedFallback = true;
+      });
       if (rows.length === 0) {
         setHint("API géographie indisponible — démarrez l'API puis actualisez.");
+      } else if (usedFallback) {
+        setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
       } else {
         setHint(null);
       }
@@ -180,8 +194,10 @@ export default function GeoCascade({
   async function onProvince(id: string) {
     const p = provinces.find((x) => x.id === id);
     emit({ province_id: id, province_name: p?.name });
-    setDistricts(show("district") ? await fetchItems(`/geo/districts?province_id=${id}`) : []);
-    setVilles(show("ville") ? await fetchItems(`/geo/villes?province_id=${id}`) : []);
+    const markLocal = () =>
+      setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
+    setDistricts(show("district") ? await fetchItems(`/geo/districts?province_id=${id}`, markLocal) : []);
+    setVilles(show("ville") ? await fetchItems(`/geo/villes?province_id=${id}`, markLocal) : []);
     setCommunes([]);
     setLocalites([]);
     setQuartiers([]);
@@ -207,7 +223,9 @@ export default function GeoCascade({
       localite_id: undefined,
       localite_name: undefined,
     });
-    setCommunes(show("commune") ? await fetchItems(`/geo/communes?ville_id=${id}`) : []);
+    const markLocal = () =>
+      setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
+    setCommunes(show("commune") ? await fetchItems(`/geo/communes?ville_id=${id}`, markLocal) : []);
     setQuartiers([]);
     setAvenues([]);
     setRues([]);
@@ -226,9 +244,11 @@ export default function GeoCascade({
       localite_id: undefined,
       localite_name: undefined,
     });
-    const byDist = show("commune") ? await fetchItems(`/geo/communes?district_id=${id}`) : [];
+    const markLocal = () =>
+      setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
+    const byDist = show("commune") ? await fetchItems(`/geo/communes?district_id=${id}`, markLocal) : [];
     if (byDist.length) setCommunes(byDist);
-    setLocalites(show("localite") ? await fetchItems(`/geo/localites?district_id=${id}`) : []);
+    setLocalites(show("localite") ? await fetchItems(`/geo/localites?district_id=${id}`, markLocal) : []);
   }
 
   async function onCommune(id: string) {
@@ -247,8 +267,10 @@ export default function GeoCascade({
       localite_id: undefined,
       localite_name: undefined,
     });
-    setQuartiers(show("quartier") ? await fetchItems(`/geo/quartiers?commune_id=${id}`) : []);
-    setLocalites(show("localite") ? await fetchItems(`/geo/localites?commune_id=${id}`) : []);
+    const markLocal = () =>
+      setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
+    setQuartiers(show("quartier") ? await fetchItems(`/geo/quartiers?commune_id=${id}`, markLocal) : []);
+    setLocalites(show("localite") ? await fetchItems(`/geo/localites?commune_id=${id}`, markLocal) : []);
     setAvenues([]);
     setRues([]);
   }
@@ -270,7 +292,9 @@ export default function GeoCascade({
       rue_name: undefined,
     });
     if (!show("avenue") && !show("rue")) return;
-    const voies = await fetchItems(`/geo/voies?quartier_id=${id}`);
+    const markLocal = () =>
+      setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
+    const voies = await fetchItems(`/geo/voies?quartier_id=${id}`, markLocal);
     setAvenues(voies.filter((v) => v.voie_type === "AVENUE"));
     setRues(voies.filter((v) => v.voie_type === "RUE"));
   }
