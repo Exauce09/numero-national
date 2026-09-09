@@ -903,6 +903,56 @@
   border-top: 1px solid var(--egouv-line);
 }
 
+.id-form-title {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+.id-fieldset {
+  border: 1px solid var(--egouv-line);
+  border-radius: 10px;
+  padding: 0.85rem 1rem 1rem;
+  margin: 0 0 1rem;
+}
+
+.id-fieldset legend {
+  padding: 0 0.45rem;
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: var(--egouv-primary);
+}
+
+.bio-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.85rem;
+}
+
+.bio-card {
+  border: 1px solid var(--egouv-line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--egouv-card, #fff);
+}
+
+.bio-card-head {
+  background: #2a3547;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.55rem 0.75rem;
+}
+
+.bio-card .webcam-box,
+.bio-card .form-grid {
+  padding: 0.85rem;
+}
+
 .webcam-box {
   border: 1px dashed var(--egouv-line);
   border-radius: 10px;
