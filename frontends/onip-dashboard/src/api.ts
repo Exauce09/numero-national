@@ -131,6 +131,33 @@ export type DirectoryUser = {
   email: string;
   full_name?: string | null;
   is_active: boolean;
+  roles?: string[];
+  permissions?: string[];
+};
+
+export type RegisterUserBody = {
+  email: string;
+  password: string;
+  full_name: string;
+  role_codes: string[];
+};
+
+export const accountsApi = {
+  listUsers: () => request<DirectoryUser[]>("/rbac/users?limit=200"),
+  registerUser: (body: RegisterUserBody) =>
+    request<DirectoryUser>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  setUserActive: (userId: string, active: boolean) =>
+    request<DirectoryUser>(`/rbac/users/${userId}/active?is_active=${active}`, {
+      method: "PATCH",
+    }),
+  assignRoles: (userId: string, roleCodes: string[]) =>
+    request<DirectoryUser>(`/rbac/users/${userId}/roles`, {
+      method: "PUT",
+      body: JSON.stringify({ role_codes: roleCodes }),
+    }),
 };
 
 export const censusApi = {
@@ -182,7 +209,8 @@ export const censusApi = {
       body: JSON.stringify({ assign_nic: assignNic }),
     }),
   stats: (campaignId: string) => request<CampaignStats>(`/census/campaigns/${campaignId}/stats`),
-  listUsers: () => request<DirectoryUser[]>("/rbac/users?limit=200"),
+  /** @deprecated prefer accountsApi.listUsers */
+  listUsers: () => accountsApi.listUsers(),
   exportCsvUrl: (campaignId: string, status?: string) => {
     const q = status ? `?status=${encodeURIComponent(status)}` : "";
     return `${BASE}/census/campaigns/${campaignId}/export.csv${q}`;

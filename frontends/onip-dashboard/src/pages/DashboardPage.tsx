@@ -64,8 +64,11 @@ export default function DashboardPage() {
       </div>
 
       <div className="panel" style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <strong>Accès rapide</strong>
-        <Link className="btn-primary" to="/campaigns">
+        <strong>Parcours</strong>
+        <Link className="btn-primary" to="/accounts">
+          Étape 1 — Créer les comptes
+        </Link>
+        <Link className="btn-secondary" to="/campaigns">
           Campagnes &amp; contrôle
         </Link>
         <Link className="btn-secondary" to="/anomalies">

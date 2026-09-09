@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { clearSession, getSession } from "./auth";
+import AccountsPage from "./pages/AccountsPage";
 import AnomaliesPage from "./pages/AnomaliesPage";
 import CampaignsPage from "./pages/CampaignsPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -49,6 +50,7 @@ function Shell() {
           </button>
         </div>
         <nav className="sidebar-nav">
+          <NavLink to="/accounts">Comptes</NavLink>
           <NavLink to="/" end>
             Vue nationale
           </NavLink>
@@ -81,6 +83,7 @@ function Shell() {
         </header>
         <main className="shell">
           <Routes>
+            <Route path="/accounts" element={<AccountsPage />} />
             <Route path="/" element={<DashboardPage />} />
             <Route path="/campaigns" element={<CampaignsPage />} />
             <Route path="/anomalies" element={<AnomaliesPage />} />

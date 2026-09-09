@@ -74,14 +74,14 @@ export default function LoginPage() {
         </form>
         <div className="login-subtitle" style={{ marginTop: "1.25rem", marginBottom: 0, textAlign: "left" }}>
           <p style={{ margin: "0 0 0.5rem" }}>
-            <strong>Campagnes (API)</strong>
+            <strong>Admin API</strong> (créer des comptes → menu Comptes)
             <br />
             {CENSUS_ADMIN_EMAIL}
             <br />
             {CENSUS_ADMIN_PASSWORD}
           </p>
           <p style={{ margin: 0 }}>
-            <strong>Démo hors API</strong> (pas de contrôle fiches) : {DEMO_USER} / {DEMO_PASSWORD}
+            <strong>Démo hors API</strong> (pas de création de comptes) : {DEMO_USER} / {DEMO_PASSWORD}
           </p>
         </div>
       </div>
