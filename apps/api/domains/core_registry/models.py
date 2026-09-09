@@ -47,7 +47,7 @@ class Citizen(Base):
         default=uuid.uuid4,
         server_default=text("gen_random_uuid()"),
     )
-    nic: Mapped[str | None] = mapped_column(String(13), unique=True, nullable=True, index=True)
+    nic: Mapped[str | None] = mapped_column(String(14), unique=True, nullable=True, index=True)
     status: Mapped[str] = mapped_column(
         String(32),
         nullable=False,
@@ -211,7 +211,7 @@ class NicIssuanceLog(Base):
         nullable=False,
         index=True,
     )
-    nic: Mapped[str] = mapped_column(String(13), nullable=False, unique=True)
+    nic: Mapped[str] = mapped_column(String(14), nullable=False, unique=True)
     issued_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
