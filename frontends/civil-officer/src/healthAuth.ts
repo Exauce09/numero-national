@@ -65,6 +65,13 @@ function ensureDemoAccount(): FacilityAccount {
   return demo;
 }
 
+export type FacilityAccountPublic = Omit<FacilityAccount, "password">;
+
+export function listFacilityAccounts(): FacilityAccountPublic[] {
+  ensureDemoAccount();
+  return loadAccounts().map(({ password: _pw, ...rest }) => rest);
+}
+
 export function createFacilityAccount(input: {
   username: string;
   password: string;
@@ -78,6 +85,9 @@ export function createFacilityAccount(input: {
   const username = input.username.trim().toLowerCase();
   if (!username || !input.password || !input.facilityName.trim()) {
     throw new Error("Identifiant, mot de passe et nom de structure sont requis.");
+  }
+  if (input.password.length < 8) {
+    throw new Error("Le mot de passe doit contenir au moins 8 caractères.");
   }
   ensureDemoAccount();
   const list = loadAccounts();

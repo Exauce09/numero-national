@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import {
   api,
   demoListDeclarations,
@@ -8,12 +8,42 @@ import {
 import { addAct, addPerson, getPersonByNic, type Sexe } from "../registry";
 import { pushNotification } from "../prefs";
 import { setDeclarationStatus } from "../civilDeclarations";
+import {
+  createFacilityAccount,
+  listFacilityAccounts,
+  type FacilityAccount,
+  type FacilityAccountPublic,
+} from "../healthAuth";
+
+const FACILITY_TYPES: { value: FacilityAccount["facilityType"]; label: string }[] = [
+  { value: "HOPITAL", label: "Hôpital" },
+  { value: "CLINIQUE", label: "Clinique" },
+  { value: "CS", label: "Centre de santé" },
+  { value: "MATERNITE", label: "Maternité" },
+];
+
+const emptyAccountForm = {
+  facilityName: "",
+  facilityType: "HOPITAL" as FacilityAccount["facilityType"],
+  province: "Kinshasa",
+  ville: "Kinshasa",
+  communeName: "Gombe",
+  communeCode: "KIN-GOMBE",
+  username: "",
+  password: "",
+  confirmPassword: "",
+};
 
 export default function DeclarationsPage() {
   const [rows, setRows] = useState<Declaration[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<Declaration | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [accounts, setAccounts] = useState<FacilityAccountPublic[]>(() => listFacilityAccounts());
+  const [form, setForm] = useState(emptyAccountForm);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formOk, setFormOk] = useState<string | null>(null);
 
   async function refresh() {
     try {
@@ -118,12 +148,57 @@ export default function DeclarationsPage() {
     setBusy(false);
   }
 
+  function openCreate() {
+    setForm(emptyAccountForm);
+    setFormError(null);
+    setFormOk(null);
+    setAccounts(listFacilityAccounts());
+    setCreateOpen(true);
+  }
+
+  function onCreateAccount(e: FormEvent) {
+    e.preventDefault();
+    setFormError(null);
+    setFormOk(null);
+    if (form.password !== form.confirmPassword) {
+      setFormError("La confirmation du mot de passe ne correspond pas.");
+      return;
+    }
+    try {
+      const account = createFacilityAccount({
+        username: form.username,
+        password: form.password,
+        facilityName: form.facilityName,
+        facilityType: form.facilityType,
+        commune_code: form.communeCode,
+        commune_name: form.communeName,
+        province: form.province,
+        ville: form.ville,
+      });
+      setAccounts(listFacilityAccounts());
+      setFormOk(
+        `Compte créé pour « ${account.facilityName} ». Identifiant : ${account.username} — connexion module santé : /sante/login`,
+      );
+      setMessage(
+        `Compte administrateur sanitaire créé : ${account.facilityName} (@${account.username}).`,
+      );
+      pushNotification({
+        title: "Compte structure sanitaire créé",
+        body: `${account.facilityName} — identifiant ${account.username}. L'administrateur peut se connecter sur /sante/login.`,
+        href: "/declarations",
+      });
+      setForm(emptyAccountForm);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Création impossible.");
+    }
+  }
+
   return (
     <div>
       <h2 className="page-title">Déclarations structures sanitaires</h2>
       <p className="page-lead">
         File d&apos;attente des naissances et décès notifiés par les hôpitaux / cliniques — à valider pour mise à
-        jour du système.
+        jour du système. Créez aussi le compte administrateur de chaque structure pour l&apos;accès au module santé.
       </p>
 
       {message ? <div className="success-banner">{message}</div> : null}
@@ -132,6 +207,9 @@ export default function DeclarationsPage() {
         <div className="toolbar">
           <button type="button" className="btn-secondary" onClick={() => void refresh()}>
             Actualiser la file
+          </button>
+          <button type="button" className="btn-primary" style={{ width: "auto" }} onClick={openCreate}>
+            Créer un compte
           </button>
         </div>
         <table className="data-table">
@@ -212,6 +290,165 @@ export default function DeclarationsPage() {
               >
                 Valider et mettre à jour
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {createOpen ? (
+        <div className="modal-backdrop" onClick={() => setCreateOpen(false)}>
+          <div className="modal-panel modal-wide" onClick={(e) => e.stopPropagation()}>
+            <div className="panel-head">
+              <h3 className="panel-title" style={{ margin: 0 }}>
+                Compte administrateur — structure sanitaire
+              </h3>
+              <button type="button" className="btn-secondary btn-sm" onClick={() => setCreateOpen(false)}>
+                Fermer
+              </button>
+            </div>
+            <p className="muted" style={{ marginTop: 0 }}>
+              Ce compte permet à l&apos;administrateur de se connecter au module santé (
+              <code>/sante/login</code>) pour déclarer naissances et décès.
+            </p>
+
+            <form className="form-grid" onSubmit={onCreateAccount} autoComplete="off">
+              {formError ? <div className="login-error full">{formError}</div> : null}
+              {formOk ? <div className="success-banner full">{formOk}</div> : null}
+
+              <div className="full">
+                <label className="form-label">Nom de la structure</label>
+                <input
+                  className="form-control"
+                  value={form.facilityName}
+                  onChange={(e) => setForm({ ...form, facilityName: e.target.value })}
+                  required
+                  placeholder="Ex. Hôpital Général de Référence — Gombe"
+                />
+              </div>
+              <div>
+                <label className="form-label">Type</label>
+                <select
+                  className="form-control"
+                  value={form.facilityType}
+                  onChange={(e) =>
+                    setForm({ ...form, facilityType: e.target.value as FacilityAccount["facilityType"] })
+                  }
+                >
+                  {FACILITY_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Province</label>
+                <input
+                  className="form-control"
+                  value={form.province}
+                  onChange={(e) => setForm({ ...form, province: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="form-label">Ville</label>
+                <input
+                  className="form-control"
+                  value={form.ville}
+                  onChange={(e) => setForm({ ...form, ville: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="form-label">Commune</label>
+                <input
+                  className="form-control"
+                  value={form.communeName}
+                  onChange={(e) => setForm({ ...form, communeName: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="form-label">Code commune</label>
+                <input
+                  className="form-control"
+                  value={form.communeCode}
+                  onChange={(e) => setForm({ ...form, communeCode: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="form-label">Identifiant administrateur</label>
+                <input
+                  className="form-control"
+                  value={form.username}
+                  onChange={(e) => setForm({ ...form, username: e.target.value })}
+                  required
+                  placeholder="ex. hopital.gombe"
+                />
+              </div>
+              <div>
+                <label className="form-label">Mot de passe</label>
+                <input
+                  className="form-control"
+                  type="password"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  required
+                  minLength={8}
+                />
+              </div>
+              <div>
+                <label className="form-label">Confirmer le mot de passe</label>
+                <input
+                  className="form-control"
+                  type="password"
+                  value={form.confirmPassword}
+                  onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                  required
+                  minLength={8}
+                />
+              </div>
+              <div className="full" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button type="submit" className="btn-primary" style={{ width: "auto", minWidth: 180 }}>
+                  Créer le compte
+                </button>
+                <button type="button" className="btn-secondary" onClick={() => setCreateOpen(false)}>
+                  Annuler
+                </button>
+              </div>
+            </form>
+
+            <div className="panel" style={{ marginTop: "1rem" }}>
+              <h4 className="panel-title">Comptes déjà créés</h4>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Structure</th>
+                    <th>Type</th>
+                    <th>Identifiant</th>
+                    <th>Commune</th>
+                    <th>Créé</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {accounts.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="muted">
+                        Aucun compte.
+                      </td>
+                    </tr>
+                  ) : (
+                    accounts.map((a) => (
+                      <tr key={a.id}>
+                        <td>{a.facilityName}</td>
+                        <td>{FACILITY_TYPES.find((t) => t.value === a.facilityType)?.label ?? a.facilityType}</td>
+                        <td>
+                          <code>{a.username}</code>
+                        </td>
+                        <td>{a.commune_name}</td>
+                        <td>{new Date(a.created_at).toLocaleString("fr-FR")}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
