@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api, type Residence } from "../api";
-import GeoCascade, { GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
+import GeoCascade, { ADDRESS_FIELD_LABELS, GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
 
 export default function ResidencePage() {
   const [commune, setCommune] = useState("KIN-GOMBE");
@@ -76,6 +76,7 @@ export default function ResidencePage() {
             <GeoCascade
               embedded
               levels={GEO_PRESETS.address}
+              fieldLabels={ADDRESS_FIELD_LABELS}
               value={geo}
               onChange={(g) => {
                 setGeo(g);

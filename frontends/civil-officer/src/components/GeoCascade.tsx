@@ -37,8 +37,8 @@ export type GeoLevel =
 /** Profils courants pour réutiliser la base géo partout. */
 export const GEO_PRESETS = {
   full: ["province", "ville", "district", "commune", "localite", "quartier", "avenue", "rue"] as GeoLevel[],
-  /** Adresse urbaine (actuelle). */
-  address: ["province", "ville", "commune", "quartier", "avenue"] as GeoLevel[],
+  /** Adresse urbaine / résidence. */
+  address: ["province", "ville", "commune", "localite", "quartier", "avenue"] as GeoLevel[],
   /** Origine / territoire rural. */
   origin: ["province", "ville", "district", "commune", "localite"] as GeoLevel[],
   /** Lieu simple (naissance, décès, enregistrement…). */
@@ -50,10 +50,17 @@ const DEFAULT_FIELD_LABELS: Record<GeoLevel, string> = {
   ville: "Ville",
   district: "District",
   commune: "Commune",
-  localite: "Localité",
+  localite: "Village",
   quartier: "Quartier",
   avenue: "Avenue",
   rue: "Rue",
+};
+
+/** Labels pour l’adresse de résidence (explicites). */
+export const ADDRESS_FIELD_LABELS: Partial<Record<GeoLevel, string>> = {
+  localite: "Village",
+  quartier: "Quartier",
+  avenue: "Avenue",
 };
 
 export const ORIGIN_FIELD_LABELS: Partial<Record<GeoLevel, string>> = {

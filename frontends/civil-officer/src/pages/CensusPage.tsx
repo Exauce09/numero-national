@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
 import GeoCascade, {
+  ADDRESS_FIELD_LABELS,
   GEO_PRESETS,
   ORIGIN_FIELD_LABELS,
   type GeoSelection,
@@ -144,6 +145,7 @@ export default function CensusPage() {
       geoActuelle.avenue_name &&
         `Av. ${geoActuelle.avenue_name}${numeroAvenue.trim() ? ` N° ${numeroAvenue.trim()}` : ""}`,
       geoActuelle.quartier_name,
+      geoActuelle.localite_name,
       geoActuelle.commune_name,
       geoActuelle.ville_name,
       geoActuelle.province_name,
@@ -205,6 +207,7 @@ export default function CensusPage() {
         province_actuelle: geoActuelle.province_name || null,
         ville_actuelle: geoActuelle.ville_name || null,
         commune_actuelle: geoActuelle.commune_name || null,
+        village_actuel: geoActuelle.localite_name || null,
         quartier_actuel: geoActuelle.quartier_name || null,
         avenue_actuelle: geoActuelle.avenue_name || null,
         numero_avenue: numeroAvenue.trim() || null,
@@ -390,6 +393,7 @@ export default function CensusPage() {
                 embedded
                 label="Adresse actuelle"
                 levels={GEO_PRESETS.address}
+                fieldLabels={ADDRESS_FIELD_LABELS}
                 value={geoActuelle}
                 onChange={setGeoActuelle}
               />

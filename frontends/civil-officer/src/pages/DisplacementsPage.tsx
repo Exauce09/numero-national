@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
-import GeoCascade, { GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
+import GeoCascade, { ADDRESS_FIELD_LABELS, GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
 import PersonPicker from "../components/PersonPicker";
 import { addAct, displayName, type Act, type Person } from "../registry";
 
@@ -52,6 +52,7 @@ export default function DisplacementsPage() {
             <GeoCascade
               embedded
               levels={GEO_PRESETS.address}
+              fieldLabels={ADDRESS_FIELD_LABELS}
               value={geo}
               onChange={setGeo}
               label="Lieu de destination"

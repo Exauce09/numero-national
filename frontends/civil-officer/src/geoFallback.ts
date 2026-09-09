@@ -148,9 +148,69 @@ function communeId(villeName: string, communeName: string) {
 function districtId(name: string) {
   return `dist-kinshasa-${slug(name)}`;
 }
+function quartierId(communeIdValue: string, quartierName: string) {
+  return `q-${communeIdValue}-${slug(quartierName)}`;
+}
+function voieId(quartierIdValue: string, voieType: string, voieName: string) {
+  return `v-${quartierIdValue}-${slug(voieType)}-${slug(voieName)}`;
+}
+function localiteId(parentId: string, name: string) {
+  return `loc-${parentId}-${slug(name)}`;
+}
 function provinceById(id: string) {
   return PROVINCES.find((p) => provId(p.code) === id);
 }
+
+const DEFAULT_QUARTIERS: Array<{ name: string; voies: Array<{ type: string; name: string }> }> = [
+  {
+    name: "Centre",
+    voies: [
+      { type: "AVENUE", name: "Principale" },
+      { type: "AVENUE", name: "du Commerce" },
+      { type: "AVENUE", name: "de l'Independance" },
+      { type: "RUE", name: "du Marche" },
+    ],
+  },
+  {
+    name: "Cite",
+    voies: [
+      { type: "AVENUE", name: "des Cités" },
+      { type: "AVENUE", name: "de la Paix" },
+      { type: "RUE", name: "Ecole" },
+    ],
+  },
+  {
+    name: "Salongo",
+    voies: [
+      { type: "AVENUE", name: "Salongo" },
+      { type: "AVENUE", name: "des Combattants" },
+      { type: "RUE", name: "Lokole" },
+    ],
+  },
+  {
+    name: "Mbudi",
+    voies: [
+      { type: "AVENUE", name: "Mbudi" },
+      { type: "AVENUE", name: "Kasavubu" },
+      { type: "RUE", name: "Ngafani" },
+    ],
+  },
+];
+
+const DEFAULT_VILLAGES = [
+  "Village Centre",
+  "Village Salongo",
+  "Village Libota",
+  "Village Esengo",
+  "Village Lokole",
+  "Village Boyoma",
+  "Village Kapata",
+  "Village Nganda",
+  "Village Mbanza",
+  "Village Katanga",
+  "Village Libulu",
+  "Village Mongala",
+];
 
 export function fallbackProvinces(): GeoItem[] {
   return PROVINCES.map((p) => ({
@@ -213,16 +273,33 @@ export function fallbackCommunes(opts: { villeId?: string; districtId?: string }
   return [];
 }
 
-export function fallbackLocalites(_opts: { communeId?: string; districtId?: string }): GeoItem[] {
-  return [];
+export function fallbackLocalites(opts: { communeId?: string; districtId?: string }): GeoItem[] {
+  const parent = opts.communeId || opts.districtId;
+  if (!parent) return [];
+  return DEFAULT_VILLAGES.map((name) => ({
+    id: localiteId(parent, name),
+    code: slug(name).toUpperCase().slice(0, 14),
+    name,
+  }));
 }
 
-export function fallbackQuartiers(_communeId: string): GeoItem[] {
-  return [];
+export function fallbackQuartiers(communeIdValue: string): GeoItem[] {
+  return DEFAULT_QUARTIERS.map((q) => ({
+    id: quartierId(communeIdValue, q.name),
+    code: slug(q.name).toUpperCase().slice(0, 12),
+    name: q.name,
+  }));
 }
 
-export function fallbackVoies(_quartierId: string): GeoItem[] {
-  return [];
+export function fallbackVoies(quartierIdValue: string): GeoItem[] {
+  const matched = DEFAULT_QUARTIERS.find((q) => quartierIdValue.includes(slug(q.name)));
+  const voies = (matched ?? DEFAULT_QUARTIERS[0]).voies;
+  return voies.map((v) => ({
+    id: voieId(quartierIdValue, v.type, v.name),
+    code: slug(v.name).toUpperCase().slice(0, 12),
+    name: v.name,
+    voie_type: v.type,
+  }));
 }
 
 /** Resolve offline items for a /geo/* path used by GeoCascade. */
