@@ -13,6 +13,7 @@ import {
   addAct,
   addPerson,
   displayName,
+  getPerson,
   type Act,
   type EtatCivil,
   type HandicapType,
@@ -33,6 +34,44 @@ const STEPS = [
 ] as const;
 
 type StepId = (typeof STEPS)[number]["id"];
+
+const CENSUS_DRAFT_KEY = "civil-officer:census-draft";
+
+type CensusDraft = {
+  step: StepId;
+  handicap: HandicapType;
+  nom: string;
+  postnom: string;
+  prenom: string;
+  sexe: Sexe;
+  etatCivil: EtatCivil;
+  profession: string;
+  geoNaissance: GeoSelection;
+  dateNaissance: string;
+  hopitalNaissance: string;
+  languesParlees: string;
+  pereId: string | null;
+  mereId: string | null;
+  nationalite: string;
+  paysResidence: string;
+  geoActuelle: GeoSelection;
+  numeroAvenue: string;
+  telephone: string;
+  email: string;
+  boitePostale: string;
+  geoOrigine: GeoSelection;
+  tribu: string;
+  photo?: string;
+  empreinteGauche: string;
+  empreinteDroite: string;
+  iris: string;
+  scolaire: string;
+  universitaire: string;
+  professionnel: string;
+  situation: string;
+  numeroAdmin: string;
+  savedAt: string;
+};
 
 export default function CensusPage() {
   const [step, setStep] = useState<StepId>(1);
@@ -68,12 +107,56 @@ export default function CensusPage() {
   const [situation, setSituation] = useState("");
   const [numeroAdmin, setNumeroAdmin] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [draftNotice, setDraftNotice] = useState<string | null>(null);
   const [created, setCreated] = useState<Act | null>(null);
   const [camError, setCamError] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CENSUS_DRAFT_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw) as CensusDraft;
+      setStep(d.step ?? 1);
+      setHandicap(d.handicap ?? "NORMAL");
+      setNom(d.nom ?? "");
+      setPostnom(d.postnom ?? "");
+      setPrenom(d.prenom ?? "");
+      setSexe(d.sexe ?? "M");
+      setEtatCivil(d.etatCivil ?? "CELIBATAIRE");
+      setProfession(d.profession ?? "");
+      setGeoNaissance(d.geoNaissance ?? {});
+      setDateNaissance(d.dateNaissance ?? "");
+      setHopitalNaissance(d.hopitalNaissance ?? "");
+      setLanguesParlees(d.languesParlees ?? "");
+      setPere(d.pereId ? getPerson(d.pereId) ?? null : null);
+      setMere(d.mereId ? getPerson(d.mereId) ?? null : null);
+      setNationalite(d.nationalite ?? "Congolaise");
+      setPaysResidence(d.paysResidence ?? "RDC");
+      setGeoActuelle(d.geoActuelle ?? {});
+      setNumeroAvenue(d.numeroAvenue ?? "");
+      setTelephone(d.telephone ?? "");
+      setEmail(d.email ?? "");
+      setBoitePostale(d.boitePostale ?? "");
+      setGeoOrigine(d.geoOrigine ?? {});
+      setTribu(d.tribu ?? "");
+      setPhoto(d.photo);
+      setEmpreinteGauche(d.empreinteGauche ?? "");
+      setEmpreinteDroite(d.empreinteDroite ?? "");
+      setIris(d.iris ?? "");
+      setScolaire(d.scolaire ?? "");
+      setUniversitaire(d.universitaire ?? "");
+      setProfessionnel(d.professionnel ?? "");
+      setSituation(d.situation ?? "");
+      setNumeroAdmin(d.numeroAdmin ?? "");
+      setDraftNotice("Brouillon restauré — vous pouvez continuer la saisie.");
+    } catch {
+      localStorage.removeItem(CENSUS_DRAFT_KEY);
+    }
+  }, []);
 
   useEffect(() => {
     if (step !== 3) {
@@ -153,9 +236,55 @@ export default function CensusPage() {
     return parts.join(", ") || geoActuelle.label || "";
   }
 
+  function saveDraft() {
+    setError(null);
+    const draft: CensusDraft = {
+      step,
+      handicap,
+      nom,
+      postnom,
+      prenom,
+      sexe,
+      etatCivil,
+      profession,
+      geoNaissance,
+      dateNaissance,
+      hopitalNaissance,
+      languesParlees,
+      pereId: pere?.id ?? null,
+      mereId: mere?.id ?? null,
+      nationalite,
+      paysResidence,
+      geoActuelle,
+      numeroAvenue,
+      telephone,
+      email,
+      boitePostale,
+      geoOrigine,
+      tribu,
+      photo,
+      empreinteGauche,
+      empreinteDroite,
+      iris,
+      scolaire,
+      universitaire,
+      professionnel,
+      situation,
+      numeroAdmin,
+      savedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(CENSUS_DRAFT_KEY, JSON.stringify(draft));
+    setDraftNotice("Sauvegarde temporaire enregistrée (brouillon local — pas encore finalisé).");
+  }
+
+  function clearDraft() {
+    localStorage.removeItem(CENSUS_DRAFT_KEY);
+  }
+
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setDraftNotice(null);
     if (!validateStep(7)) return;
     try {
       const commune = getOfficerCommune();
@@ -236,6 +365,7 @@ export default function CensusPage() {
         numero_admin: numeroAdmin.trim() || null,
       };
       const act = addAct("CENSUS", payload, person.nic);
+      clearDraft();
       setCreated(act);
       streamRef.current?.getTracks().forEach((t) => t.stop());
       setStep(1);
@@ -266,6 +396,7 @@ export default function CensusPage() {
       </div>
 
       {error ? <div className="login-error">{error}</div> : null}
+      {draftNotice ? <div className="success-banner">{draftNotice}</div> : null}
 
       <div className="panel">
         {step === 1 ? (
@@ -599,10 +730,18 @@ export default function CensusPage() {
               <button type="button" className="btn-secondary" onClick={goPrev}>
                 Retour
               </button>
-              <button type="submit" className="btn-primary" style={{ width: "auto", minWidth: 180 }}>
-                Enregistrer
-              </button>
+              <div className="census-nav-actions">
+                <button type="button" className="btn-secondary" onClick={saveDraft}>
+                  Sauvegarder temporairement
+                </button>
+                <button type="submit" className="btn-primary" style={{ width: "auto", minWidth: 180 }}>
+                  Finaliser et enregistrer
+                </button>
+              </div>
             </div>
+            <p className="muted small full" style={{ marginTop: "0.35rem" }}>
+              Temporaire = brouillon local (pas encore dans le registre). Finaliser = création de la fiche.
+            </p>
           </form>
         ) : null}
 
@@ -615,9 +754,14 @@ export default function CensusPage() {
             ) : (
               <span />
             )}
-            <button type="button" className="btn-next" style={{ width: "auto", minWidth: 160 }} onClick={goNext}>
-              Suivant
-            </button>
+            <div className="census-nav-actions">
+              <button type="button" className="btn-secondary" onClick={saveDraft}>
+                Sauvegarder temporairement
+              </button>
+              <button type="button" className="btn-next" style={{ width: "auto", minWidth: 160 }} onClick={goNext}>
+                Suivant
+              </button>
+            </div>
           </div>
         ) : null}
       </div>
