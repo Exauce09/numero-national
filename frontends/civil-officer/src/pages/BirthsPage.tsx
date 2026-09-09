@@ -7,7 +7,9 @@ import {
   addAct,
   addPerson,
   getAct,
+  inheritParentOrigin,
   listActs,
+  personNationalite,
   updateAct,
   type Act,
   type Person,
@@ -32,6 +34,7 @@ export default function BirthsPage() {
   const [, bump] = useState(0);
 
   const acts = listActs("BIRTH");
+  const inherited = inheritParentOrigin(father, mother);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -46,9 +49,10 @@ export default function BirthsPage() {
     }
     try {
       const lieuNaissance = geoNaissance.label || "";
+      const link = inheritParentOrigin(father, mother);
       const child = addPerson({
         nom: nom.trim(),
-        postnom: postnom.trim(),
+        postnom: postnom.trim() || mother.postnom || father?.postnom || "",
         prenom: prenom.trim(),
         sexe,
         date_naissance: dateNaissance,
@@ -56,6 +60,7 @@ export default function BirthsPage() {
         etat_civil: "CELIBATAIRE",
         mother_id: mother.id,
         father_id: father?.id,
+        nationalite: personNationalite(father ?? mother),
       });
       const commune = getOfficerCommune();
       const payload = {
@@ -70,9 +75,20 @@ export default function BirthsPage() {
         commune_code: geoNaissance.commune_code || commune.code,
         mother_id: mother.id,
         mother_name: `${mother.nom} ${mother.prenom}`,
+        mother_nic: mother.nic,
+        mother_snapshot: link.mother_snapshot,
         father_id: father?.id ?? null,
         father_name: father ? `${father.nom} ${father.prenom}` : null,
-        note: "Nouveau-né non enregistré en structure sanitaire",
+        father_nic: father?.nic ?? null,
+        father_snapshot: link.father_snapshot,
+        inherited_from: link.source,
+        inherited_geo: link.geo,
+        province_origine: link.geo.province || null,
+        ville_origine: link.geo.ville || null,
+        territoire_origine: link.geo.territoire || null,
+        secteur_chefferie_commune: link.geo.secteur || null,
+        village_origine: link.geo.village || null,
+        note: "Nouveau-né lié aux informations du père/mère",
       };
       const act = addAct("BIRTH", payload, child.nic);
       setCreated(act);
@@ -164,6 +180,18 @@ export default function BirthsPage() {
           <div className="full">
             <PersonPicker label="Père (optionnel)" value={father} onChange={setFather} />
           </div>
+          {inherited.source && inherited.parent ? (
+            <div className="full success-banner" style={{ margin: 0 }}>
+              Origine liée au {inherited.source === "father" ? "père" : "mère"}{" "}
+              <strong>{inherited.parent.name}</strong>
+              {inherited.parent.geo_label ? <> — {inherited.parent.geo_label}</> : " (province / ville non renseignées)"}
+            </div>
+          ) : mother || father ? (
+            <div className="full muted small">
+              Aucune province/ville trouvée chez les parents — enregistrez d&apos;abord leur recensement
+              (origine / adresse).
+            </div>
+          ) : null}
           <div className="full">
             <button className="btn-primary" style={{ width: "auto", minWidth: 200 }} type="submit">
               Enregistrer la naissance

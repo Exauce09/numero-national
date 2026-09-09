@@ -7,8 +7,10 @@ import DataToolbar from "../components/DataToolbar";
 import { PopulationStatBlocks } from "../components/StatBlocks";
 import {
   displayName,
-  listPersons,
+  getPerson,
+  listPopulationPersons,
   personNationalite,
+  personOrigin,
   populationBreakdown,
   type Person,
 } from "../registry";
@@ -17,7 +19,7 @@ const PAGE_SIZE = 10;
 
 export default function PopulationPage({ showAnalytics = false }: { showAnalytics?: boolean }) {
   const navigate = useNavigate();
-  const persons = listPersons();
+  const persons = listPopulationPersons();
   const [q, setQ] = useState("");
   const [sexe, setSexe] = useState("");
   const [nat, setNat] = useState("");
@@ -97,10 +99,13 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                 >
                   manage-population.php
                 </a>
-                ).
+                ). Vivants uniquement ; nouveaux-nés (≤ 90 j) et décédés exclus.
               </>
             ) : (
-              <>Recherche, filtre, export et fiche détail — sans graphiques (menu opérationnel).</>
+              <>
+                Recherche, filtre, export et fiche détail. Les nouveaux-nés entrent ici après 90 jours ; un décès
+                retire la personne.
+              </>
             )}
           </p>
         </div>
@@ -294,6 +299,34 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                 <dt>État civil</dt>
                 <dd>{selected.etat_civil}</dd>
               </div>
+              {(() => {
+                const origin = personOrigin(selected);
+                const father = selected.father_id ? getPerson(selected.father_id) : undefined;
+                const mother = selected.mother_id ? getPerson(selected.mother_id) : undefined;
+                return (
+                  <>
+                    <div>
+                      <dt>Père</dt>
+                      <dd>{father ? displayName(father) : "—"}</dd>
+                    </div>
+                    <div>
+                      <dt>Mère</dt>
+                      <dd>{mother ? displayName(mother) : "—"}</dd>
+                    </div>
+                    <div>
+                      <dt>Origine</dt>
+                      <dd>
+                        {origin.label || "—"}
+                        {origin.source === "father"
+                          ? " (père)"
+                          : origin.source === "mother"
+                            ? " (mère)"
+                            : ""}
+                      </dd>
+                    </div>
+                  </>
+                );
+              })()}
             </dl>
           </div>
         </div>

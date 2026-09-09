@@ -204,8 +204,49 @@ export function listPersons(): Person[] {
   return [...load().persons].sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
-/** Province / ville associées (recensement et autres actes). */
-export function personLocation(personId: string, nic?: string): { province: string; ville: string } {
+/** Personne marquée décédée via un acte DEATH. */
+export function isDeceased(personId: string, nic?: string): boolean {
+  return load().acts.some(
+    (a) =>
+      a.type === "DEATH" &&
+      (String(a.payload.deceased_id ?? "") === personId || (nic ? a.national_id === nic : false)),
+  );
+}
+
+/** Nouveau-né : âge ≤ 90 jours. */
+export function isNewbornPerson(p: Person): boolean {
+  return Boolean(p.date_naissance) && ageDays(p.date_naissance) <= 90;
+}
+
+/**
+ * Population « carte-grid » : vivants, hors nouveaux-nés (≤ 90 j).
+ * Au-delà de 90 jours, l'enfant entre dans la population.
+ */
+export function listPopulationPersons(): Person[] {
+  return listPersons().filter((p) => !isDeceased(p.id, p.nic) && !isNewbornPerson(p));
+}
+
+export type ParentOrigin = {
+  source: "self" | "father" | "mother" | null;
+  source_name: string;
+  province: string;
+  ville: string;
+  territoire: string;
+  secteur: string;
+  village: string;
+  commune: string;
+  label: string;
+};
+
+function locationFromActs(personId: string, nic?: string): {
+  province: string;
+  ville: string;
+  territoire: string;
+  secteur: string;
+  village: string;
+  commune: string;
+} {
+  const empty = { province: "", ville: "", territoire: "", secteur: "", village: "", commune: "" };
   const acts = load().acts.filter(
     (a) =>
       a.national_id === nic ||
@@ -216,6 +257,7 @@ export function personLocation(personId: string, nic?: string): { province: stri
       a.payload.geo_origine ??
       a.payload.geo_naissance ??
       a.payload.geo ??
+      a.payload.inherited_geo ??
       {}) as Record<string, unknown>;
     const province = String(
       a.payload.province_actuelle ??
@@ -227,9 +269,158 @@ export function personLocation(personId: string, nic?: string): { province: stri
     const ville = String(
       a.payload.ville_actuelle ?? a.payload.ville_origine ?? a.payload.ville ?? nested.ville_name ?? "",
     ).trim();
-    if (province || ville) return { province, ville };
+    const territoire = String(
+      a.payload.territoire_origine ?? nested.district_name ?? "",
+    ).trim();
+    const secteur = String(
+      a.payload.secteur_chefferie_commune ?? nested.commune_name ?? "",
+    ).trim();
+    const village = String(a.payload.village_origine ?? nested.localite_name ?? "").trim();
+    const commune = String(
+      a.payload.commune_actuelle ?? a.payload.commune_name ?? nested.commune_name ?? "",
+    ).trim();
+    if (province || ville || territoire || secteur || village || commune) {
+      return { province, ville, territoire, secteur, village, commune };
+    }
   }
-  return { province: "", ville: "" };
+  return empty;
+}
+
+function snapshotParent(p: Person) {
+  const loc = locationFromActs(p.id, p.nic);
+  return {
+    id: p.id,
+    nic: p.nic,
+    name: displayName(p),
+    nom: p.nom,
+    postnom: p.postnom,
+    prenom: p.prenom,
+    sexe: p.sexe,
+    date_naissance: p.date_naissance,
+    lieu_naissance: p.lieu_naissance,
+    nationalite: personNationalite(p),
+    ...loc,
+    geo_label: [loc.province, loc.ville, loc.territoire, loc.secteur, loc.village, loc.commune]
+      .filter(Boolean)
+      .join(" · "),
+  };
+}
+
+/** Hérite l'origine du père, sinon de la mère (pour lier un nouveau-né). */
+export function inheritParentOrigin(father?: Person | null, mother?: Person | null): {
+  source: "father" | "mother" | null;
+  geo: ReturnType<typeof locationFromActs>;
+  parent: ReturnType<typeof snapshotParent> | null;
+  father_snapshot: ReturnType<typeof snapshotParent> | null;
+  mother_snapshot: ReturnType<typeof snapshotParent> | null;
+} {
+  const father_snapshot = father ? snapshotParent(father) : null;
+  const mother_snapshot = mother ? snapshotParent(mother) : null;
+  if (father) {
+    const geo = locationFromActs(father.id, father.nic);
+    if (geo.province || geo.ville || geo.territoire || geo.commune) {
+      return { source: "father", geo, parent: father_snapshot, father_snapshot, mother_snapshot };
+    }
+  }
+  if (mother) {
+    const geo = locationFromActs(mother.id, mother.nic);
+    return { source: "mother", geo, parent: mother_snapshot, father_snapshot, mother_snapshot };
+  }
+  return {
+    source: null,
+    geo: { province: "", ville: "", territoire: "", secteur: "", village: "", commune: "" },
+    parent: null,
+    father_snapshot,
+    mother_snapshot,
+  };
+}
+
+/**
+ * Origine affichée : infos propres, sinon père, sinon mère.
+ */
+export function personOrigin(p: Person): ParentOrigin {
+  const self = locationFromActs(p.id, p.nic);
+  if (self.province || self.ville || self.territoire || self.commune) {
+    return {
+      source: "self",
+      source_name: displayName(p),
+      ...self,
+      label: [self.province, self.ville, self.territoire, self.secteur, self.village]
+        .filter(Boolean)
+        .join(" · "),
+    };
+  }
+  const father = p.father_id ? getPerson(p.father_id) : undefined;
+  if (father) {
+    const loc = locationFromActs(father.id, father.nic);
+    if (loc.province || loc.ville || loc.territoire || loc.commune) {
+      return {
+        source: "father",
+        source_name: displayName(father),
+        ...loc,
+        label: [loc.province, loc.ville, loc.territoire, loc.secteur, loc.village]
+          .filter(Boolean)
+          .join(" · "),
+      };
+    }
+  }
+  const mother = p.mother_id ? getPerson(p.mother_id) : undefined;
+  if (mother) {
+    const loc = locationFromActs(mother.id, mother.nic);
+    return {
+      source: "mother",
+      source_name: displayName(mother),
+      ...loc,
+      label: [loc.province, loc.ville, loc.territoire, loc.secteur, loc.village]
+        .filter(Boolean)
+        .join(" · "),
+    };
+  }
+  // Naissance : snapshots figés dans l'acte
+  const birth = load().acts.find(
+    (a) => a.type === "BIRTH" && (String(a.payload.child_id ?? "") === p.id || a.national_id === p.nic),
+  );
+  if (birth) {
+    const fromFather = birth.payload.father_snapshot as Record<string, string> | undefined;
+    const fromMother = birth.payload.mother_snapshot as Record<string, string> | undefined;
+    const snap = (fromFather?.province || fromFather?.ville ? fromFather : fromMother) ?? null;
+    const source = fromFather?.province || fromFather?.ville ? "father" : fromMother ? "mother" : null;
+    if (snap && source) {
+      return {
+        source,
+        source_name: String(snap.name ?? ""),
+        province: String(snap.province ?? ""),
+        ville: String(snap.ville ?? ""),
+        territoire: String(snap.territoire ?? ""),
+        secteur: String(snap.secteur ?? ""),
+        village: String(snap.village ?? ""),
+        commune: String(snap.commune ?? ""),
+        label: String(snap.geo_label ?? [snap.province, snap.ville].filter(Boolean).join(" · ")),
+      };
+    }
+  }
+  return {
+    source: null,
+    source_name: "",
+    province: "",
+    ville: "",
+    territoire: "",
+    secteur: "",
+    village: "",
+    commune: "",
+    label: "",
+  };
+}
+
+/** Province / ville associées (propre, sinon père, sinon mère). */
+export function personLocation(personId: string, nic?: string): { province: string; ville: string } {
+  const p = load().persons.find((x) => x.id === personId || (nic ? x.nic === nic : false));
+  if (p) {
+    const o = personOrigin(p);
+    return { province: o.province, ville: o.ville };
+  }
+  const loc = locationFromActs(personId, nic);
+  return { province: loc.province, ville: loc.ville };
 }
 
 function normalizeDateToken(value: string): string {
@@ -246,7 +437,7 @@ function normalizeDateToken(value: string): string {
 }
 
 function personSearchBlob(p: Person): string {
-  const loc = personLocation(p.id, p.nic);
+  const origin = personOrigin(p);
   const dateNorm = normalizeDateToken(p.date_naissance);
   return [
     p.nic,
@@ -257,8 +448,13 @@ function personSearchBlob(p: Person): string {
     p.date_naissance,
     dateNorm,
     p.lieu_naissance,
-    loc.province,
-    loc.ville,
+    origin.province,
+    origin.ville,
+    origin.territoire,
+    origin.secteur,
+    origin.village,
+    origin.commune,
+    origin.source_name,
   ]
     .join(" ")
     .toLowerCase();

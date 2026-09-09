@@ -11,7 +11,7 @@ import {
   IconSplit,
   IconUsers,
 } from "../components/Icons";
-import { ageDays, listActs, listPersons } from "../registry";
+import { ageDays, listActs, listPopulationPersons } from "../registry";
 
 type Tone = "primary" | "success" | "danger" | "warning" | "info" | "secondary" | "pink" | "indigo";
 
@@ -27,7 +27,7 @@ type DashItem = {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const persons = listPersons();
+  const population = listPopulationPersons();
   const acts = listActs();
   const [query, setQuery] = useState("");
 
@@ -57,8 +57,8 @@ export default function DashboardPage() {
     {
       id: "pop",
       title: "Population",
-      value: persons.length,
-      subtitle: "Habitants enregistrés",
+      value: population.length,
+      subtitle: "Vivants hors nouveaux-nés (≤ 90 j)",
       tone: "primary",
       href: "/lists/population",
       icon: <IconUsers size={26} />,

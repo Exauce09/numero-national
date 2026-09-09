@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { displayName, personLocation, searchPersons, type Person } from "../registry";
+import { displayName, personOrigin, searchPersons, type Person } from "../registry";
 
 export default function TopbarSearch() {
   const navigate = useNavigate();
@@ -66,7 +66,7 @@ export default function TopbarSearch() {
             <div className="topbar-search-empty">Aucun résultat</div>
           ) : (
             hits.map((p) => {
-              const loc = personLocation(p.id, p.nic);
+              const loc = personOrigin(p);
               return (
                 <button
                   key={p.id}
@@ -81,6 +81,11 @@ export default function TopbarSearch() {
                     {loc.ville || loc.province
                       ? ` · ${[loc.ville, loc.province].filter(Boolean).join(", ")}`
                       : ""}
+                    {loc.source === "father"
+                      ? " (père)"
+                      : loc.source === "mother"
+                        ? " (mère)"
+                        : ""}
                   </span>
                 </button>
               );
