@@ -15,6 +15,15 @@ export type FormationUniversitaire = {
   statut: "TERMINE" | "EN_COURS" | "ABANDONNE" | "";
 };
 
+export type FormationProfessionnelle = {
+  etablissement: string;
+  metier: string;
+  certificat: string;
+  annee_obtention: string;
+  duree: string;
+  statut: "TERMINE" | "EN_COURS" | "ABANDONNE" | "";
+};
+
 export type EtudesData = {
   sait_lire: "oui" | "non" | "";
   sait_ecrire: "oui" | "non" | "";
@@ -22,6 +31,7 @@ export type EtudesData = {
   annee_fin_etudes: string;
   etablissements: EtablissementScolaire[];
   formations_universitaires: FormationUniversitaire[];
+  formations_professionnelles: FormationProfessionnelle[];
   remarques: string;
 };
 
@@ -77,6 +87,17 @@ export function emptyFormationUniv(): FormationUniversitaire {
   };
 }
 
+export function emptyFormationPro(): FormationProfessionnelle {
+  return {
+    etablissement: "",
+    metier: "",
+    certificat: "",
+    annee_obtention: "",
+    duree: "",
+    statut: "",
+  };
+}
+
 export function emptyEtudes(): EtudesData {
   return {
     sait_lire: "",
@@ -85,6 +106,7 @@ export function emptyEtudes(): EtudesData {
     annee_fin_etudes: "",
     etablissements: [],
     formations_universitaires: [],
+    formations_professionnelles: [],
     remarques: "",
   };
 }
@@ -114,18 +136,34 @@ export function formatParcoursScolaire(data: EtudesData): string {
 }
 
 export function formatParcoursUniversitaire(data: EtudesData): string {
-  if (!data.formations_universitaires.length) return "";
-  const lines = [`Formations universitaires (${data.formations_universitaires.length}) :`];
-  data.formations_universitaires.forEach((f, i) => {
-    const bits = [
-      f.etablissement.trim() || "—",
-      f.filiere.trim(),
-      f.diplome.trim(),
-      f.annee_obtention.trim(),
-      f.statut,
-    ].filter(Boolean);
-    lines.push(`  ${i + 1}. ${bits.join(", ")}`);
-  });
+  const lines: string[] = [];
+  if (data.formations_universitaires.length) {
+    lines.push(`Formations universitaires (${data.formations_universitaires.length}) :`);
+    data.formations_universitaires.forEach((f, i) => {
+      const bits = [
+        f.etablissement.trim() || "—",
+        f.filiere.trim(),
+        f.diplome.trim(),
+        f.annee_obtention.trim(),
+        f.statut,
+      ].filter(Boolean);
+      lines.push(`  ${i + 1}. ${bits.join(", ")}`);
+    });
+  }
+  if (data.formations_professionnelles.length) {
+    lines.push(`Formations professionnelles (${data.formations_professionnelles.length}) :`);
+    data.formations_professionnelles.forEach((f, i) => {
+      const bits = [
+        f.etablissement.trim() || "—",
+        f.metier.trim(),
+        f.certificat.trim(),
+        f.duree.trim() && `durée ${f.duree.trim()}`,
+        f.annee_obtention.trim(),
+        f.statut,
+      ].filter(Boolean);
+      lines.push(`  ${i + 1}. ${bits.join(", ")}`);
+    });
+  }
   return lines.join("\n");
 }
 
@@ -148,6 +186,9 @@ export function parseEtudes(raw: unknown): EtudesData {
       : [],
     formations_universitaires: Array.isArray(d.formations_universitaires)
       ? d.formations_universitaires.map((e) => ({ ...emptyFormationUniv(), ...e }))
+      : [],
+    formations_professionnelles: Array.isArray(d.formations_professionnelles)
+      ? d.formations_professionnelles.map((e) => ({ ...emptyFormationPro(), ...e }))
       : [],
     remarques: typeof d.remarques === "string" ? d.remarques : "",
   };

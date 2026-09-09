@@ -41,7 +41,10 @@ export default function PersonPicker({
   const [geoNaissance, setGeoNaissance] = useState<GeoSelection>({});
   const [error, setError] = useState<string | null>(null);
 
-  const results = useMemo(() => searchPersons(query).slice(0, 12), [query, open, modal, value]);
+  const results = useMemo(() => {
+    if (query.trim().length < 1) return [];
+    return searchPersons(query).slice(0, 12);
+  }, [query, open, modal, value]);
 
   function select(person: Person) {
     onChange(person);
@@ -112,14 +115,19 @@ export default function PersonPicker({
       )}
       {open && !value ? (
         <ul className="person-picker-list">
-          {results.length === 0 ? (
-            <li className="muted">Aucun résultat</li>
+          {query.trim().length < 1 ? (
+            <li className="muted">Commencez à taper un nom, post-nom ou prénom…</li>
+          ) : results.length === 0 ? (
+            <li className="muted">Aucun résultat — utilisez « Ajouter » si la personne n&apos;existe pas.</li>
           ) : (
             results.map((p) => (
               <li key={p.id}>
                 <button type="button" onClick={() => select(p)}>
                   <strong>{displayName(p)}</strong>
-                  <span className="muted">{p.nic}</span>
+                  <span className="muted small">
+                    {" "}
+                    · {p.sexe} · {p.date_naissance} · {p.nic}
+                  </span>
                 </button>
               </li>
             ))

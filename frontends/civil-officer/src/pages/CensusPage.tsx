@@ -198,6 +198,12 @@ export default function CensusPage() {
   }, []);
 
   useEffect(() => {
+    if (etatCivil === "MARIE" && !situationFamiliale.a_conjoint) {
+      setSituationFamiliale((prev) => ({ ...prev, a_conjoint: true }));
+    }
+  }, [etatCivil, situationFamiliale.a_conjoint]);
+
+  useEffect(() => {
     if (step !== 3) {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
@@ -232,6 +238,16 @@ export default function CensusPage() {
     if (target > 1 && (!nom.trim() || !prenom.trim() || !dateNaissance)) {
       setError("Étape Identité : nom, prénom et date de naissance sont requis.");
       setStep(1);
+      return false;
+    }
+    return true;
+  }
+
+  function validateFamille(): boolean {
+    const needConjoint = situationFamiliale.a_conjoint || etatCivil === "MARIE";
+    if (needConjoint && !situationFamiliale.conjoint.person_id) {
+      setError("Conjoint(e) : liez une personne enregistrée (recherche obligatoire).");
+      setStep(7);
       return false;
     }
     return true;
@@ -324,6 +340,7 @@ export default function CensusPage() {
     setError(null);
     setDraftNotice(null);
     if (!validateStep(7)) return;
+    if (!validateFamille()) return;
     try {
       const commune = getOfficerCommune();
       const adresse = buildAdresse();
@@ -740,7 +757,11 @@ export default function CensusPage() {
         {step === 7 ? (
           <form className="form-grid" onSubmit={onSubmit}>
             <div className="full">
-              <SituationFamilialeForm value={situationFamiliale} onChange={setSituationFamiliale} />
+              <SituationFamilialeForm
+                value={situationFamiliale}
+                onChange={setSituationFamiliale}
+                etatCivil={etatCivil}
+              />
             </div>
             <div className="full census-nav">
               <button type="button" className="btn-secondary" onClick={goPrev}>

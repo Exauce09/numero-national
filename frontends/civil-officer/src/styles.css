@@ -1069,8 +1069,42 @@
   font-weight: 600;
 }
 
-.situation-familiale .id-fieldset {
-  margin-bottom: 1rem;
+.child-count-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.child-count-pill {
+  min-width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--egouv-line);
+  background: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.child-count-pill.active {
+  background: var(--egouv-primary, #1e4fd6);
+  border-color: var(--egouv-primary, #1e4fd6);
+  color: #fff;
+}
+
+.warn-inline {
+  color: #b45309;
+  margin: 0.35rem 0 0;
+}
+
+.success-inline {
+  color: #047857;
+  margin: 0.35rem 0 0;
+}
+
+.family-member-grid input[readonly],
+.family-member-grid select:disabled {
+  background: #f3f6fb;
+  color: #334155;
 }
 
 .bio-grid {

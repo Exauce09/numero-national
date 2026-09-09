@@ -72,6 +72,45 @@ class FormationUniversitaire {
   }
 }
 
+class FormationProfessionnelle {
+  FormationProfessionnelle({
+    this.etablissement = '',
+    this.metier = '',
+    this.certificat = '',
+    this.anneeObtention = '',
+    this.duree = '',
+    this.statut = '',
+  });
+
+  String etablissement;
+  String metier;
+  String certificat;
+  String anneeObtention;
+  String duree;
+  String statut;
+
+  Map<String, dynamic> toJson() => {
+        'etablissement': etablissement,
+        'metier': metier,
+        'certificat': certificat,
+        'annee_obtention': anneeObtention,
+        'duree': duree,
+        'statut': statut,
+      };
+
+  static FormationProfessionnelle fromJson(Map<String, dynamic>? raw) {
+    if (raw == null) return FormationProfessionnelle();
+    return FormationProfessionnelle(
+      etablissement: raw['etablissement']?.toString() ?? '',
+      metier: raw['metier']?.toString() ?? '',
+      certificat: raw['certificat']?.toString() ?? '',
+      anneeObtention: raw['annee_obtention']?.toString() ?? '',
+      duree: raw['duree']?.toString() ?? '',
+      statut: raw['statut']?.toString() ?? '',
+    );
+  }
+}
+
 class EtudesData {
   EtudesData({
     this.saitLire = '',
@@ -80,10 +119,13 @@ class EtudesData {
     this.anneeFinEtudes = '',
     List<EtablissementScolaire>? etablissements,
     List<FormationUniversitaire>? formationsUniversitaires,
+    List<FormationProfessionnelle>? formationsProfessionnelles,
     this.remarques = '',
   })  : etablissements = etablissements ?? <EtablissementScolaire>[],
         formationsUniversitaires =
-            formationsUniversitaires ?? <FormationUniversitaire>[];
+            formationsUniversitaires ?? <FormationUniversitaire>[],
+        formationsProfessionnelles =
+            formationsProfessionnelles ?? <FormationProfessionnelle>[];
 
   String saitLire;
   String saitEcrire;
@@ -91,6 +133,7 @@ class EtudesData {
   String anneeFinEtudes;
   List<EtablissementScolaire> etablissements;
   List<FormationUniversitaire> formationsUniversitaires;
+  List<FormationProfessionnelle> formationsProfessionnelles;
   String remarques;
 
   static const niveaux = <(String, String)>[
@@ -132,6 +175,8 @@ class EtudesData {
         'etablissements': etablissements.map((e) => e.toJson()).toList(),
         'formations_universitaires':
             formationsUniversitaires.map((e) => e.toJson()).toList(),
+        'formations_professionnelles':
+            formationsProfessionnelles.map((e) => e.toJson()).toList(),
         'remarques': remarques,
       };
 
@@ -169,20 +214,35 @@ class EtudesData {
   }
 
   String formatUniversitaire() {
-    if (formationsUniversitaires.isEmpty) return '';
-    final lines = <String>[
-      'Formations universitaires (${formationsUniversitaires.length}) :',
-    ];
-    for (var i = 0; i < formationsUniversitaires.length; i++) {
-      final f = formationsUniversitaires[i];
-      final bits = [
-        f.etablissement.trim().isEmpty ? '—' : f.etablissement.trim(),
-        if (f.filiere.trim().isNotEmpty) f.filiere.trim(),
-        if (f.diplome.trim().isNotEmpty) f.diplome.trim(),
-        if (f.anneeObtention.trim().isNotEmpty) f.anneeObtention.trim(),
-        if (f.statut.isNotEmpty) f.statut,
-      ];
-      lines.add('  ${i + 1}. ${bits.join(', ')}');
+    final lines = <String>[];
+    if (formationsUniversitaires.isNotEmpty) {
+      lines.add('Formations universitaires (${formationsUniversitaires.length}) :');
+      for (var i = 0; i < formationsUniversitaires.length; i++) {
+        final f = formationsUniversitaires[i];
+        final bits = [
+          f.etablissement.trim().isEmpty ? '—' : f.etablissement.trim(),
+          if (f.filiere.trim().isNotEmpty) f.filiere.trim(),
+          if (f.diplome.trim().isNotEmpty) f.diplome.trim(),
+          if (f.anneeObtention.trim().isNotEmpty) f.anneeObtention.trim(),
+          if (f.statut.isNotEmpty) f.statut,
+        ];
+        lines.add('  ${i + 1}. ${bits.join(', ')}');
+      }
+    }
+    if (formationsProfessionnelles.isNotEmpty) {
+      lines.add('Formations professionnelles (${formationsProfessionnelles.length}) :');
+      for (var i = 0; i < formationsProfessionnelles.length; i++) {
+        final f = formationsProfessionnelles[i];
+        final bits = [
+          f.etablissement.trim().isEmpty ? '—' : f.etablissement.trim(),
+          if (f.metier.trim().isNotEmpty) f.metier.trim(),
+          if (f.certificat.trim().isNotEmpty) f.certificat.trim(),
+          if (f.duree.trim().isNotEmpty) 'durée ${f.duree.trim()}',
+          if (f.anneeObtention.trim().isNotEmpty) f.anneeObtention.trim(),
+          if (f.statut.isNotEmpty) f.statut,
+        ];
+        lines.add('  ${i + 1}. ${bits.join(', ')}');
+      }
     }
     return lines.join('\n');
   }
@@ -197,6 +257,7 @@ class EtudesData {
     final m = Map<String, dynamic>.from(raw);
     final etabs = m['etablissements'];
     final univs = m['formations_universitaires'];
+    final pros = m['formations_professionnelles'];
     return EtudesData(
       saitLire: m['sait_lire']?.toString() ?? '',
       saitEcrire: m['sait_ecrire']?.toString() ?? '',
@@ -214,6 +275,12 @@ class EtudesData {
               .map((e) => FormationUniversitaire.fromJson(Map<String, dynamic>.from(e)))
               .toList()
           : <FormationUniversitaire>[],
+      formationsProfessionnelles: pros is List
+          ? pros
+              .whereType<Map>()
+              .map((e) => FormationProfessionnelle.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : <FormationProfessionnelle>[],
       remarques: m['remarques']?.toString() ?? '',
     );
   }

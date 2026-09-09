@@ -3,6 +3,7 @@ import {
   NIVEAUX_ETUDES,
   NIVEAUX_SCOLAIRES,
   emptyEtablissement,
+  emptyFormationPro,
   emptyFormationUniv,
   type EtudesData,
 } from "../etudesFaites";
@@ -308,13 +309,140 @@ export default function EtudesFaitesForm({ value, onChange }: Props) {
       </fieldset>
 
       <fieldset className="id-fieldset">
+        <legend>Formations professionnelles</legend>
+        {value.formations_professionnelles.length === 0 ? (
+          <p className="muted small">Aucune formation professionnelle déclarée.</p>
+        ) : null}
+        {value.formations_professionnelles.map((row, index) => (
+          <div key={`pro-${index}`} className="family-member-card">
+            <div className="family-member-head">
+              <strong>Formation pro {index + 1}</strong>
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                onClick={() =>
+                  onChange({
+                    ...value,
+                    formations_professionnelles: value.formations_professionnelles.filter(
+                      (_, i) => i !== index
+                    ),
+                  })
+                }
+              >
+                Retirer
+              </button>
+            </div>
+            <div className="form-grid family-member-grid">
+              <div className="full">
+                <label className="form-label">Centre / établissement</label>
+                <input
+                  className="form-control"
+                  value={row.etablissement}
+                  onChange={(e) => {
+                    const formations_professionnelles = [...value.formations_professionnelles];
+                    formations_professionnelles[index] = { ...row, etablissement: e.target.value };
+                    onChange({ ...value, formations_professionnelles });
+                  }}
+                />
+              </div>
+              <div>
+                <label className="form-label">Métier / spécialité</label>
+                <input
+                  className="form-control"
+                  value={row.metier}
+                  onChange={(e) => {
+                    const formations_professionnelles = [...value.formations_professionnelles];
+                    formations_professionnelles[index] = { ...row, metier: e.target.value };
+                    onChange({ ...value, formations_professionnelles });
+                  }}
+                />
+              </div>
+              <div>
+                <label className="form-label">Certificat / diplôme</label>
+                <input
+                  className="form-control"
+                  value={row.certificat}
+                  onChange={(e) => {
+                    const formations_professionnelles = [...value.formations_professionnelles];
+                    formations_professionnelles[index] = { ...row, certificat: e.target.value };
+                    onChange({ ...value, formations_professionnelles });
+                  }}
+                />
+              </div>
+              <div>
+                <label className="form-label">Durée</label>
+                <input
+                  className="form-control"
+                  value={row.duree}
+                  onChange={(e) => {
+                    const formations_professionnelles = [...value.formations_professionnelles];
+                    formations_professionnelles[index] = { ...row, duree: e.target.value };
+                    onChange({ ...value, formations_professionnelles });
+                  }}
+                  placeholder="Ex. 6 mois, 2 ans"
+                />
+              </div>
+              <div>
+                <label className="form-label">Année d&apos;obtention</label>
+                <input
+                  className="form-control"
+                  value={row.annee_obtention}
+                  onChange={(e) => {
+                    const formations_professionnelles = [...value.formations_professionnelles];
+                    formations_professionnelles[index] = { ...row, annee_obtention: e.target.value };
+                    onChange({ ...value, formations_professionnelles });
+                  }}
+                  placeholder="AAAA"
+                />
+              </div>
+              <div>
+                <label className="form-label">Statut</label>
+                <select
+                  className="form-control"
+                  value={row.statut}
+                  onChange={(e) => {
+                    const formations_professionnelles = [...value.formations_professionnelles];
+                    formations_professionnelles[index] = {
+                      ...row,
+                      statut: e.target.value as typeof row.statut,
+                    };
+                    onChange({ ...value, formations_professionnelles });
+                  }}
+                >
+                  <option value="">—</option>
+                  <option value="TERMINE">Terminé</option>
+                  <option value="EN_COURS">En cours</option>
+                  <option value="ABANDONNE">Abandonné</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        ))}
+        <button
+          type="button"
+          className="btn-secondary btn-sm"
+          onClick={() =>
+            onChange({
+              ...value,
+              formations_professionnelles: [
+                ...value.formations_professionnelles,
+                emptyFormationPro(),
+              ],
+            })
+          }
+        >
+          + Ajouter une formation professionnelle
+        </button>
+      </fieldset>
+
+      <fieldset className="id-fieldset">
         <legend>Remarques</legend>
         <textarea
           className="form-control"
           rows={3}
           value={value.remarques}
           onChange={(e) => onChange({ ...value, remarques: e.target.value })}
-          placeholder="Précisions sur le parcours scolaire ou universitaire…"
+          placeholder="Précisions sur le parcours scolaire, universitaire ou professionnel…"
         />
       </fieldset>
     </div>

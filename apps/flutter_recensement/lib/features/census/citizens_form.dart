@@ -85,7 +85,12 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   final List<_MemberEditors> _charges = [];
   final List<_ScoEditors> _etablissements = [];
   final List<_UnivEditors> _formations = [];
+  final List<_ProEditors> _formationsPro = [];
   final List<_DocEditors> _documents = [];
+  int _nombreEnfants = 0;
+  final _conjointSearch = TextEditingController();
+  List<Map<String, String>> _conjointSuggestions = [];
+  bool _conjointLocked = false;
 
   bool get _isEdit => widget.existing != null;
 
@@ -169,6 +174,9 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     for (final f in etudes.formationsUniversitaires) {
       _formations.add(_UnivEditors(f));
     }
+    for (final f in etudes.formationsProfessionnelles) {
+      _formationsPro.add(_ProEditors(f));
+    }
 
     final admin = IdentiteAdminData.parse(
       payload['identite_administrative_detail'] ?? payload['numero_admin'],
@@ -182,11 +190,18 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
       _documents.add(_DocEditors(d));
     }
 
+    _sex = e?['sex']?.toString() ?? 'M';
+    _etatCivil = payload['etat_civil']?.toString() ?? 'CELIBATAIRE';
+    _handicap = payload['handicap']?.toString() ?? 'NORMAL';
+    _relation = payload['relationship_to_head']?.toString() ?? 'AUTRE';
+
     final famille = SituationFamiliale.parse(
       payload['situation_familiale_detail'] ?? payload['situation_familiale'],
     );
-    _aConjoint = famille.aConjoint;
+    _aConjoint = famille.aConjoint || _etatCivil == 'MARIE';
     _conjoint = _MemberEditors(famille.conjoint);
+    _conjointLocked = (famille.conjoint.personId ?? '').isNotEmpty;
+    _nombreEnfants = famille.nombreEnfants;
     for (final e in famille.enfants) {
       _enfants.add(_MemberEditors(e));
     }
@@ -195,10 +210,6 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     }
     _familleRemarques = TextEditingController(text: famille.remarques);
 
-    _sex = e?['sex']?.toString() ?? 'M';
-    _etatCivil = payload['etat_civil']?.toString() ?? 'CELIBATAIRE';
-    _handicap = payload['handicap']?.toString() ?? 'NORMAL';
-    _relation = payload['relationship_to_head']?.toString() ?? 'AUTRE';
     _photoRef = e?['photo_ref']?.toString();
     _fingerprintRef = payload['fingerprint_ref']?.toString();
     _geoNaissance = _asStringMap(payload['geo_naissance']);
@@ -257,6 +268,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     _adminAgent.dispose();
     _adminRemarques.dispose();
     _familleRemarques.dispose();
+    _conjointSearch.dispose();
     _conjoint.dispose();
     for (final e in _enfants) {
       e.dispose();
@@ -268,6 +280,9 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
       e.dispose();
     }
     for (final f in _formations) {
+      f.dispose();
+    }
+    for (final f in _formationsPro) {
       f.dispose();
     }
     for (final d in _documents) {
@@ -391,6 +406,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
       anneeFinEtudes: _anneeFinEtudes.text,
       etablissements: _etablissements.map((e) => e.snapshot()).toList(),
       formationsUniversitaires: _formations.map((e) => e.snapshot()).toList(),
+      formationsProfessionnelles: _formationsPro.map((e) => e.snapshot()).toList(),
       remarques: _etudesRemarques.text,
     );
   }
@@ -408,16 +424,84 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
 
   SituationFamiliale _buildSituation() {
     return SituationFamiliale(
-      aConjoint: _aConjoint,
+      aConjoint: _aConjoint || _etatCivil == 'MARIE',
       conjoint: _conjoint.snapshot(),
+      nombreEnfants: _nombreEnfants,
       enfants: _enfants.map((e) => e.snapshot()).toList(),
       personnesACharge: _charges.map((e) => e.snapshot()).toList(),
       remarques: _familleRemarques.text,
     );
   }
 
+  Future<void> _searchConjoint(String q) async {
+    final query = q.trim().toLowerCase();
+    if (query.isEmpty) {
+      setState(() => _conjointSuggestions = []);
+      return;
+    }
+    final db = LocalDatabase.instance.db;
+    final rows = await db.query('census_records', limit: 80, orderBy: 'updated_at DESC');
+    final hits = <Map<String, String>>[];
+    for (final r in rows) {
+      final payload = _decodePayload(r['payload']);
+      final nom = (payload['nom'] ?? r['family_name'] ?? '').toString();
+      final postnom = (payload['postnom'] ?? '').toString();
+      final prenom = (payload['prenom'] ?? r['given_names'] ?? '').toString();
+      final blob = '$nom $postnom $prenom'.toLowerCase();
+      final tokens = query.split(RegExp(r'\s+')).where((t) => t.isNotEmpty);
+      if (tokens.every((t) => blob.contains(t))) {
+        hits.add({
+          'id': (r['local_id'] ?? r['id'] ?? '').toString(),
+          'nom': nom,
+          'postnom': postnom,
+          'prenom': prenom,
+          'sexe': (payload['sexe'] ?? r['sex'] ?? '').toString(),
+          'date_naissance': (payload['date_naissance'] ?? r['date_of_birth'] ?? '').toString(),
+          'telephone': (payload['telephone'] ?? '').toString(),
+        });
+      }
+      if (hits.length >= 12) break;
+    }
+    if (mounted) setState(() => _conjointSuggestions = hits);
+  }
+
+  void _applyConjointHit(Map<String, String> hit) {
+    setState(() {
+      _conjoint.personId = hit['id'];
+      _conjoint.nom.text = hit['nom'] ?? '';
+      _conjoint.postnom.text = hit['postnom'] ?? '';
+      _conjoint.prenom.text = hit['prenom'] ?? '';
+      _conjoint.sexe = hit['sexe'] ?? '';
+      _conjoint.dateNaissance.text = hit['date_naissance'] ?? '';
+      _conjoint.telephone.text = hit['telephone'] ?? '';
+      _conjointLocked = true;
+      _conjointSuggestions = [];
+      _conjointSearch.clear();
+    });
+  }
+
+  void _setNombreEnfants(int n) {
+    setState(() {
+      _nombreEnfants = n < 0 ? 0 : n;
+      while (_enfants.length > _nombreEnfants) {
+        _enfants.removeLast().dispose();
+      }
+      while (_enfants.length < _nombreEnfants) {
+        _enfants.add(_MemberEditors(FamilyMember(lien: 'Enfant')));
+      }
+    });
+  }
+
   Future<void> _save({bool draft = false}) async {
     if (!draft && !_validateStep1()) return;
+    if (!draft && (_aConjoint || _etatCivil == 'MARIE') && !_conjointLocked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Conjoint(e) : recherchez et liez une personne déjà enregistrée'),
+        ),
+      );
+      return;
+    }
     if (draft &&
         _nom.text.trim().isEmpty &&
         _prenom.text.trim().isEmpty &&
@@ -433,7 +517,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     setState(() => _busy = true);
     try {
       final db = LocalDatabase.instance.db;
-      final now = DateTime.now().toUtc().toIso8601String();
+    final now = DateTime.now().toUtc().toIso8601String();
       final payload = _buildPayload();
       final payloadJson = jsonEncode(payload);
       final given = _prenom.text.trim().isEmpty ? '(brouillon)' : _prenom.text.trim();
@@ -469,10 +553,10 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
         );
       } else {
         await db.insert('census_records', {
-          'id': localId,
-          'local_id': localId,
-          'household_local_id': widget.householdLocalId,
-          'campaign_id': widget.campaignId,
+      'id': localId,
+      'local_id': localId,
+      'household_local_id': widget.householdLocalId,
+      'campaign_id': widget.campaignId,
           ...row,
         });
         final count = await db.rawQuery(
@@ -495,15 +579,15 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
 
       if (!draft) {
         await LocalDatabase.instance.setMeta('sync_status', 'EN_ATTENTE');
-        await SyncQueue().enqueue(
-          SyncQueueItem(
-            entityType: 'census_record',
-            localId: localId,
+    await SyncQueue().enqueue(
+      SyncQueueItem(
+        entityType: 'census_record',
+        localId: localId,
             version: nextVersion,
-            payload: {
+        payload: {
               'local_id': localId,
-              'household_local_id': widget.householdLocalId,
-              'campaign_id': widget.campaignId,
+          'household_local_id': widget.householdLocalId,
+          'campaign_id': widget.campaignId,
               'given_names': given,
               'family_name': family,
               'sex': _sex,
@@ -512,13 +596,13 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               'version': nextVersion,
               'payload': payload,
               'relationship_to_head': _relation,
-            },
-          ),
-        );
+        },
+      ),
+    );
       }
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             draft
@@ -658,7 +742,10 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
                     for (final o in _etatCivilOptions)
                       DropdownMenuItem(value: o.$1, child: Text(o.$2)),
                   ],
-                  onChanged: (v) => setState(() => _etatCivil = v ?? 'CELIBATAIRE'),
+                  onChanged: (v) => setState(() {
+                    _etatCivil = v ?? 'CELIBATAIRE';
+                    if (_etatCivil == 'MARIE') _aConjoint = true;
+                  }),
                 ),
               ),
             ],
@@ -882,7 +969,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-          children: [
+        children: [
             if (_rejectNote != null && _rejectNote!.isNotEmpty) ...[
               Card(
                 color: Colors.red.shade50,
@@ -907,7 +994,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, height: 1.35),
               ),
             ),
-            const SizedBox(height: 12),
+          const SizedBox(height: 12),
             _buildIdentityBlock(),
             _buildOriginBlock(),
             _buildBioBlock(),
@@ -1035,11 +1122,72 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             child: _univFields(_formations[i]),
           ),
         ],
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Formations professionnelles (${_formationsPro.length})',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () =>
+                  setState(() => _formationsPro.add(_ProEditors(FormationProfessionnelle()))),
+              icon: const Icon(Icons.add),
+              label: const Text('Ajouter'),
+            ),
+          ],
+        ),
+        for (var i = 0; i < _formationsPro.length; i++) ...[
+          const SizedBox(height: 8),
+          _memberCard(
+            title: 'Formation pro ${i + 1}',
+            onRemove: () => setState(() {
+              _formationsPro[i].dispose();
+              _formationsPro.removeAt(i);
+            }),
+            child: _proFields(_formationsPro[i]),
+          ),
+        ],
         const SizedBox(height: 12),
         TextFormField(
           controller: _etudesRemarques,
           decoration: _dec('Remarques études'),
           maxLines: 3,
+        ),
+      ],
+    );
+  }
+
+  Widget _proFields(_ProEditors m) {
+    return Column(
+      children: [
+        TextFormField(controller: m.etablissement, decoration: _dec('Centre / établissement')),
+        const SizedBox(height: 8),
+        TextFormField(controller: m.metier, decoration: _dec('Métier / spécialité')),
+        const SizedBox(height: 8),
+        TextFormField(controller: m.certificat, decoration: _dec('Certificat / diplôme')),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(child: TextFormField(controller: m.duree, decoration: _dec('Durée'))),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextFormField(controller: m.anneeObtention, decoration: _dec('Année')),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: m.statut.isEmpty ? null : m.statut,
+          decoration: _dec('Statut'),
+          items: const [
+            DropdownMenuItem(value: 'TERMINE', child: Text('Terminé')),
+            DropdownMenuItem(value: 'EN_COURS', child: Text('En cours')),
+            DropdownMenuItem(value: 'ABANDONNE', child: Text('Abandonné')),
+          ],
+          onChanged: (v) => setState(() => m.statut = v ?? ''),
         ),
       ],
     );
@@ -1086,7 +1234,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
         const SizedBox(height: 8),
         TextFormField(controller: m.filiere, decoration: _dec('Filière / domaine')),
         const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
+          DropdownButtonFormField<String>(
           value: m.diplome.isEmpty ? null : m.diplome,
           decoration: _dec('Diplôme'),
           items: [
@@ -1106,7 +1254,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               child: DropdownButtonFormField<String>(
                 value: m.statut.isEmpty ? null : m.statut,
                 decoration: _dec('Statut'),
-                items: const [
+            items: const [
                   DropdownMenuItem(value: 'TERMINE', child: Text('Terminé')),
                   DropdownMenuItem(value: 'EN_COURS', child: Text('En cours')),
                   DropdownMenuItem(value: 'ABANDONNE', child: Text('Abandonné')),
@@ -1225,51 +1373,128 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   }
 
   Widget _buildFamilyBlock() {
+    final needConjoint = _aConjoint || _etatCivil == 'MARIE';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         DropdownButtonFormField<bool>(
-          value: _aConjoint,
-          decoration: _dec('A un conjoint / vit en couple'),
+          value: needConjoint,
+          decoration: _dec('A un conjoint / vit en couple / marié(e)'),
           items: const [
             DropdownMenuItem(value: false, child: Text('Non')),
             DropdownMenuItem(value: true, child: Text('Oui')),
           ],
-          onChanged: (v) => setState(() => _aConjoint = v ?? false),
+          onChanged: _etatCivil == 'MARIE'
+              ? null
+              : (v) => setState(() {
+                    _aConjoint = v ?? false;
+                    if (!_aConjoint) {
+                      _conjointLocked = false;
+                      _conjoint.personId = null;
+                    }
+                  }),
         ),
-        if (_aConjoint) ...[
-          const SizedBox(height: 10),
-          Text('Conjoint(e)', style: Theme.of(context).textTheme.titleSmall),
+        if (_etatCivil == 'MARIE')
+          const Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: Text(
+              'État civil = Marié(e) : conjoint(e) obligatoire via recherche.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF5A6A85)),
+            ),
+          ),
+        if (needConjoint) ...[
+          const SizedBox(height: 12),
+          Text('Lier une personne déjà enregistrée (obligatoire)',
+              style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 6),
-          _memberFields(_conjoint, showTelephone: true),
+          if (_conjointLocked)
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFECFDF5),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF6EE7B7)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${_conjoint.nom.text} ${_conjoint.postnom.text} ${_conjoint.prenom.text}'.trim(),
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => setState(() {
+                      _conjointLocked = false;
+                      _conjoint.personId = null;
+                      _conjoint.nom.clear();
+                      _conjoint.postnom.clear();
+                      _conjoint.prenom.clear();
+                      _conjoint.sexe = '';
+                      _conjoint.dateNaissance.clear();
+                      _conjoint.telephone.clear();
+                    }),
+                    child: const Text('Changer'),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            TextFormField(
+              controller: _conjointSearch,
+              decoration: _dec('Rechercher une personne…', hint: 'Nom, post-nom, prénom'),
+              onChanged: _searchConjoint,
+            ),
+            if (_conjointSuggestions.isNotEmpty)
+              ..._conjointSuggestions.map(
+                (h) => ListTile(
+                  dense: true,
+                  title: Text('${h['nom']} ${h['postnom']} ${h['prenom']}'.trim()),
+                  subtitle: Text('${h['sexe']} · ${h['date_naissance']}'),
+                  onTap: () => _applyConjointHit(h),
+                ),
+              ),
+            if (_conjointSearch.text.trim().isNotEmpty && _conjointSuggestions.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Text(
+                  'Aucun résultat local — enregistrez d’abord la personne, puis reliez-la.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFFB45309)),
+                ),
+              ),
+          ],
+          const SizedBox(height: 10),
+          _memberFields(_conjoint, showTelephone: true, locked: _conjointLocked),
         ],
         const SizedBox(height: 16),
-        Row(
+        Text("Nombre d'enfants (0–5)", style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
           children: [
-            Expanded(
-              child: Text(
-                'Enfants (${_enfants.length})',
-                style: Theme.of(context).textTheme.titleSmall,
+            for (final n in [0, 1, 2, 3, 4, 5])
+              ChoiceChip(
+                label: Text('$n'),
+                selected: _nombreEnfants == n,
+                onSelected: (_) => _setNombreEnfants(n),
               ),
-            ),
-            TextButton.icon(
-              onPressed: () => setState(() => _enfants.add(_MemberEditors(FamilyMember(lien: 'ENFANT')))),
-              icon: const Icon(Icons.person_add_alt_1),
-              label: const Text('Ajouter'),
-            ),
           ],
         ),
-        if (_enfants.isEmpty)
-          const Text('Aucun enfant déclaré.', style: TextStyle(color: Color(0xFF5A6A85))),
+        if (_nombreEnfants >= 5)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => _setNombreEnfants(_enfants.length + 1),
+              icon: const Icon(Icons.person_add_alt_1),
+              label: const Text('Ajouter un enfant (>5)'),
+            ),
+          ),
         for (var i = 0; i < _enfants.length; i++) ...[
           const SizedBox(height: 8),
           _memberCard(
             title: 'Enfant ${i + 1}',
-            onRemove: () => setState(() {
-              _enfants[i].dispose();
-              _enfants.removeAt(i);
-            }),
-            child: _memberFields(_enfants[i]),
+            onRemove: i >= 5 ? () => _setNombreEnfants(_enfants.length - 1) : null,
+            child: _memberFields(_enfants[i], showTelephone: true, showLien: true, showCote: true),
           ),
         ],
         const SizedBox(height: 16),
@@ -1288,6 +1513,10 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             ),
           ],
         ),
+        const Text(
+          'Petit frère, sœur, neveu, travailleur / employé(e)… Indiquez le côté homme/femme.',
+          style: TextStyle(fontSize: 12, color: Color(0xFF5A6A85)),
+        ),
         if (_charges.isEmpty)
           const Text('Aucune personne à charge.', style: TextStyle(color: Color(0xFF5A6A85))),
         for (var i = 0; i < _charges.length; i++) ...[
@@ -1298,7 +1527,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               _charges[i].dispose();
               _charges.removeAt(i);
             }),
-            child: _memberFields(_charges[i], showTelephone: true, showLien: true),
+            child: _memberFields(_charges[i], showTelephone: true, showLien: true, showCote: true),
           ),
         ],
         const SizedBox(height: 14),
@@ -1313,7 +1542,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
 
   Widget _memberCard({
     required String title,
-    required VoidCallback onRemove,
+    VoidCallback? onRemove,
     required Widget child,
   }) {
     return Container(
@@ -1328,11 +1557,12 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
           Row(
             children: [
               Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700))),
-              IconButton(
-                onPressed: onRemove,
-                icon: const Icon(Icons.delete_outline, color: Color(0xFFE11D48)),
-                tooltip: 'Retirer',
-              ),
+              if (onRemove != null)
+                IconButton(
+                  onPressed: onRemove,
+                  icon: const Icon(Icons.delete_outline, color: Color(0xFFE11D48)),
+                  tooltip: 'Retirer',
+                ),
             ],
           ),
           child,
@@ -1345,14 +1575,52 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     _MemberEditors m, {
     bool showTelephone = false,
     bool showLien = false,
+    bool showCote = false,
+    bool locked = false,
   }) {
     return Column(
       children: [
-        TextFormField(controller: m.nom, decoration: _dec('Nom')),
+        if (showCote) ...[
+          DropdownButtonFormField<String>(
+            value: m.cote.isEmpty ? null : m.cote,
+            decoration: _dec('Côté famille'),
+            items: [
+              for (final c in FamilyMember.cotes.where((e) => e.$1.isNotEmpty))
+                DropdownMenuItem(value: c.$1, child: Text(c.$2)),
+            ],
+            onChanged: (v) => setState(() => m.cote = v ?? ''),
+          ),
+          const SizedBox(height: 8),
+        ],
+        if (showLien) ...[
+          DropdownButtonFormField<String>(
+            value: m.lien.isEmpty ? null : m.lien,
+            decoration: _dec('Lien de parenté'),
+            items: [
+              for (final l in FamilyMember.liens.where((e) => e.isNotEmpty))
+                DropdownMenuItem(value: l, child: Text(l)),
+            ],
+            onChanged: (v) => setState(() => m.lien = v ?? ''),
+          ),
+          const SizedBox(height: 8),
+        ],
+        TextFormField(
+          controller: m.nom,
+          readOnly: locked,
+          decoration: _dec('Nom'),
+        ),
         const SizedBox(height: 8),
-        TextFormField(controller: m.postnom, decoration: _dec('Post-nom')),
+        TextFormField(
+          controller: m.postnom,
+          readOnly: locked,
+          decoration: _dec('Post-nom'),
+        ),
         const SizedBox(height: 8),
-        TextFormField(controller: m.prenom, decoration: _dec('Prénom')),
+        TextFormField(
+          controller: m.prenom,
+          readOnly: locked,
+          decoration: _dec('Prénom'),
+        ),
         const SizedBox(height: 8),
         Row(
           children: [
@@ -1364,13 +1632,14 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
                   DropdownMenuItem(value: 'M', child: Text('Masculin')),
                   DropdownMenuItem(value: 'F', child: Text('Féminin')),
                 ],
-                onChanged: (v) => setState(() => m.sexe = v ?? ''),
+                onChanged: locked ? null : (v) => setState(() => m.sexe = v ?? ''),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: TextFormField(
                 controller: m.dateNaissance,
+                readOnly: locked,
                 decoration: _dec('Date naissance', hint: 'AAAA-MM-JJ'),
               ),
             ),
@@ -1379,13 +1648,6 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
         if (showTelephone) ...[
           const SizedBox(height: 8),
           TextFormField(controller: m.telephone, decoration: _dec('Téléphone')),
-        ],
-        if (showLien) ...[
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: m.lien,
-            decoration: _dec('Lien de parenté', hint: 'Frère, oncle…'),
-          ),
         ],
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
@@ -1405,18 +1667,22 @@ class _MemberEditors {
         prenom = TextEditingController(text: m.prenom),
         dateNaissance = TextEditingController(text: m.dateNaissance),
         telephone = TextEditingController(text: m.telephone),
-        lien = TextEditingController(text: m.lien),
         sexe = m.sexe,
-        vitAvec = m.vitAvec;
+        vitAvec = m.vitAvec,
+        lien = m.lien,
+        cote = m.cote,
+        personId = m.personId;
 
   final TextEditingController nom;
   final TextEditingController postnom;
   final TextEditingController prenom;
   final TextEditingController dateNaissance;
   final TextEditingController telephone;
-  final TextEditingController lien;
   String sexe;
   bool vitAvec;
+  String lien;
+  String cote;
+  String? personId;
 
   FamilyMember snapshot() => FamilyMember(
         nom: nom.text,
@@ -1426,7 +1692,9 @@ class _MemberEditors {
         dateNaissance: dateNaissance.text.trim(),
         telephone: telephone.text,
         vitAvec: vitAvec,
-        lien: lien.text,
+        lien: lien,
+        cote: cote,
+        personId: personId,
       );
 
   void dispose() {
@@ -1435,7 +1703,6 @@ class _MemberEditors {
     prenom.dispose();
     dateNaissance.dispose();
     telephone.dispose();
-    lien.dispose();
   }
 }
 
@@ -1499,6 +1766,40 @@ class _UnivEditors {
     etablissement.dispose();
     filiere.dispose();
     anneeObtention.dispose();
+  }
+}
+
+class _ProEditors {
+  _ProEditors(FormationProfessionnelle m)
+      : etablissement = TextEditingController(text: m.etablissement),
+        metier = TextEditingController(text: m.metier),
+        certificat = TextEditingController(text: m.certificat),
+        anneeObtention = TextEditingController(text: m.anneeObtention),
+        duree = TextEditingController(text: m.duree),
+        statut = m.statut;
+
+  final TextEditingController etablissement;
+  final TextEditingController metier;
+  final TextEditingController certificat;
+  final TextEditingController anneeObtention;
+  final TextEditingController duree;
+  String statut;
+
+  FormationProfessionnelle snapshot() => FormationProfessionnelle(
+        etablissement: etablissement.text,
+        metier: metier.text,
+        certificat: certificat.text,
+        anneeObtention: anneeObtention.text,
+        duree: duree.text,
+        statut: statut,
+      );
+
+  void dispose() {
+    etablissement.dispose();
+    metier.dispose();
+    certificat.dispose();
+    anneeObtention.dispose();
+    duree.dispose();
   }
 }
 
