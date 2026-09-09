@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { clearSession, getSession } from "../auth";
 import {
   HEALTH_DEMO_PASSWORD,
@@ -60,14 +60,9 @@ export default function HealthLoginPage() {
             Démo : <strong>{HEALTH_DEMO_USER}</strong> / <strong>{HEALTH_DEMO_PASSWORD}</strong>
           </p>
           <p className="muted small" style={{ marginTop: "0.65rem" }}>
-            Pas de compte ? L&apos;officier d&apos;état civil le crée dans{" "}
-            <strong>Déclarations santé → Créer un compte</strong>.
+            Compte créé par l&apos;officier d&apos;état civil (Déclarations santé → Créer un compte).
           </p>
         </form>
-
-        <p className="muted small" style={{ marginTop: "1rem" }}>
-          Officier d&apos;état civil ? <Link to="/login">Connexion état civil</Link>
-        </p>
       </div>
     </div>
   );

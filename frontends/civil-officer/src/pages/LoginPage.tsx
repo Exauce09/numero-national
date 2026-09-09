@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { DEMO_PASSWORD, DEMO_USER, getSession, login } from "../auth";
 import { clearHealthSession, getHealthSession } from "../healthAuth";
 
@@ -76,10 +76,6 @@ export default function LoginPage() {
         </form>
         <p className="login-subtitle" style={{ marginTop: "1.25rem", marginBottom: 0 }}>
           Démo : <strong>{DEMO_USER}</strong> / <strong>{DEMO_PASSWORD}</strong>
-        </p>
-        <p className="muted small" style={{ marginTop: "0.75rem" }}>
-          Structure sanitaire ?{" "}
-          <Link to="/sante/login">Connexion hôpital / clinique</Link>
         </p>
       </div>
     </div>
