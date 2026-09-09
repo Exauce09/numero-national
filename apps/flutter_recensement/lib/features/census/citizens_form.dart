@@ -52,7 +52,6 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   late final TextEditingController _empreinteGauche;
   late final TextEditingController _empreinteDroite;
   late final TextEditingController _iris;
-  late final TextEditingController _professionnel;
   late final TextEditingController _etudesRemarques;
   late final TextEditingController _anneeFinEtudes;
   late final TextEditingController _adminNumero;
@@ -60,6 +59,10 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   late final TextEditingController _adminDateOuverture;
   late final TextEditingController _adminAgent;
   late final TextEditingController _adminRemarques;
+  late final TextEditingController _expPoste;
+  late final TextEditingController _expEmployeur;
+  late final TextEditingController _expAnnees;
+  late final TextEditingController _expRemarques;
   late final TextEditingController _familleRemarques;
 
   String _sex = 'M';
@@ -69,6 +72,8 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   String _saitLire = '';
   String _saitEcrire = '';
   String _niveauAtteint = '';
+  String _expStatut = '';
+  String _expSecteur = '';
   String? _photoRef;
   String? _fingerprintRef;
   Map<String, String?> _geoNaissance = {};
@@ -87,6 +92,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   final List<_UnivEditors> _formations = [];
   final List<_ProEditors> _formationsPro = [];
   final List<_DocEditors> _documents = [];
+  final List<_JobEditors> _emplois = [];
   int _nombreEnfants = 0;
   final _conjointSearch = TextEditingController();
   List<Map<String, String>> _conjointSuggestions = [];
@@ -151,8 +157,6 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     _empreinteDroite =
         TextEditingController(text: payload['empreinte_droite']?.toString() ?? '');
     _iris = TextEditingController(text: payload['iris']?.toString() ?? '');
-    _professionnel =
-        TextEditingController(text: payload['parcours_professionnel']?.toString() ?? '');
 
     final etudes = EtudesData.parse(
       payload['etudes_detail'] ??
@@ -176,6 +180,19 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     }
     for (final f in etudes.formationsProfessionnelles) {
       _formationsPro.add(_ProEditors(f));
+    }
+
+    final experience = ExperienceData.parse(
+      payload['experience_detail'] ?? payload['parcours_professionnel'],
+    );
+    _expStatut = experience.statutActuel;
+    _expSecteur = experience.secteurActuel;
+    _expPoste = TextEditingController(text: experience.posteActuel);
+    _expEmployeur = TextEditingController(text: experience.employeurActuel);
+    _expAnnees = TextEditingController(text: experience.anneesExperience);
+    _expRemarques = TextEditingController(text: experience.remarques);
+    for (final j in experience.emplois) {
+      _emplois.add(_JobEditors(j));
     }
 
     final admin = IdentiteAdminData.parse(
@@ -259,7 +276,6 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     _empreinteGauche.dispose();
     _empreinteDroite.dispose();
     _iris.dispose();
-    _professionnel.dispose();
     _etudesRemarques.dispose();
     _anneeFinEtudes.dispose();
     _adminNumero.dispose();
@@ -267,6 +283,10 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     _adminDateOuverture.dispose();
     _adminAgent.dispose();
     _adminRemarques.dispose();
+    _expPoste.dispose();
+    _expEmployeur.dispose();
+    _expAnnees.dispose();
+    _expRemarques.dispose();
     _familleRemarques.dispose();
     _conjointSearch.dispose();
     _conjoint.dispose();
@@ -284,6 +304,9 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     }
     for (final f in _formationsPro) {
       f.dispose();
+    }
+    for (final j in _emplois) {
+      j.dispose();
     }
     for (final d in _documents) {
       d.dispose();
@@ -388,7 +411,8 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
       'fingerprint_ref': _fingerprintRef,
       'parcours_scolaire': _buildEtudes().formatScolaire(),
       'parcours_universitaire': _buildEtudes().formatUniversitaire(),
-      'parcours_professionnel': _professionnel.text.trim(),
+      'parcours_professionnel': _buildExperience().formatSummary(),
+      'experience_detail': _buildExperience().toJson(),
       'etudes_detail': _buildEtudes().toJson(),
       'numero_admin': _buildAdmin().numeroDossier.trim(),
       'identite_administrative_detail': _buildAdmin().toJson(),
@@ -396,6 +420,18 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
       'situation_familiale_detail': _buildSituation().toJson(),
       'relationship_to_head': _relation,
     };
+  }
+
+  ExperienceData _buildExperience() {
+    return ExperienceData(
+      statutActuel: _expStatut,
+      employeurActuel: _expEmployeur.text,
+      posteActuel: _expPoste.text,
+      secteurActuel: _expSecteur,
+      anneesExperience: _expAnnees.text,
+      emplois: _emplois.map((e) => e.snapshot()).toList(),
+      remarques: _expRemarques.text,
+    );
   }
 
   EtudesData _buildEtudes() {
@@ -1002,11 +1038,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               _buildEtudesBlock(),
             ]),
             _section('5. Expérience professionnelle', [
-              TextFormField(
-                controller: _professionnel,
-                decoration: _dec('Expérience professionnelle'),
-                maxLines: 6,
-              ),
+              _buildExperienceBlock(),
             ]),
             _section('6. Identité administrative', [
               _buildAdminBlock(),
@@ -1019,6 +1051,127 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildExperienceBlock() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DropdownButtonFormField<String>(
+          value: _expStatut.isEmpty ? null : _expStatut,
+          decoration: _dec('Statut professionnel'),
+          items: [
+            for (final s in ExperienceData.statuts.where((e) => e.$1.isNotEmpty))
+              DropdownMenuItem(value: s.$1, child: Text(s.$2)),
+          ],
+          onChanged: (v) => setState(() => _expStatut = v ?? ''),
+        ),
+        const SizedBox(height: 10),
+        TextFormField(controller: _expPoste, decoration: _dec('Poste / fonction actuelle')),
+        const SizedBox(height: 10),
+        TextFormField(controller: _expEmployeur, decoration: _dec('Employeur / structure')),
+        const SizedBox(height: 10),
+        DropdownButtonFormField<String>(
+          value: _expSecteur.isEmpty ? null : _expSecteur,
+          decoration: _dec("Secteur d'activité"),
+          items: [
+            for (final s in ExperienceData.secteurs.where((e) => e.isNotEmpty))
+              DropdownMenuItem(value: s, child: Text(s)),
+          ],
+          onChanged: (v) => setState(() => _expSecteur = v ?? ''),
+        ),
+        const SizedBox(height: 10),
+        TextFormField(
+          controller: _expAnnees,
+          decoration: _dec("Années d'expérience", hint: 'Ex. 5'),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Emplois précédents (${_emplois.length})',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => setState(() => _emplois.add(_JobEditors(EmploiExperience()))),
+              icon: const Icon(Icons.add),
+              label: const Text('Ajouter'),
+            ),
+          ],
+        ),
+        for (var i = 0; i < _emplois.length; i++) ...[
+          const SizedBox(height: 8),
+          _memberCard(
+            title: 'Emploi ${i + 1}',
+            onRemove: () => setState(() {
+              _emplois[i].dispose();
+              _emplois.removeAt(i);
+            }),
+            child: _jobFields(_emplois[i]),
+          ),
+        ],
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _expRemarques,
+          decoration: _dec('Remarques professionnelles'),
+          maxLines: 3,
+        ),
+      ],
+    );
+  }
+
+  Widget _jobFields(_JobEditors m) {
+    return Column(
+      children: [
+        TextFormField(controller: m.poste, decoration: _dec('Poste')),
+        const SizedBox(height: 8),
+        TextFormField(controller: m.employeur, decoration: _dec('Employeur')),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: m.secteur.isEmpty ? null : m.secteur,
+          decoration: _dec('Secteur'),
+          items: [
+            for (final s in ExperienceData.secteurs.where((e) => e.isNotEmpty))
+              DropdownMenuItem(value: s, child: Text(s)),
+          ],
+          onChanged: (v) => setState(() => m.secteur = v ?? ''),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(controller: m.ville, decoration: _dec('Ville')),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(controller: m.anneeDebut, decoration: _dec('Début')),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextFormField(
+                controller: m.anneeFin,
+                enabled: !m.enCours,
+                decoration: _dec('Fin'),
+              ),
+            ),
+          ],
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Emploi encore en cours'),
+          value: m.enCours,
+          onChanged: (v) => setState(() {
+            m.enCours = v;
+            if (v) m.anneeFin.clear();
+          }),
+        ),
+        TextFormField(
+          controller: m.description,
+          decoration: _dec('Description / tâches'),
+          maxLines: 2,
+        ),
+      ],
     );
   }
 
@@ -1800,6 +1953,47 @@ class _ProEditors {
     certificat.dispose();
     anneeObtention.dispose();
     duree.dispose();
+  }
+}
+
+class _JobEditors {
+  _JobEditors(EmploiExperience m)
+      : employeur = TextEditingController(text: m.employeur),
+        poste = TextEditingController(text: m.poste),
+        ville = TextEditingController(text: m.ville),
+        anneeDebut = TextEditingController(text: m.anneeDebut),
+        anneeFin = TextEditingController(text: m.anneeFin),
+        description = TextEditingController(text: m.description),
+        secteur = m.secteur,
+        enCours = m.enCours;
+
+  final TextEditingController employeur;
+  final TextEditingController poste;
+  final TextEditingController ville;
+  final TextEditingController anneeDebut;
+  final TextEditingController anneeFin;
+  final TextEditingController description;
+  String secteur;
+  bool enCours;
+
+  EmploiExperience snapshot() => EmploiExperience(
+        employeur: employeur.text,
+        poste: poste.text,
+        secteur: secteur,
+        ville: ville.text,
+        anneeDebut: anneeDebut.text,
+        anneeFin: anneeFin.text,
+        enCours: enCours,
+        description: description.text,
+      );
+
+  void dispose() {
+    employeur.dispose();
+    poste.dispose();
+    ville.dispose();
+    anneeDebut.dispose();
+    anneeFin.dispose();
+    description.dispose();
   }
 }
 

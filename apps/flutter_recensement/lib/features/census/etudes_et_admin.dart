@@ -434,3 +434,172 @@ class IdentiteAdminData {
     );
   }
 }
+
+class EmploiExperience {
+  EmploiExperience({
+    this.employeur = '',
+    this.poste = '',
+    this.secteur = '',
+    this.ville = '',
+    this.anneeDebut = '',
+    this.anneeFin = '',
+    this.enCours = false,
+    this.description = '',
+  });
+
+  String employeur;
+  String poste;
+  String secteur;
+  String ville;
+  String anneeDebut;
+  String anneeFin;
+  bool enCours;
+  String description;
+
+  Map<String, dynamic> toJson() => {
+        'employeur': employeur,
+        'poste': poste,
+        'secteur': secteur,
+        'ville': ville,
+        'annee_debut': anneeDebut,
+        'annee_fin': anneeFin,
+        'en_cours': enCours,
+        'description': description,
+      };
+
+  static EmploiExperience fromJson(Map<String, dynamic>? raw) {
+    if (raw == null) return EmploiExperience();
+    return EmploiExperience(
+      employeur: raw['employeur']?.toString() ?? '',
+      poste: raw['poste']?.toString() ?? '',
+      secteur: raw['secteur']?.toString() ?? '',
+      ville: raw['ville']?.toString() ?? '',
+      anneeDebut: raw['annee_debut']?.toString() ?? '',
+      anneeFin: raw['annee_fin']?.toString() ?? '',
+      enCours: raw['en_cours'] == true,
+      description: raw['description']?.toString() ?? '',
+    );
+  }
+}
+
+class ExperienceData {
+  ExperienceData({
+    this.statutActuel = '',
+    this.employeurActuel = '',
+    this.posteActuel = '',
+    this.secteurActuel = '',
+    this.anneesExperience = '',
+    List<EmploiExperience>? emplois,
+    this.remarques = '',
+  }) : emplois = emplois ?? <EmploiExperience>[];
+
+  String statutActuel;
+  String employeurActuel;
+  String posteActuel;
+  String secteurActuel;
+  String anneesExperience;
+  List<EmploiExperience> emplois;
+  String remarques;
+
+  static const statuts = <(String, String)>[
+    ('', '—'),
+    ('SALARIE', 'Salarié(e)'),
+    ('INDEPENDANT', 'Indépendant(e) / informel'),
+    ('FONCTIONNAIRE', 'Fonctionnaire / agent public'),
+    ('ETUDIANT', 'Étudiant(e)'),
+    ('CHOMEUR', 'Sans emploi / en recherche'),
+    ('RETRAITE', 'Retraité(e)'),
+    ('AUTRE', 'Autre'),
+  ];
+
+  static const secteurs = <String>[
+    '',
+    'Administration publique',
+    'Agriculture / élevage',
+    'Commerce',
+    'Construction / BTP',
+    'Éducation / enseignement',
+    'Énergie / mines',
+    'Finance / banque',
+    'Santé',
+    'Transport / logistique',
+    'Télécoms / numérique',
+    'Artisanat',
+    'Services',
+    'ONG / coopération',
+    'Autre',
+  ];
+
+  Map<String, dynamic> toJson() => {
+        'statut_actuel': statutActuel,
+        'employeur_actuel': employeurActuel,
+        'poste_actuel': posteActuel,
+        'secteur_actuel': secteurActuel,
+        'annees_experience': anneesExperience,
+        'emplois': emplois.map((e) => e.toJson()).toList(),
+        'remarques': remarques,
+      };
+
+  String formatSummary() {
+    final lines = <String>[];
+    for (final s in statuts) {
+      if (s.$1 == statutActuel && s.$2 != '—') {
+        lines.add('Statut actuel : ${s.$2}');
+        break;
+      }
+    }
+    if (posteActuel.trim().isNotEmpty) lines.add('Poste actuel : ${posteActuel.trim()}');
+    if (employeurActuel.trim().isNotEmpty) {
+      lines.add('Employeur actuel : ${employeurActuel.trim()}');
+    }
+    if (secteurActuel.trim().isNotEmpty) lines.add('Secteur : ${secteurActuel.trim()}');
+    if (anneesExperience.trim().isNotEmpty) {
+      lines.add("Années d'expérience : ${anneesExperience.trim()}");
+    }
+    if (emplois.isNotEmpty) {
+      lines.add('Parcours (${emplois.length}) :');
+      for (var i = 0; i < emplois.length; i++) {
+        final e = emplois[i];
+        final periode = e.enCours
+            ? '${e.anneeDebut.isEmpty ? '?' : e.anneeDebut}–en cours'
+            : [e.anneeDebut, e.anneeFin].where((x) => x.isNotEmpty).join('–');
+        final bits = [
+          e.poste.trim().isEmpty ? '—' : e.poste.trim(),
+          if (e.employeur.trim().isNotEmpty) e.employeur.trim(),
+          if (e.secteur.trim().isNotEmpty) e.secteur.trim(),
+          if (e.ville.trim().isNotEmpty) e.ville.trim(),
+          if (periode.isNotEmpty) periode,
+          if (e.description.trim().isNotEmpty) e.description.trim(),
+        ];
+        lines.add('  ${i + 1}. ${bits.join(', ')}');
+      }
+    }
+    if (remarques.trim().isNotEmpty) lines.add('Remarques : ${remarques.trim()}');
+    return lines.join('\n');
+  }
+
+  static ExperienceData parse(Object? raw) {
+    if (raw == null) return ExperienceData();
+    if (raw is String) {
+      final t = raw.trim();
+      return t.isEmpty ? ExperienceData() : ExperienceData(remarques: t);
+    }
+    if (raw is! Map) return ExperienceData();
+    final m = Map<String, dynamic>.from(raw);
+    final jobs = m['emplois'];
+    return ExperienceData(
+      statutActuel: m['statut_actuel']?.toString() ?? '',
+      employeurActuel: m['employeur_actuel']?.toString() ?? '',
+      posteActuel: m['poste_actuel']?.toString() ?? '',
+      secteurActuel: m['secteur_actuel']?.toString() ?? '',
+      anneesExperience: m['annees_experience']?.toString() ?? '',
+      emplois: jobs is List
+          ? jobs
+              .whereType<Map>()
+              .map((e) => EmploiExperience.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : <EmploiExperience>[],
+      remarques: m['remarques']?.toString() ?? '',
+    );
+  }
+}

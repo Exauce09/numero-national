@@ -9,6 +9,7 @@ import GeoCascade, {
 import PersonPicker from "../components/PersonPicker";
 import SituationFamilialeForm from "../components/SituationFamilialeForm";
 import EtudesFaitesForm from "../components/EtudesFaitesForm";
+import ExperienceProfessionnelleForm from "../components/ExperienceProfessionnelleForm";
 import IdentiteAdministrativeForm from "../components/IdentiteAdministrativeForm";
 import {
   ETAT_CIVIL_OPTIONS,
@@ -44,6 +45,12 @@ import {
   parseIdentiteAdmin,
   type IdentiteAdminData,
 } from "../identiteAdministrative";
+import {
+  emptyExperience,
+  formatExperience,
+  parseExperience,
+  type ExperienceData,
+} from "../experienceProfessionnelle";
 
 const STEPS = [
   { id: 1, label: "1. Identité" },
@@ -88,12 +95,13 @@ type CensusDraft = {
   empreinteDroite: string;
   iris: string;
   etudes: EtudesData;
-  professionnel: string;
+  experience: ExperienceData;
   situationFamiliale: SituationFamilialeData;
   identiteAdmin: IdentiteAdminData;
   /** Anciens brouillons */
   scolaire?: string;
   universitaire?: string;
+  professionnel?: string;
   numeroAdmin?: string;
   savedAt: string;
 };
@@ -127,7 +135,7 @@ export default function CensusPage() {
   const [empreinteDroite, setEmpreinteDroite] = useState("");
   const [iris, setIris] = useState("");
   const [etudes, setEtudes] = useState<EtudesData>(emptyEtudes);
-  const [professionnel, setProfessionnel] = useState("");
+  const [experience, setExperience] = useState<ExperienceData>(emptyExperience);
   const [situationFamiliale, setSituationFamiliale] = useState<SituationFamilialeData>(
     emptySituationFamiliale
   );
@@ -180,7 +188,9 @@ export default function CensusPage() {
               remarques: [d.scolaire, d.universitaire].filter(Boolean).join("\n"),
             })
       );
-      setProfessionnel(d.professionnel ?? "");
+      setExperience(
+        d.experience ? parseExperience(d.experience) : parseExperience(d.professionnel)
+      );
       setSituationFamiliale(
         d.situationFamiliale
           ? parseSituationFamiliale(d.situationFamiliale)
@@ -322,7 +332,7 @@ export default function CensusPage() {
       empreinteDroite,
       iris,
       etudes,
-      professionnel,
+      experience,
       situationFamiliale,
       identiteAdmin,
       savedAt: new Date().toISOString(),
@@ -348,6 +358,7 @@ export default function CensusPage() {
       const situationSummary = formatSituationFamiliale(situationFamiliale);
       const scolaireSummary = formatParcoursScolaire(etudes);
       const univSummary = formatParcoursUniversitaire(etudes);
+      const experienceSummary = formatExperience(experience);
       const person = addPerson({
         nom: nom.trim(),
         postnom: postnom.trim(),
@@ -366,7 +377,8 @@ export default function CensusPage() {
         iris_note: iris.trim() || undefined,
         parcours_scolaire: scolaireSummary || undefined,
         parcours_universitaire: univSummary || undefined,
-        parcours_professionnel: [professionnel.trim(), profession.trim()].filter(Boolean).join(" | ") || undefined,
+        parcours_professionnel:
+          [experienceSummary, profession.trim()].filter(Boolean).join("\n") || undefined,
         situation_familiale: situationSummary || undefined,
         nationalite: nationalite.trim() === "Étrangère" || nationalite.toLowerCase().includes("etrang")
           ? "ETRANGER"
@@ -411,6 +423,7 @@ export default function CensusPage() {
         parcours_scolaire: person.parcours_scolaire ?? null,
         parcours_universitaire: person.parcours_universitaire ?? null,
         parcours_professionnel: person.parcours_professionnel ?? null,
+        experience_detail: experience,
         etudes_detail: etudes,
         situation_familiale: person.situation_familiale ?? null,
         situation_familiale_detail: situationFamiliale,
@@ -429,6 +442,7 @@ export default function CensusPage() {
       clearDraft();
       setSituationFamiliale(emptySituationFamiliale());
       setEtudes(emptyEtudes());
+      setExperience(emptyExperience());
       setIdentiteAdmin(emptyIdentiteAdmin());
       setCreated(act);
       streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -735,16 +749,8 @@ export default function CensusPage() {
         ) : null}
 
         {step === 5 ? (
-          <div className="form-grid">
-            <div className="full">
-              <label className="form-label">Expérience professionnelle</label>
-              <textarea
-                className="form-control"
-                rows={6}
-                value={professionnel}
-                onChange={(e) => setProfessionnel(e.target.value)}
-              />
-            </div>
+          <div className="full">
+            <ExperienceProfessionnelleForm value={experience} onChange={setExperience} />
           </div>
         ) : null}
 
