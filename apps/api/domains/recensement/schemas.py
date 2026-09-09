@@ -165,6 +165,19 @@ class BatchPromoteResult(BaseModel):
     errors: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class CampaignStatsOut(BaseModel):
+    campaign_id: uuid.UUID
+    households: int
+    records: int
+    by_status: dict[str, int]
+    synced: int
+    approved: int
+    rejected: int
+    promoted: int
+    conflicts: int
+    pending_review: int
+
+
 class ZoneCreate(BaseModel):
     code: str = Field(min_length=2, max_length=64)
     name: str = Field(min_length=2, max_length=255)

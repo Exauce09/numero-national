@@ -10,10 +10,13 @@ class CitizensFormScreen extends StatefulWidget {
     super.key,
     required this.campaignId,
     required this.householdLocalId,
+    this.existing,
   });
 
   final String campaignId;
   final String householdLocalId;
+  /// When set, edits an existing (e.g. REJECTED) record and re-queues sync.
+  final Map<String, Object?>? existing;
 
   @override
   State<CitizensFormScreen> createState() => _CitizensFormScreenState();
@@ -21,13 +24,28 @@ class CitizensFormScreen extends StatefulWidget {
 
 class _CitizensFormScreenState extends State<CitizensFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _given = TextEditingController();
-  final _family = TextEditingController();
-  final _dob = TextEditingController();
+  late final TextEditingController _given;
+  late final TextEditingController _family;
+  late final TextEditingController _dob;
   String _sex = 'M';
   String _relation = 'AUTRE';
   String? _photoRef;
   bool _busy = false;
+  String? _rejectNote;
+
+  bool get _isEdit => widget.existing != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.existing;
+    _given = TextEditingController(text: e?['given_names']?.toString() ?? '');
+    _family = TextEditingController(text: e?['family_name']?.toString() ?? '');
+    _dob = TextEditingController(text: e?['date_of_birth']?.toString() ?? '');
+    _sex = e?['sex']?.toString() ?? 'M';
+    _photoRef = e?['photo_ref']?.toString();
+    _rejectNote = e?['review_note']?.toString();
+  }
 
   @override
   void dispose() {
@@ -55,8 +73,58 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _busy = true);
     try {
-      final localId = const Uuid().v4();
+      final db = LocalDatabase.instance.db;
       final now = DateTime.now().toUtc().toIso8601String();
+
+      if (_isEdit) {
+        final localId = widget.existing!['local_id']!.toString();
+        final prevVersion = (widget.existing!['version'] as int?) ?? 1;
+        final nextVersion = prevVersion + 1;
+        await db.update(
+          'census_records',
+          {
+            'given_names': _given.text.trim(),
+            'family_name': _family.text.trim(),
+            'sex': _sex,
+            'date_of_birth': _dob.text.trim(),
+            'photo_ref': _photoRef,
+            'version': nextVersion,
+            'status': 'QUEUED',
+            'review_note': null,
+            'updated_at': now,
+          },
+          where: 'local_id = ?',
+          whereArgs: [localId],
+        );
+        await LocalDatabase.instance.setMeta('sync_status', 'EN_ATTENTE');
+        await SyncQueue().enqueue(
+          SyncQueueItem(
+            entityType: 'census_record',
+            localId: localId,
+            version: nextVersion,
+            payload: {
+              'local_id': localId,
+              'household_local_id': widget.householdLocalId,
+              'campaign_id': widget.campaignId,
+              'given_names': _given.text.trim(),
+              'family_name': _family.text.trim(),
+              'sex': _sex,
+              'date_of_birth': _dob.text.trim(),
+              'photo_ref': _photoRef,
+              'version': nextVersion,
+              'relationship_to_head': _relation,
+            },
+          ),
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Correction enregistrée — en file de sync')),
+        );
+        Navigator.of(context).pop(true);
+        return;
+      }
+
+      final localId = const Uuid().v4();
       final row = {
         'id': localId,
         'local_id': localId,
@@ -71,7 +139,6 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
         'status': 'QUEUED',
         'updated_at': now,
       };
-      final db = LocalDatabase.instance.db;
       await db.insert('census_records', row);
       final count = await db.rawQuery(
         'SELECT COUNT(*) AS c FROM census_records WHERE household_local_id = ?',
@@ -111,98 +178,80 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Nouvelle fiche citoyen')),
+      appBar: AppBar(
+        title: Text(_isEdit ? 'Corriger la fiche' : 'Nouvelle fiche citoyen'),
+      ),
       body: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            if (_rejectNote != null && _rejectNote!.isNotEmpty)
+              Card(
+                color: Colors.red.shade50,
+                child: ListTile(
+                  leading: const Icon(Icons.cancel, color: Colors.red),
+                  title: const Text('Motif de rejet'),
+                  subtitle: Text(_rejectNote!),
+                ),
+              ),
+            if (_rejectNote != null && _rejectNote!.isNotEmpty) const SizedBox(height: 12),
             TextFormField(
               controller: _given,
-              decoration: const InputDecoration(
-                labelText: 'Prénoms *',
-                border: OutlineInputBorder(),
-              ),
-              validator: (v) =>
-                  (v == null || v.trim().length < 2) ? 'Prénoms requis' : null,
+              decoration: const InputDecoration(labelText: 'Prénoms *'),
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Obligatoire' : null,
             ),
-            const SizedBox(height: 12),
             TextFormField(
               controller: _family,
-              decoration: const InputDecoration(
-                labelText: 'Nom de famille *',
-                border: OutlineInputBorder(),
-              ),
-              validator: (v) =>
-                  (v == null || v.trim().length < 2) ? 'Nom requis' : null,
+              decoration: const InputDecoration(labelText: 'Nom *'),
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Obligatoire' : null,
             ),
-            const SizedBox(height: 12),
             TextFormField(
               controller: _dob,
-              decoration: const InputDecoration(
-                labelText: 'Date de naissance * (YYYY-MM-DD)',
-                border: OutlineInputBorder(),
-                hintText: '1990-05-21',
-              ),
+              decoration: const InputDecoration(labelText: 'Date de naissance (YYYY-MM-DD) *'),
               validator: (v) {
-                final t = v?.trim() ?? '';
-                if (!_validDate(t)) return 'Date invalide (YYYY-MM-DD)';
+                if (v == null || v.trim().isEmpty) return 'Obligatoire';
+                if (!_validDate(v.trim())) return 'Format invalide';
                 return null;
               },
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               value: _sex,
+              decoration: const InputDecoration(labelText: 'Sexe'),
               items: const [
                 DropdownMenuItem(value: 'M', child: Text('Masculin')),
                 DropdownMenuItem(value: 'F', child: Text('Féminin')),
-                DropdownMenuItem(value: 'X', child: Text('Autre / ND')),
               ],
               onChanged: (v) => setState(() => _sex = v ?? 'M'),
-              decoration: const InputDecoration(
-                labelText: 'Sexe *',
-                border: OutlineInputBorder(),
-              ),
             ),
-            const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               value: _relation,
+              decoration: const InputDecoration(labelText: 'Lien avec le chef de ménage'),
               items: const [
                 DropdownMenuItem(value: 'CHEF', child: Text('Chef de ménage')),
                 DropdownMenuItem(value: 'CONJOINT', child: Text('Conjoint(e)')),
                 DropdownMenuItem(value: 'ENFANT', child: Text('Enfant')),
                 DropdownMenuItem(value: 'PARENT', child: Text('Parent')),
-                DropdownMenuItem(value: 'AUTRE', child: Text('Autre / non apparenté')),
+                DropdownMenuItem(value: 'AUTRE', child: Text('Autre')),
               ],
               onChanged: (v) => setState(() => _relation = v ?? 'AUTRE'),
-              decoration: const InputDecoration(
-                labelText: 'Lien avec le chef *',
-                border: OutlineInputBorder(),
-              ),
             ),
-            const SizedBox(height: 16),
-            PhotoCaptureStub(
-              onCaptured: (ref) => setState(() => _photoRef = ref),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _busy
+                  ? null
+                  : () async {
+                      final ref = await capturePhotoStub();
+                      if (ref != null) setState(() => _photoRef = ref);
+                    },
+              icon: const Icon(Icons.photo_camera),
+              label: Text(_photoRef == null ? 'Photo (stub)' : 'Photo OK'),
             ),
-            if (_photoRef != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text('Photo: $_photoRef', style: Theme.of(context).textTheme.bodySmall),
-              ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFE11D48),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
               onPressed: _busy ? null : _save,
-              child: _busy
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text('Enregistrer hors ligne'),
+              child: Text(_isEdit ? 'Corriger et renvoyer' : 'Enregistrer'),
             ),
           ],
         ),

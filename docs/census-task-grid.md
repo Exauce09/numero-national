@@ -1,53 +1,46 @@
-# Grille recensement — NUMERO NATIONAL (continuer, ne pas recommencer)
+# Grille recensement — NUMERO NATIONAL
 
-Légende : ✅ fait · 🚧 en cours · ⬜ à faire
+Légende : ✅ fait · ⚠️ partiel · ⬜ à faire
 
 ## Phase 0 — Cadre
-- [x] Rester sur le même repo
-- [x] API Docker + seed agent
-- [x] Login mobile JWT + sync basique
+- [x] 0.1 Même repo
+- [x] 0.2 API Docker + seed agent + campagne ACTIVE
+- [x] 0.3 Login mobile JWT + sync
+- [x] 0.4 Parcours MVP documenté — `docs/census-mvp-parcours.md`
 
 ## Phase 1 — Campagne & territoire
-- [x] 1.1 CRUD campagnes (API existante + permissions manage)
-- [x] 1.2 Zones liées campagne (+ geo_level / geo_ref_id) — migration `013`
+- [x] 1.1 CRUD campagnes
+- [x] 1.2 Zones + géo (API)
 - [x] 1.3 Affectation agent → équipe → zone
-- [x] 1.4 `GET /api/v1/census/agents/me/assignments`
-- [x] 1.5 Seed admin/agent/zone/équipe + test `tests/test_census_assignments.py`
+- [x] 1.4 `GET /agents/me/assignments`
+- [x] 1.5 UI admin affectations (ONIP → Campagnes → Affectations)
 
 ## Phase 2 — Mobile collecte
-- [x] 2.1 Télécharger affectations / zones (cache SQLite)
-- [x] 2.2 Créer ménage (adresse + formulaire)
-- [x] 2.3 GPS sur ménage
-- [x] 2.4 Ajouter membres (lien de parenté)
-- [x] 2.5 Validation locale champs obligatoires
-- [x] 2.6 Indicateur sync (SYNCED / EN_ATTENTE / ERROR / OFFLINE)
-- [x] 2.7 Liste ménages + membres + statuts
+- [x] 2.1 Zones/campagne hors ligne
+- [x] 2.2 Ménage (adresse ; cascade géo Flutter encore ⚠️)
+- [x] 2.3 GPS
+- [x] 2.4 Membres + parenté
+- [x] 2.5 Validation locale
+- [x] 2.6 Indicateur sync
+- [x] 2.7 Liste + correction locale (brouillon / rejet)
 
 ## Phase 3 — Sync fiable
-- [x] Push/pull durci (détails par local_id, raisons, snapshot serveur)
-- [x] Conflits UX (écran résolution: accepter serveur / forcer envoi)
-- [x] Tests API `tests/test_census_sync.py`
+- [x] 3.1–3.5 Push/pull, conflits UX, tests (versionnement partiel OK)
 
 ## Phase 4 — Superviseur
-- [x] File d'attente `GET /campaigns/{id}/records?status=SYNCED`
-- [x] `POST /records/{id}/approve` (+ note optionnelle)
-- [x] `POST /records/{id}/reject` (note obligatoire)
-- [x] Migration `014_census_review` (APPROVED + audit review)
-- [x] Tests `tests/test_census_review.py`
-- [x] Mobile: affichage APPROVED / REJECTED
+- [x] API APPROVE / REJECT + permissions
+- [x] 4.3 Liste dossiers (+ filtre `zone_id`)
+- [x] 4.4 UI ONIP contrôle + motif
+- [x] 4.5 Mobile : rejet + motif + corriger + renvoyer
 
-## Phase 5 — Promotion NIC
-- [x] `POST /records/{id}/promote` → citoyen `core_registry` (+ NIC optionnel)
-- [x] `POST /campaigns/{id}/promote` batch
-- [x] Migration `015_census_promote` (`PROMOTED`, `citizen_id`)
-- [x] Tests `tests/test_census_promote.py`
-- [x] Mobile: statut PROMOTED
+## Phase 5 — Registre NIC
+- [x] Promote + `citizen_id` / NIC
 
-## MVP recensement — terminé
-Chaîne terrain → sync → validation → registre NIC livrée.
+## Phase 6 — Stats & clôture MVP
+- [x] 6.1 `GET /campaigns/{id}/stats`
+- [x] 6.2 Stats agent (existant)
+- [x] 6.3 Export CSV campagne
+- [x] 6.4 Parcours + checklist opérationnelle documentés
 
-### Hors grille (backlog produit, non bloquant)
-- Caméra réelle / biométrie terrain
-- Formulaires dynamiques, cascade géo Flutter, GIS
-- Portail web superviseur dédié
-- Scopes RBAC par zone
+## Post-MVP (7–9)
+Caméra réelle, formulaires dynamiques, RBAC géo fin, Leaflet, E2E terrain, secrets prod — backlog.

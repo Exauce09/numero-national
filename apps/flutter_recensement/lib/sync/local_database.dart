@@ -13,11 +13,12 @@ class LocalDatabase {
     final dbPath = await getDatabasesPath();
     _db = await openDatabase(
       p.join(dbPath, 'recensement.db'),
-      version: 3,
+      version: 4,
       onCreate: (db, version) async {
         await _createV1(db);
         await _createV2(db);
         await _createV3(db);
+        await _createV4(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -25,6 +26,9 @@ class LocalDatabase {
         }
         if (oldVersion < 3) {
           await _createV3(db);
+        }
+        if (oldVersion < 4) {
+          await _createV4(db);
         }
       },
     );
@@ -115,6 +119,12 @@ class LocalDatabase {
   Future<void> _createV3(Database db) async {
     await db.execute(
       'ALTER TABLE census_records ADD COLUMN conflict_reason TEXT',
+    );
+  }
+
+  Future<void> _createV4(Database db) async {
+    await db.execute(
+      'ALTER TABLE census_records ADD COLUMN review_note TEXT',
     );
   }
 

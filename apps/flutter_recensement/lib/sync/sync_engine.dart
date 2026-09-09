@@ -421,6 +421,7 @@ class SyncEngine {
           'date_of_birth': r['date_of_birth'],
           'version': serverVersion,
           'status': r['status'] ?? 'SYNCED',
+          'review_note': r['review_note'],
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         });
       } else {
@@ -433,8 +434,13 @@ class SyncEngine {
           localVersion: localVersion,
           serverVersion: serverVersion,
         );
+        final serverStatus = r['status']?.toString() ?? 'SYNCED';
+        // Always apply rejection/approval from server even if versions equal.
         if (outcome == ConflictOutcome.serverWins ||
-            outcome == ConflictOutcome.sameVersion) {
+            outcome == ConflictOutcome.sameVersion ||
+            serverStatus == 'REJECTED' ||
+            serverStatus == 'APPROVED' ||
+            serverStatus == 'PROMOTED') {
           await _db.db.update(
             'census_records',
             {
@@ -443,7 +449,8 @@ class SyncEngine {
               'sex': r['sex'],
               'date_of_birth': r['date_of_birth'],
               'version': serverVersion,
-              'status': r['status'] ?? 'SYNCED',
+              'status': serverStatus,
+              'review_note': r['review_note'],
               'conflict_reason': null,
               'updated_at': DateTime.now().toUtc().toIso8601String(),
             },

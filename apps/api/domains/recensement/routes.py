@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.core.permissions import (
@@ -26,6 +26,7 @@ from apps.api.domains.recensement.schemas import (
     BatchPromoteResult,
     CampaignCreate,
     CampaignOut,
+    CampaignStatsOut,
     CampaignUpdate,
     CensusRecordOut,
     DeviceOut,
@@ -216,6 +217,7 @@ async def get_agent_stats(
 async def list_campaign_records(
     campaign_id: uuid.UUID,
     status_filter: CensusRecordStatus | None = Query(default=CensusRecordStatus.SYNCED, alias="status"),
+    zone_id: uuid.UUID | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
@@ -224,9 +226,51 @@ async def list_campaign_records(
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
     rows = await service.list_campaign_records(
-        db, campaign_id, status_filter=status_filter, limit=limit, offset=offset
+        db,
+        campaign_id,
+        status_filter=status_filter,
+        zone_id=zone_id,
+        limit=limit,
+        offset=offset,
     )
     return [CensusRecordOut.model_validate(r) for r in rows]
+
+
+@router.get(
+    "/campaigns/{campaign_id}/stats",
+    response_model=CampaignStatsOut,
+    dependencies=[Depends(require_permissions(PERM_CENSUS_MANAGE))],
+)
+async def get_campaign_stats(
+    campaign_id: uuid.UUID, db: AsyncSession = Depends(get_db)
+) -> CampaignStatsOut:
+    campaign = await service.get_campaign(db, campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    return await service.campaign_stats(db, campaign_id)
+
+
+@router.get(
+    "/campaigns/{campaign_id}/export.csv",
+    dependencies=[Depends(require_permissions(PERM_CENSUS_MANAGE))],
+)
+async def export_campaign_csv(
+    campaign_id: uuid.UUID,
+    status_filter: CensusRecordStatus | None = Query(default=None, alias="status"),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    campaign = await service.get_campaign(db, campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    csv_text = await service.export_campaign_records_csv(
+        db, campaign_id, status_filter=status_filter
+    )
+    filename = f"census-{campaign.code}.csv"
+    return Response(
+        content=csv_text,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post(

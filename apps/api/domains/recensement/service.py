@@ -28,6 +28,7 @@ from apps.api.domains.recensement.schemas import (
     BatchPromoteRequest,
     BatchPromoteResult,
     CampaignCreate,
+    CampaignStatsOut,
     CampaignUpdate,
     DeviceRegister,
     MyAssignmentOut,
@@ -559,14 +560,122 @@ async def list_campaign_records(
     db: AsyncSession,
     campaign_id: uuid.UUID,
     status_filter: CensusRecordStatus | None = None,
+    zone_id: uuid.UUID | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> list[CensusRecord]:
     stmt = select(CensusRecord).where(CensusRecord.campaign_id == campaign_id)
     if status_filter is not None:
         stmt = stmt.where(CensusRecord.status == status_filter)
+    if zone_id is not None:
+        stmt = stmt.join(Household, CensusRecord.household_id == Household.id).where(
+            Household.zone_id == zone_id
+        )
     stmt = stmt.order_by(CensusRecord.updated_at.desc()).offset(offset).limit(min(limit, 500))
     return list((await db.execute(stmt)).scalars().all())
+
+
+async def campaign_stats(db: AsyncSession, campaign_id: uuid.UUID) -> CampaignStatsOut:
+    hh = (
+        await db.execute(
+            select(func.count()).select_from(Household).where(Household.campaign_id == campaign_id)
+        )
+    ).scalar_one()
+    rec_total = (
+        await db.execute(
+            select(func.count())
+            .select_from(CensusRecord)
+            .where(CensusRecord.campaign_id == campaign_id)
+        )
+    ).scalar_one()
+    by_status_rows = (
+        await db.execute(
+            select(CensusRecord.status, func.count())
+            .where(CensusRecord.campaign_id == campaign_id)
+            .group_by(CensusRecord.status)
+        )
+    ).all()
+    by_status = {str(status.value if hasattr(status, "value") else status): int(n) for status, n in by_status_rows}
+
+    def _n(key: str) -> int:
+        return int(by_status.get(key, 0))
+
+    return CampaignStatsOut(
+        campaign_id=campaign_id,
+        households=int(hh or 0),
+        records=int(rec_total or 0),
+        by_status=by_status,
+        synced=_n("SYNCED"),
+        approved=_n("APPROVED"),
+        rejected=_n("REJECTED"),
+        promoted=_n("PROMOTED"),
+        conflicts=_n("CONFLICT"),
+        pending_review=_n("SYNCED"),
+    )
+
+
+async def export_campaign_records_csv(
+    db: AsyncSession,
+    campaign_id: uuid.UUID,
+    status_filter: CensusRecordStatus | None = None,
+) -> str:
+    import csv
+    import io
+
+    rows = await list_campaign_records(
+        db, campaign_id, status_filter=status_filter, limit=500, offset=0
+    )
+    # Paginate remaining if needed
+    offset = 500
+    while True:
+        more = await list_campaign_records(
+            db, campaign_id, status_filter=status_filter, limit=500, offset=offset
+        )
+        if not more:
+            break
+        rows.extend(more)
+        offset += 500
+        if offset > 20000:
+            break
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        [
+            "record_id",
+            "local_id",
+            "household_id",
+            "given_names",
+            "family_name",
+            "sex",
+            "date_of_birth",
+            "status",
+            "version",
+            "citizen_id",
+            "review_note",
+            "reviewed_at",
+            "promoted_at",
+        ]
+    )
+    for r in rows:
+        writer.writerow(
+            [
+                str(r.id),
+                r.local_id or "",
+                str(r.household_id),
+                r.given_names or "",
+                r.family_name or "",
+                r.sex or "",
+                r.date_of_birth or "",
+                r.status.value,
+                r.version,
+                str(r.citizen_id) if r.citizen_id else "",
+                (r.review_note or "").replace("\n", " "),
+                r.reviewed_at.isoformat() if r.reviewed_at else "",
+                r.promoted_at.isoformat() if r.promoted_at else "",
+            ]
+        )
+    return buf.getvalue()
 
 
 async def get_record(db: AsyncSession, record_id: uuid.UUID) -> CensusRecord | None:

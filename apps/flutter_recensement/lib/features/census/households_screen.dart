@@ -240,11 +240,24 @@ class _HouseholdMembersScreenState extends State<HouseholdMembersScreen> {
                       '${m['sex'] ?? ''} · ${m['date_of_birth'] ?? ''} · $status',
                     ),
                     leading: Icon(icon, color: color),
-                    onTap: status == 'CONFLICT'
-                        ? () {
-                            Navigator.of(context).pushNamed('/conflicts');
-                          }
-                        : null,
+                    onTap: () async {
+                      if (status == 'CONFLICT') {
+                        Navigator.of(context).pushNamed('/conflicts');
+                        return;
+                      }
+                      if (status == 'REJECTED' || status == 'QUEUED' || status == 'DRAFT') {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => CitizensFormScreen(
+                              campaignId: widget.campaignId,
+                              householdLocalId: widget.householdLocalId,
+                              existing: m,
+                            ),
+                          ),
+                        );
+                        await _load();
+                      }
+                    },
                   ),
                 );
               },
