@@ -238,16 +238,14 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               onChanged: (v) => setState(() => _relation = v ?? 'AUTRE'),
             ),
             const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: _busy
-                  ? null
-                  : () async {
-                      final ref = await capturePhotoStub();
-                      if (ref != null) setState(() => _photoRef = ref);
-                    },
-              icon: const Icon(Icons.photo_camera),
-              label: Text(_photoRef == null ? 'Photo (stub)' : 'Photo OK'),
+            PhotoCaptureStub(
+              onCaptured: (ref) => setState(() => _photoRef = ref),
             ),
+            if (_photoRef != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('Photo: $_photoRef', style: const TextStyle(fontSize: 12)),
+              ),
             const SizedBox(height: 20),
             FilledButton(
               onPressed: _busy ? null : _save,

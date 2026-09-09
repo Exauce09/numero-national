@@ -114,7 +114,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               borderRadius: BorderRadius.circular(22),
               boxShadow: [
                 BoxShadow(
-                  color: NnColors.blue.withOpacity(0.28),
+                  color: NnColors.blue.withValues(alpha: 0.28),
                   blurRadius: 18,
                   offset: const Offset(0, 8),
                 ),
@@ -147,7 +147,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.18),
+                        color: Colors.white.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: const Icon(Icons.badge_outlined, color: Colors.white),
@@ -158,7 +158,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.14),
+                    color: Colors.white.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -175,7 +175,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                         onPressed: _busy ? null : _runSync,
                         style: TextButton.styleFrom(
                           foregroundColor: Colors.white,
-                          backgroundColor: Colors.white.withOpacity(0.2),
+                          backgroundColor: Colors.white.withValues(alpha: 0.2),
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                         ),
                         child: _busy
@@ -366,7 +366,7 @@ class _ActionTile extends StatelessWidget {
                 width: 46,
                 height: 46,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
+                  color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(icon, color: color),
