@@ -8,6 +8,7 @@ import '../../sync/local_database.dart';
 import '../../sync/sync_queue.dart';
 import 'fingerprint_capture.dart';
 import 'geo_cascade_field.dart';
+import 'iris_capture.dart';
 import 'photo_capture.dart';
 import 'rdc_tribus.dart';
 import 'situation_familiale.dart';
@@ -1013,46 +1014,34 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             onCaptured: (ref) => setState(() => _photoRef = ref),
           ),
         ]),
-        _section('3. Biométrie — Empreintes & iris', [
-          TextFormField(
-            controller: _empreinteGauche,
-            decoration: _dec('Empreinte gauche (réf.)'),
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton(
-              onPressed: () {
-                final ref =
-                    'CAP-G-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
-                setState(() => _empreinteGauche.text = ref);
-              },
-              child: const Text('Capturer gauche'),
-            ),
+        _section('3. Biométrie — Empreintes & iris (téléphone)', [
+          const Text(
+            'Empreintes : posez le doigt sur le capteur du téléphone. '
+            'Iris : photo de l’œil avec la caméra (référence terrain).',
+            style: TextStyle(fontSize: 12, color: Color(0xFF5A6A85)),
           ),
           const SizedBox(height: 10),
-          TextFormField(
-            controller: _empreinteDroite,
-            decoration: _dec('Empreinte droite (réf.)'),
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton(
-              onPressed: () {
-                final ref =
-                    'CAP-D-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
-                setState(() => _empreinteDroite.text = ref);
-              },
-              child: const Text('Capturer droite'),
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextFormField(controller: _iris, decoration: _dec('Iris (réf.)')),
-          const SizedBox(height: 12),
           FingerprintCaptureWidget(
-            initialRef: _fingerprintRef,
-            onCaptured: (ref) => setState(() => _fingerprintRef = ref),
+            label: 'Empreinte main gauche',
+            hand: 'gauche',
+            initialRef: _empreinteGauche.text.trim().isEmpty ? null : _empreinteGauche.text.trim(),
+            onCaptured: (ref) => setState(() {
+              _empreinteGauche.text = ref;
+              _fingerprintRef = ref;
+            }),
+          ),
+          FingerprintCaptureWidget(
+            label: 'Empreinte main droite',
+            hand: 'droite',
+            initialRef: _empreinteDroite.text.trim().isEmpty ? null : _empreinteDroite.text.trim(),
+            onCaptured: (ref) => setState(() {
+              _empreinteDroite.text = ref;
+              _fingerprintRef ??= ref;
+            }),
+          ),
+          IrisCaptureWidget(
+            initialRef: _iris.text.trim().isEmpty ? null : _iris.text.trim(),
+            onCaptured: (ref) => setState(() => _iris.text = ref),
           ),
         ]),
       ],
