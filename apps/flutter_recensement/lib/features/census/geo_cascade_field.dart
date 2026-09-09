@@ -27,7 +27,7 @@ class GeoItem {
 }
 
 enum GeoCascadePreset {
-  /// Province → Ville → Commune → Village → Quartier → Avenue
+  /// Province → Ville → Commune → Quartier → Avenue (+ N° hors cascade)
   address,
   /// Province → Ville → Commune
   place,
@@ -75,9 +75,8 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
   bool _loading = true;
 
   bool get _showDistrict => widget.preset == GeoCascadePreset.origin;
-  bool get _showVillage =>
-      widget.preset == GeoCascadePreset.address ||
-      widget.preset == GeoCascadePreset.origin;
+  /// Village uniquement pour l’origine (rural). Adresse urbaine Kinshasa = commune → quartier → avenue.
+  bool get _showVillage => widget.preset == GeoCascadePreset.origin;
   bool get _showQuartierAvenue => widget.preset == GeoCascadePreset.address;
 
   String get _subtitle {
@@ -87,7 +86,7 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
       case GeoCascadePreset.origin:
         return 'Province → Ville → Territoire → Secteur/Commune → Village';
       case GeoCascadePreset.address:
-        return 'Province → Ville → Commune → Village → Quartier → Avenue';
+        return 'Province → Ville → Commune → Quartier → Avenue';
     }
   }
 
@@ -261,8 +260,9 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
       if (!mounted) return;
       setState(() {
         _quartiers = quartiers;
-        _hint =
-            '${_villages.length} village(s) · ${quartiers.length} quartier(s)';
+        _hint = quartiers.isEmpty
+            ? 'Aucun quartier pour cette commune — utilisez + Ajouter quartier'
+            : '${quartiers.length} quartier(s) de cette commune';
       });
     }
   }
@@ -529,13 +529,18 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
           ),
         ],
         if (_showQuartierAvenue) ...[
-          _dd(label: 'Quartier', value: _quartierId, items: _quartiers, onChanged: _onQuartier),
+          _dd(
+            label: 'Quartier (de la commune)',
+            value: _quartierId,
+            items: _quartiers,
+            onChanged: _onQuartier,
+          ),
           Align(
             alignment: Alignment.centerLeft,
             child: _addBtn('Ajouter quartier', _communeId == null ? null : _addQuartier),
           ),
           _dd(
-            label: 'Avenue',
+            label: 'Avenue / rue (du quartier)',
             value: _avenueId,
             items: _avenues,
             onChanged: _onAvenue,

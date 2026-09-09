@@ -37,8 +37,8 @@ export type GeoLevel =
 /** Profils courants pour réutiliser la base géo partout. */
 export const GEO_PRESETS = {
   full: ["province", "ville", "district", "commune", "localite", "quartier", "avenue", "rue"] as GeoLevel[],
-  /** Adresse urbaine / résidence. */
-  address: ["province", "ville", "commune", "localite", "quartier", "avenue"] as GeoLevel[],
+  /** Adresse urbaine / résidence : Province → Ville → Commune → Quartier → Avenue. */
+  address: ["province", "ville", "commune", "quartier", "avenue"] as GeoLevel[],
   /** Origine / territoire rural. */
   origin: ["province", "ville", "district", "commune", "localite"] as GeoLevel[],
   /** Lieu simple (naissance, décès, enregistrement…). */
@@ -58,9 +58,9 @@ const DEFAULT_FIELD_LABELS: Record<GeoLevel, string> = {
 
 /** Labels pour l’adresse de résidence (explicites). */
 export const ADDRESS_FIELD_LABELS: Partial<Record<GeoLevel, string>> = {
-  localite: "Village",
-  quartier: "Quartier",
-  avenue: "Avenue",
+  commune: "Commune",
+  quartier: "Quartier (de la commune)",
+  avenue: "Avenue / rue (du quartier)",
 };
 
 export const ORIGIN_FIELD_LABELS: Partial<Record<GeoLevel, string>> = {
@@ -280,7 +280,15 @@ export default function GeoCascade({
     setLocalites(show("localite") ? await fetchItems(`/geo/localites?commune_id=${id}`, markLocal) : []);
     setAvenues([]);
     setRues([]);
-  }
+    if (show("quartier")) {
+      const qs = await fetchItems(`/geo/quartiers?commune_id=${id}`, markLocal);
+      setQuartiers(qs);
+      setHint(
+        qs.length
+          ? `${qs.length} quartier(s) liés à cette commune`
+          : "Aucun quartier — utilisez + pour en ajouter",
+      );
+    }
 
   async function onLocalite(id: string) {
     const l = localites.find((x) => x.id === id);
