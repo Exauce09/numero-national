@@ -79,29 +79,52 @@ function HealthShell() {
     setNavOpen(false);
   }, [location.pathname]);
 
+  useEffect(() => {
+    document.body.style.overflow = navOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [navOpen]);
+
   function logout() {
     clearHealthSession();
-    navigate("/login", { replace: true });
+    navigate("/sante/login", { replace: true });
   }
 
+  const communeLabel = session.commune_name ? `Commune de ${session.commune_name}` : null;
+
   return (
-    <div className={`app-layout ${navOpen ? "nav-open" : ""}`}>
-      <div className="sidebar-backdrop" onClick={() => setNavOpen(false)} />
+    <div className={`page-wrapper${navOpen ? " nav-open" : ""}`}>
+      {navOpen ? (
+        <button
+          type="button"
+          className="sidebar-backdrop"
+          aria-label="Fermer le menu"
+          onClick={() => setNavOpen(false)}
+        />
+      ) : null}
       <aside className="sidebar" id="app-sidebar">
         <div className="sidebar-brand">
+          <img src="/logo-rdc.jpg" alt="RDC" />
           <strong>Structure sanitaire</strong>
-          <button type="button" className="sidebar-close" onClick={() => setNavOpen(false)}>
+          <span>E-GOUV · Santé</span>
+          <button
+            type="button"
+            className="sidebar-close"
+            aria-label="Fermer le menu"
+            onClick={() => setNavOpen(false)}
+          >
             ×
           </button>
         </div>
         <nav className="sidebar-nav">
-          <NavLink to="/sante" end>
+          <NavLink to="/sante" end onClick={() => setNavOpen(false)}>
             <IconDashboard size={18} /> Tableau de bord
           </NavLink>
-          <NavLink to="/sante/births">
-            <IconBaby size={18} /> Nouveaux-nés
+          <NavLink to="/sante/births" onClick={() => setNavOpen(false)}>
+            <IconBaby size={18} /> Nouveau-né
           </NavLink>
-          <NavLink to="/sante/deaths">
+          <NavLink to="/sante/deaths" onClick={() => setNavOpen(false)}>
             <IconCross size={18} /> Décès
           </NavLink>
         </nav>
@@ -111,21 +134,44 @@ function HealthShell() {
           </button>
         </div>
       </aside>
+
       <div className="body-wrap">
         <header className="topbar topbar-3">
           <div className="topbar-left">
-            <button type="button" className="menu-toggle" aria-label="Menu" onClick={() => setNavOpen((o) => !o)}>
+            <button
+              type="button"
+              className="menu-toggle"
+              aria-label={navOpen ? "Fermer le menu" : "Ouvrir le menu"}
+              aria-expanded={navOpen}
+              aria-controls="app-sidebar"
+              onClick={() => setNavOpen((o) => !o)}
+            >
               <span />
             </button>
-            <h1 className="topbar-title">Santé</h1>
+            <h1 className="topbar-title">Structure sanitaire</h1>
           </div>
-          <div className="topbar-center">
+
+          <div className="topbar-center" title={session.roleTitle}>
             <span className="topbar-role">{session.roleTitle}</span>
-            <span className="topbar-commune">{session.commune_name}</span>
+            {communeLabel ? <span className="topbar-commune">{communeLabel}</span> : null}
             <strong className="topbar-responsable">{session.facilityName}</strong>
           </div>
-          <div className="topbar-right" />
+
+          <div className="topbar-right">
+            <button type="button" className="topbar-icon-btn topbar-profile-btn" aria-label="Profil" disabled>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.7" />
+                <path
+                  d="M5 19.5c1.8-3.2 4.2-4.5 7-4.5s5.2 1.3 7 4.5"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
         </header>
+
         <main className="shell">
           <Routes>
             <Route path="/" element={<HealthDashboardPage />} />

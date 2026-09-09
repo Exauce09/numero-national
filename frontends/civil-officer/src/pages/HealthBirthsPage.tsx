@@ -54,8 +54,10 @@ export default function HealthBirthsPage() {
 
   return (
     <div>
-      <h2 className="page-title">Nouveaux-nés (structure sanitaire)</h2>
-      <p className="page-lead">Enregistrement puis notification automatique de l&apos;officier d&apos;état civil.</p>
+      <h2 className="page-title">Nouveau-né</h2>
+      <p className="page-lead">
+        Enregistrement à la structure sanitaire — notification automatique de l&apos;officier d&apos;état civil.
+      </p>
       <div className="panel">
         <form className="form-grid" onSubmit={onSubmit}>
           {error ? <div className="login-error full">{error}</div> : null}
