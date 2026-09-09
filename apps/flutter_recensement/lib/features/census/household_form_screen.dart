@@ -141,9 +141,9 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
             TextFormField(
               controller: _detail,
               decoration: const InputDecoration(
-                labelText: 'Complément (avenue, parcelle, repère) *',
+                labelText: 'Complément (n°, parcelle, repère) *',
                 border: OutlineInputBorder(),
-                hintText: 'Av. Liberation, parcelle 12…',
+                hintText: 'Parcelle 12, en face du marché…',
               ),
               maxLines: 2,
               onChanged: (_) => _rebuildAddress(),
