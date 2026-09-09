@@ -15,6 +15,11 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  /// Build with `--dart-define=AUTO_LOGIN=true` to open the seeded agent session.
+  static const _autoLogin = bool.fromEnvironment('AUTO_LOGIN');
+  static const _demoEmail = 'agent.recensement@example.gov';
+  static const _demoPassword = 'CensusAgent123!';
+
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _policy = OfflineAuthPolicy();
@@ -26,6 +31,14 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _prefillEmail();
+    if (_autoLogin) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _busy) return;
+        _email.text = _demoEmail;
+        _password.text = _demoPassword;
+        _submit();
+      });
+    }
   }
 
   Future<void> _prefillEmail() async {

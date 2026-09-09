@@ -9,7 +9,8 @@
 param(
   [string]$ApiHost = "",
   [switch]$Install,
-  [switch]$DebugBuild
+  [switch]$DebugBuild,
+  [switch]$AutoLogin
 )
 
 $ErrorActionPreference = "Stop"
@@ -33,16 +34,20 @@ if (-not $ApiHost) {
 
 $ApiBase = "http://${ApiHost}:8000/api/v1"
 Write-Host "API_BASE_URL=$ApiBase"
+if ($AutoLogin) { Write-Host "AUTO_LOGIN=true" }
+
+$defines = @("--dart-define=API_BASE_URL=$ApiBase")
+if ($AutoLogin) { $defines += "--dart-define=AUTO_LOGIN=true" }
 
 $appDir = Join-Path $PSScriptRoot "..\apps\flutter_recensement"
 Set-Location $appDir
 flutter pub get
 
 if ($DebugBuild) {
-  flutter build apk --debug --dart-define="API_BASE_URL=$ApiBase"
+  flutter build apk --debug @defines
   $apk = Resolve-Path ".\build\app\outputs\flutter-apk\app-debug.apk"
 } else {
-  flutter build apk --release --dart-define="API_BASE_URL=$ApiBase"
+  flutter build apk --release @defines
   $apk = Resolve-Path ".\build\app\outputs\flutter-apk\app-release.apk"
 }
 
