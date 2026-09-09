@@ -18,7 +18,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  /// Build with `--dart-define=AUTO_LOGIN=true` to open the seeded agent session.
+  /// Build with `--dart-define=AUTO_LOGIN=true` only for device test automation.
+  /// Prefills demo credentials but never submits alone — the agent must tap Connexion.
   static const _autoLogin = bool.fromEnvironment('AUTO_LOGIN');
   static const _demoEmail = 'agent.recensement@example.gov';
   static const _demoPassword = 'CensusAgent123!';
@@ -35,12 +36,9 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     _prefillEmail();
     if (_autoLogin && widget.allowAutoLogin) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || _busy) return;
-        _email.text = _demoEmail;
-        _password.text = _demoPassword;
-        _submit();
-      });
+      // Préremplir uniquement — pas de connexion automatique.
+      _email.text = _demoEmail;
+      _password.text = _demoPassword;
     }
   }
 
