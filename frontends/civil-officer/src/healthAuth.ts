@@ -134,3 +134,15 @@ export function loginHealth(username: string, password: string): HealthSession {
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
   return session;
 }
+
+export function updateHealthPassword(username: string, currentPassword: string, nextPassword: string): void {
+  ensureDemoAccount();
+  const user = username.trim().toLowerCase();
+  const list = loadAccounts();
+  const idx = list.findIndex((a) => a.username === user);
+  if (idx < 0) throw new Error("Compte introuvable.");
+  if (list[idx].password !== currentPassword) throw new Error("Mot de passe actuel incorrect.");
+  if (nextPassword.length < 8) throw new Error("Le nouveau mot de passe doit contenir au moins 8 caractères.");
+  list[idx] = { ...list[idx], password: nextPassword };
+  saveAccounts(list);
+}

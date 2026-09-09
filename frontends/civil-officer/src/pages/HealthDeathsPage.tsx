@@ -1,11 +1,14 @@
 import { FormEvent, useState } from "react";
+import PersonPicker from "../components/PersonPicker";
+import { displayName, type Person } from "../registry";
 import { getHealthSession } from "../healthAuth";
 import { listFacilityDeclarations, notifyEtatCivil } from "../civilDeclarations";
+import { pushHealthNotification } from "../healthPrefs";
 
 export default function HealthDeathsPage() {
   const session = getHealthSession()!;
-  const [nom, setNom] = useState("");
-  const [sexe, setSexe] = useState<"M" | "F">("M");
+  const [deceased, setDeceased] = useState<Person | null>(null);
+  const [responsable, setResponsable] = useState<Person | null>(null);
   const [dateDeces, setDateDeces] = useState("");
   const [cause, setCause] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -17,8 +20,12 @@ export default function HealthDeathsPage() {
     e.preventDefault();
     setError(null);
     setMessage(null);
-    if (!nom.trim() || !dateDeces || !cause.trim()) {
-      setError("Nom, date et cause du décès sont requis.");
+    if (!deceased) {
+      setError("La personne décédée est obligatoire (recherche ou ajout).");
+      return;
+    }
+    if (!dateDeces || !cause.trim()) {
+      setError("Date et cause du décès sont requis.");
       return;
     }
     const decl = notifyEtatCivil({
@@ -29,15 +36,28 @@ export default function HealthDeathsPage() {
         facility_name: session.facilityName,
         commune_code: session.commune_code,
         commune_name: session.commune_name,
-        deceased_name: nom.trim(),
-        sexe,
+        deceased_id: deceased.id,
+        deceased_nic: deceased.nic,
+        deceased_name: displayName(deceased),
+        sexe: deceased.sexe,
         date_deces: dateDeces,
         cause_deces: cause.trim(),
         lieu_deces: session.facilityName,
+        responsable_id: responsable?.id ?? null,
+        responsable_nic: responsable?.nic ?? null,
+        responsable_name: responsable ? displayName(responsable) : null,
       },
     });
-    setMessage(`Notification envoyée à l'état civil (réf. ${decl.id.slice(0, 8)}).`);
-    setNom("");
+    pushHealthNotification({
+      title: "Décès notifié à l'état civil",
+      body: `${displayName(deceased)} — en attente de validation officier (réf. ${decl.id.slice(0, 8)}).`,
+      href: "/sante/deaths",
+    });
+    setMessage(
+      `Enregistrement transmis à l'état civil pour validation (réf. ${decl.id.slice(0, 8)}). L'officier a été notifié.`,
+    );
+    setDeceased(null);
+    setResponsable(null);
     setDateDeces("");
     setCause("");
     bump((n) => n + 1);
@@ -47,26 +67,27 @@ export default function HealthDeathsPage() {
     <div>
       <h2 className="page-title">Décès</h2>
       <p className="page-lead">
-        Enregistrement à la structure sanitaire — notification automatique de l&apos;officier d&apos;état civil.
+        Enregistrement à la structure sanitaire — transmission et notification automatiques vers l&apos;état civil.
       </p>
       <div className="panel">
         <form className="form-grid" onSubmit={onSubmit}>
           {error ? <div className="login-error full">{error}</div> : null}
           {message ? <div className="success-banner full">{message}</div> : null}
           <div className="full">
-            <label className="form-label">Nom complet du défunt</label>
-            <input className="form-control" value={nom} onChange={(e) => setNom(e.target.value)} required />
+            <PersonPicker label="Nom du défunt" value={deceased} onChange={setDeceased} required />
           </div>
-          <div>
-            <label className="form-label">Sexe</label>
-            <select className="form-control" value={sexe} onChange={(e) => setSexe(e.target.value as "M" | "F")}>
-              <option value="M">Masculin</option>
-              <option value="F">Féminin</option>
-            </select>
+          <div className="full">
+            <PersonPicker label="Responsable" value={responsable} onChange={setResponsable} />
           </div>
           <div>
             <label className="form-label">Date du décès</label>
-            <input className="form-control" type="date" value={dateDeces} onChange={(e) => setDateDeces(e.target.value)} required />
+            <input
+              className="form-control"
+              type="date"
+              value={dateDeces}
+              onChange={(e) => setDateDeces(e.target.value)}
+              required
+            />
           </div>
           <div className="full">
             <label className="form-label">Cause</label>
@@ -85,14 +106,16 @@ export default function HealthDeathsPage() {
           <thead>
             <tr>
               <th>Défunt</th>
+              <th>Responsable</th>
               <th>Date</th>
-              <th>Statut</th>
+              <th>Statut état civil</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((d) => (
               <tr key={d.id}>
                 <td>{String(d.payload.deceased_name ?? "—")}</td>
+                <td>{String(d.payload.responsable_name ?? "—")}</td>
                 <td>{String(d.payload.date_deces ?? "—")}</td>
                 <td>{d.status}</td>
               </tr>

@@ -1,6 +1,9 @@
 import { FormEvent, useState } from "react";
+import PersonPicker from "../components/PersonPicker";
+import { displayName, type Person } from "../registry";
 import { getHealthSession } from "../healthAuth";
 import { listFacilityDeclarations, notifyEtatCivil } from "../civilDeclarations";
+import { pushHealthNotification } from "../healthPrefs";
 
 export default function HealthBirthsPage() {
   const session = getHealthSession()!;
@@ -9,8 +12,8 @@ export default function HealthBirthsPage() {
   const [prenom, setPrenom] = useState("");
   const [sexe, setSexe] = useState<"M" | "F">("M");
   const [dateNaissance, setDateNaissance] = useState("");
-  const [nomMere, setNomMere] = useState("");
-  const [nomPere, setNomPere] = useState("");
+  const [mother, setMother] = useState<Person | null>(null);
+  const [father, setFather] = useState<Person | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, bump] = useState(0);
@@ -20,8 +23,12 @@ export default function HealthBirthsPage() {
     e.preventDefault();
     setError(null);
     setMessage(null);
-    if (!nom.trim() || !prenom.trim() || !dateNaissance || !nomMere.trim()) {
-      setError("Nom, prénom, date de naissance et nom de la mère sont requis.");
+    if (!nom.trim() || !prenom.trim() || !dateNaissance) {
+      setError("Nom, prénom et date de naissance de l'enfant sont requis.");
+      return;
+    }
+    if (!mother) {
+      setError("La mère est obligatoire (recherche ou ajout).");
       return;
     }
     const decl = notifyEtatCivil({
@@ -33,22 +40,33 @@ export default function HealthBirthsPage() {
         commune_code: session.commune_code,
         commune_name: session.commune_name,
         child_nom: nom.trim(),
-        child_postnom: postnom.trim(),
+        child_postnom: postnom.trim() || mother.postnom || father?.postnom || "",
         child_prenom: prenom.trim(),
         sexe,
         date_naissance: dateNaissance,
-        mother_name: nomMere.trim(),
-        father_name: nomPere.trim() || null,
+        mother_id: mother.id,
+        mother_nic: mother.nic,
+        mother_name: displayName(mother),
+        father_id: father?.id ?? null,
+        father_nic: father?.nic ?? null,
+        father_name: father ? displayName(father) : null,
         lieu_naissance: session.facilityName,
       },
     });
-    setMessage(`Notification envoyée à l'état civil (réf. ${decl.id.slice(0, 8)}).`);
+    pushHealthNotification({
+      title: "Nouveau-né notifié à l'état civil",
+      body: `${prenom.trim()} ${nom.trim()} — en attente de validation officier (réf. ${decl.id.slice(0, 8)}).`,
+      href: "/sante/births",
+    });
+    setMessage(
+      `Enregistrement transmis à l'état civil pour validation (réf. ${decl.id.slice(0, 8)}). L'officier a été notifié.`,
+    );
     setNom("");
     setPostnom("");
     setPrenom("");
     setDateNaissance("");
-    setNomMere("");
-    setNomPere("");
+    setMother(null);
+    setFather(null);
     bump((n) => n + 1);
   }
 
@@ -56,7 +74,7 @@ export default function HealthBirthsPage() {
     <div>
       <h2 className="page-title">Nouveau-né</h2>
       <p className="page-lead">
-        Enregistrement à la structure sanitaire — notification automatique de l&apos;officier d&apos;état civil.
+        Enregistrement à la structure sanitaire — transmission et notification automatiques vers l&apos;état civil.
       </p>
       <div className="panel">
         <form className="form-grid" onSubmit={onSubmit}>
@@ -83,15 +101,19 @@ export default function HealthBirthsPage() {
           </div>
           <div>
             <label className="form-label">Date de naissance</label>
-            <input className="form-control" type="date" value={dateNaissance} onChange={(e) => setDateNaissance(e.target.value)} required />
+            <input
+              className="form-control"
+              type="date"
+              value={dateNaissance}
+              onChange={(e) => setDateNaissance(e.target.value)}
+              required
+            />
           </div>
-          <div>
-            <label className="form-label">Nom de la mère</label>
-            <input className="form-control" value={nomMere} onChange={(e) => setNomMere(e.target.value)} required />
+          <div className="full">
+            <PersonPicker label="Nom de la mère" value={mother} onChange={setMother} required />
           </div>
-          <div>
-            <label className="form-label">Nom du père</label>
-            <input className="form-control" value={nomPere} onChange={(e) => setNomPere(e.target.value)} />
+          <div className="full">
+            <PersonPicker label="Nom du père" value={father} onChange={setFather} />
           </div>
           <div className="full">
             <button className="btn-primary" type="submit" style={{ width: "auto", minWidth: 280 }}>
@@ -106,8 +128,10 @@ export default function HealthBirthsPage() {
           <thead>
             <tr>
               <th>Enfant</th>
+              <th>Mère</th>
+              <th>Père</th>
               <th>Naissance</th>
-              <th>Statut</th>
+              <th>Statut état civil</th>
             </tr>
           </thead>
           <tbody>
@@ -116,6 +140,8 @@ export default function HealthBirthsPage() {
                 <td>
                   {String(d.payload.child_nom ?? "")} {String(d.payload.child_prenom ?? "")}
                 </td>
+                <td>{String(d.payload.mother_name ?? "—")}</td>
+                <td>{String(d.payload.father_name ?? "—")}</td>
                 <td>{String(d.payload.date_naissance ?? "—")}</td>
                 <td>{d.status}</td>
               </tr>
