@@ -83,6 +83,11 @@ export default function LoginPage() {
             {CENSUS_ADMIN_PASSWORD}
           </p>
           <p>
+            <strong>2ᵉ accès ONIP</strong> — onip.ops2@example.gov
+            <br />
+            OnipOps2123!
+          </p>
+          <p>
             <strong>Démo hors API</strong> — {DEMO_USER} / {DEMO_PASSWORD}
           </p>
         </div>
