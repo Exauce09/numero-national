@@ -1,12 +1,19 @@
 import { FormEvent, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { DEMO_PASSWORD, DEMO_USER, getSession, login } from "../auth";
+import {
+  CENSUS_ADMIN_EMAIL,
+  CENSUS_ADMIN_PASSWORD,
+  DEMO_PASSWORD,
+  DEMO_USER,
+  getSession,
+  login,
+} from "../auth";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const existing = getSession();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState(CENSUS_ADMIN_EMAIL);
+  const [password, setPassword] = useState(CENSUS_ADMIN_PASSWORD);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -36,7 +43,7 @@ export default function LoginPage() {
           {error ? <div className="login-error">{error}</div> : null}
 
           <label className="form-label" htmlFor="username">
-            Nom d&apos;utilisateur
+            Email (API) ou identifiant démo
           </label>
           <input
             id="username"
@@ -61,19 +68,22 @@ export default function LoginPage() {
             onChange={(ev) => setPassword(ev.target.value)}
           />
 
-          <div className="login-row">
-            <a className="login-forgot" href="#">
-              Mot de Passe oublié ?
-            </a>
-          </div>
-
           <button className="btn-primary" type="submit" disabled={busy}>
             {busy ? "Connexion…" : "Se connecter"}
           </button>
         </form>
-        <p className="login-subtitle" style={{ marginTop: "1.25rem", marginBottom: 0 }}>
-          Démo : <strong>{DEMO_USER}</strong> / <strong>{DEMO_PASSWORD}</strong>
-        </p>
+        <div className="login-subtitle" style={{ marginTop: "1.25rem", marginBottom: 0, textAlign: "left" }}>
+          <p style={{ margin: "0 0 0.5rem" }}>
+            <strong>Campagnes (API)</strong>
+            <br />
+            {CENSUS_ADMIN_EMAIL}
+            <br />
+            {CENSUS_ADMIN_PASSWORD}
+          </p>
+          <p style={{ margin: 0 }}>
+            <strong>Démo hors API</strong> (pas de contrôle fiches) : {DEMO_USER} / {DEMO_PASSWORD}
+          </p>
+        </div>
       </div>
     </div>
   );
