@@ -1041,11 +1041,36 @@
   margin: 0 0 1rem;
 }
 
-.id-fieldset legend {
-  padding: 0 0.45rem;
-  font-weight: 800;
-  font-size: 0.9rem;
-  color: var(--egouv-primary);
+.family-member-card {
+  border: 1px solid var(--egouv-line);
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+  margin: 0 0 0.75rem;
+  background: var(--egouv-card, #fff);
+}
+
+.family-member-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.family-member-grid {
+  margin-top: 0.5rem;
+}
+
+.family-check label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.situation-familiale .id-fieldset {
+  margin-bottom: 1rem;
 }
 
 .bio-grid {

@@ -9,6 +9,7 @@ import 'fingerprint_capture.dart';
 import 'geo_cascade_field.dart';
 import 'photo_capture.dart';
 import 'rdc_tribus.dart';
+import 'situation_familiale.dart';
 
 /// Fiche personne — wizard 7 étapes aligné sur le site civil-officer.
 class CitizensFormScreen extends StatefulWidget {
@@ -54,7 +55,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   late final TextEditingController _universitaire;
   late final TextEditingController _professionnel;
   late final TextEditingController _numeroAdmin;
-  late final TextEditingController _situation;
+  late final TextEditingController _familleRemarques;
 
   String _sex = 'M';
   String _etatCivil = 'CELIBATAIRE';
@@ -69,6 +70,11 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   String? _rejectNote;
   String? _localId;
   int _version = 1;
+
+  bool _aConjoint = false;
+  late _MemberEditors _conjoint;
+  final List<_MemberEditors> _enfants = [];
+  final List<_MemberEditors> _charges = [];
 
   bool get _isEdit => widget.existing != null;
 
@@ -135,8 +141,19 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     _professionnel =
         TextEditingController(text: payload['parcours_professionnel']?.toString() ?? '');
     _numeroAdmin = TextEditingController(text: payload['numero_admin']?.toString() ?? '');
-    _situation =
-        TextEditingController(text: payload['situation_familiale']?.toString() ?? '');
+
+    final famille = SituationFamiliale.parse(
+      payload['situation_familiale_detail'] ?? payload['situation_familiale'],
+    );
+    _aConjoint = famille.aConjoint;
+    _conjoint = _MemberEditors(famille.conjoint);
+    for (final e in famille.enfants) {
+      _enfants.add(_MemberEditors(e));
+    }
+    for (final c in famille.personnesACharge) {
+      _charges.add(_MemberEditors(c));
+    }
+    _familleRemarques = TextEditingController(text: famille.remarques);
 
     _sex = e?['sex']?.toString() ?? 'M';
     _etatCivil = payload['etat_civil']?.toString() ?? 'CELIBATAIRE';
@@ -195,7 +212,14 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     _universitaire.dispose();
     _professionnel.dispose();
     _numeroAdmin.dispose();
-    _situation.dispose();
+    _familleRemarques.dispose();
+    _conjoint.dispose();
+    for (final e in _enfants) {
+      e.dispose();
+    }
+    for (final c in _charges) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -298,9 +322,20 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
       'parcours_universitaire': _universitaire.text.trim(),
       'parcours_professionnel': _professionnel.text.trim(),
       'numero_admin': _numeroAdmin.text.trim(),
-      'situation_familiale': _situation.text.trim(),
+      'situation_familiale': _buildSituation().formatSummary(),
+      'situation_familiale_detail': _buildSituation().toJson(),
       'relationship_to_head': _relation,
     };
+  }
+
+  SituationFamiliale _buildSituation() {
+    return SituationFamiliale(
+      aConjoint: _aConjoint,
+      conjoint: _conjoint.snapshot(),
+      enfants: _enfants.map((e) => e.snapshot()).toList(),
+      personnesACharge: _charges.map((e) => e.snapshot()).toList(),
+      remarques: _familleRemarques.text,
+    );
   }
 
   Future<void> _save({bool draft = false}) async {
@@ -825,14 +860,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               ),
             ]),
             _section('7. Situation familiale', [
-              TextFormField(
-                controller: _situation,
-                decoration: _dec(
-                  'Situation familiale',
-                  hint: 'Conjoint(e), enfants, personnes à charge…',
-                ),
-                maxLines: 6,
-              ),
+              _buildFamilyBlock(),
             ]),
             const SizedBox(height: 8),
             _saveButtons(),
@@ -840,5 +868,219 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildFamilyBlock() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DropdownButtonFormField<bool>(
+          value: _aConjoint,
+          decoration: _dec('A un conjoint / vit en couple'),
+          items: const [
+            DropdownMenuItem(value: false, child: Text('Non')),
+            DropdownMenuItem(value: true, child: Text('Oui')),
+          ],
+          onChanged: (v) => setState(() => _aConjoint = v ?? false),
+        ),
+        if (_aConjoint) ...[
+          const SizedBox(height: 10),
+          Text('Conjoint(e)', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 6),
+          _memberFields(_conjoint, showTelephone: true),
+        ],
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Enfants (${_enfants.length})',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => setState(() => _enfants.add(_MemberEditors(FamilyMember(lien: 'ENFANT')))),
+              icon: const Icon(Icons.person_add_alt_1),
+              label: const Text('Ajouter'),
+            ),
+          ],
+        ),
+        if (_enfants.isEmpty)
+          const Text('Aucun enfant déclaré.', style: TextStyle(color: Color(0xFF5A6A85))),
+        for (var i = 0; i < _enfants.length; i++) ...[
+          const SizedBox(height: 8),
+          _memberCard(
+            title: 'Enfant ${i + 1}',
+            onRemove: () => setState(() {
+              _enfants[i].dispose();
+              _enfants.removeAt(i);
+            }),
+            child: _memberFields(_enfants[i]),
+          ),
+        ],
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Personnes à charge (${_charges.length})',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => setState(() => _charges.add(_MemberEditors(FamilyMember()))),
+              icon: const Icon(Icons.person_add_alt_1),
+              label: const Text('Ajouter'),
+            ),
+          ],
+        ),
+        if (_charges.isEmpty)
+          const Text('Aucune personne à charge.', style: TextStyle(color: Color(0xFF5A6A85))),
+        for (var i = 0; i < _charges.length; i++) ...[
+          const SizedBox(height: 8),
+          _memberCard(
+            title: 'Personne à charge ${i + 1}',
+            onRemove: () => setState(() {
+              _charges[i].dispose();
+              _charges.removeAt(i);
+            }),
+            child: _memberFields(_charges[i], showTelephone: true, showLien: true),
+          ),
+        ],
+        const SizedBox(height: 14),
+        TextFormField(
+          controller: _familleRemarques,
+          decoration: _dec('Remarques', hint: 'Précisions complémentaires…'),
+          maxLines: 3,
+        ),
+      ],
+    );
+  }
+
+  Widget _memberCard({
+    required String title,
+    required VoidCallback onRemove,
+    required Widget child,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFD5DEEE)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700))),
+              IconButton(
+                onPressed: onRemove,
+                icon: const Icon(Icons.delete_outline, color: Color(0xFFE11D48)),
+                tooltip: 'Retirer',
+              ),
+            ],
+          ),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _memberFields(
+    _MemberEditors m, {
+    bool showTelephone = false,
+    bool showLien = false,
+  }) {
+    return Column(
+      children: [
+        TextFormField(controller: m.nom, decoration: _dec('Nom')),
+        const SizedBox(height: 8),
+        TextFormField(controller: m.postnom, decoration: _dec('Post-nom')),
+        const SizedBox(height: 8),
+        TextFormField(controller: m.prenom, decoration: _dec('Prénom')),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: m.sexe.isEmpty ? null : m.sexe,
+                decoration: _dec('Sexe'),
+                items: const [
+                  DropdownMenuItem(value: 'M', child: Text('Masculin')),
+                  DropdownMenuItem(value: 'F', child: Text('Féminin')),
+                ],
+                onChanged: (v) => setState(() => m.sexe = v ?? ''),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextFormField(
+                controller: m.dateNaissance,
+                decoration: _dec('Date naissance', hint: 'AAAA-MM-JJ'),
+              ),
+            ),
+          ],
+        ),
+        if (showTelephone) ...[
+          const SizedBox(height: 8),
+          TextFormField(controller: m.telephone, decoration: _dec('Téléphone')),
+        ],
+        if (showLien) ...[
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: m.lien,
+            decoration: _dec('Lien de parenté', hint: 'Frère, oncle…'),
+          ),
+        ],
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Vit dans le ménage'),
+          value: m.vitAvec,
+          onChanged: (v) => setState(() => m.vitAvec = v),
+        ),
+      ],
+    );
+  }
+}
+
+class _MemberEditors {
+  _MemberEditors(FamilyMember m)
+      : nom = TextEditingController(text: m.nom),
+        postnom = TextEditingController(text: m.postnom),
+        prenom = TextEditingController(text: m.prenom),
+        dateNaissance = TextEditingController(text: m.dateNaissance),
+        telephone = TextEditingController(text: m.telephone),
+        lien = TextEditingController(text: m.lien),
+        sexe = m.sexe,
+        vitAvec = m.vitAvec;
+
+  final TextEditingController nom;
+  final TextEditingController postnom;
+  final TextEditingController prenom;
+  final TextEditingController dateNaissance;
+  final TextEditingController telephone;
+  final TextEditingController lien;
+  String sexe;
+  bool vitAvec;
+
+  FamilyMember snapshot() => FamilyMember(
+        nom: nom.text,
+        postnom: postnom.text,
+        prenom: prenom.text,
+        sexe: sexe,
+        dateNaissance: dateNaissance.text.trim(),
+        telephone: telephone.text,
+        vitAvec: vitAvec,
+        lien: lien.text,
+      );
+
+  void dispose() {
+    nom.dispose();
+    postnom.dispose();
+    prenom.dispose();
+    dateNaissance.dispose();
+    telephone.dispose();
+    lien.dispose();
   }
 }

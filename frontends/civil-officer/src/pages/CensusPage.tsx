@@ -7,6 +7,7 @@ import GeoCascade, {
   type GeoSelection,
 } from "../components/GeoCascade";
 import PersonPicker from "../components/PersonPicker";
+import SituationFamilialeForm from "../components/SituationFamilialeForm";
 import {
   ETAT_CIVIL_OPTIONS,
   HANDICAP_OPTIONS,
@@ -22,6 +23,12 @@ import {
 } from "../registry";
 import { getOfficerCommune } from "../commune";
 import { RDC_TRIBUS, RDC_TRIBUS_NOTE } from "../data/tribusRdc";
+import {
+  emptySituationFamiliale,
+  formatSituationFamiliale,
+  parseSituationFamiliale,
+  type SituationFamilialeData,
+} from "../situationFamiliale";
 
 const STEPS = [
   { id: 1, label: "1. Identité" },
@@ -68,7 +75,7 @@ type CensusDraft = {
   scolaire: string;
   universitaire: string;
   professionnel: string;
-  situation: string;
+  situationFamiliale: SituationFamilialeData;
   numeroAdmin: string;
   savedAt: string;
 };
@@ -104,7 +111,9 @@ export default function CensusPage() {
   const [scolaire, setScolaire] = useState("");
   const [universitaire, setUniversitaire] = useState("");
   const [professionnel, setProfessionnel] = useState("");
-  const [situation, setSituation] = useState("");
+  const [situationFamiliale, setSituationFamiliale] = useState<SituationFamilialeData>(
+    emptySituationFamiliale
+  );
   const [numeroAdmin, setNumeroAdmin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [draftNotice, setDraftNotice] = useState<string | null>(null);
@@ -150,7 +159,11 @@ export default function CensusPage() {
       setScolaire(d.scolaire ?? "");
       setUniversitaire(d.universitaire ?? "");
       setProfessionnel(d.professionnel ?? "");
-      setSituation(d.situation ?? "");
+      setSituationFamiliale(
+        d.situationFamiliale
+          ? parseSituationFamiliale(d.situationFamiliale)
+          : emptySituationFamiliale()
+      );
       setNumeroAdmin(d.numeroAdmin ?? "");
       setDraftNotice("Brouillon restauré — vous pouvez continuer la saisie.");
     } catch {
@@ -269,7 +282,7 @@ export default function CensusPage() {
       scolaire,
       universitaire,
       professionnel,
-      situation,
+      situationFamiliale,
       numeroAdmin,
       savedAt: new Date().toISOString(),
     };
@@ -290,6 +303,7 @@ export default function CensusPage() {
       const commune = getOfficerCommune();
       const adresse = buildAdresse();
       const lieuNaissance = geoNaissance.label || "";
+      const situationSummary = formatSituationFamiliale(situationFamiliale);
       const person = addPerson({
         nom: nom.trim(),
         postnom: postnom.trim(),
@@ -309,7 +323,7 @@ export default function CensusPage() {
         parcours_scolaire: scolaire.trim() || undefined,
         parcours_universitaire: universitaire.trim() || undefined,
         parcours_professionnel: [professionnel.trim(), profession.trim()].filter(Boolean).join(" | ") || undefined,
-        situation_familiale: situation.trim() || undefined,
+        situation_familiale: situationSummary || undefined,
         nationalite: nationalite.trim() === "Étrangère" || nationalite.toLowerCase().includes("etrang")
           ? "ETRANGER"
           : "CONGOLAIS",
@@ -354,6 +368,7 @@ export default function CensusPage() {
         parcours_universitaire: person.parcours_universitaire ?? null,
         parcours_professionnel: person.parcours_professionnel ?? null,
         situation_familiale: person.situation_familiale ?? null,
+        situation_familiale_detail: situationFamiliale,
         province_origine: geoOrigine.province_name || null,
         ville_origine: geoOrigine.ville_name || null,
         territoire_origine: geoOrigine.district_name || null,
@@ -366,6 +381,7 @@ export default function CensusPage() {
       };
       const act = addAct("CENSUS", payload, person.nic);
       clearDraft();
+      setSituationFamiliale(emptySituationFamiliale());
       setCreated(act);
       streamRef.current?.getTracks().forEach((t) => t.stop());
       setStep(1);
@@ -717,14 +733,7 @@ export default function CensusPage() {
         {step === 7 ? (
           <form className="form-grid" onSubmit={onSubmit}>
             <div className="full">
-              <label className="form-label">Situation familiale</label>
-              <textarea
-                className="form-control"
-                rows={6}
-                value={situation}
-                onChange={(e) => setSituation(e.target.value)}
-                placeholder="Conjoint(e), enfants, personnes à charge…"
-              />
+              <SituationFamilialeForm value={situationFamiliale} onChange={setSituationFamiliale} />
             </div>
             <div className="full census-nav">
               <button type="button" className="btn-secondary" onClick={goPrev}>
