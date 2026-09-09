@@ -1,8 +1,26 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../sync/local_database.dart';
 import 'citizens_form.dart';
 import 'household_form_screen.dart';
+
+String _memberDisplayName(Map<String, Object?> m) {
+  Map<String, dynamic> payload = {};
+  final raw = m['payload'];
+  if (raw is String && raw.isNotEmpty) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) payload = Map<String, dynamic>.from(decoded);
+    } catch (_) {}
+  }
+  final nom = (payload['nom'] ?? m['family_name'] ?? '').toString().trim();
+  final postnom = (payload['postnom'] ?? '').toString().trim();
+  final prenom = (payload['prenom'] ?? m['given_names'] ?? '').toString().trim();
+  final parts = [nom, postnom, prenom].where((s) => s.isNotEmpty).toList();
+  return parts.isEmpty ? 'Sans nom' : parts.join(' ');
+}
 
 class HouseholdsScreen extends StatefulWidget {
   const HouseholdsScreen({
@@ -212,8 +230,7 @@ class _HouseholdMembersScreenState extends State<HouseholdMembersScreen> {
               itemCount: _members.length,
               itemBuilder: (context, i) {
                 final m = _members[i];
-                final name =
-                    '${m['given_names'] ?? ''} ${m['family_name'] ?? ''}'.trim();
+                final name = _memberDisplayName(m);
                 final status = m['status']?.toString() ?? '';
                 final IconData icon;
                 final Color color;
@@ -235,7 +252,7 @@ class _HouseholdMembersScreenState extends State<HouseholdMembersScreen> {
                 }
                 return Card(
                   child: ListTile(
-                    title: Text(name.isEmpty ? 'Sans nom' : name),
+                    title: Text(name),
                     subtitle: Text(
                       '${m['sex'] ?? ''} · ${m['date_of_birth'] ?? ''} · $status',
                     ),
