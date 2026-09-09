@@ -123,7 +123,7 @@ export default function DashboardPage() {
       value: acts.filter((a) => a.type === "CENSUS").length,
       subtitle: "Fiches",
       tone: "primary",
-      href: "/census",
+      href: "/acts?type=CENSUS",
       icon: <IconClipboard size={26} />,
     },
     {

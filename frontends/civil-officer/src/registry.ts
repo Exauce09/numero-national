@@ -7,6 +7,7 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? "/api/v1";
 export type Sexe = "M" | "F";
 export type EtatCivil = "CELIBATAIRE" | "MARIE" | "DIVORCE" | "VEUF" | "UNKNOWN";
 export type HandicapType = "NORMAL" | "PIED" | "BRAS" | "YEUX" | "INFIRME" | "INAPTE";
+export type Nationalite = "CONGOLAIS" | "ETRANGER";
 export type ActType =
   | "BIRTH"
   | "DEATH"
@@ -29,6 +30,7 @@ export type Person = {
   taille?: number;
   poids?: number;
   handicap_type: HandicapType;
+  nationalite?: Nationalite;
   mother_id?: string;
   father_id?: string;
   nic: string;
@@ -127,6 +129,49 @@ export function ageDays(dob: string): number {
 
 export function displayName(p: Person): string {
   return [p.nom, p.postnom, p.prenom].filter(Boolean).join(" ").trim() || p.nic;
+}
+
+const FOREIGN_HINTS = [
+  "new york",
+  "paris",
+  "bruxelles",
+  "london",
+  "londres",
+  "ottawa",
+  "beijing",
+  "dubai",
+  "geneva",
+  "genève",
+];
+
+/** Nationalité déclarée, sinon heuristique lieu de naissance (démo). */
+export function personNationalite(p: Person): Nationalite {
+  if (p.nationalite === "CONGOLAIS" || p.nationalite === "ETRANGER") return p.nationalite;
+  const lieu = (p.lieu_naissance || "").toLowerCase();
+  if (FOREIGN_HINTS.some((h) => lieu.includes(h))) return "ETRANGER";
+  return "CONGOLAIS";
+}
+
+export function populationBreakdown(persons: Person[]) {
+  const empty = { congolais: 0, etranger: 0, total: 0 };
+  const hommes = { ...empty };
+  const femmes = { ...empty };
+  for (const p of persons) {
+    const nat = personNationalite(p);
+    const bucket = p.sexe === "F" ? femmes : hommes;
+    if (nat === "ETRANGER") bucket.etranger += 1;
+    else bucket.congolais += 1;
+    bucket.total += 1;
+  }
+  return {
+    hommes,
+    femmes,
+    total: {
+      congolais: hommes.congolais + femmes.congolais,
+      etranger: hommes.etranger + femmes.etranger,
+      total: hommes.total + femmes.total,
+    },
+  };
 }
 
 export function listPersons(): Person[] {

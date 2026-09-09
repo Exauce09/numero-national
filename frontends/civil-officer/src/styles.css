@@ -248,6 +248,241 @@
   background: rgba(93, 135, 255, 0.05);
 }
 
+.eg-list-stats {
+  background: var(--egouv-card, #fff);
+  border: 1px solid var(--egouv-line);
+  border-radius: 12px;
+  padding: 1rem 1.15rem 1.15rem;
+  margin-bottom: 1rem;
+}
+
+.eg-list-stats-title {
+  margin: 0 0 0.85rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  font-weight: 800;
+  color: var(--egouv-ink);
+}
+
+.eg-list-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.eg-stat-col {
+  border: 1px solid var(--egouv-line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(93, 135, 255, 0.03);
+}
+
+.eg-stat-col.is-highlight {
+  background: rgba(19, 222, 185, 0.08);
+  border-color: rgba(19, 222, 185, 0.35);
+}
+
+.eg-stat-col-head {
+  padding: 0.55rem 0.85rem;
+  font-weight: 800;
+  font-size: 0.82rem;
+  letter-spacing: 0.03em;
+  background: rgba(93, 135, 255, 0.12);
+  color: var(--egouv-primary);
+}
+
+.eg-stat-col ul {
+  list-style: none;
+  margin: 0;
+  padding: 0.55rem 0.85rem 0.7rem;
+}
+
+.eg-stat-col li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.28rem 0;
+  font-size: 0.88rem;
+  border-bottom: 1px dashed var(--egouv-line);
+}
+
+.eg-stat-col li:last-child {
+  border-bottom: 0;
+}
+
+.eg-stat-col li.is-total {
+  margin-top: 0.2rem;
+  font-weight: 700;
+}
+
+.eg-simple-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.eg-simple-stat {
+  border: 1px solid var(--egouv-line);
+  border-top: 3px solid var(--egouv-primary);
+  border-radius: 10px;
+  padding: 0.75rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  background: var(--egouv-card, #fff);
+}
+
+.eg-simple-stat strong {
+  font-size: 1.45rem;
+}
+
+.eg-charts-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.eg-chart-card {
+  background: var(--egouv-card, #fff);
+  border: 1px solid var(--egouv-line);
+  border-radius: 12px;
+  padding: 0.9rem 1rem 1rem;
+}
+
+.eg-chart-title {
+  margin: 0 0 0.65rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.eg-chart-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.eg-chart-center {
+  font-size: 0.95rem;
+  font-weight: 800;
+  fill: var(--egouv-ink);
+}
+
+.eg-chart-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.85rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.eg-swatch {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 2px;
+  margin-right: 0.4rem;
+  vertical-align: middle;
+}
+
+.eg-bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.65rem;
+  min-height: 140px;
+  padding-top: 0.5rem;
+}
+
+.eg-bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  height: 100%;
+  min-width: 0;
+}
+
+.eg-bar {
+  width: 70%;
+  max-width: 42px;
+  min-height: 4px;
+  border-radius: 6px 6px 2px 2px;
+}
+
+.eg-bar-value {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--egouv-muted);
+}
+
+.eg-bar-label {
+  font-size: 0.72rem;
+  text-align: center;
+  color: var(--egouv-muted);
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.eg-avatar-sm {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e8eef8;
+  color: var(--egouv-primary);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.eg-avatar-empty {
+  border: 1px solid var(--egouv-line);
+}
+
+.eg-avatar-lg {
+  width: 96px;
+  height: 96px;
+  border-radius: 12px;
+  object-fit: cover;
+  margin-bottom: 0.85rem;
+  border: 1px solid var(--egouv-line);
+}
+
+.eg-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--egouv-line);
+}
+
+.eg-pager-btns {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.eg-pager-num {
+  padding: 0 0.45rem;
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+@media (max-width: 800px) {
+  .eg-list-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .sidebar-nav a {
   display: flex;
   align-items: center;

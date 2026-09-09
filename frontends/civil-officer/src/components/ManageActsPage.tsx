@@ -1,14 +1,24 @@
-/** Pages manage-* style Justicia : liste, recherche, export, détail acte. */
+/** Pages manage-* style Justicia : stats, graphiques, liste paginée, détail. */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ActPrintCard from "./ActPrintCard";
+import { BarChart, PieChart } from "./Charts";
 import DataToolbar from "./DataToolbar";
-import { actTypeLabel, getAct, listActs, type Act, type ActType } from "../registry";
+import { SimpleStatBlocks } from "./StatBlocks";
+import {
+  actTypeLabel,
+  getAct,
+  getPersonByNic,
+  listActs,
+  type Act,
+  type ActType,
+} from "../registry";
 
 export type ManageConfig = {
   slug: string;
   title: string;
+  listTitle: string;
   breadcrumb: string;
   justiciaUrl: string;
   justiciaFile: string;
@@ -22,6 +32,7 @@ export const MANAGE_CONFIGS: Record<string, ManageConfig> = {
   deces: {
     slug: "deces",
     title: "Gérer les décès",
+    listTitle: "LISTE DES DÉCÈS",
     breadcrumb: "Décès",
     justiciaUrl: "https://www.justicia.website/egouv/COMMUNE/manage-deces.php",
     justiciaFile: "manage-deces.php",
@@ -40,6 +51,7 @@ export const MANAGE_CONFIGS: Record<string, ManageConfig> = {
   divorce: {
     slug: "divorce",
     title: "Gérer les divorces",
+    listTitle: "LISTE DES DIVORCES",
     breadcrumb: "Divorces",
     justiciaUrl: "https://www.justicia.website/egouv/COMMUNE/manage-divorce.php",
     justiciaFile: "manage-divorce.php",
@@ -57,6 +69,7 @@ export const MANAGE_CONFIGS: Record<string, ManageConfig> = {
   adoption: {
     slug: "adoption",
     title: "Gérer les adoptions",
+    listTitle: "LISTE DES ADOPTIONS",
     breadcrumb: "Adoptions",
     justiciaUrl: "https://www.justicia.website/egouv/COMMUNE/manage-adoption.php",
     justiciaFile: "manage-adoption.php",
@@ -74,6 +87,7 @@ export const MANAGE_CONFIGS: Record<string, ManageConfig> = {
   deplacement: {
     slug: "deplacement",
     title: "Gérer les déplacements",
+    listTitle: "LISTE DES DÉPLACEMENTS",
     breadcrumb: "Déplacements",
     justiciaUrl: "https://www.justicia.website/egouv/COMMUNE/manage-deplacement.php",
     justiciaFile: "manage-deplacement.php",
@@ -91,6 +105,7 @@ export const MANAGE_CONFIGS: Record<string, ManageConfig> = {
   document: {
     slug: "document",
     title: "Gérer les documents",
+    listTitle: "LISTE DES DOCUMENTS",
     breadcrumb: "Documents",
     justiciaUrl: "https://www.justicia.website/egouv/COMMUNE/manage-document.php",
     justiciaFile: "manage-document.php",
@@ -107,6 +122,7 @@ export const MANAGE_CONFIGS: Record<string, ManageConfig> = {
   mariage: {
     slug: "mariage",
     title: "Gérer les mariages",
+    listTitle: "LISTE DES MARIAGES",
     breadcrumb: "Mariages",
     justiciaUrl: "https://www.justicia.website/egouv/COMMUNE/manage-mariage.php",
     justiciaFile: "manage-mariage.php",
@@ -124,6 +140,7 @@ export const MANAGE_CONFIGS: Record<string, ManageConfig> = {
   naissance: {
     slug: "naissance",
     title: "Gérer les naissances",
+    listTitle: "LISTE DES NAISSANCES",
     breadcrumb: "Naissances",
     justiciaUrl: "https://www.justicia.website/egouv/COMMUNE/manage-naissance.php",
     justiciaFile: "manage-naissance.php",
@@ -140,6 +157,9 @@ export const MANAGE_CONFIGS: Record<string, ManageConfig> = {
   },
 };
 
+const PAGE_SIZE = 10;
+const COLORS = ["#5d87ff", "#13deb9", "#fa896b", "#ffae1f", "#539bff", "#763ebd"];
+
 function cell(act: Act, key: string): string {
   const v = act.payload[key];
   if (v == null || v === "") return "—";
@@ -154,14 +174,23 @@ function subjectLabel(act: Act, cfg: ManageConfig): string {
   return act.national_id || act.act_number;
 }
 
+function monthKey(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export default function ManageActsPage({ config }: { config: ManageConfig }) {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
   const [viewAct, setViewAct] = useState<Act | null>(null);
+
+  const all = useMemo(() => listActs(config.actType), [config.actType]);
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return listActs(config.actType).filter((act) => {
+    return all.filter((act) => {
       if (!needle) return true;
       const parts = [
         act.act_number,
@@ -170,7 +199,67 @@ export default function ManageActsPage({ config }: { config: ManageConfig }) {
       ];
       return parts.join(" ").toLowerCase().includes(needle);
     });
-  }, [config, q]);
+  }, [all, config.summaryFields, q]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [q, config.slug]);
+
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const pageRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const last30 = useMemo(() => {
+    const cut = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    return all.filter((a) => new Date(a.created_at).getTime() >= cut).length;
+  }, [all]);
+
+  const last90 = useMemo(() => {
+    const cut = Date.now() - 90 * 24 * 60 * 60 * 1000;
+    return all.filter((a) => new Date(a.created_at).getTime() >= cut).length;
+  }, [all]);
+
+  const monthBars = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const a of all) {
+      const k = monthKey(a.created_at);
+      map.set(k, (map.get(k) ?? 0) + 1);
+    }
+    return [...map.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-6)
+      .map(([label, value], i) => ({
+        label: label.slice(5),
+        value,
+        color: COLORS[i % COLORS.length],
+      }));
+  }, [all]);
+
+  const breakdownField = config.summaryFields.find((f) =>
+    ["sexe", "cause_deces", "cause", "type_document", "regime_matrimonial", "motif"].includes(f.key),
+  );
+
+  const pieBreakdown = useMemo(() => {
+    if (!breakdownField) {
+      return [
+        { label: "Total", value: all.length, color: COLORS[0] },
+        { label: "30 j", value: last30, color: COLORS[1] },
+      ];
+    }
+    const map = new Map<string, number>();
+    for (const a of all) {
+      const k = cell(a, breakdownField.key);
+      map.set(k, (map.get(k) ?? 0) + 1);
+    }
+    return [...map.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([label, value], i) => ({
+        label: label === "M" ? "Garçons" : label === "F" ? "Filles" : label.slice(0, 18),
+        value,
+        color: COLORS[i % COLORS.length],
+      }));
+  }, [all, breakdownField, last30]);
 
   const exportRows = rows.map((a) => {
     const base: Record<string, string> = {
@@ -195,11 +284,11 @@ export default function ManageActsPage({ config }: { config: ManageConfig }) {
           </p>
           <h2 className="page-title">{config.title}</h2>
           <p className="page-lead">
-            Même logique que{" "}
+            Liste détaillée avec statistiques et graphiques — référence{" "}
             <a href={config.justiciaUrl} target="_blank" rel="noreferrer">
               {config.justiciaFile}
-            </a>{" "}
-            — recherche, export CSV/Excel/PDF et fiche détail cliquable.
+            </a>
+            .
           </p>
         </div>
         <button type="button" className="btn-add" onClick={() => navigate(config.createPath)}>
@@ -207,28 +296,45 @@ export default function ManageActsPage({ config }: { config: ManageConfig }) {
         </button>
       </div>
 
-      <div className="metrics-row" style={{ marginBottom: "1rem" }}>
-        <div className="metric-card">
-          <span className="muted">Total</span>
-          <strong>{rows.length}</strong>
-        </div>
-        <div className="metric-card">
-          <span className="muted">Type</span>
-          <strong style={{ fontSize: "1.05rem" }}>{actTypeLabel(config.actType)}</strong>
-        </div>
+      <SimpleStatBlocks
+        title={config.listTitle}
+        items={[
+          { label: "TOTAL", value: all.length, color: "#5d87ff" },
+          { label: "30 DERNIERS JOURS", value: last30, color: "#13deb9" },
+          { label: "90 DERNIERS JOURS", value: last90, color: "#ffae1f" },
+          { label: "FILTRÉS", value: rows.length, color: "#fa896b" },
+        ]}
+      />
+
+      <div className="eg-charts-row">
+        <PieChart
+          title={breakdownField ? `Répartition (${breakdownField.label})` : "Répartition"}
+          data={pieBreakdown}
+        />
+        <BarChart
+          title="Histogramme mensuel"
+          data={
+            monthBars.length
+              ? monthBars
+              : [{ label: "—", value: 0, color: COLORS[0] }]
+          }
+        />
       </div>
 
       <div className="panel">
         <div className="panel-head">
           <div className="eg-filter-bar">
+            <label className="muted small" htmlFor={`search-${config.slug}`}>
+              Search:
+            </label>
             <input
+              id={`search-${config.slug}`}
               className="form-control"
               style={{ marginBottom: 0, minWidth: 220 }}
               placeholder={config.searchHint}
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
-            <span className="muted small">{rows.length} enregistrement(s)</span>
           </div>
           <DataToolbar filename={`manage_${config.slug}`} rows={exportRows} />
         </div>
@@ -237,48 +343,102 @@ export default function ManageActsPage({ config }: { config: ManageConfig }) {
           <table className="data-table eg-table">
             <thead>
               <tr>
+                <th>#</th>
+                <th>Photo</th>
                 <th>N° acte</th>
-                <th>NIC</th>
+                <th>Num. national</th>
                 {primary ? <th>{primary.label}</th> : null}
                 {secondary ? <th>{secondary.label}</th> : null}
                 {tertiary ? <th>{tertiary.label}</th> : null}
                 <th>Enregistré le</th>
-                <th>Actions</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
+              {pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="muted">
+                  <td colSpan={9} className="muted">
                     Aucun enregistrement. Cliquez « + Ajouter » pour créer.
                   </td>
                 </tr>
               ) : (
-                rows.map((a) => (
-                  <tr key={a.id}>
-                    <td>{a.act_number}</td>
-                    <td>
-                      <code>{a.national_id || "—"}</code>
-                    </td>
-                    {primary ? <td>{cell(a, primary.key)}</td> : null}
-                    {secondary ? <td>{cell(a, secondary.key)}</td> : null}
-                    {tertiary ? <td>{cell(a, tertiary.key)}</td> : null}
-                    <td>{new Date(a.created_at).toLocaleString("fr-CD")}</td>
-                    <td className="table-actions">
-                      <button
-                        type="button"
-                        className="btn-add btn-sm"
-                        onClick={() => setViewAct(getAct(a.id) ?? a)}
-                        title={subjectLabel(a, config)}
-                      >
-                        Voir
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                pageRows.map((a, i) => {
+                  const person = a.national_id ? getPersonByNic(a.national_id) : undefined;
+                  const label = subjectLabel(a, config);
+                  return (
+                    <tr key={a.id}>
+                      <td>{(safePage - 1) * PAGE_SIZE + i + 1}</td>
+                      <td>
+                        {person?.photo_data_url ? (
+                          <img src={person.photo_data_url} alt="" className="eg-avatar-sm" />
+                        ) : (
+                          <span className="eg-avatar-sm eg-avatar-empty" aria-hidden>
+                            {label.slice(0, 1)}
+                          </span>
+                        )}
+                      </td>
+                      <td>{a.act_number}</td>
+                      <td>
+                        <code>{a.national_id || "—"}</code>
+                      </td>
+                      {primary ? <td>{cell(a, primary.key)}</td> : null}
+                      {secondary ? <td>{cell(a, secondary.key)}</td> : null}
+                      {tertiary ? <td>{cell(a, tertiary.key)}</td> : null}
+                      <td>{new Date(a.created_at).toLocaleString("fr-CD")}</td>
+                      <td className="table-actions">
+                        <button
+                          type="button"
+                          className="btn-add btn-sm"
+                          onClick={() => setViewAct(getAct(a.id) ?? a)}
+                        >
+                          Voir
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="eg-pager">
+          <span className="muted small">
+            Showing {rows.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1} to{" "}
+            {Math.min(safePage * PAGE_SIZE, rows.length)} of {rows.length} entries
+          </span>
+          <div className="eg-pager-btns">
+            <button type="button" className="btn-secondary btn-sm" disabled={safePage <= 1} onClick={() => setPage(1)}>
+              «
+            </button>
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              disabled={safePage <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              ‹
+            </button>
+            <span className="eg-pager-num">
+              {safePage} / {pageCount}
+            </span>
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              disabled={safePage >= pageCount}
+              onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+            >
+              ›
+            </button>
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              disabled={safePage >= pageCount}
+              onClick={() => setPage(pageCount)}
+            >
+              »
+            </button>
+          </div>
         </div>
       </div>
 
