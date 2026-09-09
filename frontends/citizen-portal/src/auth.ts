@@ -1,3 +1,5 @@
+import { getCitizenPrefs, saveCitizenPrefs } from "./citizenPrefs";
+
 export type Session = {
   username: string;
   accessToken?: string;
@@ -20,6 +22,21 @@ export function getSession(): Session | null {
 
 export function clearSession(): void {
   sessionStorage.removeItem(KEY);
+}
+
+function effectivePassword(): string {
+  return getCitizenPrefs().passwordOverride || DEMO_PASSWORD;
+}
+
+export function updateCitizenPassword(currentPassword: string, nextPassword: string): void {
+  if (currentPassword !== effectivePassword()) {
+    throw new Error("Mot de passe actuel incorrect.");
+  }
+  if (nextPassword.length < 8) {
+    throw new Error("Le nouveau mot de passe doit contenir au moins 8 caractères.");
+  }
+  const prefs = getCitizenPrefs();
+  saveCitizenPrefs({ ...prefs, passwordOverride: nextPassword });
 }
 
 export async function login(username: string, password: string): Promise<Session> {
@@ -45,8 +62,8 @@ export async function login(username: string, password: string): Promise<Session
     /* API indisponible */
   }
 
-  if (user !== DEMO_USER || password !== DEMO_PASSWORD) {
-    throw new Error("Identifiants incorrects. Utilisez le compte de démo citoyen.");
+  if (user !== DEMO_USER || password !== effectivePassword()) {
+    throw new Error(`Identifiants incorrects. Démo : ${DEMO_USER} / ${DEMO_PASSWORD}`);
   }
 
   const session: Session = { username: user };
