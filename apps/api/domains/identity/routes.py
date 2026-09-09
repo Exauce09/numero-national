@@ -32,6 +32,7 @@ from apps.api.domains.identity.schemas import (
     UserLogin,
     UserMe,
     UserRegister,
+    UserUpdate,
 )
 from apps.api.domains.identity.seed import seed_roles_and_permissions
 
@@ -329,6 +330,36 @@ async def list_users(
     await seed_roles_and_permissions(db)
     users = await identity_services.list_users(db, limit=limit, offset=offset)
     return [identity_services.user_to_me(u) for u in users]
+
+
+@rbac_router.patch(
+    "/users/{user_id}",
+    response_model=UserMe,
+    dependencies=[Depends(require_permissions("users:manage"))],
+    summary="Modifier un compte (nom, territoire, rôles, mot de passe)",
+)
+async def update_user(
+    user_id: UUID,
+    payload: UserUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> UserMe:
+    user = await identity_services.update_user(db, user_id, payload)
+    ip, device = _client_meta(request)
+    await write_audit(
+        db,
+        actor_id=current_user.id,
+        institution_id=current_user.institution_id,
+        action="user.update",
+        resource_type="user",
+        resource_id=str(user.id),
+        ip=ip,
+        device=device,
+        result="success",
+        new_value=payload.model_dump(exclude_unset=True, exclude={"password"}),
+    )
+    return identity_services.user_to_me(user)
 
 
 @rbac_router.patch(

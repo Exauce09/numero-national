@@ -36,6 +36,7 @@ from apps.api.domains.identity.schemas import (
     UserLogin,
     UserMe,
     UserRegister,
+    UserUpdate,
 )
 from apps.api.core.redis_client import (
     clear_login_failures,
@@ -100,6 +101,49 @@ async def _resolve_roles(db: AsyncSession, role_codes: list[str]) -> list[Role]:
     return roles
 
 
+async def _validate_user_geo(
+    db: AsyncSession,
+    *,
+    province_id: UUID | None,
+    ville_id: UUID | None,
+    commune_id: UUID | None,
+) -> tuple[UUID | None, UUID | None, UUID | None]:
+    if province_id is None and ville_id is None and commune_id is None:
+        return None, None, None
+    from apps.api.domains.geography.models import Commune, Province, Ville
+
+    if province_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="province_id est requis pour rattacher un compte à un territoire",
+        )
+    province = await db.get(Province, province_id)
+    if province is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Province introuvable",
+        )
+    if ville_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ville_id est requis (affectation type élections : province → ville)",
+        )
+    ville = await db.get(Ville, ville_id)
+    if ville is None or ville.province_id != province_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La ville doit appartenir à la province sélectionnée",
+        )
+    if commune_id is not None:
+        commune = await db.get(Commune, commune_id)
+        if commune is None or commune.ville_id != ville_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La commune doit appartenir à la ville sélectionnée",
+            )
+    return province_id, ville_id, commune_id
+
+
 async def register_user(db: AsyncSession, payload: UserRegister) -> User:
     validate_password_strength(payload.password)
 
@@ -118,41 +162,12 @@ async def register_user(db: AsyncSession, payload: UserRegister) -> User:
                 detail="Institution not found",
             )
 
-    province_id = payload.province_id
-    ville_id = payload.ville_id
-    commune_id = payload.commune_id
-    if ville_id is not None or province_id is not None or commune_id is not None:
-        from apps.api.domains.geography.models import Commune, Province, Ville
-
-        if province_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="province_id est requis pour rattacher un compte à un territoire",
-            )
-        province = await db.get(Province, province_id)
-        if province is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Province introuvable",
-            )
-        if ville_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="ville_id est requis (affectation type élections : province → ville)",
-            )
-        ville = await db.get(Ville, ville_id)
-        if ville is None or ville.province_id != province_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="La ville doit appartenir à la province sélectionnée",
-            )
-        if commune_id is not None:
-            commune = await db.get(Commune, commune_id)
-            if commune is None or commune.ville_id != ville_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="La commune doit appartenir à la ville sélectionnée",
-                )
+    province_id, ville_id, commune_id = await _validate_user_geo(
+        db,
+        province_id=payload.province_id,
+        ville_id=payload.ville_id,
+        commune_id=payload.commune_id,
+    )
 
     roles = await _resolve_roles(db, payload.role_codes)
     user = User(
@@ -168,6 +183,58 @@ async def register_user(db: AsyncSession, payload: UserRegister) -> User:
     db.add(user)
     await db.commit()
     loaded = await get_user_by_id(db, user.id)
+    assert loaded is not None
+    return loaded
+
+
+async def update_user(db: AsyncSession, user_id: UUID, payload: UserUpdate) -> User:
+    user = await get_user_by_id(db, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    data = payload.model_dump(exclude_unset=True)
+
+    if "full_name" in data and data["full_name"] is not None:
+        user.full_name = data["full_name"].strip()
+
+    if "password" in data and data["password"]:
+        validate_password_strength(data["password"])
+        user.hashed_password = hash_password(data["password"])
+
+    if "institution_id" in data:
+        institution_id = data["institution_id"]
+        if institution_id is not None:
+            inst = await db.get(Institution, institution_id)
+            if inst is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Institution not found",
+                )
+        user.institution_id = institution_id
+
+    if "is_active" in data and data["is_active"] is not None:
+        user.is_active = bool(data["is_active"])
+
+    geo_touched = any(k in data for k in ("province_id", "ville_id", "commune_id"))
+    if geo_touched:
+        province_id = data["province_id"] if "province_id" in data else user.province_id
+        ville_id = data["ville_id"] if "ville_id" in data else user.ville_id
+        commune_id = data["commune_id"] if "commune_id" in data else user.commune_id
+        province_id, ville_id, commune_id = await _validate_user_geo(
+            db,
+            province_id=province_id,
+            ville_id=ville_id,
+            commune_id=commune_id,
+        )
+        user.province_id = province_id
+        user.ville_id = ville_id
+        user.commune_id = commune_id
+
+    if "role_codes" in data and data["role_codes"] is not None:
+        user.roles = await _resolve_roles(db, data["role_codes"])
+
+    await db.commit()
+    loaded = await get_user_by_id(db, user_id)
     assert loaded is not None
     return loaded
 

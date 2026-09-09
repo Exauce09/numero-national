@@ -148,11 +148,26 @@ export type RegisterUserBody = {
   commune_id?: string;
 };
 
+export type UpdateUserBody = {
+  full_name?: string;
+  password?: string;
+  role_codes?: string[];
+  province_id?: string | null;
+  ville_id?: string | null;
+  commune_id?: string | null;
+  is_active?: boolean;
+};
+
 export const accountsApi = {
   listUsers: () => request<DirectoryUser[]>("/rbac/users?limit=200"),
   registerUser: (body: RegisterUserBody) =>
     request<DirectoryUser>("/auth/register", {
       method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateUser: (userId: string, body: UpdateUserBody) =>
+    request<DirectoryUser>(`/rbac/users/${userId}`, {
+      method: "PATCH",
       body: JSON.stringify(body),
     }),
   setUserActive: (userId: string, active: boolean) =>

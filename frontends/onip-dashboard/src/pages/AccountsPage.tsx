@@ -11,11 +11,8 @@ const ROLE_OPTIONS: Array<{ code: string; label: string }> = [
 ];
 
 /**
- * Création de comptes modèle élections RDC :
- * 1) choisir la province
- * 2) choisir la ville (chef-lieu / territoire urbain)
- * 3) rôle opérationnel
- * Puis affectation fine en Campagnes → Zones.
+ * Création / modification de comptes modèle élections RDC :
+ * province → ville, puis rôle.
  */
 export default function AccountsPage() {
   const hasToken = Boolean(getSession()?.accessToken);
@@ -35,6 +32,17 @@ export default function AccountsPage() {
   const [provinceId, setProvinceId] = useState("");
   const [villeId, setVilleId] = useState("");
 
+  const [editing, setEditing] = useState<DirectoryUser | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [editRole, setEditRole] = useState("CENSUS_AGENT");
+  const [editProvinceId, setEditProvinceId] = useState("");
+  const [editVilleId, setEditVilleId] = useState("");
+  const [editVilles, setEditVilles] = useState<GeoItem[]>([]);
+  const [editActive, setEditActive] = useState(true);
+
+  const [villeNames, setVilleNames] = useState<Record<string, string>>({});
+
   const reload = useCallback(async () => {
     if (!hasToken) return;
     setLoading(true);
@@ -42,6 +50,19 @@ export default function AccountsPage() {
     try {
       const rows = await accountsApi.listUsers();
       setUsers(rows);
+      const provinceIds = [...new Set(rows.map((u) => u.province_id).filter(Boolean))] as string[];
+      const names: Record<string, string> = {};
+      await Promise.all(
+        provinceIds.map(async (pid) => {
+          try {
+            const vs = await geoApi.villes(pid);
+            for (const v of vs) names[v.id] = v.name;
+          } catch {
+            /* ignore */
+          }
+        }),
+      );
+      setVilleNames(names);
     } catch (e) {
       setUsers([]);
       setError(
@@ -75,6 +96,38 @@ export default function AccountsPage() {
       .then(setVilles)
       .catch(() => setVilles([]));
   }, [provinceId]);
+
+  useEffect(() => {
+    setEditVilles([]);
+    if (!editProvinceId) {
+      setEditVilleId("");
+      return;
+    }
+    void geoApi
+      .villes(editProvinceId)
+      .then((rows) => {
+        setEditVilles(rows);
+        setEditVilleId((cur) => (rows.some((v) => v.id === cur) ? cur : ""));
+      })
+      .catch(() => setEditVilles([]));
+  }, [editProvinceId]);
+
+  function startEdit(u: DirectoryUser) {
+    setEditing(u);
+    setEditName(u.full_name || "");
+    setEditPassword("");
+    setEditRole((u.roles && u.roles[0]) || "CENSUS_AGENT");
+    setEditProvinceId(u.province_id || "");
+    setEditVilleId(u.ville_id || "");
+    setEditActive(u.is_active);
+    setError(null);
+    setMsg(null);
+  }
+
+  function cancelEdit() {
+    setEditing(null);
+    setEditPassword("");
+  }
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -111,6 +164,36 @@ export default function AccountsPage() {
     }
   }
 
+  async function onSaveEdit(e: FormEvent) {
+    e.preventDefault();
+    if (!editing) return;
+    if (!editProvinceId || !editVilleId) {
+      setError("Province et ville sont obligatoires pour modifier le compte.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setMsg(null);
+    try {
+      const body: Parameters<typeof accountsApi.updateUser>[1] = {
+        full_name: editName.trim(),
+        role_codes: [editRole],
+        province_id: editProvinceId,
+        ville_id: editVilleId,
+        is_active: editActive,
+      };
+      if (editPassword.trim()) body.password = editPassword.trim();
+      const updated = await accountsApi.updateUser(editing.id, body);
+      setMsg(`Compte modifié : ${updated.email}`);
+      cancelEdit();
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Modification impossible");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function toggleActive(u: DirectoryUser) {
     setBusy(true);
     setError(null);
@@ -126,41 +209,11 @@ export default function AccountsPage() {
     }
   }
 
-  async function changeRole(u: DirectoryUser) {
-    const current = (u.roles ?? []).join(", ");
-    const next = window.prompt(
-      `Rôles pour ${u.email} (codes séparés par des virgules)\nEx. CENSUS_AGENT, CENSUS_SUPERVISOR`,
-      current || roleCode,
-    );
-    if (next == null) return;
-    const codes = next
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (!codes.length) {
-      setError("Au moins un rôle est requis");
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    setMsg(null);
-    try {
-      await accountsApi.assignRoles(u.id, codes);
-      setMsg(`Rôles mis à jour pour ${u.email}`);
-      await reload();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Affectation des rôles impossible");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   function geoLabel(u: DirectoryUser): string {
     const p = provinces.find((x) => x.id === u.province_id)?.name;
     if (!p && !u.province_id) return "—";
-    return [p || u.province_id?.slice(0, 8), u.ville_id ? "ville liée" : null]
-      .filter(Boolean)
-      .join(" · ");
+    const v = u.ville_id ? villeNames[u.ville_id] : null;
+    return [p || u.province_id?.slice(0, 8), v || null].filter(Boolean).join(" · ");
   }
 
   if (!hasToken) {
@@ -186,7 +239,7 @@ export default function AccountsPage() {
       <div className="hero-banner">
         <h1>Comptes utilisateurs</h1>
         <p>
-          Création type élections RDC : province → ville, puis rôle. Ensuite :{" "}
+          Création / modification type élections RDC : province → ville, puis rôle. Ensuite :{" "}
           <Link to="/campaigns">Campagnes → Affectations</Link> pour les zones.
         </p>
       </div>
@@ -199,6 +252,97 @@ export default function AccountsPage() {
       {msg ? (
         <div className="success-banner" style={{ marginBottom: 12 }}>
           {msg}
+        </div>
+      ) : null}
+
+      {editing ? (
+        <div className="panel" style={{ marginBottom: 16, borderColor: "var(--nn-primary, #5d87ff)" }}>
+          <h2 style={{ marginTop: 0 }}>Modifier — {editing.email}</h2>
+          <form onSubmit={(e) => void onSaveEdit(e)} style={{ display: "grid", gap: 10, maxWidth: 520 }}>
+            <div>
+              <label className="form-label">Nom complet</label>
+              <input
+                className="form-control"
+                required
+                value={editName}
+                onChange={(ev) => setEditName(ev.target.value)}
+              />
+            </div>
+            <div>
+              <label className="form-label">Nouveau mot de passe (optionnel)</label>
+              <input
+                className="form-control"
+                type="password"
+                minLength={8}
+                value={editPassword}
+                onChange={(ev) => setEditPassword(ev.target.value)}
+                placeholder="Laisser vide pour ne pas changer"
+              />
+            </div>
+            <div>
+              <label className="form-label">Province *</label>
+              <select
+                className="form-control"
+                required
+                value={editProvinceId}
+                onChange={(ev) => setEditProvinceId(ev.target.value)}
+              >
+                <option value="">— Choisir la province —</option>
+                {provinces.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Ville *</label>
+              <select
+                className="form-control"
+                required
+                disabled={!editProvinceId}
+                value={editVilleId}
+                onChange={(ev) => setEditVilleId(ev.target.value)}
+              >
+                <option value="">— Choisir la ville —</option>
+                {editVilles.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Rôle</label>
+              <select
+                className="form-control"
+                value={editRole}
+                onChange={(ev) => setEditRole(ev.target.value)}
+              >
+                {ROLE_OPTIONS.map((r) => (
+                  <option key={r.code} value={r.code}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={editActive}
+                onChange={(ev) => setEditActive(ev.target.checked)}
+              />
+              Compte actif
+            </label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button type="submit" className="btn-primary" disabled={busy}>
+                {busy ? "Enregistrement…" : "Enregistrer"}
+              </button>
+              <button type="button" className="btn-secondary" disabled={busy} onClick={cancelEdit}>
+                Annuler
+              </button>
+            </div>
+          </form>
         </div>
       ) : null}
 
@@ -356,11 +500,16 @@ export default function AccountsPage() {
                 </td>
                 <td>{u.is_active ? "Actif" : "Inactif"}</td>
                 <td style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="btn-primary btn-sm"
+                    disabled={busy}
+                    onClick={() => startEdit(u)}
+                  >
+                    Modifier
+                  </button>
                   <button type="button" className="btn-secondary btn-sm" disabled={busy} onClick={() => void toggleActive(u)}>
                     {u.is_active ? "Désactiver" : "Activer"}
-                  </button>
-                  <button type="button" className="btn-secondary btn-sm" disabled={busy} onClick={() => void changeRole(u)}>
-                    Rôles
                   </button>
                 </td>
               </tr>

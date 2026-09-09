@@ -71,6 +71,19 @@ class UserRegister(BaseModel):
     commune_id: UUID | None = None
 
 
+class UserUpdate(BaseModel):
+    """Mise à jour compte ONIP (nom, mot de passe optionnel, territoire, rôles)."""
+
+    full_name: str | None = Field(default=None, min_length=1, max_length=255)
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+    institution_id: UUID | None = None
+    role_codes: list[str] | None = None
+    province_id: UUID | None = None
+    ville_id: UUID | None = None
+    commune_id: UUID | None = None
+    is_active: bool | None = None
+
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
