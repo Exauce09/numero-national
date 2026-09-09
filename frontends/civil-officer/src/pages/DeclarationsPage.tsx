@@ -9,8 +9,12 @@ import { addAct, addPerson, getPersonByNic, type Sexe } from "../registry";
 import { pushNotification } from "../prefs";
 import { setDeclarationStatus } from "../civilDeclarations";
 import {
+  HEALTH_DEMO_USER,
   createFacilityAccount,
+  deleteFacilityAccount,
   listFacilityAccounts,
+  setFacilityAccountActive,
+  updateFacilityAccount,
   type FacilityAccount,
   type FacilityAccountPublic,
 } from "../healthAuth";
@@ -40,6 +44,7 @@ export default function DeclarationsPage() {
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<Declaration | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<FacilityAccountPublic[]>(() => listFacilityAccounts());
   const [form, setForm] = useState(emptyAccountForm);
   const [formError, setFormError] = useState<string | null>(null);
@@ -56,6 +61,10 @@ export default function DeclarationsPage() {
   useEffect(() => {
     void refresh();
   }, []);
+
+  function refreshAccounts() {
+    setAccounts(listFacilityAccounts());
+  }
 
   function applyToRegistry(d: Declaration) {
     const commune = String(d.payload.commune_code ?? "KIN-GOMBE");
@@ -149,47 +158,158 @@ export default function DeclarationsPage() {
   }
 
   function openCreate() {
+    setEditingId(null);
     setForm(emptyAccountForm);
     setFormError(null);
     setFormOk(null);
-    setAccounts(listFacilityAccounts());
+    refreshAccounts();
     setCreateOpen(true);
   }
 
-  function onCreateAccount(e: FormEvent) {
+  function startEdit(account: FacilityAccountPublic) {
+    setEditingId(account.id);
+    setForm({
+      facilityName: account.facilityName,
+      facilityType: account.facilityType,
+      province: account.province,
+      ville: account.ville,
+      communeName: account.commune_name,
+      communeCode: account.commune_code,
+      username: account.username,
+      password: "",
+      confirmPassword: "",
+    });
+    setFormError(null);
+    setFormOk(null);
+    setCreateOpen(true);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setForm(emptyAccountForm);
+    setFormError(null);
+    setFormOk(null);
+  }
+
+  function onSaveAccount(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
     setFormOk(null);
-    if (form.password !== form.confirmPassword) {
-      setFormError("La confirmation du mot de passe ne correspond pas.");
+
+    if (form.password || form.confirmPassword) {
+      if (form.password !== form.confirmPassword) {
+        setFormError("La confirmation du mot de passe ne correspond pas.");
+        return;
+      }
+    }
+
+    try {
+      if (editingId) {
+        const account = updateFacilityAccount(editingId, {
+          username: form.username,
+          password: form.password || undefined,
+          facilityName: form.facilityName,
+          facilityType: form.facilityType,
+          commune_code: form.communeCode,
+          commune_name: form.communeName,
+          province: form.province,
+          ville: form.ville,
+        });
+        refreshAccounts();
+        setFormOk(`Compte « ${account.facilityName} » modifié (@${account.username}).`);
+        setMessage(`Compte modifié : ${account.facilityName} (@${account.username}).`);
+        pushNotification({
+          title: "Compte structure sanitaire modifié",
+          body: `${account.facilityName} — identifiant ${account.username}.`,
+          href: "/declarations",
+        });
+        setEditingId(null);
+        setForm(emptyAccountForm);
+      } else {
+        if (!form.password) {
+          setFormError("Le mot de passe est requis pour un nouveau compte.");
+          return;
+        }
+        if (form.password !== form.confirmPassword) {
+          setFormError("La confirmation du mot de passe ne correspond pas.");
+          return;
+        }
+        const account = createFacilityAccount({
+          username: form.username,
+          password: form.password,
+          facilityName: form.facilityName,
+          facilityType: form.facilityType,
+          commune_code: form.communeCode,
+          commune_name: form.communeName,
+          province: form.province,
+          ville: form.ville,
+        });
+        refreshAccounts();
+        setFormOk(
+          `Compte créé pour « ${account.facilityName} ». Identifiant : ${account.username} — connexion : /sante/login`,
+        );
+        setMessage(`Compte administrateur sanitaire créé : ${account.facilityName} (@${account.username}).`);
+        pushNotification({
+          title: "Compte structure sanitaire créé",
+          body: `${account.facilityName} — identifiant ${account.username}. L'administrateur peut se connecter sur /sante/login.`,
+          href: "/declarations",
+        });
+        setForm(emptyAccountForm);
+      }
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Enregistrement impossible.");
+    }
+  }
+
+  function onToggleActive(account: FacilityAccountPublic) {
+    const next = !account.active;
+    const label = next ? "activer" : "désactiver";
+    if (!window.confirm(`Voulez-vous ${label} le compte « ${account.facilityName} » (@${account.username}) ?`)) {
       return;
     }
     try {
-      const account = createFacilityAccount({
-        username: form.username,
-        password: form.password,
-        facilityName: form.facilityName,
-        facilityType: form.facilityType,
-        commune_code: form.communeCode,
-        commune_name: form.communeName,
-        province: form.province,
-        ville: form.ville,
-      });
-      setAccounts(listFacilityAccounts());
-      setFormOk(
-        `Compte créé pour « ${account.facilityName} ». Identifiant : ${account.username} — connexion module santé : /sante/login`,
-      );
+      setFacilityAccountActive(account.id, next);
+      refreshAccounts();
       setMessage(
-        `Compte administrateur sanitaire créé : ${account.facilityName} (@${account.username}).`,
+        next
+          ? `Compte activé : ${account.facilityName} (@${account.username}).`
+          : `Compte désactivé : ${account.facilityName} (@${account.username}).`,
       );
       pushNotification({
-        title: "Compte structure sanitaire créé",
-        body: `${account.facilityName} — identifiant ${account.username}. L'administrateur peut se connecter sur /sante/login.`,
+        title: next ? "Compte sanitaire activé" : "Compte sanitaire désactivé",
+        body: `${account.facilityName} (@${account.username}).`,
         href: "/declarations",
       });
-      setForm(emptyAccountForm);
+      if (editingId === account.id && !next) cancelEdit();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Création impossible.");
+      setMessage(err instanceof Error ? err.message : "Action impossible.");
+    }
+  }
+
+  function onDelete(account: FacilityAccountPublic) {
+    if (account.username === HEALTH_DEMO_USER) {
+      setMessage("Le compte démo ne peut pas être supprimé.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Supprimer définitivement le compte « ${account.facilityName} » (@${account.username}) ? Cette action est irréversible.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      deleteFacilityAccount(account.id);
+      refreshAccounts();
+      if (editingId === account.id) cancelEdit();
+      setMessage(`Compte supprimé : ${account.facilityName} (@${account.username}).`);
+      pushNotification({
+        title: "Compte structure sanitaire supprimé",
+        body: `${account.facilityName} (@${account.username}).`,
+        href: "/declarations",
+      });
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Suppression impossible.");
     }
   }
 
@@ -198,7 +318,7 @@ export default function DeclarationsPage() {
       <h2 className="page-title">Déclarations structures sanitaires</h2>
       <p className="page-lead">
         File d&apos;attente des naissances et décès notifiés par les hôpitaux / cliniques — à valider pour mise à
-        jour du système. Créez aussi le compte administrateur de chaque structure pour l&apos;accès au module santé.
+        jour du système. Créez et gérez aussi les comptes administrateurs des structures sanitaires.
       </p>
 
       {message ? <div className="success-banner">{message}</div> : null}
@@ -300,7 +420,9 @@ export default function DeclarationsPage() {
           <div className="modal-panel modal-wide" onClick={(e) => e.stopPropagation()}>
             <div className="panel-head">
               <h3 className="panel-title" style={{ margin: 0 }}>
-                Compte administrateur — structure sanitaire
+                {editingId
+                  ? "Modifier le compte — structure sanitaire"
+                  : "Compte administrateur — structure sanitaire"}
               </h3>
               <button type="button" className="btn-secondary btn-sm" onClick={() => setCreateOpen(false)}>
                 Fermer
@@ -311,7 +433,7 @@ export default function DeclarationsPage() {
               <code>/sante/login</code>) pour déclarer naissances et décès.
             </p>
 
-            <form className="form-grid" onSubmit={onCreateAccount} autoComplete="off">
+            <form className="form-grid" onSubmit={onSaveAccount} autoComplete="off">
               {formError ? <div className="login-error full">{formError}</div> : null}
               {formOk ? <div className="success-banner full">{formOk}</div> : null}
 
@@ -384,34 +506,45 @@ export default function DeclarationsPage() {
                 />
               </div>
               <div>
-                <label className="form-label">Mot de passe</label>
+                <label className="form-label">
+                  {editingId ? "Nouveau mot de passe (optionnel)" : "Mot de passe"}
+                </label>
                 <input
                   className="form-control"
                   type="password"
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  required
-                  minLength={8}
+                  required={!editingId}
+                  minLength={editingId && !form.password ? undefined : 8}
+                  placeholder={editingId ? "Laisser vide pour ne pas changer" : undefined}
                 />
               </div>
               <div>
-                <label className="form-label">Confirmer le mot de passe</label>
+                <label className="form-label">
+                  {editingId ? "Confirmer le nouveau mot de passe" : "Confirmer le mot de passe"}
+                </label>
                 <input
                   className="form-control"
                   type="password"
                   value={form.confirmPassword}
                   onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-                  required
-                  minLength={8}
+                  required={!editingId || Boolean(form.password)}
+                  minLength={editingId && !form.password ? undefined : 8}
                 />
               </div>
               <div className="full" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button type="submit" className="btn-primary" style={{ width: "auto", minWidth: 180 }}>
-                  Créer le compte
+                  {editingId ? "Enregistrer les modifications" : "Créer le compte"}
                 </button>
-                <button type="button" className="btn-secondary" onClick={() => setCreateOpen(false)}>
-                  Annuler
-                </button>
+                {editingId ? (
+                  <button type="button" className="btn-secondary" onClick={cancelEdit}>
+                    Annuler la modification
+                  </button>
+                ) : (
+                  <button type="button" className="btn-secondary" onClick={() => setCreateOpen(false)}>
+                    Annuler
+                  </button>
+                )}
               </div>
             </form>
 
@@ -424,26 +557,60 @@ export default function DeclarationsPage() {
                     <th>Type</th>
                     <th>Identifiant</th>
                     <th>Commune</th>
+                    <th>Statut</th>
                     <th>Créé</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {accounts.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="muted">
+                      <td colSpan={7} className="muted">
                         Aucun compte.
                       </td>
                     </tr>
                   ) : (
                     accounts.map((a) => (
-                      <tr key={a.id}>
+                      <tr key={a.id} style={editingId === a.id ? { outline: "2px solid var(--accent, #1a5f4a)" } : undefined}>
                         <td>{a.facilityName}</td>
                         <td>{FACILITY_TYPES.find((t) => t.value === a.facilityType)?.label ?? a.facilityType}</td>
                         <td>
                           <code>{a.username}</code>
                         </td>
                         <td>{a.commune_name}</td>
+                        <td>
+                          <strong style={{ color: a.active ? "#1a5f4a" : "#8a4b1a" }}>
+                            {a.active ? "Actif" : "Désactivé"}
+                          </strong>
+                        </td>
                         <td>{new Date(a.created_at).toLocaleString("fr-FR")}</td>
+                        <td className="table-actions">
+                          <button type="button" className="btn-secondary btn-sm" onClick={() => startEdit(a)}>
+                            Modifier
+                          </button>{" "}
+                          {a.active ? (
+                            <button type="button" className="btn-secondary btn-sm" onClick={() => onToggleActive(a)}>
+                              Désactiver
+                            </button>
+                          ) : (
+                            <button type="button" className="btn-primary btn-sm" onClick={() => onToggleActive(a)}>
+                              Activer
+                            </button>
+                          )}{" "}
+                          <button
+                            type="button"
+                            className="btn-secondary btn-sm"
+                            disabled={a.username === HEALTH_DEMO_USER}
+                            title={
+                              a.username === HEALTH_DEMO_USER
+                                ? "Le compte démo ne peut pas être supprimé"
+                                : "Supprimer"
+                            }
+                            onClick={() => onDelete(a)}
+                          >
+                            Supprimer
+                          </button>
+                        </td>
                       </tr>
                     ))
                   )}

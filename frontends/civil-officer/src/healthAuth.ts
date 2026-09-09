@@ -10,7 +10,9 @@ export type FacilityAccount = {
   commune_name: string;
   province: string;
   ville: string;
+  active: boolean;
   created_at: string;
+  updated_at?: string;
 };
 
 export type HealthSession = {
@@ -31,10 +33,20 @@ export const HEALTH_DEMO_USER = "hopital";
 export const HEALTH_DEMO_PASSWORD = "DemoSante2026!";
 export const HEALTH_ROLE_TITLE = "Responsable — Structure sanitaire";
 
+function normalizeAccount(raw: FacilityAccount & { active?: boolean }): FacilityAccount {
+  return {
+    ...raw,
+    active: raw.active !== false,
+  };
+}
+
 function loadAccounts(): FacilityAccount[] {
   try {
     const raw = localStorage.getItem(ACCOUNTS_KEY);
-    if (raw) return JSON.parse(raw) as FacilityAccount[];
+    if (raw) {
+      const list = JSON.parse(raw) as FacilityAccount[];
+      return list.map(normalizeAccount);
+    }
   } catch {
     /* ignore */
   }
@@ -42,7 +54,7 @@ function loadAccounts(): FacilityAccount[] {
 }
 
 function saveAccounts(list: FacilityAccount[]) {
-  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list));
+  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list.map(normalizeAccount)));
 }
 
 function ensureDemoAccount(): FacilityAccount {
@@ -59,6 +71,7 @@ function ensureDemoAccount(): FacilityAccount {
     commune_name: "Gombe",
     province: "Kinshasa",
     ville: "Kinshasa",
+    active: true,
     created_at: new Date().toISOString(),
   };
   saveAccounts([demo, ...list]);
@@ -70,6 +83,14 @@ export type FacilityAccountPublic = Omit<FacilityAccount, "password">;
 export function listFacilityAccounts(): FacilityAccountPublic[] {
   ensureDemoAccount();
   return loadAccounts().map(({ password: _pw, ...rest }) => rest);
+}
+
+export function getFacilityAccount(id: string): FacilityAccountPublic | null {
+  ensureDemoAccount();
+  const hit = loadAccounts().find((a) => a.id === id);
+  if (!hit) return null;
+  const { password: _pw, ...rest } = hit;
+  return rest;
 }
 
 export function createFacilityAccount(input: {
@@ -104,10 +125,103 @@ export function createFacilityAccount(input: {
     commune_name: input.commune_name.trim() || "Gombe",
     province: input.province.trim() || "Kinshasa",
     ville: input.ville.trim() || "Kinshasa",
+    active: true,
     created_at: new Date().toISOString(),
   };
   saveAccounts([account, ...list]);
   return account;
+}
+
+export function updateFacilityAccount(
+  id: string,
+  input: {
+    username: string;
+    password?: string;
+    facilityName: string;
+    facilityType: FacilityAccount["facilityType"];
+    commune_code: string;
+    commune_name: string;
+    province: string;
+    ville: string;
+  },
+): FacilityAccount {
+  ensureDemoAccount();
+  const list = loadAccounts();
+  const idx = list.findIndex((a) => a.id === id);
+  if (idx < 0) throw new Error("Compte introuvable.");
+
+  const username = input.username.trim().toLowerCase();
+  if (!username || !input.facilityName.trim()) {
+    throw new Error("Identifiant et nom de structure sont requis.");
+  }
+  if (list.some((a) => a.username === username && a.id !== id)) {
+    throw new Error("Cet identifiant existe déjà.");
+  }
+  if (input.password && input.password.length < 8) {
+    throw new Error("Le mot de passe doit contenir au moins 8 caractères.");
+  }
+
+  const prev = list[idx];
+  const next: FacilityAccount = {
+    ...prev,
+    username,
+    password: input.password ? input.password : prev.password,
+    facilityName: input.facilityName.trim(),
+    facilityType: input.facilityType,
+    commune_code: input.commune_code.trim() || "KIN-GOMBE",
+    commune_name: input.commune_name.trim() || "Gombe",
+    province: input.province.trim() || "Kinshasa",
+    ville: input.ville.trim() || "Kinshasa",
+    updated_at: new Date().toISOString(),
+  };
+  list[idx] = next;
+  saveAccounts(list);
+
+  const session = getHealthSession();
+  if (session?.facilityId === id) {
+    sessionStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({
+        ...session,
+        username: next.username,
+        displayName: next.facilityName,
+        facilityName: next.facilityName,
+        commune_code: next.commune_code,
+        commune_name: next.commune_name,
+      } satisfies HealthSession),
+    );
+  }
+
+  return next;
+}
+
+export function setFacilityAccountActive(id: string, active: boolean): FacilityAccount {
+  ensureDemoAccount();
+  const list = loadAccounts();
+  const idx = list.findIndex((a) => a.id === id);
+  if (idx < 0) throw new Error("Compte introuvable.");
+  list[idx] = { ...list[idx], active, updated_at: new Date().toISOString() };
+  saveAccounts(list);
+
+  if (!active) {
+    const session = getHealthSession();
+    if (session?.facilityId === id) clearHealthSession();
+  }
+
+  return list[idx];
+}
+
+export function deleteFacilityAccount(id: string): void {
+  ensureDemoAccount();
+  const list = loadAccounts();
+  const hit = list.find((a) => a.id === id);
+  if (!hit) throw new Error("Compte introuvable.");
+  if (hit.username === HEALTH_DEMO_USER) {
+    throw new Error("Le compte démo ne peut pas être supprimé.");
+  }
+  saveAccounts(list.filter((a) => a.id !== id));
+  const session = getHealthSession();
+  if (session?.facilityId === id) clearHealthSession();
 }
 
 export function getHealthSession(): HealthSession | null {
@@ -131,6 +245,9 @@ export function loginHealth(username: string, password: string): HealthSession {
   if (!account || account.password !== password) {
     throw new Error(`Identifiants incorrects. Démo : ${HEALTH_DEMO_USER} / ${HEALTH_DEMO_PASSWORD}`);
   }
+  if (!account.active) {
+    throw new Error("Ce compte est désactivé. Contactez l'officier d'état civil.");
+  }
   const session: HealthSession = {
     role: "HEALTH",
     username: account.username,
@@ -151,8 +268,9 @@ export function updateHealthPassword(username: string, currentPassword: string, 
   const list = loadAccounts();
   const idx = list.findIndex((a) => a.username === user);
   if (idx < 0) throw new Error("Compte introuvable.");
+  if (!list[idx].active) throw new Error("Compte désactivé.");
   if (list[idx].password !== currentPassword) throw new Error("Mot de passe actuel incorrect.");
   if (nextPassword.length < 8) throw new Error("Le nouveau mot de passe doit contenir au moins 8 caractères.");
-  list[idx] = { ...list[idx], password: nextPassword };
+  list[idx] = { ...list[idx], password: nextPassword, updated_at: new Date().toISOString() };
   saveAccounts(list);
 }
