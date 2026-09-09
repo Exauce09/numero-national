@@ -35,7 +35,7 @@ export default function DashboardPage() {
       <div>
         <div className="hero-banner">
           <h1>Vue nationale ONIP</h1>
-          <p>Pilotité · recensement · cartes</p>
+          <p>Pilotage identité · recensement · cartes — République Démocratique du Congo</p>
         </div>
         <p className="error">Impossible de charger le tableau de bord ({error}).</p>
         <p className="muted">Vérifiez l’API (:8000) et une connexion JWT admin.</p>
@@ -50,7 +50,8 @@ export default function DashboardPage() {
       <div className="hero-banner">
         <h1>Vue nationale</h1>
         <p>
-          Pilotage identité &amp; population — généré {new Date(data.generated_at).toLocaleString()}
+          Pilotage de l&apos;identité et de la population — données au{" "}
+          {new Date(data.generated_at).toLocaleString("fr-FR")}
         </p>
       </div>
 

@@ -14,11 +14,20 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+const PAGE_TITLES: Record<string, string> = {
+  "/": "Tableau de bord",
+  "/accounts": "Comptes agents",
+  "/campaigns": "Campagnes & contrôle",
+  "/anomalies": "Anomalies",
+  "/nic": "Numéros NIC",
+};
+
 function Shell() {
   const navigate = useNavigate();
   const location = useLocation();
   const session = getSession();
   const [navOpen, setNavOpen] = useState(false);
+  const pageTitle = PAGE_TITLES[location.pathname] ?? "ONIP";
 
   useEffect(() => {
     setNavOpen(false);
@@ -43,9 +52,9 @@ function Shell() {
       ) : null}
       <aside className="sidebar" id="app-sidebar">
         <div className="sidebar-brand">
-          <img src="/logo-rdc.jpg" alt="RDC" />
+          <img src="/logo-rdc.jpg" alt="République Démocratique du Congo" />
           <strong>ONIP</strong>
-          <span>E-GOUV</span>
+          <span>E-GOUV · RDC</span>
           <button type="button" className="sidebar-close" aria-label="Fermer le menu" onClick={() => setNavOpen(false)}>
             ×
           </button>
@@ -67,7 +76,7 @@ function Shell() {
           <NavLink to="/nic">Numéros NIC</NavLink>
         </nav>
         <div className="sidebar-foot">
-          <button type="button" className="btn-logout" style={{ width: "100%" }} onClick={logout}>
+          <button type="button" className="btn-logout" onClick={logout}>
             Déconnexion
           </button>
         </div>
@@ -86,7 +95,7 @@ function Shell() {
             >
               <span />
             </button>
-            <h1 className="topbar-title">Tableau de bord ONIP</h1>
+            <h1 className="topbar-title">{pageTitle}</h1>
           </div>
           <span className="topbar-user">{session?.username}</span>
         </header>

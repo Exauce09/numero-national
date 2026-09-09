@@ -37,13 +37,17 @@ export default function LoginPage() {
     <div className="login-page">
       <div className="login-card">
         <img className="login-logo" src="/logo-rdc.jpg" alt="République Démocratique du Congo" />
-        <h1 className="login-title">E-GOUV — ONIP</h1>
-        <p className="login-subtitle">Office National d&apos;Identification de la Population</p>
+        <h1 className="login-title">ONIP</h1>
+        <p className="login-subtitle">
+          Office National d&apos;Identification de la Population
+          <br />
+          Plateforme E-GOUV — République Démocratique du Congo
+        </p>
         <form onSubmit={onSubmit}>
           {error ? <div className="login-error">{error}</div> : null}
 
           <label className="form-label" htmlFor="username">
-            Email (API) ou identifiant démo
+            Identifiant
           </label>
           <input
             id="username"
@@ -56,7 +60,7 @@ export default function LoginPage() {
           />
 
           <label className="form-label" htmlFor="password">
-            Mot de Passe
+            Mot de passe
           </label>
           <input
             id="password"
@@ -72,16 +76,14 @@ export default function LoginPage() {
             {busy ? "Connexion…" : "Se connecter"}
           </button>
         </form>
-        <div className="login-subtitle" style={{ marginTop: "1.25rem", marginBottom: 0, textAlign: "left" }}>
-          <p style={{ margin: "0 0 0.5rem" }}>
-            <strong>Admin API</strong> (créer des comptes → menu Comptes)
-            <br />
-            {CENSUS_ADMIN_EMAIL}
+        <div className="login-hints">
+          <p>
+            <strong>Admin API</strong> — {CENSUS_ADMIN_EMAIL}
             <br />
             {CENSUS_ADMIN_PASSWORD}
           </p>
-          <p style={{ margin: 0 }}>
-            <strong>Démo hors API</strong> (pas de création de comptes) : {DEMO_USER} / {DEMO_PASSWORD}
+          <p>
+            <strong>Démo hors API</strong> — {DEMO_USER} / {DEMO_PASSWORD}
           </p>
         </div>
       </div>
