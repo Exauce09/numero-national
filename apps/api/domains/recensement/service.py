@@ -16,6 +16,7 @@ from apps.api.domains.recensement.models import (
     CensusRecord,
     CensusRecordStatus,
     Device,
+    FormDraft,
     Household,
     SyncBatch,
     SyncBatchStatus,
@@ -31,6 +32,8 @@ from apps.api.domains.recensement.schemas import (
     CampaignStatsOut,
     CampaignUpdate,
     DeviceRegister,
+    FormDraftCreate,
+    FormDraftUpdate,
     MyAssignmentOut,
     PromoteRequest,
     PromoteResult,
@@ -233,6 +236,13 @@ async def sync_push(db: AsyncSession, req: SyncPushRequest) -> SyncPushResult:
                         for k in ("relationship_to_head",)
                         if item.data.get(k) is not None
                     } or None
+                client_status = str(item.data.get("status") or "SYNCED").upper()
+                if client_status == "DRAFT":
+                    rec_status = CensusRecordStatus.DRAFT
+                elif client_status == "QUEUED":
+                    rec_status = CensusRecordStatus.SYNCED
+                else:
+                    rec_status = CensusRecordStatus.SYNCED
                 rec = CensusRecord(
                     household_id=household.id,
                     campaign_id=req.campaign_id,
@@ -243,13 +253,29 @@ async def sync_push(db: AsyncSession, req: SyncPushRequest) -> SyncPushResult:
                     date_of_birth=item.data.get("date_of_birth"),
                     payload=payload,
                     photo_ref=item.data.get("photo_ref"),
-                    status=CensusRecordStatus.SYNCED,
+                    status=rec_status,
                     version=max(item.version, 1),
                     collected_by=req.agent_user_id,
                     synced_at=datetime.now(timezone.utc),
                 )
                 db.add(rec)
             else:
+                # Ne pas écraser une fiche déjà validée / promue avec un brouillon.
+                if existing_rec.status in {
+                    CensusRecordStatus.APPROVED,
+                    CensusRecordStatus.PROMOTED,
+                }:
+                    conflicts += 1
+                    details.append(
+                        {
+                            "local_id": item.local_id,
+                            "entity_type": "census_record",
+                            "status": "CONFLICT",
+                            "reason": "already_finalized",
+                            "server_status": existing_rec.status.value,
+                        }
+                    )
+                    continue
                 existing_rec.given_names = item.data.get("given_names", existing_rec.given_names)
                 existing_rec.family_name = item.data.get("family_name", existing_rec.family_name)
                 existing_rec.sex = item.data.get("sex", existing_rec.sex)
@@ -258,7 +284,11 @@ async def sync_push(db: AsyncSession, req: SyncPushRequest) -> SyncPushResult:
                 )
                 existing_rec.payload = item.data.get("payload", existing_rec.payload)
                 existing_rec.version = max(item.version, existing_rec.version)
-                existing_rec.status = CensusRecordStatus.SYNCED
+                client_status = str(item.data.get("status") or "SYNCED").upper()
+                if client_status == "DRAFT":
+                    existing_rec.status = CensusRecordStatus.DRAFT
+                else:
+                    existing_rec.status = CensusRecordStatus.SYNCED
                 existing_rec.synced_at = datetime.now(timezone.utc)
             accepted += 1
             details.append(
@@ -358,9 +388,12 @@ async def sync_pull(db: AsyncSession, req: SyncPullRequest) -> SyncPullResponse:
                 "date_of_birth": r.date_of_birth,
                 "status": r.status.value,
                 "version": r.version,
+                "payload": r.payload,
+                "photo_ref": r.photo_ref,
                 "review_note": r.review_note,
                 "reviewed_at": r.reviewed_at.isoformat() if r.reviewed_at else None,
                 "citizen_id": str(r.citizen_id) if r.citizen_id else None,
+                "collected_by": str(r.collected_by) if r.collected_by else None,
             }
             for r in records
         ],
@@ -913,3 +946,114 @@ async def promote_campaign_batch(
     return BatchPromoteResult(
         promoted=promoted, skipped=skipped, failed=failed, results=results, errors=errors
     )
+async def upsert_form_draft(
+    db: AsyncSession,
+    body: FormDraftCreate,
+    *,
+    owner_user_id: uuid.UUID,
+) -> FormDraft:
+    existing: FormDraft | None = None
+    system = body.system.strip().lower()
+    form_type = body.form_type.strip().lower()
+    if body.local_id:
+        existing = (
+            await db.execute(
+                select(FormDraft).where(
+                    FormDraft.local_id == body.local_id,
+                    FormDraft.system == system,
+                    FormDraft.form_type == form_type,
+                )
+            )
+        ).scalar_one_or_none()
+    if existing is None:
+        draft = FormDraft(
+            system=system,
+            form_type=form_type,
+            title=body.title or "",
+            payload=body.payload,
+            status="DRAFT",
+            version=max(body.version, 1),
+            local_id=body.local_id,
+            campaign_id=body.campaign_id,
+            province_id=body.province_id,
+            ville_id=body.ville_id,
+            owner_user_id=owner_user_id,
+        )
+        db.add(draft)
+    else:
+        if existing.status == "FINALIZED":
+            raise ValueError("draft_finalized")
+        existing.title = body.title or existing.title
+        existing.payload = body.payload
+        existing.version = max(body.version, existing.version + 1)
+        existing.campaign_id = body.campaign_id or existing.campaign_id
+        existing.province_id = body.province_id or existing.province_id
+        existing.ville_id = body.ville_id or existing.ville_id
+        existing.status = "DRAFT"
+        existing.updated_at = datetime.now(timezone.utc)
+        draft = existing
+    await db.commit()
+    await db.refresh(draft)
+    return draft
+
+
+async def list_form_drafts(
+    db: AsyncSession,
+    *,
+    system: str | None = None,
+    form_type: str | None = None,
+    status: str | None = "DRAFT",
+    province_id: uuid.UUID | None = None,
+    ville_id: uuid.UUID | None = None,
+    campaign_id: uuid.UUID | None = None,
+    limit: int = 50,
+) -> list[FormDraft]:
+    stmt = select(FormDraft).order_by(FormDraft.updated_at.desc()).limit(limit)
+    if system:
+        stmt = stmt.where(FormDraft.system == system.strip().lower())
+    if form_type:
+        stmt = stmt.where(FormDraft.form_type == form_type.strip().lower())
+    if status:
+        stmt = stmt.where(FormDraft.status == status)
+    if province_id:
+        stmt = stmt.where(FormDraft.province_id == province_id)
+    if ville_id:
+        stmt = stmt.where(FormDraft.ville_id == ville_id)
+    if campaign_id:
+        stmt = stmt.where(FormDraft.campaign_id == campaign_id)
+    return list((await db.execute(stmt)).scalars().all())
+
+
+async def get_form_draft(db: AsyncSession, draft_id: uuid.UUID) -> FormDraft | None:
+    return await db.get(FormDraft, draft_id)
+
+
+async def update_form_draft(
+    db: AsyncSession,
+    draft: FormDraft,
+    body: FormDraftUpdate,
+    *,
+    actor_id: uuid.UUID,
+) -> FormDraft:
+    if draft.status == "FINALIZED" and body.status != "FINALIZED":
+        raise ValueError("draft_finalized")
+    if body.title is not None:
+        draft.title = body.title
+    if body.payload is not None:
+        draft.payload = body.payload
+    if body.status is not None:
+        draft.status = body.status
+    if body.claimed_by is not None:
+        draft.claimed_by = body.claimed_by
+    elif body.status == "IN_PROGRESS":
+        draft.claimed_by = actor_id
+    if body.version is not None:
+        draft.version = max(body.version, draft.version)
+    if body.province_id is not None:
+        draft.province_id = body.province_id
+    if body.ville_id is not None:
+        draft.ville_id = body.ville_id
+    draft.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(draft)
+    return draft

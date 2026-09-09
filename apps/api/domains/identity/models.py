@@ -196,6 +196,24 @@ class User(Base):
         ForeignKey("identity.institutions.id", ondelete="SET NULL"),
         nullable=True,
     )
+    # Périmètre géographique type élections RDC : province → ville (+ commune optionnelle).
+    province_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("geography.provinces.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    ville_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("geography.villes.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    commune_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("geography.communes.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

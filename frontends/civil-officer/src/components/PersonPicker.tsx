@@ -1,14 +1,14 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import GeoCascade, { GEO_PRESETS, type GeoSelection } from "./GeoCascade";
 import {
   ETAT_CIVIL_OPTIONS,
   addPerson,
   displayName,
-  searchPersons,
   type EtatCivil,
   type Person,
   type Sexe,
 } from "../registry";
+import { searchEveryone } from "../nationalSearch";
 
 type Props = {
   label: string;
@@ -40,11 +40,32 @@ export default function PersonPicker({
   const [form, setForm] = useState(emptyForm);
   const [geoNaissance, setGeoNaissance] = useState<GeoSelection>({});
   const [error, setError] = useState<string | null>(null);
+  const [results, setResults] = useState<Person[]>([]);
+  const [searching, setSearching] = useState(false);
 
-  const results = useMemo(() => {
-    if (query.trim().length < 1) return [];
-    return searchPersons(query).slice(0, 12);
-  }, [query, open, modal, value]);
+  useEffect(() => {
+    if (!open || value) return;
+    const q = query.trim();
+    if (q.length < 1) {
+      setResults([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setSearching(true);
+      void searchEveryone(q)
+        .then((hits) => {
+          if (!cancelled) setResults(hits);
+        })
+        .finally(() => {
+          if (!cancelled) setSearching(false);
+        });
+    }, 220);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [query, open, value]);
 
   function select(person: Person) {
     onChange(person);
@@ -100,7 +121,7 @@ export default function PersonPicker({
         <div className="person-picker-controls">
           <input
             className="form-control"
-            placeholder="Rechercher une personne…"
+            placeholder="Recherche nationale (nom, post-nom, prénom, NIC)…"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -116,17 +137,18 @@ export default function PersonPicker({
       {open && !value ? (
         <ul className="person-picker-list">
           {query.trim().length < 1 ? (
-            <li className="muted">Commencez à taper un nom, post-nom ou prénom…</li>
+            <li className="muted">Tapez pour chercher dans le registre national…</li>
+          ) : searching ? (
+            <li className="muted">Recherche nationale…</li>
           ) : results.length === 0 ? (
-            <li className="muted">Aucun résultat — utilisez « Ajouter » si la personne n&apos;existe pas.</li>
+            <li className="muted">Aucun résultat — vous pouvez « Ajouter ».</li>
           ) : (
             results.map((p) => (
               <li key={p.id}>
                 <button type="button" onClick={() => select(p)}>
                   <strong>{displayName(p)}</strong>
                   <span className="muted small">
-                    {" "}
-                    · {p.sexe} · {p.date_naissance} · {p.nic}
+                    {[p.nic, p.sexe, p.date_naissance, p.lieu_naissance].filter(Boolean).join(" · ")}
                   </span>
                 </button>
               </li>
@@ -136,27 +158,20 @@ export default function PersonPicker({
       ) : null}
 
       {modal ? (
-        <div className="modal-backdrop" role="presentation" onClick={() => setModal(false)}>
-          <div
-            className="modal-panel"
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3>Ajouter une personne</h3>
-            <form className="form-grid" onSubmit={onAdd}>
-              {error ? <div className="login-error full">{error}</div> : null}
+        <div className="modal-backdrop" onClick={() => setModal(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <h3>Nouvelle personne</h3>
+            <form onSubmit={onAdd} className="form-grid">
               <div>
                 <label className="form-label">Nom</label>
                 <input
                   className="form-control"
                   value={form.nom}
                   onChange={(e) => setForm({ ...form, nom: e.target.value })}
-                  required
                 />
               </div>
               <div>
-                <label className="form-label">Postnom</label>
+                <label className="form-label">Post-nom</label>
                 <input
                   className="form-control"
                   value={form.postnom}
@@ -169,7 +184,6 @@ export default function PersonPicker({
                   className="form-control"
                   value={form.prenom}
                   onChange={(e) => setForm({ ...form, prenom: e.target.value })}
-                  required
                 />
               </div>
               <div>
@@ -190,17 +204,6 @@ export default function PersonPicker({
                   type="date"
                   value={form.date_naissance}
                   onChange={(e) => setForm({ ...form, date_naissance: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="full">
-                <label className="form-label">Lieu de naissance</label>
-                <GeoCascade
-                  embedded
-                  levels={GEO_PRESETS.place}
-                  value={geoNaissance}
-                  onChange={setGeoNaissance}
-                  label="Lieu de naissance"
                 />
               </div>
               <div>
@@ -217,12 +220,21 @@ export default function PersonPicker({
                   ))}
                 </select>
               </div>
-              <div className="full modal-actions">
+              <div className="full">
+                <GeoCascade
+                  {...GEO_PRESETS.place}
+                  value={geoNaissance}
+                  onChange={setGeoNaissance}
+                  label="Lieu de naissance"
+                />
+              </div>
+              {error ? <p className="warn-inline full">{error}</p> : null}
+              <div className="full" style={{ display: "flex", gap: 8 }}>
+                <button type="submit" className="btn-primary">
+                  Enregistrer et lier
+                </button>
                 <button type="button" className="btn-secondary" onClick={() => setModal(false)}>
                   Annuler
-                </button>
-                <button type="submit" className="btn-primary" style={{ width: "auto", minWidth: 140 }}>
-                  Enregistrer
                 </button>
               </div>
             </form>

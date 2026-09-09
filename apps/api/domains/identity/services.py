@@ -75,6 +75,9 @@ def user_to_me(user: User) -> UserMe:
         is_active=user.is_active,
         mfa_enabled=user.mfa_enabled,
         institution_id=user.institution_id,
+        province_id=user.province_id,
+        ville_id=user.ville_id,
+        commune_id=user.commune_id,
         roles=roles,
         permissions=sorted(permissions),
         created_at=user.created_at,
@@ -115,12 +118,51 @@ async def register_user(db: AsyncSession, payload: UserRegister) -> User:
                 detail="Institution not found",
             )
 
+    province_id = payload.province_id
+    ville_id = payload.ville_id
+    commune_id = payload.commune_id
+    if ville_id is not None or province_id is not None or commune_id is not None:
+        from apps.api.domains.geography.models import Commune, Province, Ville
+
+        if province_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="province_id est requis pour rattacher un compte à un territoire",
+            )
+        province = await db.get(Province, province_id)
+        if province is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Province introuvable",
+            )
+        if ville_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="ville_id est requis (affectation type élections : province → ville)",
+            )
+        ville = await db.get(Ville, ville_id)
+        if ville is None or ville.province_id != province_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La ville doit appartenir à la province sélectionnée",
+            )
+        if commune_id is not None:
+            commune = await db.get(Commune, commune_id)
+            if commune is None or commune.ville_id != ville_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="La commune doit appartenir à la ville sélectionnée",
+                )
+
     roles = await _resolve_roles(db, payload.role_codes)
     user = User(
         email=payload.email.lower(),
         hashed_password=hash_password(payload.password),
         full_name=payload.full_name,
         institution_id=payload.institution_id,
+        province_id=province_id,
+        ville_id=ville_id,
+        commune_id=commune_id,
         roles=roles,
     )
     db.add(user)

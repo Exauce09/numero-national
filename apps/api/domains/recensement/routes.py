@@ -31,6 +31,9 @@ from apps.api.domains.recensement.schemas import (
     CensusRecordOut,
     DeviceOut,
     DeviceRegister,
+    FormDraftCreate,
+    FormDraftOut,
+    FormDraftUpdate,
     MyAssignmentOut,
     PromoteRequest,
     PromoteResult,
@@ -388,3 +391,79 @@ async def promote_campaign(
             detail="Missing required permission registry:citizen:validate for assign_nic",
         )
     return await service.promote_campaign_batch(db, campaign_id, current_user.id, req)
+
+
+@router.post(
+    "/form-drafts",
+    response_model=FormDraftOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Créer / mettre à jour un brouillon partagé (tous systèmes)",
+)
+async def upsert_form_draft(
+    body: FormDraftCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> FormDraftOut:
+    try:
+        draft = await service.upsert_form_draft(db, body, owner_user_id=current_user.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return draft  # type: ignore[return-value]
+
+
+@router.get(
+    "/form-drafts",
+    response_model=list[FormDraftOut],
+    summary="Lister les brouillons synchronisés (reprise par un autre agent)",
+)
+async def list_form_drafts(
+    system: str | None = Query(default=None),
+    form_type: str | None = Query(default=None),
+    status_filter: str | None = Query(default="DRAFT", alias="status"),
+    province_id: uuid.UUID | None = Query(default=None),
+    ville_id: uuid.UUID | None = Query(default=None),
+    campaign_id: uuid.UUID | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> list[FormDraftOut]:
+    rows = await service.list_form_drafts(
+        db,
+        system=system,
+        form_type=form_type,
+        status=status_filter,
+        province_id=province_id,
+        ville_id=ville_id,
+        campaign_id=campaign_id,
+        limit=limit,
+    )
+    return rows  # type: ignore[return-value]
+
+
+@router.get("/form-drafts/{draft_id}", response_model=FormDraftOut)
+async def get_form_draft(
+    draft_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> FormDraftOut:
+    draft = await service.get_form_draft(db, draft_id)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    return draft  # type: ignore[return-value]
+
+
+@router.patch("/form-drafts/{draft_id}", response_model=FormDraftOut)
+async def patch_form_draft(
+    draft_id: uuid.UUID,
+    body: FormDraftUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> FormDraftOut:
+    draft = await service.get_form_draft(db, draft_id)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    try:
+        updated = await service.update_form_draft(db, draft, body, actor_id=current_user.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return updated  # type: ignore[return-value]

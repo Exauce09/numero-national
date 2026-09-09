@@ -133,6 +133,9 @@ export type DirectoryUser = {
   is_active: boolean;
   roles?: string[];
   permissions?: string[];
+  province_id?: string | null;
+  ville_id?: string | null;
+  commune_id?: string | null;
 };
 
 export type RegisterUserBody = {
@@ -140,6 +143,9 @@ export type RegisterUserBody = {
   password: string;
   full_name: string;
   role_codes: string[];
+  province_id?: string;
+  ville_id?: string;
+  commune_id?: string;
 };
 
 export const accountsApi = {
@@ -158,6 +164,16 @@ export const accountsApi = {
       method: "PUT",
       body: JSON.stringify({ role_codes: roleCodes }),
     }),
+};
+
+export type GeoItem = { id: string; code?: string; name: string };
+
+export const geoApi = {
+  provinces: () => request<GeoItem[]>("/geo/provinces"),
+  villes: (provinceId: string) =>
+    request<GeoItem[]>(`/geo/villes?province_id=${encodeURIComponent(provinceId)}`),
+  communes: (villeId: string) =>
+    request<GeoItem[]>(`/geo/communes?ville_id=${encodeURIComponent(villeId)}`),
 };
 
 export const censusApi = {

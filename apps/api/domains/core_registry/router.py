@@ -84,8 +84,10 @@ async def merge_citizens(
     summary="Search citizens (minimal PII, permission-gated)",
 )
 async def search_citizens(
+    q: str | None = Query(default=None, description="Recherche libre (nom, prénom, NIC…)"),
     family_name: str | None = Query(default=None),
     given_names: str | None = Query(default=None),
+    nic: str | None = Query(default=None),
     date_of_birth: date | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
@@ -94,14 +96,16 @@ async def search_citizens(
 ) -> PaginatedCitizens:
     rows, total = await citizen_service.search_citizens(
         db,
+        q=q,
         family_name=family_name,
         given_names=given_names,
+        nic=nic,
         date_of_birth=date_of_birth,
         page=page,
         page_size=page_size,
     )
     return PaginatedCitizens(
-        items=[CitizenListItem.model_validate(r) for r in rows],
+        items=[CitizenListItem.model_validate(citizen_service.citizen_to_list_item(r)) for r in rows],
         total=total,
         page=page,
         page_size=page_size,

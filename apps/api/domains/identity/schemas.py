@@ -64,6 +64,11 @@ class UserRegister(BaseModel):
     full_name: str = Field(min_length=1, max_length=255)
     institution_id: UUID | None = None
     role_codes: list[str] = Field(default_factory=list)
+    # Affectation géographique (modèle type élections RDC / CENI) :
+    # l'agent est rattaché à une province puis une ville (commune optionnelle).
+    province_id: UUID | None = None
+    ville_id: UUID | None = None
+    commune_id: UUID | None = None
 
 
 class UserLogin(BaseModel):
@@ -101,6 +106,9 @@ class UserMe(BaseModel):
     is_active: bool
     mfa_enabled: bool
     institution_id: UUID | None
+    province_id: UUID | None = None
+    ville_id: UUID | None = None
+    commune_id: UUID | None = None
     roles: list[str] = Field(default_factory=list)
     permissions: list[str] = Field(default_factory=list)
     created_at: datetime

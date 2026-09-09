@@ -491,15 +491,23 @@ export type PersonInput = Omit<Person, "id" | "nic" | "created_at" | "handicap_t
   nic?: string;
 };
 
-export function addPerson(input: PersonInput): Person {
+export function addPerson(input: PersonInput & { id?: string }): Person {
   const registry = load();
+  if (input.id) {
+    const byId = registry.persons.find((p) => p.id === input.id);
+    if (byId) return byId;
+  }
+  if (input.nic) {
+    const byNic = registry.persons.find((p) => p.nic === input.nic);
+    if (byNic) return byNic;
+  }
   const nic = input.nic ?? generateNic();
   if (registry.persons.some((p) => p.nic === nic)) {
     throw new Error(`NIC déjà attribué : ${nic}`);
   }
   const person: Person = {
     ...input,
-    id: crypto.randomUUID(),
+    id: input.id ?? crypto.randomUUID(),
     nic,
     handicap_type: input.handicap_type ?? "NORMAL",
     created_at: new Date().toISOString(),

@@ -243,3 +243,45 @@ class MyAssignmentOut(BaseModel):
     zone: ZoneOut | None
     campaign: CampaignOut
 
+
+class FormDraftCreate(BaseModel):
+    system: str = Field(min_length=2, max_length=32, description="civil_officer | flutter_census | onip")
+    form_type: str = Field(min_length=2, max_length=64, description="ex. census_person")
+    title: str = Field(default="", max_length=255)
+    payload: dict[str, Any]
+    local_id: str | None = Field(default=None, max_length=128)
+    campaign_id: uuid.UUID | None = None
+    province_id: uuid.UUID | None = None
+    ville_id: uuid.UUID | None = None
+    version: int = Field(default=1, ge=1)
+
+
+class FormDraftUpdate(BaseModel):
+    title: str | None = Field(default=None, max_length=255)
+    payload: dict[str, Any] | None = None
+    status: str | None = Field(default=None, max_length=32)
+    claimed_by: uuid.UUID | None = None
+    version: int | None = Field(default=None, ge=1)
+    province_id: uuid.UUID | None = None
+    ville_id: uuid.UUID | None = None
+
+
+class FormDraftOut(BaseModel):
+    id: uuid.UUID
+    system: str
+    form_type: str
+    title: str
+    payload: dict[str, Any]
+    status: str
+    version: int
+    local_id: str | None
+    campaign_id: uuid.UUID | None
+    province_id: uuid.UUID | None
+    ville_id: uuid.UUID | None
+    owner_user_id: uuid.UUID
+    claimed_by: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+

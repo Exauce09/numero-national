@@ -115,31 +115,69 @@ async def get_citizen_by_nic(session: AsyncSession, nic: str) -> Citizen:
 async def search_citizens(
     session: AsyncSession,
     *,
-    family_name: str | None,
-    given_names: str | None,
-    date_of_birth: date | None,
-    page: int,
-    page_size: int,
+    q: str | None = None,
+    family_name: str | None = None,
+    given_names: str | None = None,
+    nic: str | None = None,
+    date_of_birth: date | None = None,
+    page: int = 1,
+    page_size: int = 20,
 ) -> tuple[list[Citizen], int]:
+    """National search: free-text `q` (tokens AND) and/or structured filters."""
     filters = []
+    if nic:
+        filters.append(Citizen.nic == nic.strip())
     if family_name:
         filters.append(func.lower(Citizen.family_name).like(f"%{family_name.strip().lower()}%"))
     if given_names:
         filters.append(func.lower(Citizen.given_names).like(f"%{given_names.strip().lower()}%"))
     if date_of_birth is not None:
         filters.append(Citizen.date_of_birth == date_of_birth)
+    if q and q.strip():
+        tokens = [t for t in q.strip().lower().split() if t]
+        for token in tokens:
+            like = f"%{token}%"
+            filters.append(
+                (
+                    func.lower(Citizen.family_name).like(like)
+                    | func.lower(Citizen.given_names).like(like)
+                    | func.coalesce(Citizen.nic, "").ilike(like)
+                    | func.coalesce(Citizen.place_of_birth, "").ilike(like)
+                )
+            )
 
     where_clause = and_(*filters) if filters else True
     total = await session.scalar(select(func.count()).select_from(Citizen).where(where_clause))
     stmt = (
         select(Citizen)
         .where(where_clause)
+        .options(selectinload(Citizen.addresses))
         .order_by(Citizen.family_name, Citizen.given_names, Citizen.id)
         .offset((page - 1) * page_size)
         .limit(page_size)
     )
     rows = list((await session.scalars(stmt)).all())
     return rows, int(total or 0)
+
+
+def citizen_to_list_item(citizen: Citizen) -> dict:
+    """Map ORM citizen (+ primary address) to list/autofill fields."""
+    primary = next((a for a in (citizen.addresses or []) if a.is_primary), None)
+    if primary is None and citizen.addresses:
+        primary = citizen.addresses[0]
+    return {
+        "id": citizen.id,
+        "nic": citizen.nic,
+        "status": citizen.status,
+        "family_name": citizen.family_name,
+        "given_names": citizen.given_names,
+        "date_of_birth": citizen.date_of_birth,
+        "sex": citizen.sex,
+        "place_of_birth": citizen.place_of_birth,
+        "province_code": primary.province_code if primary else None,
+        "ville": primary.city if primary else None,
+        "commune_code": primary.commune_code if primary else None,
+    }
 
 
 async def update_draft_citizen(

@@ -109,7 +109,12 @@ class SyncEngine {
             if (status == 'ACCEPTED') {
               acceptedCount++;
               await _queue.remove(row['id'] as int);
-              await _markSynced(localId);
+              final data = jsonDecode(row['payload'] as String) as Map<String, dynamic>;
+              final clientStatus = data['status']?.toString().toUpperCase();
+              await _markSynced(
+                localId,
+                keepDraft: clientStatus == 'DRAFT',
+              );
             } else if (status == 'CONFLICT') {
               conflictCount++;
               await _markConflict(
@@ -309,10 +314,13 @@ class SyncEngine {
     );
   }
 
-  Future<void> _markSynced(String localId) async {
+  Future<void> _markSynced(String localId, {bool keepDraft = false}) async {
     await _db.db.update(
       'census_records',
-      {'status': 'SYNCED', 'conflict_reason': null},
+      {
+        'status': keepDraft ? 'DRAFT' : 'SYNCED',
+        'conflict_reason': null,
+      },
       where: 'local_id = ?',
       whereArgs: [localId],
     );
@@ -419,6 +427,8 @@ class SyncEngine {
           'family_name': r['family_name'],
           'sex': r['sex'],
           'date_of_birth': r['date_of_birth'],
+          'payload': r['payload'] is Map ? jsonEncode(r['payload']) : r['payload']?.toString(),
+          'photo_ref': r['photo_ref'],
           'version': serverVersion,
           'status': r['status'] ?? 'SYNCED',
           'review_note': r['review_note'],

@@ -91,7 +91,7 @@ class CitizenDetail(BaseModel):
 
 
 class CitizenListItem(BaseModel):
-    """Minimal PII for search/list results."""
+    """Search/list hit enriched for autofill (still permission-gated)."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -101,11 +101,18 @@ class CitizenListItem(BaseModel):
     family_name: str
     given_names: str
     date_of_birth: date
+    sex: Sex = Sex.UNKNOWN
+    place_of_birth: str | None = None
+    province_code: str | None = None
+    ville: str | None = None
+    commune_code: str | None = None
 
 
 class CitizenSearchParams(BaseModel):
+    q: str | None = None
     family_name: str | None = None
     given_names: str | None = None
+    nic: str | None = None
     date_of_birth: date | None = None
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)

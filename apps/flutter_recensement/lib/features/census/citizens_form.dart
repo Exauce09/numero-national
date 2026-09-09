@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/api_client.dart';
 import '../../sync/local_database.dart';
 import '../../sync/sync_queue.dart';
 import 'fingerprint_capture.dart';
@@ -475,28 +476,71 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
       setState(() => _conjointSuggestions = []);
       return;
     }
-    final db = LocalDatabase.instance.db;
-    final rows = await db.query('census_records', limit: 80, orderBy: 'updated_at DESC');
     final hits = <Map<String, String>>[];
-    for (final r in rows) {
-      final payload = _decodePayload(r['payload']);
-      final nom = (payload['nom'] ?? r['family_name'] ?? '').toString();
-      final postnom = (payload['postnom'] ?? '').toString();
-      final prenom = (payload['prenom'] ?? r['given_names'] ?? '').toString();
-      final blob = '$nom $postnom $prenom'.toLowerCase();
-      final tokens = query.split(RegExp(r'\s+')).where((t) => t.isNotEmpty);
-      if (tokens.every((t) => blob.contains(t))) {
+    final seen = <String>{};
+
+    // 1) Recherche nationale (registre serveur) — prioritaire.
+    try {
+      final api = ApiClient();
+      final encoded = Uri.encodeQueryComponent(q.trim());
+      final res = await api.get('/registry/citizens?q=$encoded&page=1&page_size=12');
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        final body = api.decodeMap(res);
+        final items = (body['items'] as List?) ?? const [];
+        for (final raw in items) {
+          if (raw is! Map) continue;
+          final m = Map<String, dynamic>.from(raw);
+          final id = (m['id'] ?? '').toString();
+          if (id.isEmpty || seen.contains(id)) continue;
+          final given = (m['given_names'] ?? '').toString().trim();
+          final parts = given.split(RegExp(r'\s+')).where((e) => e.isNotEmpty).toList();
+          final prenom = parts.isEmpty ? '' : parts.first;
+          final postnom = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+          hits.add({
+            'id': id,
+            'nom': (m['family_name'] ?? '').toString(),
+            'postnom': postnom,
+            'prenom': prenom,
+            'sexe': (m['sex'] ?? '').toString(),
+            'date_naissance': (m['date_of_birth'] ?? '').toString().split('T').first,
+            'telephone': '',
+            'nic': (m['nic'] ?? '').toString(),
+          });
+          seen.add(id);
+          if (hits.length >= 12) break;
+        }
+      }
+    } catch (_) {
+      // Offline / sans droit : on complète avec le cache local.
+    }
+
+    // 2) Fallback local (SQLite appareil).
+    if (hits.length < 12) {
+      final db = LocalDatabase.instance.db;
+      final rows = await db.query('census_records', limit: 80, orderBy: 'updated_at DESC');
+      for (final r in rows) {
+        final payload = _decodePayload(r['payload']);
+        final nom = (payload['nom'] ?? r['family_name'] ?? '').toString();
+        final postnom = (payload['postnom'] ?? '').toString();
+        final prenom = (payload['prenom'] ?? r['given_names'] ?? '').toString();
+        final blob = '$nom $postnom $prenom'.toLowerCase();
+        final tokens = query.split(RegExp(r'\s+')).where((t) => t.isNotEmpty);
+        if (!tokens.every((t) => blob.contains(t))) continue;
+        final id = (r['local_id'] ?? r['id'] ?? '').toString();
+        if (id.isEmpty || seen.contains(id)) continue;
         hits.add({
-          'id': (r['local_id'] ?? r['id'] ?? '').toString(),
+          'id': id,
           'nom': nom,
           'postnom': postnom,
           'prenom': prenom,
           'sexe': (payload['sexe'] ?? r['sex'] ?? '').toString(),
           'date_naissance': (payload['date_naissance'] ?? r['date_of_birth'] ?? '').toString(),
           'telephone': (payload['telephone'] ?? '').toString(),
+          'nic': '',
         });
+        seen.add(id);
+        if (hits.length >= 12) break;
       }
-      if (hits.length >= 12) break;
     }
     if (mounted) setState(() => _conjointSuggestions = hits);
   }
@@ -613,28 +657,48 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
         _version = nextVersion;
       });
 
-      if (!draft) {
-        await LocalDatabase.instance.setMeta('sync_status', 'EN_ATTENTE');
-    await SyncQueue().enqueue(
-      SyncQueueItem(
-        entityType: 'census_record',
-        localId: localId,
-            version: nextVersion,
-        payload: {
+      await LocalDatabase.instance.setMeta('sync_status', 'EN_ATTENTE');
+      await SyncQueue().enqueue(
+        SyncQueueItem(
+          entityType: 'census_record',
+          localId: localId,
+          version: nextVersion,
+          payload: {
+            'local_id': localId,
+            'household_local_id': widget.householdLocalId,
+            'campaign_id': widget.campaignId,
+            'given_names': given,
+            'family_name': family,
+            'sex': _sex,
+            'date_of_birth': dob,
+            'photo_ref': _photoRef,
+            'version': nextVersion,
+            'status': status,
+            'payload': payload,
+            'relationship_to_head': _relation,
+          },
+        ),
+      );
+
+      // Brouillon partagé aussi via API form-drafts (web / autre agent).
+      if (draft) {
+        try {
+          final api = ApiClient();
+          await api.post(
+            '/census/form-drafts',
+            body: {
+              'system': 'flutter_census',
+              'form_type': 'census_person',
+              'title': '$family $given'.trim(),
               'local_id': localId,
-          'household_local_id': widget.householdLocalId,
-          'campaign_id': widget.campaignId,
-              'given_names': given,
-              'family_name': family,
-              'sex': _sex,
-              'date_of_birth': dob,
-              'photo_ref': _photoRef,
-              'version': nextVersion,
+              'campaign_id': widget.campaignId,
               'payload': payload,
-              'relationship_to_head': _relation,
-        },
-      ),
-    );
+              'version': nextVersion,
+            },
+          );
+        } catch (_) {
+          // Sync file + local DRAFT restent disponibles hors ligne.
+        }
       }
 
     if (!mounted) return;
@@ -642,7 +706,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
         SnackBar(
           content: Text(
             draft
-                ? 'Brouillon enregistré — vous pouvez continuer plus tard'
+                ? 'Brouillon enregistré et synchronisé — un autre agent peut le terminer'
                 : (isUpdate
                     ? 'Fiche finalisée — en file de sync'
                     : 'Fiche enregistrée — en file de sync'),

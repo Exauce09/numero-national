@@ -31,6 +31,24 @@ export type PopulationHit = {
   status: string | null;
 };
 
+export type FormDraft = {
+  id: string;
+  system: string;
+  form_type: string;
+  title: string;
+  payload: Record<string, unknown>;
+  status: string;
+  version: number;
+  local_id: string | null;
+  campaign_id: string | null;
+  province_id: string | null;
+  ville_id: string | null;
+  owner_user_id: string;
+  claimed_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Residence = {
   id: string;
   citizen_id: string;
@@ -63,6 +81,32 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   searchPopulation: (params: URLSearchParams) =>
     request<PopulationHit[]>(`/civil/population/search?${params}`),
+
+  searchCitizens: (params: URLSearchParams) =>
+    request<{ items: Array<Record<string, unknown>>; total: number }>(
+      `/registry/citizens?${params}`,
+    ),
+
+  listFormDrafts: (params?: URLSearchParams) =>
+    request<FormDraft[]>(`/census/form-drafts?${params ?? new URLSearchParams({ status: "DRAFT" })}`),
+
+  upsertFormDraft: (body: Record<string, unknown>) =>
+    request<FormDraft>("/census/form-drafts", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  claimFormDraft: (id: string) =>
+    request<FormDraft>(`/census/form-drafts/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "IN_PROGRESS" }),
+    }),
+
+  finalizeFormDraft: (id: string) =>
+    request<FormDraft>(`/census/form-drafts/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "FINALIZED" }),
+    }),
 
   listActs: (kind: string, commune?: string) => {
     const q = new URLSearchParams();

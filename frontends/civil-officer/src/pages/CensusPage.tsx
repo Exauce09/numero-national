@@ -24,6 +24,7 @@ import {
   type Person,
   type Sexe,
 } from "../registry";
+import { api } from "../api";
 import { getOfficerCommune } from "../commune";
 import { RDC_TRIBUS, RDC_TRIBUS_NOTE } from "../data/tribusRdc";
 import {
@@ -338,11 +339,54 @@ export default function CensusPage() {
       savedAt: new Date().toISOString(),
     };
     localStorage.setItem(CENSUS_DRAFT_KEY, JSON.stringify(draft));
-    setDraftNotice("Sauvegarde temporaire enregistrée (brouillon local — pas encore finalisé).");
+    const localId =
+      localStorage.getItem(`${CENSUS_DRAFT_KEY}:id`) ??
+      (typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `draft-${Date.now()}`);
+    localStorage.setItem(`${CENSUS_DRAFT_KEY}:id`, localId);
+    const title = [nom, postnom, prenom].filter(Boolean).join(" ").trim() || "Brouillon recensement";
+    void api
+      .upsertFormDraft({
+        system: "civil_officer",
+        form_type: "census_person",
+        title,
+        local_id: localId,
+        payload: draft as unknown as Record<string, unknown>,
+        province_id: geoActuelle.province_id || geoNaissance.province_id || null,
+        ville_id: geoActuelle.ville_id || geoNaissance.ville_id || null,
+      })
+      .then(() => {
+        setDraftNotice(
+          "Brouillon synchronisé — un autre agent / système peut le reprendre et le terminer.",
+        );
+      })
+      .catch(() => {
+        setDraftNotice(
+          "Sauvegarde locale OK — sync serveur indisponible (reconnectez-vous pour partager le brouillon).",
+        );
+      });
   }
 
   function clearDraft() {
     localStorage.removeItem(CENSUS_DRAFT_KEY);
+    const localId = localStorage.getItem(`${CENSUS_DRAFT_KEY}:id`);
+    localStorage.removeItem(`${CENSUS_DRAFT_KEY}:id`);
+    if (localId) {
+      void api
+        .listFormDrafts(
+          new URLSearchParams({
+            system: "civil_officer",
+            form_type: "census_person",
+            status: "DRAFT",
+          }),
+        )
+        .then((rows) => {
+          const mine = rows.find((r) => r.local_id === localId);
+          if (mine) return api.finalizeFormDraft(mine.id);
+        })
+        .catch(() => undefined);
+    }
   }
 
   function onSubmit(e: FormEvent) {
