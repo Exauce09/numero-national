@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/api_client.dart';
+import '../../core/theme.dart';
 import 'assignment_repository.dart';
 import 'households_screen.dart';
 
@@ -71,27 +72,45 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
     return RefreshIndicator(
       onRefresh: () => _load(forceRefresh: true),
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
         children: [
-          Card(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            child: ListTile(
-              leading: const Icon(Icons.cloud_sync),
-              title: const Text('État synchronisation'),
-              subtitle: Text(_syncLabel),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: NnColors.softBlue,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: NnColors.line),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.cloud_sync_rounded, color: NnColors.blue),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Synchronisation', style: TextStyle(fontWeight: FontWeight.w700)),
+                      Text(_syncLabel, style: const TextStyle(color: NnColors.muted, fontSize: 13)),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
           if (_error != null) ...[
-            const SizedBox(height: 8),
-            Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            const SizedBox(height: 10),
+            Text(_error!, style: const TextStyle(color: NnColors.danger)),
           ],
+          const SizedBox(height: 18),
+          const Text(
+            'Mes zones',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: NnColors.ink),
+          ),
           const SizedBox(height: 12),
-          Text('Mes affectations', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
           if (_assignments.isEmpty)
             const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: Text('Aucune zone affectée')),
+              padding: EdgeInsets.all(32),
+              child: Center(child: Text('Aucune zone affectée', style: TextStyle(color: NnColors.muted))),
             )
           else
             ..._assignments.map((a) {
@@ -102,24 +121,72 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
               final zoneName = zone?['name']?.toString() ?? 'Zone non définie';
               final id = campaign['id']?.toString() ?? '';
               return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  tileColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  title: Text(name),
-                  subtitle: Text('$zoneName · $status'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => HouseholdsScreen(
-                          campaignId: id,
-                          campaignName: '$name — $zoneName',
-                          zoneId: zone?['id']?.toString(),
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Material(
+                  color: NnColors.card,
+                  borderRadius: BorderRadius.circular(18),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => HouseholdsScreen(
+                            campaignId: id,
+                            campaignName: '$name — $zoneName',
+                            zoneId: zone?['id']?.toString(),
+                          ),
                         ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: NnColors.line),
                       ),
-                    );
-                  },
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: NnColors.softGreen,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(Icons.location_on_outlined, color: Color(0xFF13DEB9)),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                                const SizedBox(height: 2),
+                                Text(zoneName, style: const TextStyle(color: NnColors.muted)),
+                                const SizedBox(height: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: NnColors.softBlue,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    status,
+                                    style: const TextStyle(
+                                      color: NnColors.blue,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right_rounded, color: NnColors.muted),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               );
             }),

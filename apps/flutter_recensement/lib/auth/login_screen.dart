@@ -4,6 +4,7 @@ import '../auth/offline_auth_policy.dart';
 import '../core/api_client.dart';
 import '../core/auth_service.dart';
 import '../core/secure_storage.dart';
+import '../core/theme.dart';
 
 /// Agent login: online JWT against API; offline within [OfflineAuthPolicy] window.
 class LoginScreen extends StatefulWidget {
@@ -51,7 +52,6 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed('/home');
     } on ApiException catch (e) {
-      // Offline fallback: existing session still valid.
       if (await _policy.mayCollect() && mounted) {
         Navigator.of(context).pushReplacementNamed('/home');
         return;
@@ -87,90 +87,102 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFEEF5F8),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Image.asset('assets/logo-rdc.jpg', height: 140),
-                      const SizedBox(height: 12),
-                      Text(
-                        'E-GOUV — Recensement',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF2A3547),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFE8F0FF), NnColors.page, Color(0xFFE6F7F2)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: NnColors.blue.withOpacity(0.12),
+                            blurRadius: 24,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.asset('assets/logo-rdc.jpg', height: 120, fit: BoxFit.contain),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'E-GOUV',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                              color: NnColors.ink,
+                              letterSpacing: -0.5,
                             ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Connexion agent terrain',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: const Color(0xFF5A6A85),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Recensement terrain',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: NnColors.muted, fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 24),
+                          TextField(
+                            controller: _email,
+                            keyboardType: TextInputType.emailAddress,
+                            autocorrect: false,
+                            decoration: const InputDecoration(
+                              labelText: 'Email agent',
+                              prefixIcon: Icon(Icons.mail_outline),
                             ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _password,
+                            obscureText: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Mot de passe',
+                              prefixIcon: Icon(Icons.lock_outline),
+                            ),
+                            onSubmitted: (_) => _busy ? null : _submit(),
+                          ),
+                          if (_error != null) ...[
+                            const SizedBox(height: 12),
+                            Text(_error!, style: const TextStyle(color: NnColors.danger)),
+                          ],
+                          const SizedBox(height: 20),
+                          FilledButton(
+                            onPressed: _busy ? null : _submit,
+                            child: _busy
+                                ? const SizedBox(
+                                    height: 18,
+                                    width: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Text('Se connecter'),
+                          ),
+                          TextButton(
+                            onPressed: _busy ? null : _continueOffline,
+                            child: const Text('Continuer hors ligne'),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 28),
-                      TextField(
-                        controller: _email,
-                        keyboardType: TextInputType.emailAddress,
-                        autocorrect: false,
-                        decoration: const InputDecoration(
-                          labelText: 'Email agent',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _password,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Mot de passe',
-                          border: OutlineInputBorder(),
-                        ),
-                        onSubmitted: (_) => _busy ? null : _submit(),
-                      ),
-                      if (_error != null) ...[
-                        const SizedBox(height: 12),
-                        Text(
-                          _error!,
-                          style: TextStyle(color: Theme.of(context).colorScheme.error),
-                        ),
-                      ],
-                      const SizedBox(height: 20),
-                      FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF5D87FF),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        onPressed: _busy ? null : _submit,
-                        child: _busy
-                            ? const SizedBox(
-                                height: 18,
-                                width: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text('Se connecter'),
-                      ),
-                      TextButton(
-                        onPressed: _busy ? null : _continueOffline,
-                        child: const Text('Continuer hors ligne'),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),

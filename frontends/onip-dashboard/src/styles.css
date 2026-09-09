@@ -1,15 +1,260 @@
 @import "../../shared/egouv.css";
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap");
 
-.btn-primary, .btn-secondary {
-  border: none;
-  border-radius: 8px;
-  padding: 0.45rem 0.9rem;
-  cursor: pointer;
+:root {
+  --nn-shadow: 0 12px 30px rgba(45, 82, 171, 0.08);
+  --nn-radius: 16px;
+}
+
+body {
+  font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+}
+
+.page-wrapper {
+  min-height: 100vh;
+}
+
+.sidebar {
+  background: linear-gradient(180deg, #1c2536 0%, #151c29 100%);
+  color: #fff;
+  border-right: none;
+}
+
+.sidebar-brand strong {
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+}
+
+.sidebar-nav a {
+  border-radius: 12px;
+  margin: 0.2rem 0.65rem;
+  padding: 0.7rem 0.9rem;
+  color: rgba(255, 255, 255, 0.72);
   font-weight: 600;
 }
-.btn-primary { background: var(--egouv-primary, #5d87ff); color: #fff; }
-.btn-secondary { background: #eef2f8; color: #2a3547; }
-.data-table { width: 100%; border-collapse: collapse; }
-.data-table th, .data-table td { border-bottom: 1px solid #e5eaf2; padding: 0.55rem 0.4rem; text-align: left; font-size: 0.92rem; }
-.success-banner { background: #e8f7ef; color: #1b5e3b; padding: 0.75rem 1rem; border-radius: 8px; }
-.panel input, .panel select, .panel textarea { display: block; width: 100%; margin-top: 0.35rem; margin-bottom: 0.5rem; padding: 0.45rem 0.6rem; border: 1px solid #d5deea; border-radius: 8px; }
+
+.sidebar-nav a.active,
+.sidebar-nav a[aria-current="page"] {
+  background: rgba(93, 135, 255, 0.22);
+  color: #fff;
+}
+
+.topbar {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--egouv-line);
+}
+
+.shell {
+  padding: 1.35rem 1.5rem 2rem;
+  background:
+    radial-gradient(1200px 400px at 10% -10%, rgba(93, 135, 255, 0.12), transparent 60%),
+    radial-gradient(900px 360px at 100% 0%, rgba(19, 222, 185, 0.08), transparent 55%),
+    var(--egouv-page);
+}
+
+.shell > h1,
+.panel > h1,
+.shell h1 {
+  font-size: 1.65rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 0.35rem;
+}
+
+.muted {
+  color: var(--egouv-muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin: 1.1rem 0 1.4rem;
+}
+
+.metric {
+  background: #fff;
+  border: 1px solid var(--egouv-line);
+  border-radius: var(--nn-radius);
+  padding: 1.05rem 1.1rem;
+  box-shadow: var(--nn-shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.metric::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, #5d87ff, #13deb9);
+}
+
+.metric .label {
+  color: var(--egouv-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.metric .value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--egouv-ink);
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid var(--egouv-line);
+  border-radius: calc(var(--nn-radius) + 2px);
+  padding: 1.15rem 1.25rem;
+  box-shadow: var(--nn-shadow);
+  margin-bottom: 1rem;
+}
+
+.panel h2,
+.panel h3 {
+  margin-top: 0;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.btn-primary,
+.btn-secondary {
+  border: none;
+  border-radius: 12px;
+  padding: 0.55rem 1rem;
+  cursor: pointer;
+  font-weight: 700;
+  font-family: inherit;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #5d87ff, #4570ea);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(93, 135, 255, 0.28);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: #eef2f8;
+  color: #2a3547;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.data-table th {
+  background: #f7f9fc;
+  color: var(--egouv-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
+.data-table th,
+.data-table td {
+  border-bottom: 1px solid var(--egouv-line);
+  padding: 0.75rem 0.55rem;
+  text-align: left;
+  font-size: 0.92rem;
+}
+
+.data-table tr:hover td {
+  background: #fafcff;
+}
+
+.success-banner {
+  background: #e6fffa;
+  color: #0a5c4c;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #b6f3e6;
+  font-weight: 600;
+}
+
+.login-error,
+.error {
+  background: #fbf2ef;
+  color: #c23b22;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #f5c9bc;
+  font-weight: 600;
+}
+
+.panel input,
+.panel select,
+.panel textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  margin-bottom: 0.55rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #d5deea;
+  border-radius: 12px;
+  font-family: inherit;
+  background: #fff;
+}
+
+.panel input:focus,
+.panel select:focus,
+.panel textarea:focus {
+  outline: none;
+  border-color: #5d87ff;
+  box-shadow: 0 0 0 3px rgba(93, 135, 255, 0.15);
+}
+
+.hero-banner {
+  background: linear-gradient(135deg, #5d87ff 0%, #3f66e0 55%, #2f55c8 100%);
+  color: #fff;
+  border-radius: 20px;
+  padding: 1.35rem 1.5rem;
+  margin-bottom: 1.2rem;
+  box-shadow: 0 16px 36px rgba(69, 112, 234, 0.28);
+}
+
+.hero-banner h1 {
+  margin: 0 0 0.35rem;
+  color: #fff;
+  font-size: 1.7rem;
+}
+
+.hero-banner p {
+  margin: 0;
+  opacity: 0.9;
+}
+
+.tab-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+}
+
+.stat-chip {
+  background: #f5f7fb;
+  border-radius: 14px;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--egouv-line);
+}
+
+.stat-chip .muted {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.stat-chip strong {
+  font-size: 1.45rem;
+  font-weight: 800;
+}

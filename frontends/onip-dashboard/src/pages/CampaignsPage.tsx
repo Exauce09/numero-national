@@ -41,27 +41,24 @@ export default function CampaignsPage() {
     if (hasToken) void reloadCampaigns();
   }, [hasToken, reloadCampaigns]);
 
-  if (!hasToken) {
-    return (
-      <div>
+  return (
+    <div>
+      <div className="hero-banner">
         <h1>Campagnes de recensement</h1>
+        <p>Contrôle superviseur, affectations agents et statistiques — structure type tableau de bord national.</p>
+      </div>
+
+      {!hasToken ? (
         <div className="panel">
           <p className="muted">
             Connectez-vous avec un compte API (ex.{" "}
-            <code>admin.recensement@example.gov</code> / <code>CensusAdmin123!</code> ou
-            superviseur) pour gérer campagnes, contrôle et affectations.
+            <code>admin.recensement@example.gov</code> / <code>CensusAdmin123!</code>) pour gérer
+            campagnes, contrôle et affectations.
           </p>
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <h1>Campagnes de recensement</h1>
-      <p className="muted">Contrôle superviseur, affectations agents et statistiques.</p>
-
-      <div className="panel" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+      ) : (
+        <>
+      <div className="panel tab-row">
         {(
           [
             ["campagnes", "Campagnes"],
@@ -122,6 +119,8 @@ export default function CampaignsPage() {
       {tab === "stats" && selected ? (
         <StatsTab campaign={selected} setError={setError} />
       ) : null}
+        </>
+      )}
     </div>
   );
 }
@@ -585,13 +584,13 @@ function StatsTab({
       <h2>Statistiques — {campaign.code}</h2>
       {stats ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12 }}>
-          <Stat label="Ménages" value={stats.households} />
-          <Stat label="Personnes" value={stats.records} />
-          <Stat label="À contrôler" value={stats.pending_review} />
-          <Stat label="Approuvées" value={stats.approved} />
-          <Stat label="Rejetées" value={stats.rejected} />
-          <Stat label="Promues" value={stats.promoted} />
-          <Stat label="Conflits" value={stats.conflicts} />
+          <div className="stat-chip"><div className="muted">Ménages</div><strong>{stats.households}</strong></div>
+          <div className="stat-chip"><div className="muted">Personnes</div><strong>{stats.records}</strong></div>
+          <div className="stat-chip"><div className="muted">À contrôler</div><strong>{stats.pending_review}</strong></div>
+          <div className="stat-chip"><div className="muted">Approuvées</div><strong>{stats.approved}</strong></div>
+          <div className="stat-chip"><div className="muted">Rejetées</div><strong>{stats.rejected}</strong></div>
+          <div className="stat-chip"><div className="muted">Promues</div><strong>{stats.promoted}</strong></div>
+          <div className="stat-chip"><div className="muted">Conflits</div><strong>{stats.conflicts}</strong></div>
         </div>
       ) : (
         <p className="muted">Chargement…</p>
@@ -615,15 +614,6 @@ function StatsTab({
           CSV à contrôler
         </button>
       </div>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div style={{ background: "var(--egouv-page)", padding: 12, borderRadius: 8 }}>
-      <div className="muted">{label}</div>
-      <strong style={{ fontSize: 22 }}>{value}</strong>
     </div>
   );
 }
