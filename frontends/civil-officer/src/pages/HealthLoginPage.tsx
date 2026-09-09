@@ -4,7 +4,6 @@ import { clearSession, getSession } from "../auth";
 import {
   HEALTH_DEMO_PASSWORD,
   HEALTH_DEMO_USER,
-  clearHealthSession,
   createFacilityAccount,
   getHealthSession,
   loginHealth,

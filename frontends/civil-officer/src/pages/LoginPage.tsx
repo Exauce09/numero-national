@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { DEMO_PASSWORD, DEMO_USER, clearSession, getSession, login } from "../auth";
+import { DEMO_PASSWORD, DEMO_USER, getSession, login } from "../auth";
 import { clearHealthSession, getHealthSession } from "../healthAuth";
 
 export default function LoginPage() {
