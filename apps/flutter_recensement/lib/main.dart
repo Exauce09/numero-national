@@ -69,11 +69,13 @@ class _HomeShellState extends State<HomeShell> {
           IconButton(
             tooltip: 'Synchroniser',
             onPressed: () async {
+              await LocalDatabase.instance.setMeta('sync_status', 'SYNCING');
               final result = await _sync.runOnce();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text(result)),
                 );
+                setState(() {});
               }
             },
             icon: const Icon(Icons.sync),

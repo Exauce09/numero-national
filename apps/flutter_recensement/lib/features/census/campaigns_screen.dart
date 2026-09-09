@@ -115,6 +115,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                         builder: (_) => HouseholdsScreen(
                           campaignId: id,
                           campaignName: '$name — $zoneName',
+                          zoneId: zone?['id']?.toString(),
                         ),
                       ),
                     );

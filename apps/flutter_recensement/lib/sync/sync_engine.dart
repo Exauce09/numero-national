@@ -33,11 +33,13 @@ class SyncEngine {
 
   Future<String> runOnce({String? campaignId}) async {
     if (!await isOnline) {
+      await _db.setMeta('sync_status', 'OFFLINE');
       return 'Hors ligne — sync reportée.';
     }
 
     final token = await _store.accessToken;
     if (token == null || token.isEmpty) {
+      await _db.setMeta('sync_status', 'ERROR');
       return 'Non authentifié — reconnectez-vous.';
     }
 
@@ -120,10 +122,14 @@ class SyncEngine {
         await _applyPull(body);
       }
 
+      await _db.setMeta('sync_status', 'SYNCED');
+      await _db.setMeta('last_sync_at', DateTime.now().toUtc().toIso8601String());
       return 'Synchronisation terminée (${items.length} envois).';
     } on ApiException catch (e) {
+      await _db.setMeta('sync_status', 'ERROR');
       return 'Échec sync: ${e.message}';
     } catch (e) {
+      await _db.setMeta('sync_status', 'ERROR');
       return 'Échec sync: $e';
     }
   }

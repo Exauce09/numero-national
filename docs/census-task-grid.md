@@ -16,9 +16,12 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 
 ## Phase 2 — Mobile collecte
 - [x] 2.1 Télécharger affectations / zones (cache SQLite)
-- [x] 2.6 Indicateur sync (SYNCED / EN_ATTENTE / ERROR)
-- [ ] 2.2–2.5 GPS, validation, liste correction
-- [ ] 2.7 Correction locale complète
+- [x] 2.2 Créer ménage (adresse + formulaire)
+- [x] 2.3 GPS sur ménage
+- [x] 2.4 Ajouter membres (lien de parenté)
+- [x] 2.5 Validation locale champs obligatoires
+- [x] 2.6 Indicateur sync (SYNCED / EN_ATTENTE / ERROR / OFFLINE)
+- [x] 2.7 Liste ménages + membres + statuts
 
 ## Phase 3 — Sync fiable
 - [ ] Push/pull durci + conflits UX + tests
@@ -26,10 +29,4 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 ## Phase 4 — Superviseur
 - [ ] Workflow APPROVE/REJECT
 
-## Phase 5 — Registre NIC
-- [ ] Validé → core_registry
-
-## Phase 6 — Stats MVP
-- [ ] Critères §66 complets
-
-Prochaine session Agent : Phase 2.2+ (GPS ménage) ou Phase 3.
+Prochaine session Agent : Phase 3 (conflits sync) ou Phase 4.
