@@ -1,7 +1,7 @@
 name: flutter_recensement
 description: Application terrain de recensement offline-first (Phase 3)
 publish_to: "none"
-version: 0.2.1+8
+version: 0.2.2+9
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

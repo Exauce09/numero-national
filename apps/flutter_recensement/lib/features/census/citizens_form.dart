@@ -67,6 +67,8 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   Map<String, String?> _geoOrigine = {};
   bool _busy = false;
   String? _rejectNote;
+  String? _localId;
+  int _version = 1;
 
   bool get _isEdit => widget.existing != null;
 
@@ -146,6 +148,8 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     _geoActuelle = _asStringMap(payload['geo_actuelle']);
     _geoOrigine = _asStringMap(payload['geo_origine']);
     _rejectNote = e?['review_note']?.toString();
+    _localId = e?['local_id']?.toString();
+    _version = (e?['version'] as int?) ?? 1;
   }
 
   Map<String, String?> _asStringMap(Object? raw) {
@@ -299,38 +303,84 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     };
   }
 
-  Future<void> _save() async {
-    if (!_validateStep1()) return;
+  Future<void> _save({bool draft = false}) async {
+    if (!draft && !_validateStep1()) return;
+    if (draft &&
+        _nom.text.trim().isEmpty &&
+        _prenom.text.trim().isEmpty &&
+        _postnom.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Brouillon : saisissez au moins un nom, post-nom ou prénom'),
+        ),
+      );
+      return;
+    }
+
     setState(() => _busy = true);
     try {
       final db = LocalDatabase.instance.db;
       final now = DateTime.now().toUtc().toIso8601String();
       final payload = _buildPayload();
       final payloadJson = jsonEncode(payload);
-      final given = _prenom.text.trim();
-      final family = _nom.text.trim();
+      final given = _prenom.text.trim().isEmpty ? '(brouillon)' : _prenom.text.trim();
+      final family = _nom.text.trim().isEmpty ? 'Sans nom' : _nom.text.trim();
+      final status = draft ? 'DRAFT' : 'QUEUED';
+      final dob = _dob.text.trim();
 
-      if (_isEdit) {
-        final localId = widget.existing!['local_id']!.toString();
-        final prevVersion = (widget.existing!['version'] as int?) ?? 1;
-        final nextVersion = prevVersion + 1;
+      final isUpdate = _localId != null;
+      final localId = _localId ?? const Uuid().v4();
+      final nextVersion = isUpdate ? _version + 1 : 1;
+
+      final row = <String, Object?>{
+        'given_names': given,
+        'family_name': family,
+        'sex': _sex,
+        'date_of_birth': dob.isEmpty ? null : dob,
+        'photo_ref': _photoRef,
+        'payload': payloadJson,
+        'version': nextVersion,
+        'status': status,
+        'updated_at': now,
+      };
+
+      if (isUpdate) {
+        if (!draft) {
+          row['review_note'] = null;
+        }
         await db.update(
           'census_records',
-          {
-            'given_names': given,
-            'family_name': family,
-            'sex': _sex,
-            'date_of_birth': _dob.text.trim(),
-            'photo_ref': _photoRef,
-            'payload': payloadJson,
-            'version': nextVersion,
-            'status': 'QUEUED',
-            'review_note': null,
-            'updated_at': now,
-          },
+          row,
           where: 'local_id = ?',
           whereArgs: [localId],
         );
+      } else {
+        await db.insert('census_records', {
+          'id': localId,
+          'local_id': localId,
+          'household_local_id': widget.householdLocalId,
+          'campaign_id': widget.campaignId,
+          ...row,
+        });
+        final count = await db.rawQuery(
+          'SELECT COUNT(*) AS c FROM census_records WHERE household_local_id = ?',
+          [widget.householdLocalId],
+        );
+        final n = (count.first['c'] as num?)?.toInt() ?? 0;
+        await db.update(
+          'households',
+          {'member_count': n, 'updated_at': now},
+          where: 'local_id = ?',
+          whereArgs: [widget.householdLocalId],
+        );
+      }
+
+      setState(() {
+        _localId = localId;
+        _version = nextVersion;
+      });
+
+      if (!draft) {
         await LocalDatabase.instance.setMeta('sync_status', 'EN_ATTENTE');
         await SyncQueue().enqueue(
           SyncQueueItem(
@@ -344,7 +394,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               'given_names': given,
               'family_name': family,
               'sex': _sex,
-              'date_of_birth': _dob.text.trim(),
+              'date_of_birth': dob,
               'photo_ref': _photoRef,
               'version': nextVersion,
               'payload': payload,
@@ -352,60 +402,23 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             },
           ),
         );
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Correction enregistrée — en file de sync')),
-        );
-        Navigator.of(context).pop(true);
-        return;
       }
 
-      final localId = const Uuid().v4();
-      final row = <String, Object?>{
-        'id': localId,
-        'local_id': localId,
-        'household_local_id': widget.householdLocalId,
-        'campaign_id': widget.campaignId,
-        'given_names': given,
-        'family_name': family,
-        'sex': _sex,
-        'date_of_birth': _dob.text.trim(),
-        'photo_ref': _photoRef,
-        'payload': payloadJson,
-        'version': 1,
-        'status': 'QUEUED',
-        'updated_at': now,
-      };
-      await db.insert('census_records', row);
-      final count = await db.rawQuery(
-        'SELECT COUNT(*) AS c FROM census_records WHERE household_local_id = ?',
-        [widget.householdLocalId],
-      );
-      final n = (count.first['c'] as num?)?.toInt() ?? 0;
-      await db.update(
-        'households',
-        {'member_count': n, 'updated_at': now},
-        where: 'local_id = ?',
-        whereArgs: [widget.householdLocalId],
-      );
-      await LocalDatabase.instance.setMeta('sync_status', 'EN_ATTENTE');
-      await SyncQueue().enqueue(
-        SyncQueueItem(
-          entityType: 'census_record',
-          localId: localId,
-          version: 1,
-          payload: {
-            ...row,
-            'payload': payload,
-            'relationship_to_head': _relation,
-          },
-        ),
-      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Fiche enregistrée — en file de sync')),
+        SnackBar(
+          content: Text(
+            draft
+                ? 'Brouillon enregistré — vous pouvez continuer plus tard'
+                : (isUpdate
+                    ? 'Fiche finalisée — en file de sync'
+                    : 'Fiche enregistrée — en file de sync'),
+          ),
+        ),
       );
-      Navigator.of(context).pop(true);
+      if (!draft) {
+        Navigator.of(context).pop(true);
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -444,20 +457,46 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     );
   }
 
-  Widget _saveButton() {
-    return FilledButton(
-      style: FilledButton.styleFrom(
-        backgroundColor: const Color(0xFFE11D48),
-        padding: const EdgeInsets.symmetric(vertical: 14),
-      ),
-      onPressed: _busy ? null : _save,
-      child: _busy
-          ? const SizedBox(
-              height: 18,
-              width: 18,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-            )
-          : Text(_isEdit ? 'Corriger et renvoyer' : 'Enregistrer toute la fiche'),
+  Widget _saveButtons() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OutlinedButton.icon(
+          onPressed: _busy ? null : () => _save(draft: true),
+          icon: const Icon(Icons.save_outlined),
+          label: const Text('Sauvegarder temporairement'),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            foregroundColor: const Color(0xFF5D87FF),
+          ),
+        ),
+        const SizedBox(height: 10),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFE11D48),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+          ),
+          onPressed: _busy ? null : () => _save(draft: false),
+          icon: _busy
+              ? const SizedBox(
+                  height: 18,
+                  width: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : const Icon(Icons.check_circle_outline),
+          label: Text(
+            _localId != null && (widget.existing?['status']?.toString() == 'DRAFT' || _isEdit)
+                ? 'Finaliser et envoyer'
+                : 'Enregistrer toute la fiche',
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Temporaire = brouillon local (pas de sync). Finaliser = file de synchronisation.',
+          style: TextStyle(fontSize: 12, color: Color(0xFF5A6A85)),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 
@@ -796,7 +835,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               ),
             ]),
             const SizedBox(height: 8),
-            _saveButton(),
+            _saveButtons(),
           ],
         ),
       ),

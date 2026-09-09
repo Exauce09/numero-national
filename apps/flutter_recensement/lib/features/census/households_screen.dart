@@ -246,6 +246,9 @@ class _HouseholdMembersScreenState extends State<HouseholdMembersScreen> {
                 } else if (status == 'CONFLICT') {
                   icon = Icons.warning_amber;
                   color = Colors.orange;
+                } else if (status == 'DRAFT') {
+                  icon = Icons.edit_note;
+                  color = Colors.orange.shade800;
                 } else {
                   icon = Icons.cloud_upload;
                   color = const Color(0xFF5D87FF);
