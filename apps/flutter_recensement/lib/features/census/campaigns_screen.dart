@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/api_client.dart';
-import 'campaign_repository.dart';
+import 'assignment_repository.dart';
 import 'households_screen.dart';
 
 class CampaignsScreen extends StatefulWidget {
@@ -12,8 +12,9 @@ class CampaignsScreen extends StatefulWidget {
 }
 
 class _CampaignsScreenState extends State<CampaignsScreen> {
-  final _repo = CampaignRepository();
-  List<Map<String, dynamic>> _campaigns = [];
+  final _repo = AssignmentRepository();
+  List<Map<String, dynamic>> _assignments = [];
+  String _syncLabel = '…';
   bool _loading = true;
   String? _error;
 
@@ -29,23 +30,34 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
       _error = null;
     });
     try {
-      final list = await _repo.listCampaigns(forceRefresh: forceRefresh);
+      final list = await _repo.fetchMyAssignments(forceRefresh: forceRefresh);
+      final label = await _repo.syncStatusLabel();
       if (!mounted) return;
       setState(() {
-        _campaigns = list;
+        _assignments = list;
+        _syncLabel = label;
         _loading = false;
+        if (list.isEmpty) {
+          _error = forceRefresh
+              ? 'Aucune affectation. Demandez à un admin de vous assigner une zone.'
+              : null;
+        }
       });
     } on ApiException catch (e) {
+      final cached = await _repo.fetchMyAssignments(forceRefresh: false);
+      final label = await _repo.syncStatusLabel();
       if (!mounted) return;
       setState(() {
-        _error = e.message;
+        _assignments = cached;
+        _syncLabel = label;
         _loading = false;
+        _error = cached.isEmpty ? e.message : 'Hors ligne — cache local (${cached.length})';
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
         _loading = false;
+        _error = '$e';
       });
     }
   }
@@ -55,64 +67,62 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_error != null && _campaigns.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_error!, textAlign: TextAlign.center),
-              const SizedBox(height: 12),
-              FilledButton(onPressed: () => _load(), child: const Text('Réessayer')),
-            ],
-          ),
-        ),
-      );
-    }
-    if (_campaigns.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Aucune campagne disponible'),
-            const SizedBox(height: 12),
-            FilledButton(onPressed: () => _load(), child: const Text('Actualiser')),
-          ],
-        ),
-      );
-    }
 
     return RefreshIndicator(
       onRefresh: () => _load(forceRefresh: true),
-      child: ListView.separated(
+      child: ListView(
         padding: const EdgeInsets.all(16),
-        itemCount: _campaigns.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (context, i) {
-          final c = _campaigns[i];
-          final name = c['name']?.toString() ?? 'Campagne';
-          final code = c['code']?.toString() ?? '';
-          final status = c['status']?.toString() ?? '';
-          final id = c['id']?.toString() ?? '';
-          return ListTile(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            tileColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-            title: Text(name),
-            subtitle: Text('$code · $status'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => HouseholdsScreen(
-                    campaignId: id,
-                    campaignName: name,
-                  ),
+        children: [
+          Card(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: ListTile(
+              leading: const Icon(Icons.cloud_sync),
+              title: const Text('État synchronisation'),
+              subtitle: Text(_syncLabel),
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          ],
+          const SizedBox(height: 12),
+          Text('Mes affectations', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          if (_assignments.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: Text('Aucune zone affectée')),
+            )
+          else
+            ..._assignments.map((a) {
+              final campaign = Map<String, dynamic>.from(a['campaign'] as Map? ?? {});
+              final zone = a['zone'] != null ? Map<String, dynamic>.from(a['zone'] as Map) : null;
+              final name = campaign['name']?.toString() ?? 'Campagne';
+              final status = campaign['status']?.toString() ?? '';
+              final zoneName = zone?['name']?.toString() ?? 'Zone non définie';
+              final id = campaign['id']?.toString() ?? '';
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  tileColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  title: Text(name),
+                  subtitle: Text('$zoneName · $status'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => HouseholdsScreen(
+                          campaignId: id,
+                          campaignName: '$name — $zoneName',
+                        ),
+                      ),
+                    );
+                  },
                 ),
               );
-            },
-          );
-        },
+            }),
+        ],
       ),
     );
   }

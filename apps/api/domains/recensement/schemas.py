@@ -113,3 +113,70 @@ class CensusRecordOut(BaseModel):
     version: int
 
     model_config = {"from_attributes": True}
+
+
+class ZoneCreate(BaseModel):
+    code: str = Field(min_length=2, max_length=64)
+    name: str = Field(min_length=2, max_length=255)
+    commune_code: str | None = None
+    province_code: str | None = None
+    geo_level: str | None = Field(default=None, max_length=32)
+    geo_ref_id: uuid.UUID | None = None
+    geo_bounds: dict[str, Any] | None = None
+
+
+class ZoneOut(BaseModel):
+    id: uuid.UUID
+    campaign_id: uuid.UUID
+    code: str
+    name: str
+    commune_code: str | None
+    province_code: str | None
+    geo_level: str | None = None
+    geo_ref_id: uuid.UUID | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class TeamCreate(BaseModel):
+    code: str = Field(min_length=2, max_length=64)
+    name: str = Field(min_length=2, max_length=255)
+    zone_id: uuid.UUID | None = None
+
+
+class TeamOut(BaseModel):
+    id: uuid.UUID
+    campaign_id: uuid.UUID
+    code: str
+    name: str
+    zone_id: uuid.UUID | None
+
+    model_config = {"from_attributes": True}
+
+
+class AssignmentCreate(BaseModel):
+    agent_user_id: uuid.UUID
+    role_label: str = "CENSUS_AGENT"
+    active: bool = True
+
+
+class AssignmentOut(BaseModel):
+    id: uuid.UUID
+    team_id: uuid.UUID
+    agent_user_id: uuid.UUID
+    role_label: str
+    active: bool
+    assigned_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class MyAssignmentOut(BaseModel):
+    assignment_id: uuid.UUID
+    role_label: str
+    active: bool
+    assigned_at: datetime
+    team: TeamOut
+    zone: ZoneOut | None
+    campaign: CampaignOut
+

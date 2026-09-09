@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.domains.recensement.models import (
+    AgentAssignment,
     Campaign,
     CampaignStatus,
     CensusRecord,
@@ -18,16 +19,22 @@ from apps.api.domains.recensement.models import (
     Household,
     SyncBatch,
     SyncBatchStatus,
+    Team,
+    Zone,
 )
 from apps.api.domains.recensement.schemas import (
     AgentStatsOut,
+    AssignmentCreate,
     CampaignCreate,
     CampaignUpdate,
     DeviceRegister,
+    MyAssignmentOut,
     SyncPullRequest,
     SyncPullResponse,
     SyncPushRequest,
     SyncPushResult,
+    TeamCreate,
+    ZoneCreate,
 )
 
 
@@ -349,3 +356,134 @@ def _parse_uuid(value: Any) -> uuid.UUID | None:
         return uuid.UUID(str(value))
     except (ValueError, TypeError):
         return None
+
+
+# --- Zones / teams / assignments (Phase 1 ops) ---
+
+
+async def create_zone(db: AsyncSession, campaign_id: uuid.UUID, data: ZoneCreate) -> Zone:
+    campaign = await get_campaign(db, campaign_id)
+    if not campaign:
+        raise ValueError("campaign_not_found")
+    zone = Zone(campaign_id=campaign_id, **data.model_dump())
+    db.add(zone)
+    await db.commit()
+    await db.refresh(zone)
+    return zone
+
+
+async def list_zones(db: AsyncSession, campaign_id: uuid.UUID) -> list[Zone]:
+    result = await db.execute(
+        select(Zone).where(Zone.campaign_id == campaign_id).order_by(Zone.code.asc())
+    )
+    return list(result.scalars().all())
+
+
+async def get_zone(db: AsyncSession, zone_id: uuid.UUID) -> Zone | None:
+    return await db.get(Zone, zone_id)
+
+
+async def create_team(db: AsyncSession, campaign_id: uuid.UUID, data: TeamCreate) -> Team:
+    campaign = await get_campaign(db, campaign_id)
+    if not campaign:
+        raise ValueError("campaign_not_found")
+    if data.zone_id:
+        zone = await get_zone(db, data.zone_id)
+        if not zone or zone.campaign_id != campaign_id:
+            raise ValueError("zone_not_found")
+    team = Team(campaign_id=campaign_id, **data.model_dump())
+    db.add(team)
+    await db.commit()
+    await db.refresh(team)
+    return team
+
+
+async def list_teams(db: AsyncSession, campaign_id: uuid.UUID) -> list[Team]:
+    result = await db.execute(
+        select(Team).where(Team.campaign_id == campaign_id).order_by(Team.code.asc())
+    )
+    return list(result.scalars().all())
+
+
+async def get_team(db: AsyncSession, team_id: uuid.UUID) -> Team | None:
+    return await db.get(Team, team_id)
+
+
+async def assign_agent(
+    db: AsyncSession, team_id: uuid.UUID, data: AssignmentCreate
+) -> AgentAssignment:
+    team = await get_team(db, team_id)
+    if not team:
+        raise ValueError("team_not_found")
+    existing = await db.execute(
+        select(AgentAssignment).where(
+            AgentAssignment.team_id == team_id,
+            AgentAssignment.agent_user_id == data.agent_user_id,
+            AgentAssignment.active.is_(True),
+        )
+    )
+    row = existing.scalar_one_or_none()
+    if row:
+        row.role_label = data.role_label
+        row.active = data.active
+        await db.commit()
+        await db.refresh(row)
+        return row
+    assignment = AgentAssignment(
+        team_id=team_id,
+        agent_user_id=data.agent_user_id,
+        role_label=data.role_label,
+        active=data.active,
+    )
+    db.add(assignment)
+    await db.commit()
+    await db.refresh(assignment)
+    return assignment
+
+
+async def list_team_assignments(db: AsyncSession, team_id: uuid.UUID) -> list[AgentAssignment]:
+    result = await db.execute(
+        select(AgentAssignment)
+        .where(AgentAssignment.team_id == team_id)
+        .order_by(AgentAssignment.assigned_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+async def list_my_assignments(db: AsyncSession, agent_user_id: uuid.UUID) -> list[MyAssignmentOut]:
+    from sqlalchemy.orm import selectinload
+
+    from apps.api.domains.recensement.schemas import CampaignOut, TeamOut, ZoneOut
+
+    result = await db.execute(
+        select(AgentAssignment)
+        .where(
+            AgentAssignment.agent_user_id == agent_user_id,
+            AgentAssignment.active.is_(True),
+        )
+        .options(
+            selectinload(AgentAssignment.team).selectinload(Team.zone),
+            selectinload(AgentAssignment.team).selectinload(Team.campaign),
+        )
+        .order_by(AgentAssignment.assigned_at.desc())
+    )
+    rows = list(result.scalars().all())
+    out: list[MyAssignmentOut] = []
+    for a in rows:
+        team = a.team
+        zone = team.zone if team else None
+        campaign = team.campaign if team else None
+        if not team or not campaign:
+            continue
+        out.append(
+            MyAssignmentOut(
+                assignment_id=a.id,
+                role_label=a.role_label,
+                active=a.active,
+                assigned_at=a.assigned_at,
+                team=TeamOut.model_validate(team),
+                zone=ZoneOut.model_validate(zone) if zone else None,
+                campaign=CampaignOut.model_validate(campaign),
+            )
+        )
+    return out

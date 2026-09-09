@@ -85,9 +85,12 @@ class Zone(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     commune_code: Mapped[str | None] = mapped_column(String(32))
     province_code: Mapped[str | None] = mapped_column(String(32))
+    geo_level: Mapped[str | None] = mapped_column(String(32))  # PROVINCE|COMMUNE|QUARTIER|…
+    geo_ref_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     geo_bounds: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
     campaign: Mapped[Campaign] = relationship(back_populates="zones")
+    teams: Mapped[list["Team"]] = relationship(back_populates="zone")
 
 
 class Team(Base):
@@ -105,6 +108,7 @@ class Team(Base):
     )
 
     campaign: Mapped[Campaign] = relationship(back_populates="teams")
+    zone: Mapped[Zone | None] = relationship(back_populates="teams")
     assignments: Mapped[list[AgentAssignment]] = relationship(back_populates="team")
 
 
