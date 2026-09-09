@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../sync/local_database.dart';
 import '../../sync/sync_queue.dart';
+import 'geo_cascade_field.dart';
 
 /// Create / edit a household with address + optional GPS.
 class HouseholdFormScreen extends StatefulWidget {
@@ -22,7 +23,9 @@ class HouseholdFormScreen extends StatefulWidget {
 
 class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
   final _address = TextEditingController();
+  final _detail = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  String _geoLabel = '';
   double? _lat;
   double? _lng;
   bool _busy = false;
@@ -31,7 +34,16 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
   @override
   void dispose() {
     _address.dispose();
+    _detail.dispose();
     super.dispose();
+  }
+
+  void _rebuildAddress() {
+    final parts = <String>[
+      if (_geoLabel.trim().isNotEmpty) _geoLabel.trim(),
+      if (_detail.text.trim().isNotEmpty) _detail.text.trim(),
+    ];
+    _address.text = parts.join(' — ');
   }
 
   Future<void> _captureGps() async {
@@ -72,6 +84,7 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
   }
 
   Future<void> _save() async {
+    _rebuildAddress();
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _busy = true);
     try {
@@ -98,6 +111,7 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
             ...data,
             'campaign_id': widget.campaignId,
             if (widget.zoneId != null) 'zone_id': widget.zoneId,
+            if (_geoLabel.isNotEmpty) 'geo_label': _geoLabel,
           },
         ),
       );
@@ -117,17 +131,28 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            GeoCascadeField(
+              onLabelChanged: (label) {
+                setState(() => _geoLabel = label);
+                _rebuildAddress();
+              },
+            ),
+            const SizedBox(height: 8),
             TextFormField(
-              controller: _address,
+              controller: _detail,
               decoration: const InputDecoration(
-                labelText: 'Adresse / description du ménage *',
+                labelText: 'Complément (avenue, parcelle, repère) *',
                 border: OutlineInputBorder(),
-                hintText: 'Avenue, parcelle, point de repère…',
+                hintText: 'Av. Liberation, parcelle 12…',
               ),
               maxLines: 2,
-              validator: (v) {
-                final t = v?.trim() ?? '';
-                if (t.length < 5) return 'Adresse trop courte (min. 5 caractères)';
+              onChanged: (_) => _rebuildAddress(),
+              validator: (_) {
+                _rebuildAddress();
+                final t = _address.text.trim();
+                if (t.length < 5) {
+                  return 'Précisez la localisation (cascade ou complément)';
+                }
                 return null;
               },
             ),

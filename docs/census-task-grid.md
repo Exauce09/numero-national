@@ -17,7 +17,8 @@ Légende : ✅ fait · ⚠️ partiel · ⬜ à faire
 
 ## Phase 2 — Mobile collecte
 - [x] 2.1 Zones/campagne hors ligne
-- [x] 2.2 Ménage (adresse ; cascade géo Flutter encore ⚠️)
+- [x] 2.2 Ménage (adresse + cascade géo Flutter province→quartier)
+
 - [x] 2.3 GPS
 - [x] 2.4 Membres + parenté
 - [x] 2.5 Validation locale
