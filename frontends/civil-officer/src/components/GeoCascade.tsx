@@ -289,6 +289,7 @@ export default function GeoCascade({
           : "Aucun quartier — utilisez + pour en ajouter",
       );
     }
+  }
 
   async function onLocalite(id: string) {
     const l = localites.find((x) => x.id === id);
