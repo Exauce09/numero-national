@@ -26,7 +26,8 @@ from apps.api.domains.geography.seed_data import (
 MIN_COMMUNES = 150
 MIN_QUARTIERS = 700
 MIN_VOIES = 2500
-SEED_VERSION = 3
+MIN_LOCALITES = 1500
+SEED_VERSION = 4
 
 
 def _slug(name: str) -> str:
@@ -70,6 +71,42 @@ async def clear_geography(db: AsyncSession) -> None:
 
 def _quartier_defs(ville: str, commune: str) -> list[tuple[str, list[tuple[str, str]]]]:
     return QUARTIERS_VOIES.get(f"{ville}|{commune}", DEFAULT_QUARTIERS)
+
+
+# Villages / localités générés par commune (référence opérationnelle — la RDC en a
+# des dizaines de milliers ; le bouton « Ajouter village » complète le reste).
+DEFAULT_VILLAGE_NAMES: list[str] = [
+    "Centre",
+    "Salongo",
+    "Libota",
+    "Esengo",
+    "Lokole",
+    "Boyoma",
+    "Kapata",
+    "Nganda",
+    "Mbanza",
+    "Katanga",
+    "Libulu",
+    "Mongala",
+]
+
+
+async def _add_villages_for_commune(
+    db: AsyncSession,
+    commune: Commune,
+    district_id,
+    counts: dict[str, int],
+) -> None:
+    for i, vname in enumerate(DEFAULT_VILLAGE_NAMES, start=1):
+        db.add(
+            Localite(
+                commune_id=commune.id,
+                district_id=district_id,
+                code=f"{commune.code}-V{i:02d}",
+                name=f"Village {vname}",
+            )
+        )
+        counts["localites"] += 1
 
 
 async def _add_quartiers_voies(
@@ -160,17 +197,7 @@ async def _seed_all(db: AsyncSession) -> dict[str, int]:
                         await db.flush()
                         counts["communes"] += 1
                         await _add_quartiers_voies(db, com, "Kinshasa", cname, counts)
-                        if cname in {"Maluku", "Nsele", "Mont-Ngafula"}:
-                            for i in range(1, 4):
-                                db.add(
-                                    Localite(
-                                        district_id=dist.id,
-                                        commune_id=com.id,
-                                        code=f"{com.code}-LOC-{i}",
-                                        name=f"Localité {cname} {i}",
-                                    )
-                                )
-                                counts["localites"] += 1
+                        await _add_villages_for_commune(db, com, dist.id, counts)
                 continue
 
             for cname in communes:
@@ -184,8 +211,9 @@ async def _seed_all(db: AsyncSession) -> dict[str, int]:
                 await db.flush()
                 counts["communes"] += 1
                 await _add_quartiers_voies(db, com, ville_name, cname, counts)
+                await _add_villages_for_commune(db, com, d_urbain.id, counts)
 
-            # Localité périphérique chef-lieu
+            # Localité périphérique chef-lieu (en plus des villages commune)
             if is_chef:
                 db.add(
                     Localite(
@@ -208,6 +236,7 @@ async def ensure_geography_seeded(db: AsyncSession, *, force: bool = False) -> d
         and current["communes"] >= MIN_COMMUNES
         and current["quartiers"] >= MIN_QUARTIERS
         and current["voies"] >= MIN_VOIES
+        and current["localites"] >= MIN_LOCALITES
     )
     if complete and not force:
         return {**current, "skipped": 1, "seed_version": SEED_VERSION}

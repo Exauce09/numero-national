@@ -5,7 +5,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../sync/local_database.dart';
 import '../../sync/sync_queue.dart';
-import 'photo_capture_stub.dart';
+import 'photo_capture.dart';
+import 'fingerprint_capture.dart';
 import 'rdc_tribus.dart';
 
 /// Fiche personne — alignée sur le formulaire officiel
@@ -49,6 +50,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   String _handicap = 'NORMAL';
   String _relation = 'AUTRE';
   String? _photoRef;
+  String? _fingerprintRef;
   bool _busy = false;
   String? _rejectNote;
 
@@ -109,6 +111,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     _handicap = payload['handicap']?.toString() ?? 'NORMAL';
     _relation = payload['relationship_to_head']?.toString() ?? 'AUTRE';
     _photoRef = e?['photo_ref']?.toString();
+    _fingerprintRef = payload['fingerprint_ref']?.toString();
     _rejectNote = e?['review_note']?.toString();
   }
 
@@ -174,6 +177,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
       'handicap': _handicap,
       'telephone': _telephone.text.trim(),
       'tribu': _tribu.text.trim(),
+      'fingerprint_ref': _fingerprintRef,
       'relationship_to_head': _relation,
     };
   }
@@ -526,17 +530,16 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               ),
             ]),
             _section('Photo', [
-              PhotoCaptureStub(
+              PhotoCaptureWidget(
+                initialRef: _photoRef,
                 onCaptured: (ref) => setState(() => _photoRef = ref),
               ),
-              if (_photoRef != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    'Photo: $_photoRef',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ),
+            ]),
+            _section('Empreinte (capteur téléphone)', [
+              FingerprintCaptureWidget(
+                initialRef: _fingerprintRef,
+                onCaptured: (ref) => setState(() => _fingerprintRef = ref),
+              ),
             ]),
             const SizedBox(height: 8),
             FilledButton(
