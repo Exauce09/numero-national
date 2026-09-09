@@ -12,7 +12,7 @@ import {
   type Person,
   type Sexe,
 } from "../registry";
-import GeoCascade, { type GeoSelection } from "../components/GeoCascade";
+import { getOfficerCommune } from "../commune";
 
 export default function BirthsPage() {
   const [nom, setNom] = useState("");
@@ -21,7 +21,6 @@ export default function BirthsPage() {
   const [sexe, setSexe] = useState<Sexe>("M");
   const [dateNaissance, setDateNaissance] = useState("");
   const [lieuNaissance, setLieuNaissance] = useState("");
-  const [geo, setGeo] = useState<GeoSelection>({});
   const [mother, setMother] = useState<Person | null>(null);
   const [father, setFather] = useState<Person | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,11 +50,12 @@ export default function BirthsPage() {
         prenom: prenom.trim(),
         sexe,
         date_naissance: dateNaissance,
-        lieu_naissance: (geo.label || lieuNaissance).trim(),
+        lieu_naissance: lieuNaissance.trim(),
         etat_civil: "CELIBATAIRE",
         mother_id: mother.id,
         father_id: father?.id,
       });
+      const commune = getOfficerCommune();
       const payload = {
         child_id: child.id,
         nom: child.nom,
@@ -64,8 +64,7 @@ export default function BirthsPage() {
         sexe: child.sexe,
         date_naissance: child.date_naissance,
         lieu_naissance: child.lieu_naissance,
-        geo,
-        commune_code: geo.commune_code ?? "KIN-GOMBE",
+        commune_code: commune.code,
         mother_id: mother.id,
         mother_name: `${mother.nom} ${mother.prenom}`,
         father_id: father?.id ?? null,
@@ -147,22 +146,12 @@ export default function BirthsPage() {
             />
           </div>
           <div>
-            <label className="form-label">Lieu de naissance (texte libre optionnel)</label>
+            <label className="form-label">Lieu de naissance</label>
             <input
               className="form-control"
               value={lieuNaissance}
               onChange={(e) => setLieuNaissance(e.target.value)}
-              placeholder="Complément si besoin"
-            />
-          </div>
-          <div className="full">
-            <GeoCascade
-              value={geo}
-              onChange={(g) => {
-                setGeo(g);
-                if (g.label) setLieuNaissance(g.label);
-              }}
-              label="Lieu de naissance — sélection territoriale"
+              placeholder="Ex. Kinshasa, Gombe"
             />
           </div>
           <div className="full">

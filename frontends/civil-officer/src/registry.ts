@@ -204,14 +204,72 @@ export function listPersons(): Person[] {
   return [...load().persons].sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
+/** Province / ville associées (recensement et autres actes). */
+export function personLocation(personId: string, nic?: string): { province: string; ville: string } {
+  const acts = load().acts.filter(
+    (a) =>
+      a.national_id === nic ||
+      String(a.payload.person_id ?? a.payload.child_id ?? a.payload.deceased_id ?? "") === personId,
+  );
+  for (const a of acts) {
+    const province = String(
+      a.payload.province_actuelle ?? a.payload.province_origine ?? a.payload.province ?? "",
+    ).trim();
+    const ville = String(
+      a.payload.ville_actuelle ?? a.payload.ville_origine ?? a.payload.ville ?? "",
+    ).trim();
+    if (province || ville) return { province, ville };
+  }
+  return { province: "", ville: "" };
+}
+
+function normalizeDateToken(value: string): string {
+  const v = value.trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  if (iso) return `${iso[1]}${iso[2]}${iso[3]}`;
+  const fr = /^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/.exec(v);
+  if (fr) {
+    const d = fr[1].padStart(2, "0");
+    const m = fr[2].padStart(2, "0");
+    return `${fr[3]}${m}${d}`;
+  }
+  return v.replace(/[^\d]/g, "");
+}
+
+function personSearchBlob(p: Person): string {
+  const loc = personLocation(p.id, p.nic);
+  const dateNorm = normalizeDateToken(p.date_naissance);
+  return [
+    p.nic,
+    p.nom,
+    p.postnom,
+    p.prenom,
+    displayName(p),
+    p.date_naissance,
+    dateNorm,
+    p.lieu_naissance,
+    loc.province,
+    loc.ville,
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+/**
+ * Recherche intelligente : NIC, nom, postnom, prénom, date de naissance,
+ * province, ville (jetons séparés = ET).
+ */
 export function searchPersons(q: string): Person[] {
-  const needle = q.trim().toLowerCase();
-  if (!needle) return listPersons();
+  const raw = q.trim().toLowerCase();
+  if (!raw) return listPersons();
+  const tokens = raw.split(/\s+/).filter(Boolean);
   return listPersons().filter((p) => {
-    const hay = [p.nom, p.postnom, p.prenom, p.nic, p.lieu_naissance, displayName(p)]
-      .join(" ")
-      .toLowerCase();
-    return hay.includes(needle);
+    const hay = personSearchBlob(p);
+    return tokens.every((token) => {
+      if (hay.includes(token)) return true;
+      const dateTok = normalizeDateToken(token);
+      return Boolean(dateTok) && hay.includes(dateTok);
+    });
   });
 }
 

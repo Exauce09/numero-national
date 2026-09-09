@@ -37,6 +37,7 @@ import ManageNaissancePage from "./pages/ManageNaissancePage";
 import SynopticPage from "./pages/SynopticPage";
 import ManageActsPage, { MANAGE_CONFIGS } from "./components/ManageActsPage";
 import TerritoryPage from "./pages/TerritoryPage";
+import TopbarSearch from "./components/TopbarSearch";
 import {
   IconBaby,
   IconCar,
@@ -46,7 +47,6 @@ import {
   IconFile,
   IconHome,
   IconRing,
-  IconSearch,
   IconSplit,
   IconTable,
   IconUsers,
@@ -203,9 +203,6 @@ function Shell() {
           <NavLink to="/acts">
             <IconFile size={18} /> Actes & documents
           </NavLink>
-          <NavLink to="/search">
-            <IconSearch size={18} /> Recherche
-          </NavLink>
         </nav>
         <div className="sidebar-foot">
           <button type="button" className="btn-logout" style={{ width: "100%" }} onClick={logout}>
@@ -237,6 +234,7 @@ function Shell() {
           </div>
 
           <div className="topbar-right">
+            <TopbarSearch />
             <button
               type="button"
               className="topbar-icon-btn"
