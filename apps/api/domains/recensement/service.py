@@ -25,10 +25,14 @@ from apps.api.domains.recensement.models import (
 from apps.api.domains.recensement.schemas import (
     AgentStatsOut,
     AssignmentCreate,
+    BatchPromoteRequest,
+    BatchPromoteResult,
     CampaignCreate,
     CampaignUpdate,
     DeviceRegister,
     MyAssignmentOut,
+    PromoteRequest,
+    PromoteResult,
     RecordRejectRequest,
     RecordReviewRequest,
     SyncPullRequest,
@@ -355,6 +359,7 @@ async def sync_pull(db: AsyncSession, req: SyncPullRequest) -> SyncPullResponse:
                 "version": r.version,
                 "review_note": r.review_note,
                 "reviewed_at": r.reviewed_at.isoformat() if r.reviewed_at else None,
+                "citizen_id": str(r.citizen_id) if r.citizen_id else None,
             }
             for r in records
         ],
@@ -604,3 +609,198 @@ async def reject_record(
     await db.commit()
     await db.refresh(rec)
     return rec
+
+
+def _map_sex(raw: str | None):
+    from apps.api.domains.core_registry.enums import Sex
+
+    if not raw:
+        return Sex.UNKNOWN
+    key = raw.strip().upper()
+    if key in {"M", "MALE", "H", "HOMME"}:
+        return Sex.MALE
+    if key in {"F", "FEMALE", "FEMME"}:
+        return Sex.FEMALE
+    if key in {"OTHER", "AUTRE"}:
+        return Sex.OTHER
+    return Sex.UNKNOWN
+
+
+def _parse_dob(raw: str | None):
+    from datetime import date as date_cls
+
+    if not raw or not str(raw).strip():
+        raise ValueError("missing_date_of_birth")
+    text = str(raw).strip()[:10]
+    try:
+        return date_cls.fromisoformat(text)
+    except ValueError as exc:
+        raise ValueError("invalid_date_of_birth") from exc
+
+
+async def promote_record(
+    db: AsyncSession,
+    rec: CensusRecord,
+    promoter_id: uuid.UUID,
+    body: PromoteRequest,
+) -> PromoteResult:
+    """Create core_registry citizen from APPROVED census record (idempotent)."""
+    from fastapi import HTTPException
+
+    from apps.api.domains.core_registry.enums import AddressType, CitizenEventType
+    from apps.api.domains.core_registry.models import Citizen, CitizenHistory
+    from apps.api.domains.core_registry.schemas import CitizenAddressIn, CitizenCreate
+    from apps.api.domains.core_registry import service as registry_service
+
+    if rec.citizen_id is not None:
+        citizen = await db.get(Citizen, rec.citizen_id)
+        if citizen is None:
+            raise ValueError("orphan_citizen_link")
+        return PromoteResult(
+            census_record_id=rec.id,
+            citizen_id=citizen.id,
+            nic=citizen.nic,
+            citizen_status=citizen.status,
+            already_promoted=True,
+            nic_assigned=citizen.nic is not None,
+        )
+
+    if rec.status != CensusRecordStatus.APPROVED:
+        raise ValueError("not_promotable")
+
+    if not (rec.given_names and rec.given_names.strip()):
+        raise ValueError("missing_given_names")
+    if not (rec.family_name and rec.family_name.strip()):
+        raise ValueError("missing_family_name")
+
+    dob = _parse_dob(rec.date_of_birth)
+
+    hh = await db.get(Household, rec.household_id)
+    zone = None
+    if hh and hh.zone_id:
+        zone = await db.get(Zone, hh.zone_id)
+
+    addresses: list[CitizenAddressIn] = []
+    if hh and hh.address_line and hh.address_line.strip():
+        city = (zone.name if zone else None) or (zone.commune_code if zone else None) or "Kinshasa"
+        addresses.append(
+            CitizenAddressIn(
+                address_type=AddressType.RESIDENTIAL,
+                line1=hh.address_line.strip()[:255],
+                city=str(city)[:128],
+                commune_code=zone.commune_code if zone else None,
+                province_code=zone.province_code if zone else None,
+                is_primary=True,
+            )
+        )
+
+    create_data = CitizenCreate(
+        given_names=rec.given_names.strip(),
+        family_name=rec.family_name.strip(),
+        date_of_birth=dob,
+        sex=_map_sex(rec.sex),
+        nationality="COD",
+        addresses=addresses,
+    )
+    citizen, _dupes = await registry_service.create_draft_citizen(
+        db, create_data, actor_id=promoter_id
+    )
+
+    db.add(
+        CitizenHistory(
+            citizen_id=citizen.id,
+            event_type=CitizenEventType.STATUS_CHANGED.value,
+            payload={
+                "source": "census_promote",
+                "census_record_id": str(rec.id),
+                "campaign_id": str(rec.campaign_id),
+                "local_id": rec.local_id,
+            },
+            actor_id=promoter_id,
+        )
+    )
+    await db.commit()
+
+    nic_assigned = False
+    nic_error: str | None = None
+    if body.assign_nic:
+        try:
+            citizen, _ = await registry_service.validate_and_assign_nic(
+                db,
+                citizen.id,
+                actor_id=promoter_id,
+                force_despite_duplicates=body.force_despite_duplicates,
+                override_justification=body.override_justification,
+            )
+            nic_assigned = citizen.nic is not None
+        except HTTPException as exc:
+            nic_error = str(exc.detail)
+            citizen = await db.get(Citizen, citizen.id)
+            assert citizen is not None
+        except Exception as exc:  # noqa: BLE001
+            nic_error = str(exc)
+            citizen = await db.get(Citizen, citizen.id)
+            assert citizen is not None
+
+    rec = await db.get(CensusRecord, rec.id)
+    assert rec is not None
+    rec.citizen_id = citizen.id
+    rec.status = CensusRecordStatus.PROMOTED
+    rec.promoted_by = promoter_id
+    rec.promoted_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(rec)
+    await db.refresh(citizen)
+
+    return PromoteResult(
+        census_record_id=rec.id,
+        citizen_id=citizen.id,
+        nic=citizen.nic,
+        citizen_status=citizen.status,
+        already_promoted=False,
+        nic_assigned=nic_assigned,
+        nic_error=nic_error,
+    )
+
+
+async def promote_campaign_batch(
+    db: AsyncSession,
+    campaign_id: uuid.UUID,
+    promoter_id: uuid.UUID,
+    body: BatchPromoteRequest,
+) -> BatchPromoteResult:
+    rows = await list_campaign_records(
+        db,
+        campaign_id,
+        status_filter=CensusRecordStatus.APPROVED,
+        limit=body.limit,
+        offset=0,
+    )
+    results: list[PromoteResult] = []
+    errors: list[dict[str, Any]] = []
+    promoted = 0
+    skipped = 0
+    failed = 0
+    req = PromoteRequest(assign_nic=body.assign_nic)
+    for rec in rows:
+        try:
+            fresh = await get_record(db, rec.id)
+            if fresh is None:
+                failed += 1
+                errors.append({"record_id": str(rec.id), "error": "not_found"})
+                continue
+            out = await promote_record(db, fresh, promoter_id, req)
+            results.append(out)
+            if out.already_promoted:
+                skipped += 1
+            else:
+                promoted += 1
+        except ValueError as exc:
+            failed += 1
+            errors.append({"record_id": str(rec.id), "error": str(exc)})
+        except Exception as exc:  # noqa: BLE001
+            failed += 1
+            errors.append({"record_id": str(rec.id), "error": str(exc)})
+    return BatchPromoteResult(
+        promoted=promoted, skipped=skipped, failed=failed, results=results, errors=errors
+    )

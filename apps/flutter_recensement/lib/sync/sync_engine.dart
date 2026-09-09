@@ -443,7 +443,7 @@ class SyncEngine {
               'sex': r['sex'],
               'date_of_birth': r['date_of_birth'],
               'version': serverVersion,
-              'status': 'SYNCED',
+              'status': r['status'] ?? 'SYNCED',
               'conflict_reason': null,
               'updated_at': DateTime.now().toUtc().toIso8601String(),
             },

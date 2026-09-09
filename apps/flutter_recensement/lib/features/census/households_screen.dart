@@ -217,7 +217,7 @@ class _HouseholdMembersScreenState extends State<HouseholdMembersScreen> {
                 final status = m['status']?.toString() ?? '';
                 final IconData icon;
                 final Color color;
-                if (status == 'APPROVED') {
+                if (status == 'APPROVED' || status == 'PROMOTED') {
                   icon = Icons.verified;
                   color = Colors.green.shade700;
                 } else if (status == 'SYNCED') {

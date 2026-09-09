@@ -7,7 +7,12 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.api.core.permissions import PERM_CENSUS_MANAGE, PERM_CENSUS_SYNC
+from apps.api.core.permissions import (
+    PERM_CENSUS_MANAGE,
+    PERM_CENSUS_SYNC,
+    PERM_CITIZEN_CREATE,
+    PERM_CITIZEN_VALIDATE,
+)
 from apps.api.core.security import get_current_user, require_permissions
 from apps.api.db.session import get_db
 from apps.api.domains.identity.models import User
@@ -17,6 +22,8 @@ from apps.api.domains.recensement.schemas import (
     AgentStatsOut,
     AssignmentCreate,
     AssignmentOut,
+    BatchPromoteRequest,
+    BatchPromoteResult,
     CampaignCreate,
     CampaignOut,
     CampaignUpdate,
@@ -24,6 +31,8 @@ from apps.api.domains.recensement.schemas import (
     DeviceOut,
     DeviceRegister,
     MyAssignmentOut,
+    PromoteRequest,
+    PromoteResult,
     RecordRejectRequest,
     RecordReviewRequest,
     SyncPullRequest,
@@ -272,3 +281,66 @@ async def reject_record(
             ) from exc
         raise
     return CensusRecordOut.model_validate(updated)
+
+
+@router.post(
+    "/records/{record_id}/promote",
+    response_model=PromoteResult,
+    dependencies=[Depends(require_permissions(PERM_CENSUS_MANAGE, PERM_CITIZEN_CREATE))],
+)
+async def promote_record(
+    record_id: uuid.UUID,
+    body: PromoteRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> PromoteResult:
+    from apps.api.core.security import user_permission_codes
+
+    req = body or PromoteRequest()
+    if req.assign_nic and PERM_CITIZEN_VALIDATE not in user_permission_codes(current_user):
+        raise HTTPException(
+            status_code=403,
+            detail="Missing required permission registry:citizen:validate for assign_nic",
+        )
+    rec = await service.get_record(db, record_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="Record not found")
+    try:
+        return await service.promote_record(db, rec, current_user.id, req)
+    except ValueError as exc:
+        code = str(exc)
+        mapping = {
+            "not_promotable": (409, f"Record status {rec.status.value} cannot be promoted"),
+            "missing_given_names": (422, "given_names required"),
+            "missing_family_name": (422, "family_name required"),
+            "missing_date_of_birth": (422, "date_of_birth required"),
+            "invalid_date_of_birth": (422, "date_of_birth must be YYYY-MM-DD"),
+            "orphan_citizen_link": (409, "Linked citizen missing"),
+        }
+        status_code, detail = mapping.get(code, (400, code))
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+
+
+@router.post(
+    "/campaigns/{campaign_id}/promote",
+    response_model=BatchPromoteResult,
+    dependencies=[Depends(require_permissions(PERM_CENSUS_MANAGE, PERM_CITIZEN_CREATE))],
+)
+async def promote_campaign(
+    campaign_id: uuid.UUID,
+    body: BatchPromoteRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> BatchPromoteResult:
+    from apps.api.core.security import user_permission_codes
+
+    campaign = await service.get_campaign(db, campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    req = body or BatchPromoteRequest()
+    if req.assign_nic and PERM_CITIZEN_VALIDATE not in user_permission_codes(current_user):
+        raise HTTPException(
+            status_code=403,
+            detail="Missing required permission registry:citizen:validate for assign_nic",
+        )
+    return await service.promote_campaign_batch(db, campaign_id, current_user.id, req)

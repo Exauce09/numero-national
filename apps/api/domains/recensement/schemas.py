@@ -117,6 +117,9 @@ class CensusRecordOut(BaseModel):
     reviewed_by: uuid.UUID | None = None
     reviewed_at: datetime | None = None
     review_note: str | None = None
+    citizen_id: uuid.UUID | None = None
+    promoted_by: uuid.UUID | None = None
+    promoted_at: datetime | None = None
     synced_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -129,6 +132,37 @@ class RecordReviewRequest(BaseModel):
 
 class RecordRejectRequest(BaseModel):
     note: str = Field(min_length=3, max_length=2000)
+
+
+class PromoteRequest(BaseModel):
+    """Promote an APPROVED census fiche into core_registry."""
+
+    assign_nic: bool = False
+    force_despite_duplicates: bool = False
+    override_justification: str | None = Field(default=None, max_length=2000)
+
+
+class PromoteResult(BaseModel):
+    census_record_id: uuid.UUID
+    citizen_id: uuid.UUID
+    nic: str | None = None
+    citizen_status: str
+    already_promoted: bool = False
+    nic_assigned: bool = False
+    nic_error: str | None = None
+
+
+class BatchPromoteRequest(BaseModel):
+    assign_nic: bool = False
+    limit: int = Field(default=50, ge=1, le=200)
+
+
+class BatchPromoteResult(BaseModel):
+    promoted: int
+    skipped: int
+    failed: int
+    results: list[PromoteResult] = Field(default_factory=list)
+    errors: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ZoneCreate(BaseModel):

@@ -46,6 +46,7 @@ class CensusRecordStatus(str, enum.Enum):
     CONFLICT = "CONFLICT"
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
+    PROMOTED = "PROMOTED"
 
 
 class Campaign(Base):
@@ -208,6 +209,9 @@ class CensusRecord(Base):
     reviewed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     review_note: Mapped[str | None] = mapped_column(Text)
+    citizen_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
+    promoted_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    promoted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -46,6 +46,8 @@ ROLE_PERMISSION_MAP: dict[str, tuple[str, ...]] = {
         "census:sync",
         "census:manage",
         "registry:citizen:read",
+        "registry:citizen:create",
+        "registry:citizen:validate",
     ),
     "CIVIL_OFFICER": (
         "civil:act:read",

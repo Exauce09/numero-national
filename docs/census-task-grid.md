@@ -37,6 +37,17 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 - [x] Mobile: affichage APPROVED / REJECTED
 
 ## Phase 5 — Promotion NIC
-- [ ] Fiches APPROVED → `core_registry`
+- [x] `POST /records/{id}/promote` → citoyen `core_registry` (+ NIC optionnel)
+- [x] `POST /campaigns/{id}/promote` batch
+- [x] Migration `015_census_promote` (`PROMOTED`, `citizen_id`)
+- [x] Tests `tests/test_census_promote.py`
+- [x] Mobile: statut PROMOTED
 
-Prochaine session Agent : Phase 5 (promotion registre).
+## MVP recensement — terminé
+Chaîne terrain → sync → validation → registre NIC livrée.
+
+### Hors grille (backlog produit, non bloquant)
+- Caméra réelle / biométrie terrain
+- Formulaires dynamiques, cascade géo Flutter, GIS
+- Portail web superviseur dédié
+- Scopes RBAC par zone
