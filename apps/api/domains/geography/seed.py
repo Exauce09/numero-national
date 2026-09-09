@@ -18,6 +18,7 @@ from apps.api.domains.geography.seed_data import (
     CITY_COMMUNES,
     DEFAULT_QUARTIERS,
     KIN_DISTRICTS,
+    KINSHASA_QUARTIERS,
     PROVINCES,
     QUARTIERS_VOIES,
 )
@@ -27,7 +28,7 @@ MIN_COMMUNES = 150
 MIN_QUARTIERS = 700
 MIN_VOIES = 2500
 MIN_LOCALITES = 1500
-SEED_VERSION = 4
+SEED_VERSION = 5
 
 
 def _slug(name: str) -> str:
@@ -69,7 +70,19 @@ async def clear_geography(db: AsyncSession) -> None:
     await db.flush()
 
 
+def _default_voies_for_quartier(qname: str) -> list[tuple[str, str]]:
+    """Avenues de base tant que la liste officielle avenues n’est pas fournie."""
+    return [
+        ("AVENUE", qname),
+        ("AVENUE", "Principale"),
+        ("RUE", "du Marche"),
+        ("RUE", "Ecole"),
+    ]
+
+
 def _quartier_defs(ville: str, commune: str) -> list[tuple[str, list[tuple[str, str]]]]:
+    if ville == "Kinshasa" and commune in KINSHASA_QUARTIERS:
+        return [(q, _default_voies_for_quartier(q)) for q in KINSHASA_QUARTIERS[commune]]
     return QUARTIERS_VOIES.get(f"{ville}|{commune}", DEFAULT_QUARTIERS)
 
 
