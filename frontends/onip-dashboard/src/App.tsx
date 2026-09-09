@@ -100,7 +100,10 @@ function Shell() {
             </button>
             <h1 className="topbar-title">{pageTitle}</h1>
           </div>
-          <span className="topbar-user">{session?.username}</span>
+          <span className="topbar-user">
+            {session?.username}
+            {isLocalSession() ? " · démo locale" : ""}
+          </span>
         </header>
         <main className="shell">
           <Routes>
