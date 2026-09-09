@@ -46,7 +46,10 @@ export default function CampaignsPage() {
     <div>
       <div className="hero-banner">
         <h1>Campagnes de recensement</h1>
-        <p>Contrôle superviseur, affectations agents et statistiques — structure type tableau de bord national.</p>
+        <p>
+          Étapes 2–4 : créer / activer la campagne → Affectations (zones, équipes, agents) → Contrôle
+          fiches → Stats. (Étape 1 = menu Comptes.)
+        </p>
       </div>
 
       {!hasToken ? (
@@ -62,9 +65,9 @@ export default function CampaignsPage() {
       <div className="panel tab-row">
         {(
           [
-            ["campagnes", "Campagnes"],
-            ["controle", "Contrôle fiches"],
-            ["affectations", "Affectations"],
+            ["campagnes", "2. Campagnes"],
+            ["affectations", "3. Affectations"],
+            ["controle", "4. Contrôle fiches"],
             ["stats", "Stats / CSV"],
           ] as const
         ).map(([id, label]) => (

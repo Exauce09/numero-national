@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { accountsApi, type DirectoryUser } from "../api";
 import { getSession } from "../auth";
 
@@ -155,6 +156,10 @@ export default function AccountsPage() {
 
       <div className="panel" style={{ marginBottom: 16 }}>
         <h2 style={{ marginTop: 0 }}>Créer un compte</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Ensuite :{" "}
+          <Link to="/campaigns">Campagnes → Affectations</Link> pour assigner l’agent à une zone.
+        </p>
         <form
           onSubmit={onCreate}
           style={{ display: "grid", gap: 10, maxWidth: 480 }}
