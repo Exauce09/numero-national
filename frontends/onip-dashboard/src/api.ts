@@ -1,4 +1,4 @@
-import { getSession } from "./auth";
+import { getSession, clearSession, updateAccessToken } from "./auth";
 
 const BASE = import.meta.env.VITE_API_BASE ?? "/api/v1";
 
@@ -18,14 +18,36 @@ function authHeaders(): HeadersInit {
   return headers;
 }
 
+async function parseError(res: Response): Promise<string> {
+  const text = await res.text();
+  try {
+    const body = JSON.parse(text) as { detail?: unknown };
+    if (typeof body.detail === "string") return body.detail;
+    if (Array.isArray(body.detail)) {
+      return body.detail
+        .map((d) => (typeof d === "object" && d && "msg" in d ? String((d as { msg: unknown }).msg) : String(d)))
+        .join("; ");
+    }
+    if (body.detail && typeof body.detail === "object" && "message" in body.detail) {
+      return String((body.detail as { message: unknown }).message);
+    }
+  } catch {
+    /* raw text */
+  }
+  return text || res.statusText || `HTTP ${res.status}`;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: { ...authHeaders(), ...(init?.headers ?? {}) },
   });
+  if (res.status === 401) {
+    clearSession();
+    throw new ApiError("Session expirée — reconnectez-vous.", 401);
+  }
   if (!res.ok) {
-    const text = await res.text();
-    throw new ApiError(text || res.statusText, res.status);
+    throw new ApiError(await parseError(res), res.status);
   }
   if (res.status === 204) return undefined as T;
   const ct = res.headers.get("content-type") || "";
@@ -95,6 +117,22 @@ export type CampaignStats = {
   pending_review: number;
 };
 
+export type PromoteResult = {
+  citizen_id?: string | null;
+  nic?: string | null;
+  already_promoted?: boolean;
+  nic_assigned?: boolean;
+  nic_error?: string | null;
+  status?: string;
+};
+
+export type DirectoryUser = {
+  id: string;
+  email: string;
+  full_name?: string | null;
+  is_active: boolean;
+};
+
 export const censusApi = {
   listCampaigns: () => request<Campaign[]>("/census/campaigns"),
   createCampaign: (body: { code: string; name: string; description?: string }) =>
@@ -138,12 +176,13 @@ export const censusApi = {
       method: "POST",
       body: JSON.stringify({ note }),
     }),
-  promote: (recordId: string, assignNic = false) =>
-    request(`/census/records/${recordId}/promote`, {
+  promote: (recordId: string, assignNic = true) =>
+    request<PromoteResult>(`/census/records/${recordId}/promote`, {
       method: "POST",
       body: JSON.stringify({ assign_nic: assignNic }),
     }),
   stats: (campaignId: string) => request<CampaignStats>(`/census/campaigns/${campaignId}/stats`),
+  listUsers: () => request<DirectoryUser[]>("/rbac/users?limit=200"),
   exportCsvUrl: (campaignId: string, status?: string) => {
     const q = status ? `?status=${encodeURIComponent(status)}` : "";
     return `${BASE}/census/campaigns/${campaignId}/export.csv${q}`;
@@ -151,7 +190,11 @@ export const censusApi = {
   downloadCsv: async (campaignId: string, status?: string) => {
     const url = censusApi.exportCsvUrl(campaignId, status);
     const res = await fetch(url, { headers: authHeaders() });
-    if (!res.ok) throw new ApiError(await res.text(), res.status);
+    if (res.status === 401) {
+      clearSession();
+      throw new ApiError("Session expirée — reconnectez-vous.", 401);
+    }
+    if (!res.ok) throw new ApiError(await parseError(res), res.status);
     const blob = await res.blob();
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -160,3 +203,13 @@ export const censusApi = {
     URL.revokeObjectURL(a.href);
   },
 };
+
+export async function fetchOnipDashboard(): Promise<{
+  anomalies?: Array<{ code: string; message: string; count: number }>;
+  cards?: Record<string, unknown>;
+  [k: string]: unknown;
+}> {
+  return request("/onip/dashboard");
+}
+
+export { updateAccessToken, BASE as API_BASE };

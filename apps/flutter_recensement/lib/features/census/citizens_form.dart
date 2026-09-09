@@ -220,6 +220,32 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     }
   }
 
+  Future<void> _pickDob() async {
+    final now = DateTime.now();
+    DateTime initial = DateTime(now.year - 25);
+    final parts = _dob.text.trim().split('-');
+    if (parts.length == 3) {
+      final y = int.tryParse(parts[0]);
+      final m = int.tryParse(parts[1]);
+      final d = int.tryParse(parts[2]);
+      if (y != null && m != null && d != null) {
+        initial = DateTime(y, m, d);
+      }
+    }
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(1900),
+      lastDate: now,
+      helpText: 'Date de naissance',
+    );
+    if (picked == null) return;
+    final y = picked.year.toString().padLeft(4, '0');
+    final m = picked.month.toString().padLeft(2, '0');
+    final d = picked.day.toString().padLeft(2, '0');
+    setState(() => _dob.text = '$y-$m-$d');
+  }
+
   bool _validateStep1() {
     if (_nom.text.trim().isEmpty ||
         _prenom.text.trim().isEmpty ||
@@ -561,8 +587,14 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
           const SizedBox(height: 10),
           TextFormField(
             controller: _dob,
-            decoration: _dec('Date de naissance *', hint: 'AAAA-MM-JJ'),
-            keyboardType: TextInputType.datetime,
+            readOnly: true,
+            onTap: _pickDob,
+            decoration: _dec('Date de naissance *', hint: 'Toucher pour choisir').copyWith(
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.calendar_today),
+                onPressed: _pickDob,
+              ),
+            ),
           ),
           const SizedBox(height: 10),
           TextFormField(
@@ -877,8 +909,17 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               const SizedBox(height: 8),
             ],
             const Text(
-              'Formulaire d’identification — 7 étapes (comme le site)',
-              style: TextStyle(color: Color(0xFF5A6A85), fontSize: 13),
+              'Formulaire complet — 7 étapes (comme le site Recensement)',
+              style: TextStyle(color: Color(0xFF5A6A85), fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Étape $_step / 7 — ${_steps[_step - 1].$2}',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF2A3547),
+              ),
             ),
             const SizedBox(height: 10),
             SingleChildScrollView(
@@ -888,6 +929,14 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               ),
             ),
             const SizedBox(height: 12),
+            LinearProgressIndicator(
+              value: _step / 7,
+              minHeight: 6,
+              borderRadius: BorderRadius.circular(8),
+              backgroundColor: const Color(0xFFE8EEF7),
+              color: const Color(0xFF5D87FF),
+            ),
+            const SizedBox(height: 14),
             _stepBody(),
           ],
         ),

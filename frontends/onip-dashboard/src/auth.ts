@@ -1,6 +1,7 @@
 export type Session = {
   username: string;
   accessToken?: string;
+  refreshToken?: string;
 };
 
 const KEY = "nn_session_onip";
@@ -29,6 +30,13 @@ export function clearSession(): void {
   sessionStorage.removeItem(KEY);
 }
 
+export function updateAccessToken(accessToken: string): void {
+  const s = getSession();
+  if (!s) return;
+  const next = { ...s, accessToken };
+  sessionStorage.setItem(KEY, JSON.stringify(next));
+}
+
 export async function login(username: string, password: string): Promise<Session> {
   const user = username.trim();
   if (!user || !password) {
@@ -45,58 +53,61 @@ export async function login(username: string, password: string): Promise<Session
       body: JSON.stringify({ email: user, password }),
     });
     if (res.ok) {
-      const data = (await res.json()) as { access_token?: string };
+      const data = (await res.json()) as {
+        access_token?: string;
+        refresh_token?: string;
+      };
       if (!data.access_token) {
         throw new Error("Réponse API sans jeton d’accès.");
       }
-      const session: Session = { username: user, accessToken: data.access_token };
+      const session: Session = {
+        username: user,
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+      };
       sessionStorage.setItem(KEY, JSON.stringify(session));
       return session;
     }
 
-    // Email known to API → don't hide behind demo message
-    if (looksLikeEmail) {
-      let detail = `Connexion API refusée (${res.status}).`;
-      try {
-        const body = (await res.json()) as { detail?: unknown };
-        if (typeof body.detail === "string") detail = body.detail;
-      } catch {
-        /* ignore */
-      }
-      if (res.status === 401) {
-        throw new Error(
-          "Email ou mot de passe incorrect. Essayez admin.recensement@example.gov / CensusAdmin123! (seed).",
-        );
-      }
-      throw new Error(detail);
+    let detail = `Connexion API refusée (${res.status}).`;
+    try {
+      const body = (await res.json()) as { detail?: unknown };
+      if (typeof body.detail === "string") detail = body.detail;
+    } catch {
+      /* ignore */
     }
+    if (res.status === 401) {
+      throw new Error(
+        "Email ou mot de passe incorrect. Essayez admin.recensement@example.gov / CensusAdmin123!",
+      );
+    }
+    throw new Error(detail);
   } catch (err) {
-    if (err instanceof Error && err.message && !err.message.startsWith("Failed to fetch")) {
-      // Re-throw our API errors; network errors fall through to demo
-      if (looksLikeEmail || !(err instanceof TypeError)) {
-        if (
-          err.message.includes("incorrect") ||
-          err.message.includes("refusée") ||
-          err.message.includes("jeton") ||
-          err.message.includes("seed")
-        ) {
-          throw err;
-        }
+    if (err instanceof Error && !(err.message.includes("Failed to fetch") || err instanceof TypeError)) {
+      // API responded with a business error
+      if (
+        err.message.includes("incorrect") ||
+        err.message.includes("refusée") ||
+        err.message.includes("jeton") ||
+        err.message.includes("seed") ||
+        looksLikeEmail
+      ) {
+        throw err;
       }
     }
-    if (looksLikeEmail && err instanceof Error && !err.message.includes("fetch")) {
-      throw err;
+
+    // Network down — allow local demo only for non-email demo account
+    if (user === DEMO_USER && password === DEMO_PASSWORD) {
+      const session: Session = { username: user };
+      sessionStorage.setItem(KEY, JSON.stringify(session));
+      return session;
     }
-    /* API indisponible → démo locale */
-  }
 
-  if (user !== DEMO_USER || password !== DEMO_PASSWORD) {
-    throw new Error(
-      "Identifiants incorrects. Démo : onip / DemoONIP2026! — ou API : admin.recensement@example.gov / CensusAdmin123!",
-    );
+    if (err instanceof TypeError || (err instanceof Error && err.message.includes("fetch"))) {
+      throw new Error(
+        "API inaccessible. Vérifiez que le serveur tourne (port 8000), puis reconnectez-vous avec admin.recensement@example.gov.",
+      );
+    }
+    throw err instanceof Error ? err : new Error("Connexion impossible");
   }
-
-  const session: Session = { username: user };
-  sessionStorage.setItem(KEY, JSON.stringify(session));
-  return session;
 }

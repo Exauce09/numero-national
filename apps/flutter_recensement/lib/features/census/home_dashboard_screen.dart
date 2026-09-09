@@ -6,6 +6,7 @@ import '../../sync/local_database.dart';
 import '../../sync/sync_engine.dart';
 import 'assignment_repository.dart';
 import 'conflicts_screen.dart';
+import 'new_person_flow_screen.dart';
 
 /// Home agent — layout type dashboard mobile (cartes KPI + actions), charte E-GOUV.
 class HomeDashboardScreen extends StatefulWidget {
@@ -247,18 +248,25 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           const SizedBox(height: 12),
           _ActionTile(
             title: 'Fiche d’identification',
-            subtitle: '7 étapes comme le site — Zones → ménage → + Personne',
+            subtitle: '7 étapes : Identité → Origine → Bio → Études → Pro → Admin → Famille',
             icon: Icons.badge_outlined,
             color: const Color(0xFFE11D48),
             onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Zones → campagne → ménage → bouton + Personne (wizard 7 étapes)',
-                  ),
-                ),
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NewPersonFlowScreen()),
               );
-              widget.onOpenTab(1);
+            },
+          ),
+          const SizedBox(height: 10),
+          _ActionTile(
+            title: 'Nouveau ménage + personne',
+            subtitle: 'Même parcours guidé (zone → ménage → formulaire)',
+            icon: Icons.person_add_alt_1_outlined,
+            color: NnColors.blue,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NewPersonFlowScreen()),
+              );
             },
           ),
           const SizedBox(height: 10),

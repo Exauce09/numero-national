@@ -220,8 +220,8 @@ class _HouseholdMembersScreenState extends State<HouseholdMembersScreen> {
           await _load();
         },
         icon: const Icon(Icons.person_add),
-        label: const Text('Personne'),
-        backgroundColor: const Color(0xFF5D87FF),
+        label: const Text('Personne (7 étapes)'),
+        backgroundColor: const Color(0xFFE11D48),
       ),
       body: _members.isEmpty
           ? const Center(child: Text('Aucun membre — ajoutez la première personne.'))

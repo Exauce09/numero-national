@@ -4,6 +4,7 @@ import {
   Campaign,
   CampaignStats,
   CensusRecord,
+  DirectoryUser,
   Team,
   Zone,
   censusApi,
@@ -113,11 +114,20 @@ export default function CampaignsPage() {
           setMsg={setMsg}
         />
       ) : null}
+      {tab === "controle" && !selected ? (
+        <div className="panel"><p className="muted">Créez ou sélectionnez une campagne pour contrôler les fiches.</p></div>
+      ) : null}
       {tab === "affectations" && selected ? (
         <AssignmentsTab campaign={selected} setError={setError} setMsg={setMsg} />
       ) : null}
+      {tab === "affectations" && !selected ? (
+        <div className="panel"><p className="muted">Créez ou sélectionnez une campagne pour gérer les affectations.</p></div>
+      ) : null}
       {tab === "stats" && selected ? (
-        <StatsTab campaign={selected} setError={setError} />
+        <StatsTab campaign={selected} setError={setError} setMsg={setMsg} />
+      ) : null}
+      {tab === "stats" && !selected ? (
+        <div className="panel"><p className="muted">Créez ou sélectionnez une campagne pour voir les stats.</p></div>
       ) : null}
         </>
       )}
@@ -287,8 +297,21 @@ function ReviewTab({
   async function promote(id: string) {
     setBusyId(id);
     try {
-      await censusApi.promote(id, true);
-      setMsg("Promue vers le registre (NIC)");
+      const result = await censusApi.promote(id, true);
+      if (result.already_promoted) {
+        setMsg(`Déjà promue${result.nic ? ` — NIC ${result.nic}` : ""}`);
+      } else if (result.nic_assigned && result.nic) {
+        setMsg(`Promue — NIC attribué : ${result.nic}`);
+      } else if (result.nic_error) {
+        setError(`Citoyen créé mais NIC non attribué : ${result.nic_error}`);
+        setMsg(result.citizen_id ? `Citoyen ${result.citizen_id}` : null);
+      } else {
+        setMsg(
+          result.nic
+            ? `Promue — NIC ${result.nic}`
+            : "Promue vers le registre (sans NIC pour l’instant)",
+        );
+      }
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Promotion échouée");
@@ -408,10 +431,13 @@ function AssignmentsTab({
   const [teamId, setTeamId] = useState("");
   const [zoneCode, setZoneCode] = useState("");
   const [zoneName, setZoneName] = useState("");
+  const [provinceCode, setProvinceCode] = useState("KIN");
+  const [communeCode, setCommuneCode] = useState("");
   const [teamCode, setTeamCode] = useState("");
   const [teamName, setTeamName] = useState("");
   const [teamZoneId, setTeamZoneId] = useState("");
   const [agentUserId, setAgentUserId] = useState("");
+  const [users, setUsers] = useState<DirectoryUser[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -422,6 +448,12 @@ function AssignmentsTab({
       setZones(z);
       setTeams(t);
       if (!teamId && t.length) setTeamId(t[0].id);
+      try {
+        const u = await censusApi.listUsers();
+        setUsers(u.filter((x) => x.is_active));
+      } catch {
+        setUsers([]);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Chargement affectations impossible");
     }
@@ -448,10 +480,12 @@ function AssignmentsTab({
       await censusApi.createZone(campaign.id, {
         code: zoneCode.trim(),
         name: zoneName.trim(),
-        province_code: "KIN",
+        province_code: provinceCode.trim() || "KIN",
+        commune_code: communeCode.trim() || undefined,
       });
       setZoneCode("");
       setZoneName("");
+      setCommuneCode("");
       setMsg("Zone créée");
       await load();
     } catch (err) {
@@ -501,6 +535,16 @@ function AssignmentsTab({
           <h3>Nouvelle zone</h3>
           <input placeholder="Code zone" value={zoneCode} onChange={(e) => setZoneCode(e.target.value)} required />
           <input placeholder="Nom zone" value={zoneName} onChange={(e) => setZoneName(e.target.value)} required />
+          <input
+            placeholder="Province (ex. KIN)"
+            value={provinceCode}
+            onChange={(e) => setProvinceCode(e.target.value)}
+          />
+          <input
+            placeholder="Commune (optionnel)"
+            value={communeCode}
+            onChange={(e) => setCommuneCode(e.target.value)}
+          />
           <button type="submit" className="btn-primary" style={{ marginTop: 8 }}>
             Créer zone
           </button>
@@ -530,12 +574,31 @@ function AssignmentsTab({
               </option>
             ))}
           </select>
-          <input
-            placeholder="UUID agent (user id)"
-            value={agentUserId}
-            onChange={(e) => setAgentUserId(e.target.value)}
-            required
-          />
+          {users.length > 0 ? (
+            <select
+              value={agentUserId}
+              onChange={(e) => setAgentUserId(e.target.value)}
+              required
+            >
+              <option value="">Choisir un utilisateur…</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.email}
+                  {u.full_name ? ` — ${u.full_name}` : ""}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              placeholder="UUID agent (user id)"
+              value={agentUserId}
+              onChange={(e) => setAgentUserId(e.target.value)}
+              required
+            />
+          )}
+          <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+            Seed : agent.recensement@example.gov (sélectionnez-le dans la liste si visible)
+          </p>
           <button type="submit" className="btn-primary" style={{ marginTop: 8 }}>
             Affecter
           </button>
@@ -566,23 +629,57 @@ function AssignmentsTab({
 function StatsTab({
   campaign,
   setError,
+  setMsg,
 }: {
   campaign: Campaign;
   setError: (v: string | null) => void;
+  setMsg: (v: string | null) => void;
 }) {
   const [stats, setStats] = useState<CampaignStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
     void censusApi
       .stats(campaign.id)
-      .then(setStats)
-      .catch((e) => setError(e instanceof Error ? e.message : "Stats KO"));
+      .then((s) => {
+        if (!cancelled) {
+          setStats(s);
+          setLoading(false);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setStats(null);
+          setLoading(false);
+          const msg = e instanceof Error ? e.message : "Stats KO";
+          setLoadError(msg);
+          setError(msg);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [campaign.id, setError]);
+
+  async function exportCsv(status?: string) {
+    try {
+      await censusApi.downloadCsv(campaign.id, status);
+      setMsg("Export CSV téléchargé");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Export CSV échoué");
+    }
+  }
 
   return (
     <div className="panel">
       <h2>Statistiques — {campaign.code}</h2>
-      {stats ? (
+      {loading ? <p className="muted">Chargement…</p> : null}
+      {loadError ? <div className="login-error">{loadError}</div> : null}
+      {!loading && !loadError && stats ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12 }}>
           <div className="stat-chip"><div className="muted">Ménages</div><strong>{stats.households}</strong></div>
           <div className="stat-chip"><div className="muted">Personnes</div><strong>{stats.records}</strong></div>
@@ -592,25 +689,18 @@ function StatsTab({
           <div className="stat-chip"><div className="muted">Promues</div><strong>{stats.promoted}</strong></div>
           <div className="stat-chip"><div className="muted">Conflits</div><strong>{stats.conflicts}</strong></div>
         </div>
-      ) : (
-        <p className="muted">Chargement…</p>
-      )}
+      ) : null}
+      {!loading && !loadError && !stats ? (
+        <p className="muted">Aucune statistique.</p>
+      ) : null}
       <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button type="button" className="btn-primary" onClick={() => void censusApi.downloadCsv(campaign.id)}>
+        <button type="button" className="btn-primary" onClick={() => void exportCsv()}>
           Export CSV (toutes)
         </button>
-        <button
-          type="button"
-          className="btn-secondary"
-          onClick={() => void censusApi.downloadCsv(campaign.id, "APPROVED")}
-        >
+        <button type="button" className="btn-secondary" onClick={() => void exportCsv("APPROVED")}>
           CSV approuvées
         </button>
-        <button
-          type="button"
-          className="btn-secondary"
-          onClick={() => void censusApi.downloadCsv(campaign.id, "SYNCED")}
-        >
+        <button type="button" className="btn-secondary" onClick={() => void exportCsv("SYNCED")}>
           CSV à contrôler
         </button>
       </div>
