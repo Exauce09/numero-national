@@ -74,7 +74,17 @@ export async function login(portal: Portal, username: string, password: string):
   }
 
   const demo = DEMO_CREDENTIALS[portal];
-  if (user !== demo.username || password !== demo.password) {
+  const prefsRaw = portal === "sante" ? localStorage.getItem("nn_gov_sante_prefs") : null;
+  let effectivePassword = demo.password;
+  if (prefsRaw) {
+    try {
+      const parsed = JSON.parse(prefsRaw) as { passwordOverride?: string };
+      if (parsed.passwordOverride) effectivePassword = parsed.passwordOverride;
+    } catch {
+      /* ignore */
+    }
+  }
+  if (user !== demo.username || password !== effectivePassword) {
     throw new Error(`Identifiants incorrects. Compte démo : ${demo.username}`);
   }
 

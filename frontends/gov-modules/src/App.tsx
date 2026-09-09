@@ -3,11 +3,14 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { getSession, setActivePortal, type Portal } from "./auth";
 import LoginForm from "./components/LoginForm";
 import PortalShell, { type NavItem } from "./components/PortalShell";
+import SantePortalShell, { type NavItem as SanteNavItem } from "./components/SantePortalShell";
 
 import SanteDashboard from "./pages/sante/DashboardPage";
 import SanteIndicators from "./pages/sante/IndicatorsPage";
 import SanteFacilities from "./pages/sante/FacilitiesPage";
 import SanteExport from "./pages/sante/ExportPage";
+import SanteSynoptic from "./pages/sante/SynopticPage";
+import SanteDeclarations from "./pages/sante/DeclarationsPage";
 
 import InterieurDashboard from "./pages/interieur/DashboardPage";
 import CivilSupervision from "./pages/interieur/CivilSupervisionPage";
@@ -33,10 +36,12 @@ function RequireAuth({ portal, children }: { portal: Portal; children: ReactNode
   return <>{children}</>;
 }
 
-const SANTE_NAV: NavItem[] = [
-  { to: "/sante", label: "Tableau de bord" },
-  { to: "/sante/indicateurs", label: "Indicateurs" },
+const SANTE_NAV: SanteNavItem[] = [
+  { to: "/sante", label: "Tableau de bord", end: true },
+  { to: "/sante/synoptique/naissances", label: "Tableau synoptique" },
   { to: "/sante/structures", label: "Structures" },
+  { to: "/sante/declarations", label: "Déclarations" },
+  { to: "/sante/indicateurs", label: "Indicateurs" },
   { to: "/sante/export", label: "Export" },
 ];
 
@@ -83,21 +88,18 @@ export default function App() {
         path="/sante/*"
         element={
           <RequireAuth portal="sante">
-            <PortalShell
-              portal="sante"
-              brand="Santé"
-              tagline="E-GOUV · Ministère"
-              nav={SANTE_NAV}
-              title="Ministère de la Santé"
-            >
+            <SantePortalShell nav={SANTE_NAV}>
               <Routes>
                 <Route index element={<SanteDashboard />} />
-                <Route path="indicateurs" element={<SanteIndicators />} />
+                <Route path="synoptique" element={<SanteSynoptic />} />
+                <Route path="synoptique/:section" element={<SanteSynoptic />} />
                 <Route path="structures" element={<SanteFacilities />} />
+                <Route path="declarations" element={<SanteDeclarations />} />
+                <Route path="indicateurs" element={<SanteIndicators />} />
                 <Route path="export" element={<SanteExport />} />
                 <Route path="*" element={<Navigate to="/sante" replace />} />
               </Routes>
-            </PortalShell>
+            </SantePortalShell>
           </RequireAuth>
         }
       />

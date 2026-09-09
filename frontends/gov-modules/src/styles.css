@@ -178,3 +178,191 @@
   content: "☐ ";
   color: var(--egouv-primary);
 }
+
+.eg-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+}
+
+.eg-breadcrumb {
+  margin: 0 0 0.35rem;
+  font-size: 0.82rem;
+  color: var(--egouv-muted);
+}
+
+.eg-breadcrumb a {
+  color: var(--egouv-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.panel-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+}
+
+.metric-btn {
+  border: 0;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.metric-btn:disabled {
+  cursor: default;
+}
+
+.profile-photo {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--egouv-line);
+  background: #f4f7f5;
+}
+
+.profile-photo-lg {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.notif-item {
+  border-bottom: 1px solid var(--egouv-line);
+  padding: 0.85rem 0;
+}
+
+.notif-item:last-child {
+  border-bottom: 0;
+}
+
+.notif-item.unread .notif-title {
+  color: var(--egouv-primary);
+}
+
+.notif-title {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 20, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-panel {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.25rem;
+  width: min(560px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
+}
+
+.modal-panel.modal-wide {
+  width: min(760px, 100%);
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  margin-top: 0.75rem;
+}
+
+.small {
+  font-size: 0.82rem;
+}
+
+.syn-page {
+  width: 100%;
+}
+
+.syn-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.syn-tab {
+  border: 1px solid var(--egouv-line);
+  background: #fff;
+  color: var(--egouv-ink);
+  border-radius: 8px;
+  padding: 0.45rem 0.85rem;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.88rem;
+  text-decoration: none;
+}
+
+.syn-tab.active {
+  background: var(--egouv-primary);
+  border-color: var(--egouv-primary);
+  color: #fff;
+}
+
+.syn-official-title {
+  font-size: 0.95rem;
+  text-align: center;
+  margin: 0 0 1rem;
+  line-height: 1.45;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.syn-official {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  min-width: 720px;
+}
+
+.syn-official th,
+.syn-official td {
+  border: 1px solid #c5d2cb;
+  padding: 0.35rem 0.45rem;
+  text-align: center;
+}
+
+.syn-official th {
+  background: #eef5f1;
+  font-weight: 700;
+}
+
+.syn-commune-cell {
+  text-align: left !important;
+  font-weight: 600;
+  white-space: nowrap;
+}
