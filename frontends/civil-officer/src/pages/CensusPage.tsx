@@ -1,6 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
-import GeoCascade, { type GeoSelection } from "../components/GeoCascade";
 import PersonPicker from "../components/PersonPicker";
 import {
   ETAT_CIVIL_OPTIONS,
@@ -13,14 +12,16 @@ import {
   type Person,
   type Sexe,
 } from "../registry";
+import { getOfficerCommune } from "../commune";
 
 const STEPS = [
   { id: 1, label: "1. Identité" },
-  { id: 2, label: "2. Biométrie" },
-  { id: 3, label: "3. Études faites" },
-  { id: 4, label: "4. Expérience professionnelle" },
-  { id: 5, label: "5. Identité administrative actuelle" },
-  { id: 6, label: "6. Situation familiale" },
+  { id: 2, label: "2. Origine" },
+  { id: 3, label: "3. Biométrie" },
+  { id: 4, label: "4. Études faites" },
+  { id: 5, label: "5. Expérience professionnelle" },
+  { id: 6, label: "6. Identité administrative actuelle" },
+  { id: 7, label: "7. Situation familiale" },
 ] as const;
 
 type StepId = (typeof STEPS)[number]["id"];
@@ -36,11 +37,13 @@ export default function CensusPage() {
   const [sexe, setSexe] = useState<Sexe>("M");
   const [dateNaissance, setDateNaissance] = useState("");
   const [lieuNaissance, setLieuNaissance] = useState("");
-  const [geo, setGeo] = useState<GeoSelection>({});
-  const [geoResidence, setGeoResidence] = useState<GeoSelection>({});
-  const [etatCivil, setEtatCivil] = useState<EtatCivil>("CELIBATAIRE");
   const [taille, setTaille] = useState("");
   const [poids, setPoids] = useState("");
+  const [provinceOrigine, setProvinceOrigine] = useState("");
+  const [territoireOrigine, setTerritoireOrigine] = useState("");
+  const [ethnie, setEthnie] = useState("");
+  const [nationalite, setNationalite] = useState("Congolaise");
+  const [etatCivil, setEtatCivil] = useState<EtatCivil>("CELIBATAIRE");
   const [adresseActuelle, setAdresseActuelle] = useState("");
   const [professionActuelle, setProfessionActuelle] = useState("");
   const [photo, setPhoto] = useState<string | undefined>();
@@ -59,7 +62,7 @@ export default function CensusPage() {
   const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
-    if (step !== 2) {
+    if (step !== 3) {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
       return;
@@ -104,7 +107,7 @@ export default function CensusPage() {
   }
 
   function goNext() {
-    if (step < 6) goTo((step + 1) as StepId);
+    if (step < 7) goTo((step + 1) as StepId);
   }
 
   function goPrev() {
@@ -126,16 +129,16 @@ export default function CensusPage() {
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!validateStep(6)) return;
+    if (!validateStep(7)) return;
     try {
-      const lieuAdmin = (geoResidence.label || adresseActuelle).trim();
+      const commune = getOfficerCommune();
       const person = addPerson({
         nom: nom.trim(),
         postnom: postnom.trim(),
         prenom: prenom.trim(),
         sexe,
         date_naissance: dateNaissance,
-        lieu_naissance: (geo.label || lieuNaissance).trim(),
+        lieu_naissance: lieuNaissance.trim(),
         etat_civil: etatCivil,
         taille: taille ? Number(taille) : undefined,
         poids: poids ? Number(poids) : undefined,
@@ -160,7 +163,7 @@ export default function CensusPage() {
         sexe: person.sexe,
         date_naissance: person.date_naissance,
         lieu_naissance: person.lieu_naissance,
-        commune_code: geoResidence.commune_code ?? geo.commune_code ?? null,
+        commune_code: commune.code,
         etat_civil: person.etat_civil,
         taille: person.taille ?? null,
         poids: person.poids ?? null,
@@ -174,8 +177,12 @@ export default function CensusPage() {
         parcours_universitaire: person.parcours_universitaire ?? null,
         parcours_professionnel: person.parcours_professionnel ?? null,
         situation_familiale: person.situation_familiale ?? null,
-        adresse_actuelle: lieuAdmin || null,
+        adresse_actuelle: adresseActuelle.trim() || null,
         profession_actuelle: professionActuelle.trim() || null,
+        province_origine: provinceOrigine.trim() || null,
+        territoire_origine: territoireOrigine.trim() || null,
+        ethnie: ethnie.trim() || null,
+        nationalite: nationalite.trim() || null,
       };
       const act = addAct("CENSUS", payload, person.nic);
       setCreated(act);
@@ -190,7 +197,8 @@ export default function CensusPage() {
     <div>
       <h2 className="page-title">Recensement</h2>
       <p className="page-lead">
-        Wizard en 6 étapes — identité, biométrie, études, expérience, identité administrative, situation familiale.
+        Wizard en 7 étapes — identité, origine, biométrie, études, expérience, identité administrative, situation
+        familiale.
       </p>
 
       <div className="wizard-steps census-wizard-steps">
@@ -259,20 +267,60 @@ export default function CensusPage() {
                 onChange={(e) => setDateNaissance(e.target.value)}
               />
             </div>
-            <div className="full">
-              <GeoCascade
-                value={geo}
-                onChange={(g) => {
-                  setGeo(g);
-                  if (g.label) setLieuNaissance(g.label);
-                }}
-                label="Lieu de naissance — territoire RDC"
+            <div>
+              <label className="form-label">Lieu de naissance</label>
+              <input
+                className="form-control"
+                value={lieuNaissance}
+                onChange={(e) => setLieuNaissance(e.target.value)}
+                placeholder="Ville, commune, pays…"
               />
+            </div>
+            <div>
+              <label className="form-label">Taille (cm)</label>
+              <input className="form-control" type="number" value={taille} onChange={(e) => setTaille(e.target.value)} />
+            </div>
+            <div>
+              <label className="form-label">Poids (kg)</label>
+              <input className="form-control" type="number" value={poids} onChange={(e) => setPoids(e.target.value)} />
             </div>
           </div>
         ) : null}
 
         {step === 2 ? (
+          <div className="form-grid">
+            <div>
+              <label className="form-label">Province d&apos;origine</label>
+              <input
+                className="form-control"
+                value={provinceOrigine}
+                onChange={(e) => setProvinceOrigine(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="form-label">Territoire / ville d&apos;origine</label>
+              <input
+                className="form-control"
+                value={territoireOrigine}
+                onChange={(e) => setTerritoireOrigine(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="form-label">Nationalité</label>
+              <input
+                className="form-control"
+                value={nationalite}
+                onChange={(e) => setNationalite(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="form-label">Ethnie / tribu</label>
+              <input className="form-control" value={ethnie} onChange={(e) => setEthnie(e.target.value)} />
+            </div>
+          </div>
+        ) : null}
+
+        {step === 3 ? (
           <div className="form-grid">
             <div className="full webcam-box">
               <video ref={videoRef} playsInline muted />
@@ -296,7 +344,7 @@ export default function CensusPage() {
           </div>
         ) : null}
 
-        {step === 3 ? (
+        {step === 4 ? (
           <div className="form-grid">
             <div className="full">
               <label className="form-label">Parcours scolaire</label>
@@ -321,7 +369,7 @@ export default function CensusPage() {
           </div>
         ) : null}
 
-        {step === 4 ? (
+        {step === 5 ? (
           <div className="form-grid">
             <div className="full">
               <label className="form-label">Expérience professionnelle</label>
@@ -336,7 +384,7 @@ export default function CensusPage() {
           </div>
         ) : null}
 
-        {step === 5 ? (
+        {step === 6 ? (
           <div className="form-grid">
             <div>
               <label className="form-label">État civil actuel</label>
@@ -360,37 +408,19 @@ export default function CensusPage() {
                 onChange={(e) => setProfessionActuelle(e.target.value)}
               />
             </div>
-            <div>
-              <label className="form-label">Taille (cm)</label>
-              <input className="form-control" type="number" value={taille} onChange={(e) => setTaille(e.target.value)} />
-            </div>
-            <div>
-              <label className="form-label">Poids (kg)</label>
-              <input className="form-control" type="number" value={poids} onChange={(e) => setPoids(e.target.value)} />
-            </div>
             <div className="full">
-              <GeoCascade
-                value={geoResidence}
-                onChange={(g) => {
-                  setGeoResidence(g);
-                  if (g.label) setAdresseActuelle(g.label);
-                }}
-                label="Résidence / adresse administrative actuelle"
-              />
-            </div>
-            <div className="full">
-              <label className="form-label">Adresse actuelle (complément)</label>
+              <label className="form-label">Adresse administrative actuelle</label>
               <input
                 className="form-control"
                 value={adresseActuelle}
                 onChange={(e) => setAdresseActuelle(e.target.value)}
-                placeholder="Avenue, n°, quartier…"
+                placeholder="Avenue, n°, quartier, commune…"
               />
             </div>
           </div>
         ) : null}
 
-        {step === 6 ? (
+        {step === 7 ? (
           <form className="form-grid" onSubmit={onSubmit}>
             <div className="full">
               <label className="form-label">Situation familiale</label>
@@ -413,7 +443,7 @@ export default function CensusPage() {
           </form>
         ) : null}
 
-        {step !== 6 ? (
+        {step !== 7 ? (
           <div className="census-nav">
             {step > 1 ? (
               <button type="button" className="btn-secondary" onClick={goPrev}>
