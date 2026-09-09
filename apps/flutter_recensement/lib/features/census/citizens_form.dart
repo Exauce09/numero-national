@@ -10,6 +10,7 @@ import 'geo_cascade_field.dart';
 import 'photo_capture.dart';
 import 'rdc_tribus.dart';
 import 'situation_familiale.dart';
+import 'etudes_et_admin.dart';
 
 /// Fiche personne — wizard 7 étapes aligné sur le site civil-officer.
 class CitizensFormScreen extends StatefulWidget {
@@ -51,16 +52,23 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   late final TextEditingController _empreinteGauche;
   late final TextEditingController _empreinteDroite;
   late final TextEditingController _iris;
-  late final TextEditingController _scolaire;
-  late final TextEditingController _universitaire;
   late final TextEditingController _professionnel;
-  late final TextEditingController _numeroAdmin;
+  late final TextEditingController _etudesRemarques;
+  late final TextEditingController _anneeFinEtudes;
+  late final TextEditingController _adminNumero;
+  late final TextEditingController _adminBureau;
+  late final TextEditingController _adminDateOuverture;
+  late final TextEditingController _adminAgent;
+  late final TextEditingController _adminRemarques;
   late final TextEditingController _familleRemarques;
 
   String _sex = 'M';
   String _etatCivil = 'CELIBATAIRE';
   String _handicap = 'NORMAL';
   String _relation = 'AUTRE';
+  String _saitLire = '';
+  String _saitEcrire = '';
+  String _niveauAtteint = '';
   String? _photoRef;
   String? _fingerprintRef;
   Map<String, String?> _geoNaissance = {};
@@ -75,6 +83,9 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   late _MemberEditors _conjoint;
   final List<_MemberEditors> _enfants = [];
   final List<_MemberEditors> _charges = [];
+  final List<_ScoEditors> _etablissements = [];
+  final List<_UnivEditors> _formations = [];
+  final List<_DocEditors> _documents = [];
 
   bool get _isEdit => widget.existing != null;
 
@@ -135,12 +146,41 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     _empreinteDroite =
         TextEditingController(text: payload['empreinte_droite']?.toString() ?? '');
     _iris = TextEditingController(text: payload['iris']?.toString() ?? '');
-    _scolaire = TextEditingController(text: payload['parcours_scolaire']?.toString() ?? '');
-    _universitaire =
-        TextEditingController(text: payload['parcours_universitaire']?.toString() ?? '');
     _professionnel =
         TextEditingController(text: payload['parcours_professionnel']?.toString() ?? '');
-    _numeroAdmin = TextEditingController(text: payload['numero_admin']?.toString() ?? '');
+
+    final etudes = EtudesData.parse(
+      payload['etudes_detail'] ??
+          {
+            'remarques': [
+              payload['parcours_scolaire']?.toString() ?? '',
+              payload['parcours_universitaire']?.toString() ?? '',
+            ].where((s) => s.trim().isNotEmpty).join('\n'),
+          },
+    );
+    _saitLire = etudes.saitLire;
+    _saitEcrire = etudes.saitEcrire;
+    _niveauAtteint = etudes.niveauAtteint;
+    _anneeFinEtudes = TextEditingController(text: etudes.anneeFinEtudes);
+    _etudesRemarques = TextEditingController(text: etudes.remarques);
+    for (final e in etudes.etablissements) {
+      _etablissements.add(_ScoEditors(e));
+    }
+    for (final f in etudes.formationsUniversitaires) {
+      _formations.add(_UnivEditors(f));
+    }
+
+    final admin = IdentiteAdminData.parse(
+      payload['identite_administrative_detail'] ?? payload['numero_admin'],
+    );
+    _adminNumero = TextEditingController(text: admin.numeroDossier);
+    _adminBureau = TextEditingController(text: admin.bureauReference);
+    _adminDateOuverture = TextEditingController(text: admin.dateOuvertureDossier);
+    _adminAgent = TextEditingController(text: admin.agentReference);
+    _adminRemarques = TextEditingController(text: admin.remarques);
+    for (final d in admin.documents) {
+      _documents.add(_DocEditors(d));
+    }
 
     final famille = SituationFamiliale.parse(
       payload['situation_familiale_detail'] ?? payload['situation_familiale'],
@@ -208,10 +248,14 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     _empreinteGauche.dispose();
     _empreinteDroite.dispose();
     _iris.dispose();
-    _scolaire.dispose();
-    _universitaire.dispose();
     _professionnel.dispose();
-    _numeroAdmin.dispose();
+    _etudesRemarques.dispose();
+    _anneeFinEtudes.dispose();
+    _adminNumero.dispose();
+    _adminBureau.dispose();
+    _adminDateOuverture.dispose();
+    _adminAgent.dispose();
+    _adminRemarques.dispose();
     _familleRemarques.dispose();
     _conjoint.dispose();
     for (final e in _enfants) {
@@ -219,6 +263,15 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     }
     for (final c in _charges) {
       c.dispose();
+    }
+    for (final e in _etablissements) {
+      e.dispose();
+    }
+    for (final f in _formations) {
+      f.dispose();
+    }
+    for (final d in _documents) {
+      d.dispose();
     }
     super.dispose();
   }
@@ -318,14 +371,39 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
       'empreinte_droite': _empreinteDroite.text.trim(),
       'iris': _iris.text.trim(),
       'fingerprint_ref': _fingerprintRef,
-      'parcours_scolaire': _scolaire.text.trim(),
-      'parcours_universitaire': _universitaire.text.trim(),
+      'parcours_scolaire': _buildEtudes().formatScolaire(),
+      'parcours_universitaire': _buildEtudes().formatUniversitaire(),
       'parcours_professionnel': _professionnel.text.trim(),
-      'numero_admin': _numeroAdmin.text.trim(),
+      'etudes_detail': _buildEtudes().toJson(),
+      'numero_admin': _buildAdmin().numeroDossier.trim(),
+      'identite_administrative_detail': _buildAdmin().toJson(),
       'situation_familiale': _buildSituation().formatSummary(),
       'situation_familiale_detail': _buildSituation().toJson(),
       'relationship_to_head': _relation,
     };
+  }
+
+  EtudesData _buildEtudes() {
+    return EtudesData(
+      saitLire: _saitLire,
+      saitEcrire: _saitEcrire,
+      niveauAtteint: _niveauAtteint,
+      anneeFinEtudes: _anneeFinEtudes.text,
+      etablissements: _etablissements.map((e) => e.snapshot()).toList(),
+      formationsUniversitaires: _formations.map((e) => e.snapshot()).toList(),
+      remarques: _etudesRemarques.text,
+    );
+  }
+
+  IdentiteAdminData _buildAdmin() {
+    return IdentiteAdminData(
+      documents: _documents.map((e) => e.snapshot()).toList(),
+      numeroDossier: _adminNumero.text,
+      bureauReference: _adminBureau.text,
+      dateOuvertureDossier: _adminDateOuverture.text.trim(),
+      agentReference: _adminAgent.text,
+      remarques: _adminRemarques.text,
+    );
   }
 
   SituationFamiliale _buildSituation() {
@@ -833,18 +911,8 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             _buildIdentityBlock(),
             _buildOriginBlock(),
             _buildBioBlock(),
-            _section('4. Études', [
-              TextFormField(
-                controller: _scolaire,
-                decoration: _dec('Parcours scolaire'),
-                maxLines: 4,
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _universitaire,
-                decoration: _dec('Parcours universitaire'),
-                maxLines: 4,
-              ),
+            _section('4. Études faites', [
+              _buildEtudesBlock(),
             ]),
             _section('5. Expérience professionnelle', [
               TextFormField(
@@ -854,10 +922,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               ),
             ]),
             _section('6. Identité administrative', [
-              TextFormField(
-                controller: _numeroAdmin,
-                decoration: _dec('N° administratif / référence dossier'),
-              ),
+              _buildAdminBlock(),
             ]),
             _section('7. Situation familiale', [
               _buildFamilyBlock(),
@@ -867,6 +932,295 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildEtudesBlock() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DropdownButtonFormField<String>(
+          value: _niveauAtteint.isEmpty ? null : _niveauAtteint,
+          decoration: _dec("Niveau d'études atteint"),
+          items: [
+            for (final o in EtudesData.niveaux.where((e) => e.$1.isNotEmpty))
+              DropdownMenuItem(value: o.$1, child: Text(o.$2)),
+          ],
+          onChanged: (v) => setState(() => _niveauAtteint = v ?? ''),
+        ),
+        const SizedBox(height: 10),
+        TextFormField(
+          controller: _anneeFinEtudes,
+          decoration: _dec("Année de fin d'études", hint: 'Ex. 2018'),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: _saitLire.isEmpty ? null : _saitLire,
+                decoration: _dec('Sait lire'),
+                items: const [
+                  DropdownMenuItem(value: 'oui', child: Text('Oui')),
+                  DropdownMenuItem(value: 'non', child: Text('Non')),
+                ],
+                onChanged: (v) => setState(() => _saitLire = v ?? ''),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: _saitEcrire.isEmpty ? null : _saitEcrire,
+                decoration: _dec('Sait écrire'),
+                items: const [
+                  DropdownMenuItem(value: 'oui', child: Text('Oui')),
+                  DropdownMenuItem(value: 'non', child: Text('Non')),
+                ],
+                onChanged: (v) => setState(() => _saitEcrire = v ?? ''),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Parcours scolaire (${_etablissements.length})',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => setState(() => _etablissements.add(_ScoEditors(EtablissementScolaire()))),
+              icon: const Icon(Icons.add),
+              label: const Text('Ajouter'),
+            ),
+          ],
+        ),
+        for (var i = 0; i < _etablissements.length; i++) ...[
+          const SizedBox(height: 8),
+          _memberCard(
+            title: 'Établissement ${i + 1}',
+            onRemove: () => setState(() {
+              _etablissements[i].dispose();
+              _etablissements.removeAt(i);
+            }),
+            child: _scoFields(_etablissements[i]),
+          ),
+        ],
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Parcours universitaire (${_formations.length})',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => setState(() => _formations.add(_UnivEditors(FormationUniversitaire()))),
+              icon: const Icon(Icons.add),
+              label: const Text('Ajouter'),
+            ),
+          ],
+        ),
+        for (var i = 0; i < _formations.length; i++) ...[
+          const SizedBox(height: 8),
+          _memberCard(
+            title: 'Formation ${i + 1}',
+            onRemove: () => setState(() {
+              _formations[i].dispose();
+              _formations.removeAt(i);
+            }),
+            child: _univFields(_formations[i]),
+          ),
+        ],
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _etudesRemarques,
+          decoration: _dec('Remarques études'),
+          maxLines: 3,
+        ),
+      ],
+    );
+  }
+
+  Widget _scoFields(_ScoEditors m) {
+    return Column(
+      children: [
+        TextFormField(controller: m.etablissement, decoration: _dec('Établissement')),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: m.niveau.isEmpty ? null : m.niveau,
+          decoration: _dec('Niveau'),
+          items: [
+            for (final n in EtudesData.niveauxScolaires.where((e) => e.isNotEmpty))
+              DropdownMenuItem(value: n, child: Text(n)),
+          ],
+          onChanged: (v) => setState(() => m.niveau = v ?? ''),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(controller: m.ville, decoration: _dec('Ville / commune')),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(controller: m.anneeDebut, decoration: _dec('Année début')),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextFormField(controller: m.anneeFin, decoration: _dec('Année fin')),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        TextFormField(controller: m.diplome, decoration: _dec('Diplôme / certificat')),
+      ],
+    );
+  }
+
+  Widget _univFields(_UnivEditors m) {
+    return Column(
+      children: [
+        TextFormField(controller: m.etablissement, decoration: _dec('Université / établissement')),
+        const SizedBox(height: 8),
+        TextFormField(controller: m.filiere, decoration: _dec('Filière / domaine')),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: m.diplome.isEmpty ? null : m.diplome,
+          decoration: _dec('Diplôme'),
+          items: [
+            for (final d in EtudesData.diplomesUniv.where((e) => e.isNotEmpty))
+              DropdownMenuItem(value: d, child: Text(d)),
+          ],
+          onChanged: (v) => setState(() => m.diplome = v ?? ''),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(controller: m.anneeObtention, decoration: _dec('Année')),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: m.statut.isEmpty ? null : m.statut,
+                decoration: _dec('Statut'),
+                items: const [
+                  DropdownMenuItem(value: 'TERMINE', child: Text('Terminé')),
+                  DropdownMenuItem(value: 'EN_COURS', child: Text('En cours')),
+                  DropdownMenuItem(value: 'ABANDONNE', child: Text('Abandonné')),
+                ],
+                onChanged: (v) => setState(() => m.statut = v ?? ''),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAdminBlock() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextFormField(
+          controller: _adminNumero,
+          decoration: _dec('N° administratif / dossier'),
+        ),
+        const SizedBox(height: 10),
+        TextFormField(
+          controller: _adminBureau,
+          decoration: _dec('Bureau / service de référence'),
+        ),
+        const SizedBox(height: 10),
+        TextFormField(
+          controller: _adminDateOuverture,
+          decoration: _dec("Date d'ouverture", hint: 'AAAA-MM-JJ'),
+        ),
+        const SizedBox(height: 10),
+        TextFormField(
+          controller: _adminAgent,
+          decoration: _dec('Référence agent / matricule'),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Pièces (${_documents.length})',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => setState(() => _documents.add(_DocEditors(DocumentAdmin()))),
+              icon: const Icon(Icons.add),
+              label: const Text('Ajouter'),
+            ),
+          ],
+        ),
+        for (var i = 0; i < _documents.length; i++) ...[
+          const SizedBox(height: 8),
+          _memberCard(
+            title: 'Pièce ${i + 1}',
+            onRemove: () => setState(() {
+              _documents[i].dispose();
+              _documents.removeAt(i);
+            }),
+            child: _docFields(_documents[i]),
+          ),
+        ],
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _adminRemarques,
+          decoration: _dec('Remarques administratives'),
+          maxLines: 3,
+        ),
+      ],
+    );
+  }
+
+  Widget _docFields(_DocEditors m) {
+    return Column(
+      children: [
+        DropdownButtonFormField<String>(
+          value: m.type.isEmpty ? null : m.type,
+          decoration: _dec('Type de document'),
+          items: [
+            for (final t in IdentiteAdminData.typesDocument.where((e) => e.$1.isNotEmpty))
+              DropdownMenuItem(value: t.$1, child: Text(t.$2)),
+          ],
+          onChanged: (v) => setState(() => m.type = v ?? ''),
+        ),
+        if (m.type == 'AUTRE') ...[
+          const SizedBox(height: 8),
+          TextFormField(controller: m.typeAutre, decoration: _dec('Préciser le type')),
+        ],
+        const SizedBox(height: 8),
+        TextFormField(controller: m.numero, decoration: _dec('Numéro')),
+        const SizedBox(height: 8),
+        TextFormField(controller: m.autorite, decoration: _dec('Autorité émettrice')),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: m.dateEmission,
+                decoration: _dec('Émission', hint: 'AAAA-MM-JJ'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextFormField(
+                controller: m.dateExpiration,
+                decoration: _dec('Expiration', hint: 'AAAA-MM-JJ'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        TextFormField(controller: m.lieuEmission, decoration: _dec("Lieu d'émission")),
+      ],
     );
   }
 
@@ -1082,5 +1436,106 @@ class _MemberEditors {
     dateNaissance.dispose();
     telephone.dispose();
     lien.dispose();
+  }
+}
+
+class _ScoEditors {
+  _ScoEditors(EtablissementScolaire m)
+      : etablissement = TextEditingController(text: m.etablissement),
+        ville = TextEditingController(text: m.ville),
+        anneeDebut = TextEditingController(text: m.anneeDebut),
+        anneeFin = TextEditingController(text: m.anneeFin),
+        diplome = TextEditingController(text: m.diplome),
+        niveau = m.niveau;
+
+  final TextEditingController etablissement;
+  final TextEditingController ville;
+  final TextEditingController anneeDebut;
+  final TextEditingController anneeFin;
+  final TextEditingController diplome;
+  String niveau;
+
+  EtablissementScolaire snapshot() => EtablissementScolaire(
+        etablissement: etablissement.text,
+        niveau: niveau,
+        anneeDebut: anneeDebut.text,
+        anneeFin: anneeFin.text,
+        diplome: diplome.text,
+        ville: ville.text,
+      );
+
+  void dispose() {
+    etablissement.dispose();
+    ville.dispose();
+    anneeDebut.dispose();
+    anneeFin.dispose();
+    diplome.dispose();
+  }
+}
+
+class _UnivEditors {
+  _UnivEditors(FormationUniversitaire m)
+      : etablissement = TextEditingController(text: m.etablissement),
+        filiere = TextEditingController(text: m.filiere),
+        anneeObtention = TextEditingController(text: m.anneeObtention),
+        diplome = m.diplome,
+        statut = m.statut;
+
+  final TextEditingController etablissement;
+  final TextEditingController filiere;
+  final TextEditingController anneeObtention;
+  String diplome;
+  String statut;
+
+  FormationUniversitaire snapshot() => FormationUniversitaire(
+        etablissement: etablissement.text,
+        filiere: filiere.text,
+        diplome: diplome,
+        anneeObtention: anneeObtention.text,
+        statut: statut,
+      );
+
+  void dispose() {
+    etablissement.dispose();
+    filiere.dispose();
+    anneeObtention.dispose();
+  }
+}
+
+class _DocEditors {
+  _DocEditors(DocumentAdmin m)
+      : typeAutre = TextEditingController(text: m.typeAutre),
+        numero = TextEditingController(text: m.numero),
+        autorite = TextEditingController(text: m.autorite),
+        dateEmission = TextEditingController(text: m.dateEmission),
+        dateExpiration = TextEditingController(text: m.dateExpiration),
+        lieuEmission = TextEditingController(text: m.lieuEmission),
+        type = m.type;
+
+  final TextEditingController typeAutre;
+  final TextEditingController numero;
+  final TextEditingController autorite;
+  final TextEditingController dateEmission;
+  final TextEditingController dateExpiration;
+  final TextEditingController lieuEmission;
+  String type;
+
+  DocumentAdmin snapshot() => DocumentAdmin(
+        type: type,
+        typeAutre: typeAutre.text,
+        numero: numero.text,
+        autorite: autorite.text,
+        dateEmission: dateEmission.text.trim(),
+        dateExpiration: dateExpiration.text.trim(),
+        lieuEmission: lieuEmission.text,
+      );
+
+  void dispose() {
+    typeAutre.dispose();
+    numero.dispose();
+    autorite.dispose();
+    dateEmission.dispose();
+    dateExpiration.dispose();
+    lieuEmission.dispose();
   }
 }

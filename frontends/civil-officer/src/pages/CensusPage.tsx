@@ -8,6 +8,8 @@ import GeoCascade, {
 } from "../components/GeoCascade";
 import PersonPicker from "../components/PersonPicker";
 import SituationFamilialeForm from "../components/SituationFamilialeForm";
+import EtudesFaitesForm from "../components/EtudesFaitesForm";
+import IdentiteAdministrativeForm from "../components/IdentiteAdministrativeForm";
 import {
   ETAT_CIVIL_OPTIONS,
   HANDICAP_OPTIONS,
@@ -29,6 +31,19 @@ import {
   parseSituationFamiliale,
   type SituationFamilialeData,
 } from "../situationFamiliale";
+import {
+  emptyEtudes,
+  formatParcoursScolaire,
+  formatParcoursUniversitaire,
+  parseEtudes,
+  type EtudesData,
+} from "../etudesFaites";
+import {
+  emptyIdentiteAdmin,
+  formatIdentiteAdmin,
+  parseIdentiteAdmin,
+  type IdentiteAdminData,
+} from "../identiteAdministrative";
 
 const STEPS = [
   { id: 1, label: "1. Identité" },
@@ -72,11 +87,14 @@ type CensusDraft = {
   empreinteGauche: string;
   empreinteDroite: string;
   iris: string;
-  scolaire: string;
-  universitaire: string;
+  etudes: EtudesData;
   professionnel: string;
   situationFamiliale: SituationFamilialeData;
-  numeroAdmin: string;
+  identiteAdmin: IdentiteAdminData;
+  /** Anciens brouillons */
+  scolaire?: string;
+  universitaire?: string;
+  numeroAdmin?: string;
   savedAt: string;
 };
 
@@ -108,13 +126,12 @@ export default function CensusPage() {
   const [empreinteGauche, setEmpreinteGauche] = useState("");
   const [empreinteDroite, setEmpreinteDroite] = useState("");
   const [iris, setIris] = useState("");
-  const [scolaire, setScolaire] = useState("");
-  const [universitaire, setUniversitaire] = useState("");
+  const [etudes, setEtudes] = useState<EtudesData>(emptyEtudes);
   const [professionnel, setProfessionnel] = useState("");
   const [situationFamiliale, setSituationFamiliale] = useState<SituationFamilialeData>(
     emptySituationFamiliale
   );
-  const [numeroAdmin, setNumeroAdmin] = useState("");
+  const [identiteAdmin, setIdentiteAdmin] = useState<IdentiteAdminData>(emptyIdentiteAdmin);
   const [error, setError] = useState<string | null>(null);
   const [draftNotice, setDraftNotice] = useState<string | null>(null);
   const [created, setCreated] = useState<Act | null>(null);
@@ -156,15 +173,24 @@ export default function CensusPage() {
       setEmpreinteGauche(d.empreinteGauche ?? "");
       setEmpreinteDroite(d.empreinteDroite ?? "");
       setIris(d.iris ?? "");
-      setScolaire(d.scolaire ?? "");
-      setUniversitaire(d.universitaire ?? "");
+      setEtudes(
+        d.etudes
+          ? parseEtudes(d.etudes)
+          : parseEtudes({
+              remarques: [d.scolaire, d.universitaire].filter(Boolean).join("\n"),
+            })
+      );
       setProfessionnel(d.professionnel ?? "");
       setSituationFamiliale(
         d.situationFamiliale
           ? parseSituationFamiliale(d.situationFamiliale)
           : emptySituationFamiliale()
       );
-      setNumeroAdmin(d.numeroAdmin ?? "");
+      setIdentiteAdmin(
+        d.identiteAdmin
+          ? parseIdentiteAdmin(d.identiteAdmin)
+          : parseIdentiteAdmin(d.numeroAdmin)
+      );
       setDraftNotice("Brouillon restauré — vous pouvez continuer la saisie.");
     } catch {
       localStorage.removeItem(CENSUS_DRAFT_KEY);
@@ -279,11 +305,10 @@ export default function CensusPage() {
       empreinteGauche,
       empreinteDroite,
       iris,
-      scolaire,
-      universitaire,
+      etudes,
       professionnel,
       situationFamiliale,
-      numeroAdmin,
+      identiteAdmin,
       savedAt: new Date().toISOString(),
     };
     localStorage.setItem(CENSUS_DRAFT_KEY, JSON.stringify(draft));
@@ -304,6 +329,8 @@ export default function CensusPage() {
       const adresse = buildAdresse();
       const lieuNaissance = geoNaissance.label || "";
       const situationSummary = formatSituationFamiliale(situationFamiliale);
+      const scolaireSummary = formatParcoursScolaire(etudes);
+      const univSummary = formatParcoursUniversitaire(etudes);
       const person = addPerson({
         nom: nom.trim(),
         postnom: postnom.trim(),
@@ -320,8 +347,8 @@ export default function CensusPage() {
           .filter(Boolean)
           .join(" | ") || undefined,
         iris_note: iris.trim() || undefined,
-        parcours_scolaire: scolaire.trim() || undefined,
-        parcours_universitaire: universitaire.trim() || undefined,
+        parcours_scolaire: scolaireSummary || undefined,
+        parcours_universitaire: univSummary || undefined,
         parcours_professionnel: [professionnel.trim(), profession.trim()].filter(Boolean).join(" | ") || undefined,
         situation_familiale: situationSummary || undefined,
         nationalite: nationalite.trim() === "Étrangère" || nationalite.toLowerCase().includes("etrang")
@@ -367,6 +394,7 @@ export default function CensusPage() {
         parcours_scolaire: person.parcours_scolaire ?? null,
         parcours_universitaire: person.parcours_universitaire ?? null,
         parcours_professionnel: person.parcours_professionnel ?? null,
+        etudes_detail: etudes,
         situation_familiale: person.situation_familiale ?? null,
         situation_familiale_detail: situationFamiliale,
         province_origine: geoOrigine.province_name || null,
@@ -377,11 +405,14 @@ export default function CensusPage() {
         geo_origine: geoOrigine,
         geo_naissance: geoNaissance,
         tribu: tribu.trim() || null,
-        numero_admin: numeroAdmin.trim() || null,
+        numero_admin: formatIdentiteAdmin(identiteAdmin) || null,
+        identite_administrative_detail: identiteAdmin,
       };
       const act = addAct("CENSUS", payload, person.nic);
       clearDraft();
       setSituationFamiliale(emptySituationFamiliale());
+      setEtudes(emptyEtudes());
+      setIdentiteAdmin(emptyIdentiteAdmin());
       setCreated(act);
       streamRef.current?.getTracks().forEach((t) => t.stop());
       setStep(1);
@@ -681,25 +712,8 @@ export default function CensusPage() {
         ) : null}
 
         {step === 4 ? (
-          <div className="form-grid">
-            <div className="full">
-              <label className="form-label">Parcours scolaire</label>
-              <textarea
-                className="form-control"
-                rows={4}
-                value={scolaire}
-                onChange={(e) => setScolaire(e.target.value)}
-              />
-            </div>
-            <div className="full">
-              <label className="form-label">Parcours universitaire</label>
-              <textarea
-                className="form-control"
-                rows={4}
-                value={universitaire}
-                onChange={(e) => setUniversitaire(e.target.value)}
-              />
-            </div>
+          <div className="full">
+            <EtudesFaitesForm value={etudes} onChange={setEtudes} />
           </div>
         ) : null}
 
@@ -718,15 +732,8 @@ export default function CensusPage() {
         ) : null}
 
         {step === 6 ? (
-          <div className="form-grid">
-            <div className="full">
-              <label className="form-label">N° administratif / référence dossier</label>
-              <input className="form-control" value={numeroAdmin} onChange={(e) => setNumeroAdmin(e.target.value)} />
-            </div>
-            <p className="muted small full">
-              L&apos;identité, la profession, l&apos;état civil et l&apos;adresse actuelle sont déjà saisis à l&apos;étape
-              Identité.
-            </p>
+          <div className="full">
+            <IdentiteAdministrativeForm value={identiteAdmin} onChange={setIdentiteAdmin} />
           </div>
         ) : null}
 
