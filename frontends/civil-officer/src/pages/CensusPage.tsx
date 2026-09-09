@@ -27,6 +27,7 @@ import {
 import { api } from "../api";
 import { getOfficerCommune } from "../commune";
 import { RDC_TRIBUS, RDC_TRIBUS_NOTE } from "../data/tribusRdc";
+import { captureGpsOnSave } from "../gpsCapture";
 import {
   emptySituationFamiliale,
   formatSituationFamiliale,
@@ -389,13 +390,14 @@ export default function CensusPage() {
     }
   }
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setDraftNotice(null);
     if (!validateStep(7)) return;
     if (!validateFamille()) return;
     try {
+      const gps = await captureGpsOnSave();
       const commune = getOfficerCommune();
       const adresse = buildAdresse();
       const lieuNaissance = geoNaissance.label || "";
@@ -481,6 +483,9 @@ export default function CensusPage() {
         tribu: tribu.trim() || null,
         numero_admin: formatIdentiteAdmin(identiteAdmin) || null,
         identite_administrative_detail: identiteAdmin,
+        latitude: gps?.latitude ?? null,
+        longitude: gps?.longitude ?? null,
+        gps_captured_at: gps ? new Date().toISOString() : null,
       };
       const act = addAct("CENSUS", payload, person.nic);
       clearDraft();
@@ -827,7 +832,7 @@ export default function CensusPage() {
               </div>
             </div>
             <p className="muted small full" style={{ marginTop: "0.35rem" }}>
-              Temporaire = brouillon local (pas encore dans le registre). Finaliser = création de la fiche.
+              Temporaire = brouillon local. Finaliser = création de la fiche + capture GPS pour la cartographie.
             </p>
           </form>
         ) : null}

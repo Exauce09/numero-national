@@ -17,3 +17,9 @@ router = APIRouter(prefix="/onip", tags=["onip"])
 async def onip_dashboard(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
     """National operations aggregates for ONIP operators."""
     return await service.build_dashboard(db)
+
+
+@router.get("/map-points")
+async def onip_map_points(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+    """GPS points of registered households for cartography."""
+    return await service.list_map_points(db)

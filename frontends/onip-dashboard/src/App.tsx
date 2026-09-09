@@ -5,6 +5,7 @@ import { clearSession, getSession } from "./auth";
 import AccountsPage from "./pages/AccountsPage";
 import AnomaliesPage from "./pages/AnomaliesPage";
 import CampaignsPage from "./pages/CampaignsPage";
+import CartographiePage from "./pages/CartographiePage";
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 import NicNumbersPage from "./pages/NicNumbersPage";
@@ -20,6 +21,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/campaigns": "Campagnes & contrôle",
   "/anomalies": "Anomalies",
   "/nic": "Numéros NIC",
+  "/cartographie": "Cartographie",
 };
 
 function Shell() {
@@ -71,6 +73,7 @@ function Shell() {
           <div className="nav-group-label">Recensement</div>
           <NavLink to="/campaigns">Campagnes &amp; contrôle</NavLink>
           <NavLink to="/anomalies">Anomalies</NavLink>
+          <NavLink to="/cartographie">Cartographie</NavLink>
 
           <div className="nav-group-label">Registre</div>
           <NavLink to="/nic">Numéros NIC</NavLink>
@@ -105,6 +108,7 @@ function Shell() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/campaigns" element={<CampaignsPage />} />
             <Route path="/anomalies" element={<AnomaliesPage />} />
+            <Route path="/cartographie" element={<CartographiePage />} />
             <Route path="/nic" element={<NicNumbersPage />} />
           </Routes>
         </main>

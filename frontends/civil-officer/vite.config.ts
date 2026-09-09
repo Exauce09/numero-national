@@ -7,5 +7,8 @@ export default defineConfig({
     port: 5176,
     proxy: { "/api": "http://localhost:8000" },
     fs: { allow: [".."] },
+    headers: {
+      "Permissions-Policy": "geolocation=(self)",
+    },
   },
 });

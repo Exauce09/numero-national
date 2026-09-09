@@ -297,4 +297,18 @@ export async function fetchOnipDashboard(): Promise<{
   return request("/onip/dashboard");
 }
 
+export type MapPoint = {
+  id: string;
+  local_id?: string | null;
+  campaign_id?: string | null;
+  address_line?: string | null;
+  latitude: number;
+  longitude: number;
+  updated_at?: string | null;
+};
+
+export async function fetchOnipMapPoints(): Promise<{ count: number; points: MapPoint[] }> {
+  return request("/onip/map-points");
+}
+
 export { updateAccessToken, BASE as API_BASE };

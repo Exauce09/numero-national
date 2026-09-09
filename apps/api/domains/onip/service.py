@@ -114,3 +114,51 @@ async def build_dashboard(db: AsyncSession) -> dict[str, Any]:
         },
         "anomalies": anomalies,
     }
+
+
+async def list_map_points(db: AsyncSession, limit: int = 2000) -> dict[str, Any]:
+    """Household GPS points for national cartography (filled on save/sync)."""
+    points: list[dict[str, Any]] = []
+    try:
+        result = await db.execute(
+            text(
+                """
+                SELECT h.id::text AS id,
+                       h.local_id,
+                       h.campaign_id::text AS campaign_id,
+                       h.address_line,
+                       h.latitude,
+                       h.longitude,
+                       h.updated_at
+                FROM recensement.households h
+                WHERE h.latitude IS NOT NULL
+                  AND h.longitude IS NOT NULL
+                ORDER BY h.updated_at DESC NULLS LAST
+                LIMIT :lim
+                """
+            ),
+            {"lim": limit},
+        )
+        for row in result.mappings():
+            points.append(
+                {
+                    "id": row["id"],
+                    "local_id": row["local_id"],
+                    "campaign_id": row["campaign_id"],
+                    "address_line": row["address_line"],
+                    "latitude": float(row["latitude"]),
+                    "longitude": float(row["longitude"]),
+                    "updated_at": row["updated_at"].isoformat()
+                    if row["updated_at"] is not None
+                    else None,
+                }
+            )
+    except Exception as exc:
+        logger.debug("onip map points fallback: %s", exc)
+        await db.rollback()
+
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "count": len(points),
+        "points": points,
+    }

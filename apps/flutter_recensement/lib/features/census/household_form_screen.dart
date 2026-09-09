@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/gps_capture.dart';
 import '../../sync/local_database.dart';
 import '../../sync/sync_queue.dart';
 import 'geo_cascade_field.dart';
 
-/// Create / edit a household with address + optional GPS.
+/// Create a household — GPS is captured automatically on save for cartography.
 class HouseholdFormScreen extends StatefulWidget {
   const HouseholdFormScreen({
     super.key,
@@ -26,10 +26,8 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
   final _detail = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   String _geoLabel = '';
-  double? _lat;
-  double? _lng;
   bool _busy = false;
-  String? _gpsError;
+  String? _status;
 
   @override
   void dispose() {
@@ -46,48 +44,52 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
     _address.text = parts.join(' — ');
   }
 
-  Future<void> _captureGps() async {
-    setState(() {
-      _busy = true;
-      _gpsError = null;
-    });
-    try {
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        setState(() => _gpsError = 'Permission GPS refusée');
-        return;
-      }
-      final enabled = await Geolocator.isLocationServiceEnabled();
-      if (!enabled) {
-        setState(() => _gpsError = 'Activez la localisation sur l’appareil');
-        return;
-      }
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 20),
-        ),
-      );
-      setState(() {
-        _lat = pos.latitude;
-        _lng = pos.longitude;
-      });
-    } catch (e) {
-      setState(() => _gpsError = 'GPS indisponible: $e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
   Future<void> _save() async {
     _rebuildAddress();
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _status = 'Capture GPS pour la cartographie…';
+    });
+
+    double? lat;
+    double? lng;
+    String? gpsNote;
     try {
+      final pos = await GpsCapture.capture();
+      if (pos != null) {
+        lat = pos.lat;
+        lng = pos.lng;
+      }
+    } catch (e) {
+      gpsNote = e is StateError ? e.message : 'GPS indisponible';
+      if (!mounted) return;
+      final cont = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('GPS non capturé'),
+          content: Text(
+            '$gpsNote\n\nEnregistrer le ménage sans point cartographique ?',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Enregistrer sans GPS')),
+          ],
+        ),
+      );
+      if (cont != true) {
+        if (mounted) {
+          setState(() {
+            _busy = false;
+            _status = null;
+          });
+        }
+        return;
+      }
+    }
+
+    try {
+      setState(() => _status = 'Enregistrement…');
       final localId = const Uuid().v4();
       final now = DateTime.now().toUtc().toIso8601String();
       final data = <String, Object?>{
@@ -95,8 +97,8 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
         'local_id': localId,
         'campaign_id': widget.campaignId,
         'address_line': _address.text.trim(),
-        'latitude': _lat,
-        'longitude': _lng,
+        'latitude': lat,
+        'longitude': lng,
         'member_count': 0,
         'updated_at': now,
       };
@@ -118,7 +120,12 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _status = null;
+        });
+      }
     }
   }
 
@@ -158,29 +165,20 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
             ),
             const SizedBox(height: 16),
             Card(
+              color: const Color(0xFFEFF6FF),
               child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Géolocalisation', style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 8),
-                    if (_lat != null && _lng != null)
-                      Text(
-                        'Lat ${_lat!.toStringAsFixed(6)} · Lng ${_lng!.toStringAsFixed(6)}',
+                    Icon(Icons.map_outlined, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _status ??
+                            'La position GPS sera capturée automatiquement à l’enregistrement pour alimenter la cartographie.',
                         style: Theme.of(context).textTheme.bodyMedium,
-                      )
-                    else
-                      const Text('Non capturée (recommandée hors ligne)'),
-                    if (_gpsError != null) ...[
-                      const SizedBox(height: 8),
-                      Text(_gpsError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                    ],
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: _busy ? null : _captureGps,
-                      icon: const Icon(Icons.my_location),
-                      label: const Text('Capturer GPS'),
+                      ),
                     ),
                   ],
                 ),
