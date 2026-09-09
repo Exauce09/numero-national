@@ -14,8 +14,19 @@ import {
   type Sexe,
 } from "../registry";
 
+const STEPS = [
+  { id: 1, label: "1. Identité" },
+  { id: 2, label: "2. Biométrie" },
+  { id: 3, label: "3. Études faites" },
+  { id: 4, label: "4. Expérience professionnelle" },
+  { id: 5, label: "5. Identité administrative actuelle" },
+  { id: 6, label: "6. Situation familiale" },
+] as const;
+
+type StepId = (typeof STEPS)[number]["id"];
+
 export default function CensusPage() {
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<StepId>(1);
   const [handicap, setHandicap] = useState<HandicapType>("NORMAL");
   const [mother, setMother] = useState<Person | null>(null);
   const [father, setFather] = useState<Person | null>(null);
@@ -26,9 +37,12 @@ export default function CensusPage() {
   const [dateNaissance, setDateNaissance] = useState("");
   const [lieuNaissance, setLieuNaissance] = useState("");
   const [geo, setGeo] = useState<GeoSelection>({});
+  const [geoResidence, setGeoResidence] = useState<GeoSelection>({});
   const [etatCivil, setEtatCivil] = useState<EtatCivil>("CELIBATAIRE");
   const [taille, setTaille] = useState("");
   const [poids, setPoids] = useState("");
+  const [adresseActuelle, setAdresseActuelle] = useState("");
+  const [professionActuelle, setProfessionActuelle] = useState("");
   const [photo, setPhoto] = useState<string | undefined>();
   const [empreinte, setEmpreinte] = useState("");
   const [iris, setIris] = useState("");
@@ -74,13 +88,27 @@ export default function CensusPage() {
     };
   }, [step]);
 
-  function goStep2() {
+  function validateStep(target: StepId): boolean {
     setError(null);
-    if (!nom.trim() || !prenom.trim() || !dateNaissance) {
-      setError("Nom, prénom et date de naissance sont requis.");
-      return;
+    if (target > 1 && (!nom.trim() || !prenom.trim() || !dateNaissance)) {
+      setError("Étape 1 : nom, prénom et date de naissance sont requis.");
+      setStep(1);
+      return false;
     }
-    setStep(2);
+    return true;
+  }
+
+  function goTo(next: StepId) {
+    if (!validateStep(next)) return;
+    setStep(next);
+  }
+
+  function goNext() {
+    if (step < 6) goTo((step + 1) as StepId);
+  }
+
+  function goPrev() {
+    if (step > 1) setStep((step - 1) as StepId);
   }
 
   function takePhoto() {
@@ -98,7 +126,9 @@ export default function CensusPage() {
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!validateStep(6)) return;
     try {
+      const lieuAdmin = (geoResidence.label || adresseActuelle).trim();
       const person = addPerson({
         nom: nom.trim(),
         postnom: postnom.trim(),
@@ -117,7 +147,9 @@ export default function CensusPage() {
         iris_note: iris.trim() || undefined,
         parcours_scolaire: scolaire.trim() || undefined,
         parcours_universitaire: universitaire.trim() || undefined,
-        parcours_professionnel: professionnel.trim() || undefined,
+        parcours_professionnel: [professionnel.trim(), professionActuelle.trim()]
+          .filter(Boolean)
+          .join(" | ") || undefined,
         situation_familiale: situation.trim() || undefined,
       });
       const payload = {
@@ -128,7 +160,7 @@ export default function CensusPage() {
         sexe: person.sexe,
         date_naissance: person.date_naissance,
         lieu_naissance: person.lieu_naissance,
-        commune_code: geo.commune_code ?? null,
+        commune_code: geoResidence.commune_code ?? geo.commune_code ?? null,
         etat_civil: person.etat_civil,
         taille: person.taille ?? null,
         poids: person.poids ?? null,
@@ -142,6 +174,8 @@ export default function CensusPage() {
         parcours_universitaire: person.parcours_universitaire ?? null,
         parcours_professionnel: person.parcours_professionnel ?? null,
         situation_familiale: person.situation_familiale ?? null,
+        adresse_actuelle: lieuAdmin || null,
+        profession_actuelle: professionActuelle.trim() || null,
       };
       const act = addAct("CENSUS", payload, person.nic);
       setCreated(act);
@@ -155,17 +189,27 @@ export default function CensusPage() {
   return (
     <div>
       <h2 className="page-title">Recensement</h2>
-      <p className="page-lead">Wizard en 2 étapes — identité puis biométrie / parcours.</p>
+      <p className="page-lead">
+        Wizard en 6 étapes — identité, biométrie, études, expérience, identité administrative, situation familiale.
+      </p>
 
-      <div className="wizard-steps">
-        <span className={step === 1 ? "active" : ""}>1. Identité</span>
-        <span className={step === 2 ? "active" : ""}>2. Biométrie</span>
+      <div className="wizard-steps census-wizard-steps">
+        {STEPS.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            className={`wizard-step-btn${step === s.id ? " active" : ""}`}
+            onClick={() => goTo(s.id)}
+          >
+            {s.label}
+          </button>
+        ))}
       </div>
 
       {error ? <div className="login-error">{error}</div> : null}
 
-      {step === 1 ? (
-        <div className="panel">
+      <div className="panel">
+        {step === 1 ? (
           <div className="form-grid">
             <div>
               <label className="form-label">Type de handicap</label>
@@ -225,38 +269,11 @@ export default function CensusPage() {
                 label="Lieu de naissance — territoire RDC"
               />
             </div>
-            <div>
-              <label className="form-label">État civil</label>
-              <select
-                className="form-control"
-                value={etatCivil}
-                onChange={(e) => setEtatCivil(e.target.value as EtatCivil)}
-              >
-                {ETAT_CIVIL_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="form-label">Taille (cm)</label>
-              <input className="form-control" type="number" value={taille} onChange={(e) => setTaille(e.target.value)} />
-            </div>
-            <div>
-              <label className="form-label">Poids (kg)</label>
-              <input className="form-control" type="number" value={poids} onChange={(e) => setPoids(e.target.value)} />
-            </div>
-            <div className="full">
-              <button type="button" className="btn-next" style={{ width: "auto", minWidth: 160 }} onClick={goStep2}>
-                Suivant
-              </button>
-            </div>
           </div>
-        </div>
-      ) : (
-        <div className="panel">
-          <form className="form-grid" onSubmit={onSubmit}>
+        ) : null}
+
+        {step === 2 ? (
+          <div className="form-grid">
             <div className="full webcam-box">
               <video ref={videoRef} playsInline muted />
               <canvas ref={canvasRef} style={{ display: "none" }} />
@@ -276,32 +293,117 @@ export default function CensusPage() {
               <label className="form-label">Iris</label>
               <input className="form-control" value={iris} onChange={(e) => setIris(e.target.value)} />
             </div>
+          </div>
+        ) : null}
+
+        {step === 3 ? (
+          <div className="form-grid">
             <div className="full">
               <label className="form-label">Parcours scolaire</label>
-              <textarea className="form-control" value={scolaire} onChange={(e) => setScolaire(e.target.value)} />
+              <textarea
+                className="form-control"
+                rows={4}
+                value={scolaire}
+                onChange={(e) => setScolaire(e.target.value)}
+                placeholder="Écoles, niveaux, diplômes…"
+              />
             </div>
             <div className="full">
               <label className="form-label">Parcours universitaire</label>
               <textarea
                 className="form-control"
+                rows={4}
                 value={universitaire}
                 onChange={(e) => setUniversitaire(e.target.value)}
+                placeholder="Facultés, filières, diplômes…"
               />
             </div>
+          </div>
+        ) : null}
+
+        {step === 4 ? (
+          <div className="form-grid">
             <div className="full">
-              <label className="form-label">Parcours professionnel</label>
+              <label className="form-label">Expérience professionnelle</label>
               <textarea
                 className="form-control"
+                rows={6}
                 value={professionnel}
                 onChange={(e) => setProfessionnel(e.target.value)}
+                placeholder="Emplois, entreprises, périodes, responsabilités…"
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {step === 5 ? (
+          <div className="form-grid">
+            <div>
+              <label className="form-label">État civil actuel</label>
+              <select
+                className="form-control"
+                value={etatCivil}
+                onChange={(e) => setEtatCivil(e.target.value as EtatCivil)}
+              >
+                {ETAT_CIVIL_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Profession actuelle</label>
+              <input
+                className="form-control"
+                value={professionActuelle}
+                onChange={(e) => setProfessionActuelle(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="form-label">Taille (cm)</label>
+              <input className="form-control" type="number" value={taille} onChange={(e) => setTaille(e.target.value)} />
+            </div>
+            <div>
+              <label className="form-label">Poids (kg)</label>
+              <input className="form-control" type="number" value={poids} onChange={(e) => setPoids(e.target.value)} />
+            </div>
+            <div className="full">
+              <GeoCascade
+                value={geoResidence}
+                onChange={(g) => {
+                  setGeoResidence(g);
+                  if (g.label) setAdresseActuelle(g.label);
+                }}
+                label="Résidence / adresse administrative actuelle"
               />
             </div>
             <div className="full">
-              <label className="form-label">Situation familiale</label>
-              <textarea className="form-control" value={situation} onChange={(e) => setSituation(e.target.value)} />
+              <label className="form-label">Adresse actuelle (complément)</label>
+              <input
+                className="form-control"
+                value={adresseActuelle}
+                onChange={(e) => setAdresseActuelle(e.target.value)}
+                placeholder="Avenue, n°, quartier…"
+              />
             </div>
-            <div className="full modal-actions">
-              <button type="button" className="btn-secondary" onClick={() => setStep(1)}>
+          </div>
+        ) : null}
+
+        {step === 6 ? (
+          <form className="form-grid" onSubmit={onSubmit}>
+            <div className="full">
+              <label className="form-label">Situation familiale</label>
+              <textarea
+                className="form-control"
+                rows={6}
+                value={situation}
+                onChange={(e) => setSituation(e.target.value)}
+                placeholder="Conjoint(e), enfants, personnes à charge…"
+              />
+            </div>
+            <div className="full census-nav">
+              <button type="button" className="btn-secondary" onClick={goPrev}>
                 Retour
               </button>
               <button type="submit" className="btn-primary" style={{ width: "auto", minWidth: 180 }}>
@@ -309,8 +411,23 @@ export default function CensusPage() {
               </button>
             </div>
           </form>
-        </div>
-      )}
+        ) : null}
+
+        {step !== 6 ? (
+          <div className="census-nav">
+            {step > 1 ? (
+              <button type="button" className="btn-secondary" onClick={goPrev}>
+                Retour
+              </button>
+            ) : (
+              <span />
+            )}
+            <button type="button" className="btn-next" style={{ width: "auto", minWidth: 160 }} onClick={goNext}>
+              Suivant
+            </button>
+          </div>
+        ) : null}
+      </div>
 
       {created ? (
         <div className="panel" style={{ marginTop: "1rem" }}>

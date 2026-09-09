@@ -854,23 +854,53 @@
 
 .wizard-steps {
   display: flex;
-  gap: 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   margin-bottom: 1rem;
 }
 
-.wizard-steps span {
-  padding: 0.45rem 0.9rem;
+.wizard-steps span,
+.wizard-step-btn {
+  padding: 0.45rem 0.75rem;
   border-radius: 999px;
   border: 1px solid var(--egouv-line);
   color: var(--egouv-muted);
-  font-size: 0.88rem;
-  font-weight: 600;
+  font-size: 0.82rem;
+  font-weight: 650;
+  background: var(--egouv-card, #fff);
+  cursor: pointer;
+  font: inherit;
 }
 
-.wizard-steps span.active {
+.wizard-steps span.active,
+.wizard-step-btn.active {
   background: var(--egouv-primary);
   border-color: var(--egouv-primary);
   color: #fff;
+}
+
+.wizard-step-btn:hover {
+  border-color: var(--egouv-primary);
+  color: var(--egouv-primary);
+}
+
+.wizard-step-btn.active:hover {
+  color: #fff;
+}
+
+.census-wizard-steps {
+  gap: 0.45rem;
+}
+
+.census-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--egouv-line);
 }
 
 .webcam-box {
