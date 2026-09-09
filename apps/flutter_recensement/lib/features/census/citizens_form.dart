@@ -5,12 +5,12 @@ import 'package:uuid/uuid.dart';
 
 import '../../sync/local_database.dart';
 import '../../sync/sync_queue.dart';
-import 'photo_capture.dart';
 import 'fingerprint_capture.dart';
+import 'geo_cascade_field.dart';
+import 'photo_capture.dart';
 import 'rdc_tribus.dart';
 
-/// Fiche personne — alignée sur le formulaire officiel
-/// (`frontends/civil-officer` → Recensement / Identité).
+/// Fiche personne — wizard 7 étapes aligné sur le site civil-officer.
 class CitizensFormScreen extends StatefulWidget {
   const CitizensFormScreen({
     super.key,
@@ -29,6 +29,7 @@ class CitizensFormScreen extends StatefulWidget {
 
 class _CitizensFormScreenState extends State<CitizensFormScreen> {
   final _formKey = GlobalKey<FormState>();
+  int _step = 1;
 
   late final TextEditingController _nom;
   late final TextEditingController _postnom;
@@ -43,7 +44,18 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   late final TextEditingController _nationalite;
   late final TextEditingController _paysResidence;
   late final TextEditingController _telephone;
+  late final TextEditingController _email;
+  late final TextEditingController _boitePostale;
+  late final TextEditingController _numeroAvenue;
   late final TextEditingController _tribu;
+  late final TextEditingController _empreinteGauche;
+  late final TextEditingController _empreinteDroite;
+  late final TextEditingController _iris;
+  late final TextEditingController _scolaire;
+  late final TextEditingController _universitaire;
+  late final TextEditingController _professionnel;
+  late final TextEditingController _numeroAdmin;
+  late final TextEditingController _situation;
 
   String _sex = 'M';
   String _etatCivil = 'CELIBATAIRE';
@@ -51,10 +63,23 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   String _relation = 'AUTRE';
   String? _photoRef;
   String? _fingerprintRef;
+  Map<String, String?> _geoNaissance = {};
+  Map<String, String?> _geoActuelle = {};
+  Map<String, String?> _geoOrigine = {};
   bool _busy = false;
   String? _rejectNote;
 
   bool get _isEdit => widget.existing != null;
+
+  static const _steps = <(int, String)>[
+    (1, 'Identité'),
+    (2, 'Origine'),
+    (3, 'Biométrie'),
+    (4, 'Études'),
+    (5, 'Expérience'),
+    (6, 'Admin'),
+    (7, 'Famille'),
+  ];
 
   static const _etatCivilOptions = <(String, String)>[
     ('CELIBATAIRE', 'Célibataire'),
@@ -104,7 +129,23 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
       text: payload['pays_residence']?.toString() ?? 'RDC',
     );
     _telephone = TextEditingController(text: payload['telephone']?.toString() ?? '');
+    _email = TextEditingController(text: payload['email']?.toString() ?? '');
+    _boitePostale = TextEditingController(text: payload['boite_postale']?.toString() ?? '');
+    _numeroAvenue = TextEditingController(text: payload['numero_avenue']?.toString() ?? '');
     _tribu = TextEditingController(text: payload['tribu']?.toString() ?? '');
+    _empreinteGauche =
+        TextEditingController(text: payload['empreinte_gauche']?.toString() ?? '');
+    _empreinteDroite =
+        TextEditingController(text: payload['empreinte_droite']?.toString() ?? '');
+    _iris = TextEditingController(text: payload['iris']?.toString() ?? '');
+    _scolaire = TextEditingController(text: payload['parcours_scolaire']?.toString() ?? '');
+    _universitaire =
+        TextEditingController(text: payload['parcours_universitaire']?.toString() ?? '');
+    _professionnel =
+        TextEditingController(text: payload['parcours_professionnel']?.toString() ?? '');
+    _numeroAdmin = TextEditingController(text: payload['numero_admin']?.toString() ?? '');
+    _situation =
+        TextEditingController(text: payload['situation_familiale']?.toString() ?? '');
 
     _sex = e?['sex']?.toString() ?? 'M';
     _etatCivil = payload['etat_civil']?.toString() ?? 'CELIBATAIRE';
@@ -112,7 +153,15 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     _relation = payload['relationship_to_head']?.toString() ?? 'AUTRE';
     _photoRef = e?['photo_ref']?.toString();
     _fingerprintRef = payload['fingerprint_ref']?.toString();
+    _geoNaissance = _asStringMap(payload['geo_naissance']);
+    _geoActuelle = _asStringMap(payload['geo_actuelle']);
+    _geoOrigine = _asStringMap(payload['geo_origine']);
     _rejectNote = e?['review_note']?.toString();
+  }
+
+  Map<String, String?> _asStringMap(Object? raw) {
+    if (raw is! Map) return {};
+    return raw.map((k, v) => MapEntry(k.toString(), v?.toString()));
   }
 
   Map<String, dynamic> _decodePayload(Object? raw) {
@@ -142,7 +191,18 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     _nationalite.dispose();
     _paysResidence.dispose();
     _telephone.dispose();
+    _email.dispose();
+    _boitePostale.dispose();
+    _numeroAvenue.dispose();
     _tribu.dispose();
+    _empreinteGauche.dispose();
+    _empreinteDroite.dispose();
+    _iris.dispose();
+    _scolaire.dispose();
+    _universitaire.dispose();
+    _professionnel.dispose();
+    _numeroAdmin.dispose();
+    _situation.dispose();
     super.dispose();
   }
 
@@ -160,14 +220,32 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     }
   }
 
+  bool _validateStep1() {
+    if (_nom.text.trim().isEmpty ||
+        _prenom.text.trim().isEmpty ||
+        !_validDate(_dob.text.trim())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Étape Identité : nom, prénom et date (AAAA-MM-JJ) requis'),
+        ),
+      );
+      return false;
+    }
+    return true;
+  }
+
   Map<String, dynamic> _buildPayload() {
+    final lieu = _geoNaissance['label']?.trim().isNotEmpty == true
+        ? _geoNaissance['label']
+        : _lieuNaissance.text.trim();
     return {
       'nom': _nom.text.trim(),
       'postnom': _postnom.text.trim(),
       'prenom': _prenom.text.trim(),
       'etat_civil': _etatCivil,
       'profession': _profession.text.trim(),
-      'lieu_naissance': _lieuNaissance.text.trim(),
+      'lieu_naissance': lieu,
+      'geo_naissance': _geoNaissance,
       'hopital_naissance': _hopitalNaissance.text.trim(),
       'langues_parlees': _langues.text.trim(),
       'nom_pere': _pere.text.trim(),
@@ -176,14 +254,41 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
       'pays_residence': _paysResidence.text.trim(),
       'handicap': _handicap,
       'telephone': _telephone.text.trim(),
+      'email': _email.text.trim(),
+      'boite_postale': _boitePostale.text.trim(),
+      'numero_avenue': _numeroAvenue.text.trim(),
+      'geo_actuelle': _geoActuelle,
+      'province_actuelle': _geoActuelle['province_name'],
+      'ville_actuelle': _geoActuelle['ville_name'],
+      'commune_actuelle': _geoActuelle['commune_name'],
+      'village_actuel': _geoActuelle['localite_name'],
+      'quartier_actuel': _geoActuelle['quartier_name'],
+      'avenue_actuelle': _geoActuelle['avenue_name'],
+      'geo_origine': _geoOrigine,
+      'province_origine': _geoOrigine['province_name'],
+      'ville_origine': _geoOrigine['ville_name'],
+      'territoire_origine': _geoOrigine['district_name'],
+      'secteur_chefferie_commune': _geoOrigine['commune_name'],
+      'village_origine': _geoOrigine['localite_name'],
       'tribu': _tribu.text.trim(),
+      'empreinte_gauche': _empreinteGauche.text.trim(),
+      'empreinte_droite': _empreinteDroite.text.trim(),
+      'iris': _iris.text.trim(),
       'fingerprint_ref': _fingerprintRef,
+      'parcours_scolaire': _scolaire.text.trim(),
+      'parcours_universitaire': _universitaire.text.trim(),
+      'parcours_professionnel': _professionnel.text.trim(),
+      'numero_admin': _numeroAdmin.text.trim(),
+      'situation_familiale': _situation.text.trim(),
       'relationship_to_head': _relation,
     };
   }
 
   Future<void> _save() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!_validateStep1()) {
+      setState(() => _step = 1);
+      return;
+    }
     setState(() => _busy = true);
     try {
       final db = LocalDatabase.instance.db;
@@ -327,6 +432,428 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     );
   }
 
+  Widget _stepChip(int id, String label) {
+    final active = _step == id;
+    final done = _step > id;
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: ChoiceChip(
+        label: Text('$id. $label', style: const TextStyle(fontSize: 12)),
+        selected: active,
+        onSelected: (_) {
+          if (id > 1 && !_validateStep1()) return;
+          setState(() => _step = id);
+        },
+        selectedColor: const Color(0xFF5D87FF),
+        labelStyle: TextStyle(
+          color: active ? Colors.white : (done ? const Color(0xFF5D87FF) : null),
+          fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
+  Widget _navBar({required bool isLast}) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          if (_step > 1)
+            OutlinedButton(
+              onPressed: _busy ? null : () => setState(() => _step -= 1),
+              child: const Text('Retour'),
+            )
+          else
+            const SizedBox.shrink(),
+          const Spacer(),
+          if (!isLast)
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF5D87FF)),
+              onPressed: _busy
+                  ? null
+                  : () {
+                      if (_step == 1 && !_validateStep1()) return;
+                      setState(() => _step += 1);
+                    },
+              child: const Text('Suivant'),
+            )
+          else
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF5D87FF),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+              onPressed: _busy ? null : _save,
+              child: _busy
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(_isEdit ? 'Corriger et renvoyer' : 'Enregistrer'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStep1() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _section('Identité de la personne', [
+          TextFormField(
+            controller: _nom,
+            decoration: _dec('Nom de la personne *'),
+            textCapitalization: TextCapitalization.characters,
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _postnom,
+            decoration: _dec('Post-nom de la personne'),
+            textCapitalization: TextCapitalization.characters,
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _prenom,
+            decoration: _dec('Prénom *'),
+            textCapitalization: TextCapitalization.words,
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _sex,
+                  decoration: _dec('Sexe'),
+                  items: const [
+                    DropdownMenuItem(value: 'M', child: Text('Masculin')),
+                    DropdownMenuItem(value: 'F', child: Text('Féminin')),
+                  ],
+                  onChanged: (v) => setState(() => _sex = v ?? 'M'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _etatCivil,
+                  decoration: _dec('État-civil'),
+                  items: [
+                    for (final o in _etatCivilOptions)
+                      DropdownMenuItem(value: o.$1, child: Text(o.$2)),
+                  ],
+                  onChanged: (v) => setState(() => _etatCivil = v ?? 'CELIBATAIRE'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          TextFormField(controller: _profession, decoration: _dec('Profession')),
+          const SizedBox(height: 10),
+          GeoCascadeField(
+            preset: GeoCascadePreset.place,
+            title: 'Lieu de naissance',
+            onLabelChanged: (label) {
+              _lieuNaissance.text = label;
+            },
+            onSelectionChanged: (sel) => _geoNaissance = sel,
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _dob,
+            decoration: _dec('Date de naissance *', hint: 'AAAA-MM-JJ'),
+            keyboardType: TextInputType.datetime,
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _hopitalNaissance,
+            decoration: _dec('Hôpital de naissance'),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _langues,
+            decoration: _dec('Langues parlées', hint: 'Français, Lingala…'),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(controller: _pere, decoration: _dec('Nom du père')),
+          const SizedBox(height: 10),
+          TextFormField(controller: _mere, decoration: _dec('Nom de la mère')),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _nationalite,
+                  decoration: _dec('Nationalité'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextFormField(
+                  controller: _paysResidence,
+                  decoration: _dec('Pays de résidence'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            value: _handicap,
+            decoration: _dec('Type de handicap'),
+            items: [
+              for (final o in _handicapOptions)
+                DropdownMenuItem(value: o.$1, child: Text(o.$2)),
+            ],
+            onChanged: (v) => setState(() => _handicap = v ?? 'NORMAL'),
+          ),
+        ]),
+        _section('Adresse actuelle', [
+          GeoCascadeField(
+            preset: GeoCascadePreset.address,
+            title: 'Adresse actuelle',
+            onLabelChanged: (_) {},
+            onSelectionChanged: (sel) => _geoActuelle = sel,
+          ),
+          const SizedBox(height: 10),
+          TextFormField(controller: _numeroAvenue, decoration: _dec('N° avenue / parcelle')),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _telephone,
+            decoration: _dec('Numéro de téléphone'),
+            keyboardType: TextInputType.phone,
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _email,
+            decoration: _dec('Adresse e-mail'),
+            keyboardType: TextInputType.emailAddress,
+          ),
+          const SizedBox(height: 10),
+          TextFormField(controller: _boitePostale, decoration: _dec('Boîte postale')),
+        ]),
+        _section('Lien dans le ménage', [
+          DropdownButtonFormField<String>(
+            value: _relation,
+            decoration: _dec('Lien avec le chef de ménage'),
+            items: const [
+              DropdownMenuItem(value: 'CHEF', child: Text('Chef de ménage')),
+              DropdownMenuItem(value: 'CONJOINT', child: Text('Conjoint(e)')),
+              DropdownMenuItem(value: 'ENFANT', child: Text('Enfant')),
+              DropdownMenuItem(value: 'PARENT', child: Text('Parent')),
+              DropdownMenuItem(value: 'AUTRE', child: Text('Autre')),
+            ],
+            onChanged: (v) => setState(() => _relation = v ?? 'AUTRE'),
+          ),
+        ]),
+        _navBar(isLast: false),
+      ],
+    );
+  }
+
+  Widget _buildStep2() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _section('Originaire', [
+          GeoCascadeField(
+            preset: GeoCascadePreset.origin,
+            title: 'Origine',
+            onLabelChanged: (_) {},
+            onSelectionChanged: (sel) => _geoOrigine = sel,
+          ),
+          const SizedBox(height: 10),
+          Autocomplete<String>(
+            optionsBuilder: (TextEditingValue tev) {
+              final q = tev.text.trim().toLowerCase();
+              if (q.isEmpty) return kRdcTribus.take(40);
+              return kRdcTribus.where((t) => t.toLowerCase().contains(q)).take(60);
+            },
+            onSelected: (v) {
+              _tribu.text = v;
+              setState(() {});
+            },
+            fieldViewBuilder: (context, controller, focus, onSubmit) {
+              if (controller.text.isEmpty && _tribu.text.isNotEmpty) {
+                controller.text = _tribu.text;
+              }
+              return TextFormField(
+                controller: controller,
+                focusNode: focus,
+                decoration: _dec(
+                  'Tribu / ethnie',
+                  hint: '${kRdcTribus.length} références — ou Autre',
+                ),
+                onChanged: (v) => _tribu.text = v,
+                onFieldSubmitted: (_) => onSubmit(),
+              );
+            },
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              kRdcTribusNote,
+              style: const TextStyle(fontSize: 11, color: Color(0xFF5A6A85)),
+            ),
+          ),
+        ]),
+        _navBar(isLast: false),
+      ],
+    );
+  }
+
+  Widget _buildStep3() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _section('Photo / reconnaissance faciale', [
+          PhotoCaptureWidget(
+            initialRef: _photoRef,
+            onCaptured: (ref) => setState(() => _photoRef = ref),
+          ),
+        ]),
+        _section('Empreintes', [
+          TextFormField(
+            controller: _empreinteGauche,
+            decoration: _dec('Empreinte gauche (réf.)'),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton(
+              onPressed: () {
+                final ref = 'CAP-G-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
+                setState(() => _empreinteGauche.text = ref);
+              },
+              child: const Text('Capturer gauche'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _empreinteDroite,
+            decoration: _dec('Empreinte droite (réf.)'),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton(
+              onPressed: () {
+                final ref = 'CAP-D-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
+                setState(() => _empreinteDroite.text = ref);
+              },
+              child: const Text('Capturer droite'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(controller: _iris, decoration: _dec('Iris (réf.)')),
+          const SizedBox(height: 12),
+          FingerprintCaptureWidget(
+            initialRef: _fingerprintRef,
+            onCaptured: (ref) => setState(() => _fingerprintRef = ref),
+          ),
+        ]),
+        _navBar(isLast: false),
+      ],
+    );
+  }
+
+  Widget _buildStep4() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _section('Études', [
+          TextFormField(
+            controller: _scolaire,
+            decoration: _dec('Parcours scolaire'),
+            maxLines: 4,
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _universitaire,
+            decoration: _dec('Parcours universitaire'),
+            maxLines: 4,
+          ),
+        ]),
+        _navBar(isLast: false),
+      ],
+    );
+  }
+
+  Widget _buildStep5() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _section('Expérience professionnelle', [
+          TextFormField(
+            controller: _professionnel,
+            decoration: _dec('Expérience professionnelle'),
+            maxLines: 6,
+          ),
+        ]),
+        _navBar(isLast: false),
+      ],
+    );
+  }
+
+  Widget _buildStep6() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _section('Identité administrative', [
+          TextFormField(
+            controller: _numeroAdmin,
+            decoration: _dec('N° administratif / référence dossier'),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'L’identité, la profession, l’état civil et l’adresse sont saisis à l’étape Identité.',
+            style: TextStyle(fontSize: 12, color: Color(0xFF5A6A85)),
+          ),
+        ]),
+        _navBar(isLast: false),
+      ],
+    );
+  }
+
+  Widget _buildStep7() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _section('Situation familiale', [
+          TextFormField(
+            controller: _situation,
+            decoration: _dec(
+              'Situation familiale',
+              hint: 'Conjoint(e), enfants, personnes à charge…',
+            ),
+            maxLines: 6,
+          ),
+        ]),
+        _navBar(isLast: true),
+      ],
+    );
+  }
+
+  Widget _stepBody() {
+    switch (_step) {
+      case 1:
+        return _buildStep1();
+      case 2:
+        return _buildStep2();
+      case 3:
+        return _buildStep3();
+      case 4:
+        return _buildStep4();
+      case 5:
+        return _buildStep5();
+      case 6:
+        return _buildStep6();
+      case 7:
+        return _buildStep7();
+      default:
+        return _buildStep1();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -350,215 +877,18 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               const SizedBox(height: 8),
             ],
             const Text(
-              'Formulaire d’identification — modèle officiel RDC',
+              'Formulaire d’identification — 7 étapes (comme le site)',
               style: TextStyle(color: Color(0xFF5A6A85), fontSize: 13),
             ),
-            const SizedBox(height: 12),
-            _section('Identité de la personne', [
-              TextFormField(
-                controller: _nom,
-                decoration: _dec('Nom de la personne *'),
-                textCapitalization: TextCapitalization.characters,
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Obligatoire' : null,
+            const SizedBox(height: 10),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [for (final s in _steps) _stepChip(s.$1, s.$2)],
               ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _postnom,
-                decoration: _dec('Post-nom de la personne'),
-                textCapitalization: TextCapitalization.characters,
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _prenom,
-                decoration: _dec('Prénom *'),
-                textCapitalization: TextCapitalization.words,
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Obligatoire' : null,
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _sex,
-                      decoration: _dec('Sexe'),
-                      items: const [
-                        DropdownMenuItem(value: 'M', child: Text('Masculin')),
-                        DropdownMenuItem(value: 'F', child: Text('Féminin')),
-                      ],
-                      onChanged: (v) => setState(() => _sex = v ?? 'M'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _etatCivil,
-                      decoration: _dec('État-civil'),
-                      items: [
-                        for (final o in _etatCivilOptions)
-                          DropdownMenuItem(value: o.$1, child: Text(o.$2)),
-                      ],
-                      onChanged: (v) =>
-                          setState(() => _etatCivil = v ?? 'CELIBATAIRE'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _profession,
-                decoration: _dec('Profession'),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _lieuNaissance,
-                decoration: _dec('Lieu de naissance'),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _dob,
-                decoration: _dec('Date de naissance *', hint: 'AAAA-MM-JJ'),
-                keyboardType: TextInputType.datetime,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Obligatoire';
-                  if (!_validDate(v.trim())) return 'Format AAAA-MM-JJ invalide';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _hopitalNaissance,
-                decoration: _dec('Hôpital de naissance'),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _langues,
-                decoration: _dec(
-                  'Langues parlées',
-                  hint: 'Français, Lingala…',
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _pere,
-                decoration: _dec('Nom du père'),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _mere,
-                decoration: _dec('Nom de la mère'),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _nationalite,
-                      decoration: _dec('Nationalité'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _paysResidence,
-                      decoration: _dec('Pays de résidence'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                value: _handicap,
-                decoration: _dec('Type de handicap'),
-                items: [
-                  for (final o in _handicapOptions)
-                    DropdownMenuItem(value: o.$1, child: Text(o.$2)),
-                ],
-                onChanged: (v) => setState(() => _handicap = v ?? 'NORMAL'),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _telephone,
-                decoration: _dec('Numéro de téléphone'),
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 10),
-              Autocomplete<String>(
-                optionsBuilder: (TextEditingValue tev) {
-                  final q = tev.text.trim().toLowerCase();
-                  if (q.isEmpty) return kRdcTribus.take(40);
-                  return kRdcTribus.where((t) => t.toLowerCase().contains(q)).take(60);
-                },
-                onSelected: (v) {
-                  _tribu.text = v;
-                  setState(() {});
-                },
-                fieldViewBuilder: (context, controller, focus, onSubmit) {
-                  return TextFormField(
-                    controller: controller,
-                    focusNode: focus,
-                    decoration: _dec(
-                      'Tribu / ethnie',
-                      hint: '${kRdcTribus.length} références — ou Autre',
-                    ),
-                    onChanged: (v) => _tribu.text = v,
-                    onFieldSubmitted: (_) => onSubmit(),
-                  );
-                },
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(
-                  kRdcTribusNote,
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF5A6A85)),
-                ),
-              ),
-            ]),
-            _section('Lien dans le ménage', [
-              DropdownButtonFormField<String>(
-                value: _relation,
-                decoration: _dec('Lien avec le chef de ménage'),
-                items: const [
-                  DropdownMenuItem(value: 'CHEF', child: Text('Chef de ménage')),
-                  DropdownMenuItem(value: 'CONJOINT', child: Text('Conjoint(e)')),
-                  DropdownMenuItem(value: 'ENFANT', child: Text('Enfant')),
-                  DropdownMenuItem(value: 'PARENT', child: Text('Parent')),
-                  DropdownMenuItem(value: 'AUTRE', child: Text('Autre')),
-                ],
-                onChanged: (v) => setState(() => _relation = v ?? 'AUTRE'),
-              ),
-            ]),
-            _section('Photo', [
-              PhotoCaptureWidget(
-                initialRef: _photoRef,
-                onCaptured: (ref) => setState(() => _photoRef = ref),
-              ),
-            ]),
-            _section('Empreinte (capteur téléphone)', [
-              FingerprintCaptureWidget(
-                initialRef: _fingerprintRef,
-                onCaptured: (ref) => setState(() => _fingerprintRef = ref),
-              ),
-            ]),
-            const SizedBox(height: 8),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF5D87FF),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              onPressed: _busy ? null : _save,
-              child: _busy
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Text(_isEdit ? 'Corriger et renvoyer' : 'Enregistrer la fiche'),
             ),
+            const SizedBox(height: 12),
+            _stepBody(),
           ],
         ),
       ),

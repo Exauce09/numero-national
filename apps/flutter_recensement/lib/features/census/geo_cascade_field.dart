@@ -26,12 +26,29 @@ class GeoItem {
   }
 }
 
-/// Province → Ville → Commune → Village → Quartier → Avenue
-/// (+ boutons Ajouter village / quartier / avenue).
+enum GeoCascadePreset {
+  /// Province → Ville → Commune → Village → Quartier → Avenue
+  address,
+  /// Province → Ville → Commune
+  place,
+  /// Province → Ville → Territoire → Secteur/Commune → Village
+  origin,
+}
+
+/// Cascades géo RDC (API /geo/*) avec ajout village / quartier / avenue.
 class GeoCascadeField extends StatefulWidget {
-  const GeoCascadeField({super.key, required this.onLabelChanged});
+  const GeoCascadeField({
+    super.key,
+    required this.onLabelChanged,
+    this.onSelectionChanged,
+    this.preset = GeoCascadePreset.address,
+    this.title,
+  });
 
   final ValueChanged<String> onLabelChanged;
+  final ValueChanged<Map<String, String?>>? onSelectionChanged;
+  final GeoCascadePreset preset;
+  final String? title;
 
   @override
   State<GeoCascadeField> createState() => _GeoCascadeFieldState();
@@ -41,12 +58,14 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
   final _api = ApiClient();
   List<GeoItem> _provinces = [];
   List<GeoItem> _villes = [];
+  List<GeoItem> _districts = [];
   List<GeoItem> _communes = [];
   List<GeoItem> _villages = [];
   List<GeoItem> _quartiers = [];
   List<GeoItem> _avenues = [];
   String? _provinceId;
   String? _villeId;
+  String? _districtId;
   String? _communeId;
   String? _villageId;
   String? _quartierId;
@@ -54,6 +73,23 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
   String? _error;
   String? _hint;
   bool _loading = true;
+
+  bool get _showDistrict => widget.preset == GeoCascadePreset.origin;
+  bool get _showVillage =>
+      widget.preset == GeoCascadePreset.address ||
+      widget.preset == GeoCascadePreset.origin;
+  bool get _showQuartierAvenue => widget.preset == GeoCascadePreset.address;
+
+  String get _subtitle {
+    switch (widget.preset) {
+      case GeoCascadePreset.place:
+        return 'Province → Ville → Commune';
+      case GeoCascadePreset.origin:
+        return 'Province → Ville → Territoire → Secteur/Commune → Village';
+      case GeoCascadePreset.address:
+        return 'Province → Ville → Commune → Village → Quartier → Avenue';
+    }
+  }
 
   @override
   void initState() {
@@ -86,7 +122,7 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
         if (rows.isEmpty) {
           _error = 'Géo indisponible — saisissez l’adresse manuellement.';
         } else {
-          _hint = '${rows.length} provinces — sélectionnez jusqu’à Avenue';
+          _hint = '${rows.length} provinces';
         }
       });
     } catch (e) {
@@ -98,34 +134,54 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
     }
   }
 
+  String? _nameOf(String? id, List<GeoItem> list, {bool voie = false}) {
+    if (id == null) return null;
+    for (final i in list) {
+      if (i.id == id) return voie ? i.displayName : i.name;
+    }
+    return null;
+  }
+
   void _emit() {
     final parts = <String>[];
-    String? nameOf(String? id, List<GeoItem> list, {bool voie = false}) {
-      if (id == null) return null;
-      for (final i in list) {
-        if (i.id == id) return voie ? i.displayName : i.name;
-      }
-      return null;
-    }
-
     for (final x in [
-      nameOf(_provinceId, _provinces),
-      nameOf(_villeId, _villes),
-      nameOf(_communeId, _communes),
-      nameOf(_villageId, _villages),
-      nameOf(_quartierId, _quartiers),
-      nameOf(_avenueId, _avenues, voie: true),
+      _nameOf(_provinceId, _provinces),
+      _nameOf(_villeId, _villes),
+      if (_showDistrict) _nameOf(_districtId, _districts),
+      _nameOf(_communeId, _communes),
+      if (_showVillage) _nameOf(_villageId, _villages),
+      if (_showQuartierAvenue) _nameOf(_quartierId, _quartiers),
+      if (_showQuartierAvenue) _nameOf(_avenueId, _avenues, voie: true),
     ]) {
       if (x != null) parts.add(x);
     }
-    widget.onLabelChanged(parts.join(' · '));
+    final label = parts.join(' · ');
+    widget.onLabelChanged(label);
+    widget.onSelectionChanged?.call({
+      'province_name': _nameOf(_provinceId, _provinces),
+      'ville_name': _nameOf(_villeId, _villes),
+      'district_name': _nameOf(_districtId, _districts),
+      'commune_name': _nameOf(_communeId, _communes),
+      'commune_code': () {
+        if (_communeId == null) return null;
+        for (final i in _communes) {
+          if (i.id == _communeId) return i.code;
+        }
+        return null;
+      }(),
+      'localite_name': _nameOf(_villageId, _villages),
+      'quartier_name': _nameOf(_quartierId, _quartiers),
+      'avenue_name': _nameOf(_avenueId, _avenues),
+      'label': label,
+    });
   }
 
   Future<void> _onProvince(String? id) async {
     setState(() {
       _provinceId = id;
-      _villeId = _communeId = _villageId = _quartierId = _avenueId = null;
+      _villeId = _districtId = _communeId = _villageId = _quartierId = _avenueId = null;
       _villes = [];
+      _districts = [];
       _communes = [];
       _villages = [];
       _quartiers = [];
@@ -133,30 +189,52 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
     });
     _emit();
     if (id == null) return;
-    final rows = await _getList('/geo/villes?province_id=$id');
+    final villes = await _getList('/geo/villes?province_id=$id');
+    final districts =
+        _showDistrict ? await _getList('/geo/districts?province_id=$id') : <GeoItem>[];
     if (!mounted) return;
     setState(() {
-      _villes = rows;
-      _hint = '${rows.length} ville(s)';
+      _villes = villes;
+      _districts = districts;
+      _hint = '${villes.length} ville(s)';
     });
   }
 
   Future<void> _onVille(String? id) async {
     setState(() {
       _villeId = id;
-      _communeId = _villageId = _quartierId = _avenueId = null;
-      _communes = [];
-      _villages = [];
-      _quartiers = [];
-      _avenues = [];
+      if (!_showDistrict) {
+        _communeId = _villageId = _quartierId = _avenueId = null;
+        _communes = [];
+        _villages = [];
+        _quartiers = [];
+        _avenues = [];
+      }
     });
     _emit();
-    if (id == null) return;
+    if (id == null || _showDistrict) return;
     final rows = await _getList('/geo/communes?ville_id=$id');
     if (!mounted) return;
     setState(() {
       _communes = rows;
       _hint = '${rows.length} commune(s)';
+    });
+  }
+
+  Future<void> _onDistrict(String? id) async {
+    setState(() {
+      _districtId = id;
+      _communeId = _villageId = null;
+      _communes = [];
+      _villages = [];
+    });
+    _emit();
+    if (id == null) return;
+    final rows = await _getList('/geo/communes?district_id=$id');
+    if (!mounted) return;
+    setState(() {
+      _communes = rows;
+      _hint = '${rows.length} secteur(s)/commune(s)';
     });
   }
 
@@ -170,15 +248,23 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
     });
     _emit();
     if (id == null) return;
-    final villages = await _getList('/geo/localites?commune_id=$id');
-    final quartiers = await _getList('/geo/quartiers?commune_id=$id');
-    if (!mounted) return;
-    setState(() {
-      _villages = villages;
-      _quartiers = quartiers;
-      _hint =
-          '${villages.length} village(s) · ${quartiers.length} quartier(s)';
-    });
+    if (_showVillage) {
+      final villages = await _getList('/geo/localites?commune_id=$id');
+      if (!mounted) return;
+      setState(() {
+        _villages = villages;
+        _hint = '${villages.length} village(s)';
+      });
+    }
+    if (_showQuartierAvenue) {
+      final quartiers = await _getList('/geo/quartiers?commune_id=$id');
+      if (!mounted) return;
+      setState(() {
+        _quartiers = quartiers;
+        _hint =
+            '${_villages.length} village(s) · ${quartiers.length} quartier(s)';
+      });
+    }
   }
 
   Future<void> _onVillage(String? id) async {
@@ -230,7 +316,8 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
         setState(() => _hint = 'Ajout village impossible (${res.statusCode})');
         return;
       }
-      final item = GeoItem.fromJson(Map<String, dynamic>.from(jsonDecode(res.body) as Map));
+      final item =
+          GeoItem.fromJson(Map<String, dynamic>.from(jsonDecode(res.body) as Map));
       setState(() {
         _villages = [..._villages, item]..sort((a, b) => a.name.compareTo(b.name));
         _villageId = item.id;
@@ -263,7 +350,8 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
         setState(() => _hint = 'Ajout quartier impossible (${res.statusCode})');
         return;
       }
-      final item = GeoItem.fromJson(Map<String, dynamic>.from(jsonDecode(res.body) as Map));
+      final item =
+          GeoItem.fromJson(Map<String, dynamic>.from(jsonDecode(res.body) as Map));
       setState(() {
         _quartiers = [..._quartiers, item]..sort((a, b) => a.name.compareTo(b.name));
         _quartierId = item.id;
@@ -303,7 +391,8 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
         setState(() => _hint = 'Ajout avenue impossible (${res.statusCode})');
         return;
       }
-      final item = GeoItem.fromJson(Map<String, dynamic>.from(jsonDecode(res.body) as Map));
+      final item =
+          GeoItem.fromJson(Map<String, dynamic>.from(jsonDecode(res.body) as Map));
       setState(() {
         _avenues = [..._avenues, item];
         _avenueId = item.id;
@@ -397,10 +486,13 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Localisation RDC', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          widget.title ?? 'Localisation RDC',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: 4),
         Text(
-          'Province → Ville → Commune → Village → Quartier → Avenue',
+          _subtitle,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: const Color(0xFF5A6A85),
               ),
@@ -416,28 +508,44 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
         const SizedBox(height: 8),
         _dd(label: 'Province', value: _provinceId, items: _provinces, onChanged: _onProvince),
         _dd(label: 'Ville', value: _villeId, items: _villes, onChanged: _onVille),
-        _dd(label: 'Commune', value: _communeId, items: _communes, onChanged: _onCommune),
-        _dd(label: 'Village', value: _villageId, items: _villages, onChanged: _onVillage),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: _addBtn('Ajouter village', _communeId == null ? null : _addVillage),
-        ),
-        _dd(label: 'Quartier', value: _quartierId, items: _quartiers, onChanged: _onQuartier),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: _addBtn('Ajouter quartier', _communeId == null ? null : _addQuartier),
-        ),
+        if (_showDistrict)
+          _dd(
+            label: 'Territoire',
+            value: _districtId,
+            items: _districts,
+            onChanged: _onDistrict,
+          ),
         _dd(
-          label: 'Avenue',
-          value: _avenueId,
-          items: _avenues,
-          onChanged: _onAvenue,
-          voieLabels: true,
+          label: _showDistrict ? 'Secteur / Chefferie / Commune' : 'Commune',
+          value: _communeId,
+          items: _communes,
+          onChanged: _onCommune,
         ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: _addBtn('Ajouter avenue', _quartierId == null ? null : _addAvenue),
-        ),
+        if (_showVillage) ...[
+          _dd(label: 'Village', value: _villageId, items: _villages, onChanged: _onVillage),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _addBtn('Ajouter village', _communeId == null ? null : _addVillage),
+          ),
+        ],
+        if (_showQuartierAvenue) ...[
+          _dd(label: 'Quartier', value: _quartierId, items: _quartiers, onChanged: _onQuartier),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _addBtn('Ajouter quartier', _communeId == null ? null : _addQuartier),
+          ),
+          _dd(
+            label: 'Avenue',
+            value: _avenueId,
+            items: _avenues,
+            onChanged: _onAvenue,
+            voieLabels: true,
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _addBtn('Ajouter avenue', _quartierId == null ? null : _addAvenue),
+          ),
+        ],
       ],
     );
   }
