@@ -34,8 +34,10 @@ import ManageDeplacementPage from "./pages/ManageDeplacementPage";
 import ManageDocumentPage from "./pages/ManageDocumentPage";
 import ManageMariagePage from "./pages/ManageMariagePage";
 import ManageNaissancePage from "./pages/ManageNaissancePage";
+import SynopticPage from "./pages/SynopticPage";
 import ManageActsPage, { MANAGE_CONFIGS } from "./components/ManageActsPage";
 import TerritoryPage from "./pages/TerritoryPage";
+import { getOfficerCommune } from "./commune";
 import {
   IconBaby,
   IconCar,
@@ -47,6 +49,7 @@ import {
   IconRing,
   IconSearch,
   IconSplit,
+  IconTable,
   IconUsers,
 } from "./components/Icons";
 
@@ -163,6 +166,20 @@ function Shell() {
           <NavLink to="/" end>
             <IconDashboard size={18} /> Tableau de bord
           </NavLink>
+          <div className="nav-group">
+            <NavLink to="/synoptique/naissances" className={({ isActive }) => (isActive || location.pathname.startsWith("/synoptique") ? "active" : "")}>
+              <IconTable size={18} /> Tableau synoptique
+            </NavLink>
+            <div className="nav-sub">
+              <NavLink to="/synoptique/naissances">Nouveaux-nés</NavLink>
+              <NavLink to="/synoptique/matrimonial">État matrimonial</NavLink>
+              <NavLink to="/synoptique/deces">Décès</NavLink>
+              <NavLink to="/synoptique/documents">Documents</NavLink>
+            </div>
+            <p className="nav-commune muted small">
+              Commune : <strong>{getOfficerCommune().name}</strong>
+            </p>
+          </div>
           <NavLink to="/population">
             <IconUsers size={18} /> Population
           </NavLink>
@@ -271,6 +288,8 @@ function Shell() {
         <main className="shell">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
+            <Route path="/synoptique" element={<SynopticPage />} />
+            <Route path="/synoptique/:section" element={<SynopticPage />} />
             <Route path="/population" element={<PopulationPage />} />
             <Route path="/lists/population" element={<PopulationPage showAnalytics />} />
             <Route path="/newborns" element={<NewbornsPage />} />

@@ -505,6 +505,118 @@
   gap: 0.65rem;
 }
 
+.nav-group {
+  margin: 0.15rem 0 0.35rem;
+}
+
+.nav-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.15rem 0 0.35rem 1.85rem;
+}
+
+.nav-sub a {
+  font-size: 0.82rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 6px;
+  color: var(--egouv-muted);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.nav-sub a.active,
+.nav-sub a:hover {
+  color: var(--egouv-primary);
+  background: rgba(93, 135, 255, 0.08);
+}
+
+.nav-commune {
+  margin: 0 0 0.35rem 1.85rem;
+  font-size: 0.75rem;
+}
+
+.syn-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.syn-tab {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.55rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--egouv-line);
+  background: var(--egouv-card, #fff);
+  color: var(--egouv-ink);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.syn-tab.active,
+.syn-tab:hover {
+  border-color: var(--egouv-primary);
+  color: var(--egouv-primary);
+  background: rgba(93, 135, 255, 0.08);
+}
+
+.syn-panel {
+  background: var(--egouv-card, #fff);
+  border: 1px solid var(--egouv-line);
+  border-radius: 12px;
+  padding: 1rem 1.1rem 1.25rem;
+}
+
+.syn-title {
+  margin: 0 0 1rem;
+  text-align: center;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--egouv-ink);
+}
+
+.syn-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  min-width: 720px;
+}
+
+.syn-table th,
+.syn-table td {
+  border: 1px solid #5d87ff;
+  padding: 0.35rem 0.4rem;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.syn-table thead th {
+  background: #5d87ff;
+  color: #fff;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.syn-commune {
+  text-align: left !important;
+  font-weight: 700;
+  white-space: nowrap;
+  background: rgba(93, 135, 255, 0.06);
+}
+
+.syn-cell {
+  min-width: 2rem;
+}
+
+.syn-foot {
+  margin: 0.75rem 0 0;
+}
+
 .sidebar-nav a svg {
   flex-shrink: 0;
   opacity: 0.9;

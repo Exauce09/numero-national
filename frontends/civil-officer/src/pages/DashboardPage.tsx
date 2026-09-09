@@ -190,18 +190,6 @@ export default function DashboardPage() {
           </button>
         ))}
       </div>
-
-      <div className="eg-quick-row">
-        <button type="button" className="btn-add" onClick={() => navigate("/population")}>
-          Gérer la population
-        </button>
-        <button type="button" className="btn-next" onClick={() => navigate("/manage/naissance")}>
-          Gérer les naissances
-        </button>
-        <button type="button" className="btn-primary" style={{ width: "auto" }} onClick={() => navigate("/births")}>
-          Enregistrer une naissance
-        </button>
-      </div>
     </div>
   );
 }

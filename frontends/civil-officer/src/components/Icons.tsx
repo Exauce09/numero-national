@@ -184,3 +184,17 @@ export function IconDashboard(p: IconProps) {
     ),
   });
 }
+
+export function IconTable(p: IconProps) {
+  return base({
+    ...p,
+    children: (
+      <>
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <path d="M3 10h18" />
+        <path d="M3 15h18" />
+        <path d="M9 4v16" />
+      </>
+    ),
+  });
+}
