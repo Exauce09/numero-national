@@ -19,6 +19,7 @@ import {
   type Sexe,
 } from "../registry";
 import { getOfficerCommune } from "../commune";
+import { RDC_TRIBUS, RDC_TRIBUS_NOTE } from "../data/tribusRdc";
 
 const STEPS = [
   { id: 1, label: "1. Identité" },
@@ -448,25 +449,16 @@ export default function CensusPage() {
                   list="tribus-rdc"
                   value={tribu}
                   onChange={(e) => setTribu(e.target.value)}
-                  placeholder="-- choisissez --"
+                  placeholder="Rechercher une tribu…"
                 />
                 <datalist id="tribus-rdc">
-                  <option value="Luba" />
-                  <option value="Kongo" />
-                  <option value="Mongo" />
-                  <option value="Rwanda" />
-                  <option value="Lunda" />
-                  <option value="Tetela" />
-                  <option value="Yaka" />
-                  <option value="Chokwe" />
-                  <option value="Nande" />
-                  <option value="Hema" />
-                  <option value="Lendu" />
-                  <option value="Alur" />
-                  <option value="Shi" />
-                  <option value="Rega" />
-                  <option value="Zande" />
+                  {RDC_TRIBUS.map((t) => (
+                    <option key={t} value={t} />
+                  ))}
                 </datalist>
+                <p className="muted" style={{ marginTop: "0.35rem", fontSize: "0.8rem" }}>
+                  {RDC_TRIBUS.length} entrées de référence — {RDC_TRIBUS_NOTE}
+                </p>
               </div>
             </div>
           </div>

@@ -47,6 +47,26 @@ async def seed_geo(
     return {"status": "ok", "counts": counts}
 
 
+@router.get("/tribus", summary="Liste de référence des tribus / ethnies RDC")
+async def list_tribus(q: str | None = Query(None, description="Filtre optionnel")) -> dict:
+    """~300+ entrées de référence. Total réel RDC ≈ 250–450 selon critères."""
+    from apps.api.domains.geography.tribus_data import RDC_TRIBUS
+
+    rows = RDC_TRIBUS
+    if q and q.strip():
+        needle = q.strip().casefold()
+        rows = [t for t in rows if needle in t.casefold()]
+    return {
+        "count": len(rows),
+        "total_reference": len(RDC_TRIBUS),
+        "note": (
+            "La RDC compte environ 250 à 450 ethnies/tribus selon les critères. "
+            "Cette liste est une référence opérationnelle ; utilisez « Autre » si besoin."
+        ),
+        "items": rows,
+    }
+
+
 @router.get("/provinces", response_model=list[ProvinceOut])
 async def list_provinces(db: AsyncSession = Depends(get_db)) -> list[ProvinceOut]:
     await ensure_geography_seeded(db)

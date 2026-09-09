@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../sync/local_database.dart';
 import '../../sync/sync_queue.dart';
 import 'photo_capture_stub.dart';
+import 'rdc_tribus.dart';
 
 /// Fiche personne — alignée sur le formulaire officiel
 /// (`frontends/civil-officer` → Recensement / Identité).
@@ -41,6 +42,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   late final TextEditingController _nationalite;
   late final TextEditingController _paysResidence;
   late final TextEditingController _telephone;
+  late final TextEditingController _tribu;
 
   String _sex = 'M';
   String _etatCivil = 'CELIBATAIRE';
@@ -100,6 +102,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
       text: payload['pays_residence']?.toString() ?? 'RDC',
     );
     _telephone = TextEditingController(text: payload['telephone']?.toString() ?? '');
+    _tribu = TextEditingController(text: payload['tribu']?.toString() ?? '');
 
     _sex = e?['sex']?.toString() ?? 'M';
     _etatCivil = payload['etat_civil']?.toString() ?? 'CELIBATAIRE';
@@ -136,6 +139,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     _nationalite.dispose();
     _paysResidence.dispose();
     _telephone.dispose();
+    _tribu.dispose();
     super.dispose();
   }
 
@@ -169,6 +173,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
       'pays_residence': _paysResidence.text.trim(),
       'handicap': _handicap,
       'telephone': _telephone.text.trim(),
+      'tribu': _tribu.text.trim(),
       'relationship_to_head': _relation,
     };
   }
@@ -473,6 +478,37 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
                 controller: _telephone,
                 decoration: _dec('Numéro de téléphone'),
                 keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 10),
+              Autocomplete<String>(
+                optionsBuilder: (TextEditingValue tev) {
+                  final q = tev.text.trim().toLowerCase();
+                  if (q.isEmpty) return kRdcTribus.take(40);
+                  return kRdcTribus.where((t) => t.toLowerCase().contains(q)).take(60);
+                },
+                onSelected: (v) {
+                  _tribu.text = v;
+                  setState(() {});
+                },
+                fieldViewBuilder: (context, controller, focus, onSubmit) {
+                  return TextFormField(
+                    controller: controller,
+                    focusNode: focus,
+                    decoration: _dec(
+                      'Tribu / ethnie',
+                      hint: '${kRdcTribus.length} références — ou Autre',
+                    ),
+                    onChanged: (v) => _tribu.text = v,
+                    onFieldSubmitted: (_) => onSubmit(),
+                  );
+                },
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  kRdcTribusNote,
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF5A6A85)),
+                ),
               ),
             ]),
             _section('Lien dans le ménage', [
