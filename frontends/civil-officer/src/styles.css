@@ -524,7 +524,7 @@
   display: inline-flex;
   align-items: center;
   padding: 0.55rem 0.85rem;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid var(--egouv-line);
   background: var(--egouv-card, #fff);
   color: var(--egouv-ink);
@@ -536,14 +536,8 @@
 .syn-tab.active,
 .syn-tab:hover {
   border-color: var(--egouv-primary);
-  color: var(--egouv-primary);
-  background: rgba(93, 135, 255, 0.08);
-}
-
-.syn-panel {
-  background: transparent;
-  border: 0;
-  padding: 0;
+  color: #fff;
+  background: #5d87ff;
 }
 
 .syn-toolbar {
@@ -552,184 +546,57 @@
   margin-bottom: 0.75rem;
 }
 
-.syn-header {
-  background: var(--egouv-card, #fff);
-  border: 1px solid var(--egouv-line);
-  border-radius: 12px;
-  padding: 1rem 1.15rem 1.1rem;
-  margin-bottom: 0.9rem;
+.syn-official-wrap {
+  background: #5a2d2d;
+  border-radius: 10px;
+  padding: 1rem 1rem 1.25rem;
 }
 
-.syn-kicker {
-  margin: 0 0 0.35rem;
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--egouv-primary);
-}
-
-.syn-title {
-  margin: 0;
-  text-align: left;
-  font-size: 1.2rem;
-  line-height: 1.35;
-  font-weight: 800;
-  letter-spacing: 0;
-  color: var(--egouv-ink);
-}
-
-.syn-title span {
-  display: block;
-  margin-top: 0.25rem;
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--egouv-muted);
-}
-
-.syn-interpret {
-  margin: 0.75rem 0 0;
-  font-size: 0.88rem;
-  color: var(--egouv-muted);
-  line-height: 1.45;
-}
-
-.syn-grid-2 {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.85rem;
-  margin-bottom: 0.85rem;
-}
-
-.syn-grid-3 {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.65rem;
-}
-
-.syn-block {
-  background: var(--egouv-card, #fff);
-  border: 1px solid var(--egouv-line);
-  border-radius: 12px;
-  padding: 0.9rem 1rem 1rem;
-  margin-bottom: 0.85rem;
-}
-
-.syn-block-cong {
-  border-top: 3px solid #13deb9;
-}
-
-.syn-block-etr {
-  border-top: 3px solid #ffae1f;
-}
-
-.syn-block-total {
-  border-top: 3px solid #5d87ff;
-}
-
-.syn-block-title {
-  margin: 0 0 0.75rem;
+.syn-official-title {
+  margin: 0 0 0.85rem;
+  text-align: center;
+  color: #fff;
   font-size: 0.92rem;
   font-weight: 800;
+  line-height: 1.45;
+  letter-spacing: 0.02em;
 }
 
-.syn-mini {
-  border: 1px solid var(--egouv-line);
-  border-radius: 10px;
-  padding: 0.65rem 0.75rem;
-  margin-bottom: 0.55rem;
-  background: rgba(93, 135, 255, 0.03);
-}
-
-.syn-mini:last-child {
-  margin-bottom: 0;
-}
-
-.syn-mini-label {
-  font-size: 0.8rem;
-  font-weight: 700;
-  margin-bottom: 0.45rem;
-  color: var(--egouv-ink);
-}
-
-.syn-mini-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.4rem;
-}
-
-.syn-mini-grid > div {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  text-align: center;
-  padding: 0.35rem;
-  border-radius: 8px;
-  background: var(--egouv-card, #fff);
-  border: 1px solid var(--egouv-line);
-}
-
-.syn-mini-grid span {
-  font-size: 0.7rem;
-  color: var(--egouv-muted);
-}
-
-.syn-mini-grid strong {
-  font-size: 1.15rem;
-}
-
-.syn-table {
+.syn-official {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.88rem;
+  background: #fff;
+  font-size: 0.72rem;
+  min-width: 640px;
 }
 
-.syn-table-simple {
-  min-width: 0;
-}
-
-.syn-table th,
-.syn-table td {
-  border: 1px solid var(--egouv-line);
-  padding: 0.55rem 0.65rem;
+.syn-official th,
+.syn-official td {
+  border: 1px solid #5d87ff;
+  padding: 0.35rem 0.3rem;
   text-align: center;
   vertical-align: middle;
 }
 
-.syn-table thead th {
+.syn-official thead th {
   background: #5d87ff;
   color: #fff;
   font-weight: 700;
+  white-space: normal;
+  line-height: 1.25;
 }
 
-.syn-left {
+.syn-commune-cell {
   text-align: left !important;
-}
-
-.syn-big-total {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.85rem 1rem;
-  border-radius: 10px;
-  background: rgba(93, 135, 255, 0.08);
   font-weight: 700;
+  white-space: nowrap;
+  background: #f4f7ff;
+  padding-left: 0.55rem !important;
 }
 
-.syn-big-total strong {
-  font-size: 1.75rem;
-  color: var(--egouv-primary);
-}
-
-.syn-foot {
-  margin: 0.35rem 0 0;
-}
-
-@media (max-width: 900px) {
-  .syn-grid-2 {
-    grid-template-columns: 1fr;
-  }
+.syn-legend {
+  margin: 0.65rem 0 0;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 @media print {
@@ -740,16 +607,17 @@
     display: none !important;
   }
 
-  .syn-panel,
-  .syn-block,
-  .syn-header {
-    break-inside: avoid;
-    box-shadow: none !important;
-    border-color: #ccc !important;
+  .syn-official-wrap {
+    background: #fff !important;
+    padding: 0 !important;
   }
 
-  .syn-page {
-    background: #fff !important;
+  .syn-official-title {
+    color: #000 !important;
+  }
+
+  .syn-legend {
+    color: #333 !important;
   }
 }
 
