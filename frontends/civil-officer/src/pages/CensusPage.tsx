@@ -28,6 +28,7 @@ import { api } from "../api";
 import { getOfficerCommune } from "../commune";
 import { RDC_TRIBUS, RDC_TRIBUS_NOTE } from "../data/tribusRdc";
 import { captureGpsOnSave } from "../gpsCapture";
+import GpsCapturePanel, { type GpsCoords } from "../components/GpsCapturePanel";
 import {
   emptySituationFamiliale,
   formatSituationFamiliale,
@@ -146,6 +147,7 @@ export default function CensusPage() {
   const [draftNotice, setDraftNotice] = useState<string | null>(null);
   const [created, setCreated] = useState<Act | null>(null);
   const [camError, setCamError] = useState<string | null>(null);
+  const [gps, setGps] = useState<GpsCoords | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -397,7 +399,7 @@ export default function CensusPage() {
     if (!validateStep(7)) return;
     if (!validateFamille()) return;
     try {
-      const gps = await captureGpsOnSave();
+      const gpsLive = gps ?? (await captureGpsOnSave());
       const commune = getOfficerCommune();
       const adresse = buildAdresse();
       const lieuNaissance = geoNaissance.label || "";
@@ -483,9 +485,9 @@ export default function CensusPage() {
         tribu: tribu.trim() || null,
         numero_admin: formatIdentiteAdmin(identiteAdmin) || null,
         identite_administrative_detail: identiteAdmin,
-        latitude: gps?.latitude ?? null,
-        longitude: gps?.longitude ?? null,
-        gps_captured_at: gps ? new Date().toISOString() : null,
+        latitude: gpsLive?.latitude ?? null,
+        longitude: gpsLive?.longitude ?? null,
+        gps_captured_at: gpsLive ? new Date().toISOString() : null,
       };
       const act = addAct("CENSUS", payload, person.nic);
       clearDraft();
@@ -506,8 +508,9 @@ export default function CensusPage() {
       <h2 className="page-title">Recensement</h2>
       <p className="page-lead">
         Formulaire d&apos;identification de la personne — identité selon le modèle officiel ; photos et empreintes à
-        l&apos;étape Biométrie.
+        l&apos;étape Biométrie. La localisation GPS est capturée pour la cartographie.
       </p>
+      <GpsCapturePanel onChange={setGps} />
 
       <div className="wizard-steps census-wizard-steps">
         {STEPS.map((s) => (

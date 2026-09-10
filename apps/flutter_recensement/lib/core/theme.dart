@@ -3,21 +3,24 @@ import 'package:google_fonts/google_fonts.dart';
 
 /// E-GOUV RDC tokens — layout inspiré dashboards modernes, pas le look HR.
 class NnColors {
-  static const blue = Color(0xFF5D87FF);
-  static const blueDark = Color(0xFF4570EA);
-  static const ink = Color(0xFF2A3547);
-  static const muted = Color(0xFF5A6A85);
-  static const line = Color(0xFFE5EAF2);
-  static const page = Color(0xFFF5F7FB);
+  static const rdcBlue = Color(0xFF007FFF);
+  static const rdcYellow = Color(0xFFF7D618);
+  static const rdcRed = Color(0xFFCE1126);
+  static const blue = rdcBlue;
+  static const blueDark = Color(0xFF0066CC);
+  static const ink = Color(0xFF1A2332);
+  static const muted = Color(0xFF5C6B82);
+  static const line = Color(0xFFE6EBF2);
+  static const page = Color(0xFFF7F9FC);
   static const card = Color(0xFFFFFFFF);
-  static const save = Color(0xFFCE1126);
-  static const success = Color(0xFF13DEB9);
-  static const warning = Color(0xFFFFAE1F);
-  static const danger = Color(0xFFFA896B);
-  static const softBlue = Color(0xFFEBF3FE);
-  static const softGreen = Color(0xFFE6FFFA);
-  static const softOrange = Color(0xFFFEF5E5);
-  static const softRed = Color(0xFFFBF2EF);
+  static const save = rdcRed;
+  static const success = Color(0xFF22A06B);
+  static const warning = Color(0xFFE2A03F);
+  static const danger = Color(0xFFE11D48);
+  static const softBlue = Color(0xFFEAF4FF);
+  static const softGreen = Color(0xFFEEFBF4);
+  static const softOrange = Color(0xFFFFF8E8);
+  static const softRed = Color(0xFFFFF5F5);
 }
 
 class AppTheme {
@@ -27,10 +30,10 @@ class AppTheme {
       brightness: Brightness.light,
       scaffoldBackgroundColor: NnColors.page,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: NnColors.blue,
-        primary: NnColors.blue,
-        secondary: NnColors.success,
-        error: NnColors.danger,
+        seedColor: NnColors.rdcBlue,
+        primary: NnColors.rdcBlue,
+        secondary: NnColors.rdcYellow,
+        error: NnColors.rdcRed,
         surface: NnColors.card,
         brightness: Brightness.light,
       ),
@@ -76,7 +79,7 @@ class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: NnColors.blue,
+          backgroundColor: NnColors.rdcBlue,
           foregroundColor: Colors.white,
           minimumSize: const Size.fromHeight(48),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

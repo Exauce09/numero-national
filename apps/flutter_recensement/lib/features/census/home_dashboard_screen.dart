@@ -8,7 +8,7 @@ import 'assignment_repository.dart';
 import 'conflicts_screen.dart';
 import 'new_person_flow_screen.dart';
 
-/// Home agent — layout type dashboard mobile (cartes KPI + actions), charte E-GOUV.
+/// Accueil agent — design épuré (RDC), une action principale.
 class HomeDashboardScreen extends StatefulWidget {
   const HomeDashboardScreen({super.key, required this.onOpenTab});
 
@@ -23,10 +23,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   String _email = 'Agent';
   String _syncLabel = '…';
   int _hh = 0;
-  int _rec = 0;
   int _queued = 0;
   int _conflicts = 0;
-  int _assignments = 0;
   bool _busy = false;
 
   @override
@@ -40,22 +38,18 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     final label = await AssignmentRepository().syncStatusLabel();
     final db = LocalDatabase.instance.db;
     final hh = await _count(db, 'SELECT COUNT(*) AS c FROM households');
-    final rec = await _count(db, 'SELECT COUNT(*) AS c FROM census_records');
     final q = await _count(db, 'SELECT COUNT(*) AS c FROM sync_queue');
     final conf = await _count(
       db,
       "SELECT COUNT(*) AS c FROM census_records WHERE status = 'CONFLICT'",
     );
-    final asg = await _count(db, 'SELECT COUNT(*) AS c FROM assignments_cache');
     if (!mounted) return;
     setState(() {
       _email = email ?? 'Agent terrain';
       _syncLabel = label;
       _hh = hh;
-      _rec = rec;
       _queued = q;
       _conflicts = conf;
-      _assignments = asg;
     });
   }
 
@@ -91,7 +85,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     if (s.contains('OFFLINE') || s.contains('HORS')) return NnColors.muted;
     if (s.contains('ERROR') || s.contains('CONFLICT')) return NnColors.danger;
     if (s.contains('ATTENTE') || s.contains('SYNCING')) return NnColors.warning;
-    return NnColors.blue;
+    return NnColors.rdcBlue;
   }
 
   @override
@@ -101,197 +95,124 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
         children: [
-          // Hero header
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF5D87FF), Color(0xFF4570EA)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(22),
+              color: NnColors.card,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: NnColors.line),
               boxShadow: [
                 BoxShadow(
-                  color: NnColors.blue.withValues(alpha: 0.28),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(2),
+                    gradient: const LinearGradient(
+                      colors: [NnColors.rdcBlue, NnColors.rdcYellow, NnColors.rdcRed],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  '$_greeting,',
+                  style: TextStyle(color: NnColors.muted, fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  shortName,
+                  style: const TextStyle(
+                    color: NnColors.ink,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 14),
                 Row(
                   children: [
+                    Icon(Icons.circle, size: 9, color: _syncColor()),
+                    const SizedBox(width: 8),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '$_greeting,',
-                            style: const TextStyle(color: Colors.white70, fontSize: 14),
-                          ),
-                          Text(
-                            shortName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        _syncLabel,
+                        style: const TextStyle(fontWeight: FontWeight.w600, color: NnColors.ink),
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(14),
+                    FilledButton(
+                      onPressed: _busy ? null : _runSync,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: NnColors.rdcBlue,
+                        minimumSize: const Size(0, 40),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
                       ),
-                      child: const Icon(Icons.badge_outlined, color: Colors.white),
+                      child: _busy
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Text('Synchroniser'),
                     ),
                   ],
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.circle, size: 10, color: _syncColor()),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Sync · $_syncLabel',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: _busy ? null : _runSync,
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          backgroundColor: Colors.white.withValues(alpha: 0.2),
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                        ),
-                        child: _busy
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
-                            : const Text('Sync'),
-                      ),
-                    ],
-                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
-          Text(
-            'Aujourd’hui',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 12),
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1.35,
+          const SizedBox(height: 18),
+          Row(
             children: [
-              _KpiCard(
-                label: 'Ménages',
-                value: '$_hh',
-                icon: Icons.home_work_outlined,
-                tint: NnColors.softBlue,
-                iconColor: NnColors.blue,
+              Expanded(
+                child: _StatChip(label: 'Ménages', value: '$_hh', color: NnColors.rdcBlue),
               ),
-              _KpiCard(
-                label: 'Personnes',
-                value: '$_rec',
-                icon: Icons.groups_outlined,
-                tint: NnColors.softGreen,
-                iconColor: const Color(0xFF13DEB9),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _StatChip(label: 'À envoyer', value: '$_queued', color: NnColors.warning),
               ),
-              _KpiCard(
-                label: 'En attente',
-                value: '$_queued',
-                icon: Icons.cloud_upload_outlined,
-                tint: NnColors.softOrange,
-                iconColor: NnColors.warning,
-              ),
-              _KpiCard(
-                label: 'Conflits',
-                value: '$_conflicts',
-                icon: Icons.warning_amber_rounded,
-                tint: NnColors.softRed,
-                iconColor: NnColors.danger,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ConflictsScreen()),
+              if (_conflicts > 0) ...[
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _StatChip(
+                    label: 'Conflits',
+                    value: '$_conflicts',
+                    color: NnColors.danger,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ConflictsScreen()),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
           const SizedBox(height: 22),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NewPersonFlowScreen()),
+              );
+            },
+            icon: const Icon(Icons.person_add_alt_1),
+            label: const Text('Nouvelle fiche'),
+            style: FilledButton.styleFrom(
+              backgroundColor: NnColors.rdcRed,
+              minimumSize: const Size.fromHeight(54),
+              textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+          ),
+          const SizedBox(height: 10),
           Text(
-            'Actions rapides',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 12),
-          _ActionTile(
-            title: 'Fiche d’identification',
-            subtitle: '7 étapes : Identité → Origine → Bio → Études → Pro → Admin → Famille',
-            icon: Icons.badge_outlined,
-            color: const Color(0xFFE11D48),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const NewPersonFlowScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 10),
-          _ActionTile(
-            title: 'Nouveau ménage + personne',
-            subtitle: 'Même parcours guidé (zone → ménage → formulaire)',
-            icon: Icons.person_add_alt_1_outlined,
-            color: NnColors.blue,
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const NewPersonFlowScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 10),
-          _ActionTile(
-            title: 'Mes zones',
-            subtitle: '$_assignments affectation(s)',
-            icon: Icons.map_outlined,
-            color: NnColors.blue,
-            onTap: () => widget.onOpenTab(1),
-          ),
-          const SizedBox(height: 10),
-          _ActionTile(
-            title: 'Statistiques',
-            subtitle: 'Local + serveur',
-            icon: Icons.insights_outlined,
-            color: const Color(0xFF13DEB9),
-            onTap: () => widget.onOpenTab(2),
-          ),
-          const SizedBox(height: 10),
-          _ActionTile(
-            title: 'Appareil',
-            subtitle: 'Enregistrement device',
-            icon: Icons.phone_android_outlined,
-            color: NnColors.warning,
-            onTap: () => widget.onOpenTab(3),
+            'Identité, adresse, biométrie — puis synchronisation.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: NnColors.muted, fontSize: 13),
           ),
         ],
       ),
@@ -299,120 +220,41 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   }
 }
 
-class _KpiCard extends StatelessWidget {
-  const _KpiCard({
+class _StatChip extends StatelessWidget {
+  const _StatChip({
     required this.label,
     required this.value,
-    required this.icon,
-    required this.tint,
-    required this.iconColor,
+    required this.color,
     this.onTap,
   });
 
   final String label;
   final String value;
-  final IconData icon;
-  final Color tint;
-  final Color iconColor;
+  final Color color;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: NnColors.card,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: NnColors.line),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: tint, borderRadius: BorderRadius.circular(12)),
-                child: Icon(icon, color: iconColor, size: 20),
-              ),
-              const Spacer(),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  color: NnColors.ink,
-                ),
-              ),
-              Text(label, style: const TextStyle(color: NnColors.muted, fontWeight: FontWeight.w600)),
-            ],
-          ),
-        ),
+    final child = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      decoration: BoxDecoration(
+        color: NnColors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: NnColors.line),
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 11, color: NnColors.muted, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: color)),
+        ],
+      ),
+    );
+    if (onTap == null) return child;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(14), child: child),
     );
   }
 }
-
-class _ActionTile extends StatelessWidget {
-  const _ActionTile({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: NnColors.card,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: NnColors.line),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: color),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                    Text(subtitle, style: const TextStyle(color: NnColors.muted, fontSize: 12)),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right, color: NnColors.muted),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Home KPI dashboard widgets.

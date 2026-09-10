@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
 import DataToolbar from "../components/DataToolbar";
 import GeoCascade, { GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
+import GpsCapturePanel, { type GpsCoords } from "../components/GpsCapturePanel";
 import PersonPicker from "../components/PersonPicker";
 import {
   addAct,
@@ -31,6 +32,7 @@ export default function BirthsPage() {
   const [viewAct, setViewAct] = useState<Act | null>(null);
   const [editAct, setEditAct] = useState<Act | null>(null);
   const [editJson, setEditJson] = useState("");
+  const [gps, setGps] = useState<GpsCoords | null>(null);
   const [, bump] = useState(0);
 
   const acts = listActs("BIRTH");
@@ -89,6 +91,9 @@ export default function BirthsPage() {
         secteur_chefferie_commune: link.geo.secteur || null,
         village_origine: link.geo.village || null,
         note: "Nouveau-né lié aux informations du père/mère",
+        latitude: gps?.latitude ?? null,
+        longitude: gps?.longitude ?? null,
+        gps_captured_at: gps ? new Date().toISOString() : null,
       };
       const act = addAct("BIRTH", payload, child.nic);
       setCreated(act);
@@ -131,6 +136,7 @@ export default function BirthsPage() {
       <p className="page-lead">
         Enregistrement des nouveau-nés non enregistrés en structure sanitaire.
       </p>
+      <GpsCapturePanel onChange={setGps} />
 
       <div className="panel">
         <form className="form-grid" onSubmit={onSubmit}>
