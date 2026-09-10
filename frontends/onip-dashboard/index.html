@@ -9,14 +9,35 @@
     <title>ONIP — Tableau de bord</title>
     <style>
       html, body { margin: 0; min-height: 100%; background: #f7f9fc; color: #1a2332; font-family: "Segoe UI", system-ui, sans-serif; }
-      #boot-fallback { padding: 24px; max-width: 480px; }
+      #boot-fallback { padding: 24px; max-width: 520px; }
     </style>
+    <script>
+      // Purge cache / SW Edge qui gardent l’ancienne UI
+      try {
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            regs.forEach(function (r) { r.unregister(); });
+          });
+        }
+        if (window.caches && caches.keys) {
+          caches.keys().then(function (keys) {
+            keys.forEach(function (k) { caches.delete(k); });
+          });
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <noscript>Activez JavaScript pour utiliser ONIP.</noscript>
     <div id="root">
-      <div id="boot-fallback">Chargement ONIP… Si cette page reste blanche sur Edge, ouvrez une fenêtre InPrivate ou Ctrl+Shift+R.</div>
+      <div id="boot-fallback">
+        Chargement ONIP (build 2026-09-10)…
+        <br /><br />
+        Sur Edge : utilisez
+        <strong>http://127.0.0.1:5183/</strong>
+        (pas l’ancien port 5173) ou une fenêtre InPrivate.
+      </div>
     </div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="/src/main.tsx?v=20260910c"></script>
   </body>
 </html>

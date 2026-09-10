@@ -56,12 +56,12 @@ function Shell() {
         <div className="sidebar-brand">
           <img src="/logo-rdc.jpg" alt="République Démocratique du Congo" />
           <strong>ONIP</strong>
-          <span>E-GOUV · RDC</span>
+          <span>E-GOUV · RDC · menu v2</span>
           <button type="button" className="sidebar-close" aria-label="Fermer le menu" onClick={() => setNavOpen(false)}>
             ×
           </button>
         </div>
-        <nav className="sidebar-nav">
+        <nav className="sidebar-nav" aria-label="Menu principal ONIP">
           <div className="nav-group-label">Vue d’ensemble</div>
           <NavLink to="/" end>
             Tableau de bord
