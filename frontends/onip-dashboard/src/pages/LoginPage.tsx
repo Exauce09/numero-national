@@ -1,19 +1,12 @@
 import { FormEvent, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import {
-  CENSUS_ADMIN_EMAIL,
-  CENSUS_ADMIN_PASSWORD,
-  DEMO_PASSWORD,
-  DEMO_USER,
-  getSession,
-  login,
-} from "../auth";
+import { getSession, login } from "../auth";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const existing = getSession();
-  const [username, setUsername] = useState(CENSUS_ADMIN_EMAIL);
-  const [password, setPassword] = useState(CENSUS_ADMIN_PASSWORD);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -43,7 +36,7 @@ export default function LoginPage() {
           <br />
           Plateforme E-GOUV — République Démocratique du Congo
         </p>
-        <form onSubmit={onSubmit}>
+        <form onSubmit={onSubmit} autoComplete="off">
           {error ? <div className="login-error">{error}</div> : null}
 
           <label className="form-label" htmlFor="username">
@@ -76,16 +69,6 @@ export default function LoginPage() {
             {busy ? "Connexion…" : "Se connecter"}
           </button>
         </form>
-        <div className="login-hints">
-          <p>
-            <strong>Admin API</strong> — {CENSUS_ADMIN_EMAIL}
-            <br />
-            {CENSUS_ADMIN_PASSWORD}
-          </p>
-          <p>
-            <strong>Démo hors API</strong> — {DEMO_USER} / {DEMO_PASSWORD}
-          </p>
-        </div>
       </div>
     </div>
   );

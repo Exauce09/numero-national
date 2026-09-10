@@ -64,9 +64,7 @@ export default function CampaignsPage() {
       {!hasToken ? (
         <div className="panel">
           <p className="muted">
-            Connectez-vous avec un compte API (ex.{" "}
-            <code>admin.recensement@example.gov</code> / <code>CensusAdmin123!</code>) pour gérer
-            campagnes, contrôle et affectations.
+            Connectez-vous avec un compte API (JWT) pour gérer campagnes, contrôle et affectations.
           </p>
         </div>
       ) : (

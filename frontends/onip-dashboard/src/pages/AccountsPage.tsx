@@ -225,9 +225,7 @@ export default function AccountsPage() {
         </div>
         <div className="panel">
           <p className="muted">
-            Connectez-vous avec un compte admin API (ex.{" "}
-            <code>admin.recensement@example.gov</code> / <code>CensusAdmin123!</code>) pour créer
-            des utilisateurs. La session démo sans JWT ne permet pas la gestion des comptes.
+            Connectez-vous avec un compte administrateur API (JWT) pour créer des utilisateurs.
           </p>
         </div>
       </div>
