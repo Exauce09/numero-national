@@ -46,6 +46,11 @@ class NationalCard(Base):
         ForeignKey("cards.national_cards.card_id", ondelete="SET NULL"),
         nullable=True,
     )
+    commune_code: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    commune_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    delivery_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    dispatched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

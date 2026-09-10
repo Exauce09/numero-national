@@ -1,11 +1,7 @@
 import { FormEvent, useState } from "react";
 import { registryApi, cardsApi, type CitizenHit, type NationalCard } from "../api";
 import { getSession } from "../auth";
-
-function qrImgUrl(payload: Record<string, unknown> | null | undefined): string {
-  const data = encodeURIComponent(JSON.stringify(payload ?? {}));
-  return `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&data=${data}`;
-}
+import IdCardRdc from "./IdCardRdc";
 
 export default function CardsPage() {
   const hasToken = Boolean(getSession()?.accessToken);
@@ -59,7 +55,11 @@ export default function CardsPage() {
     try {
       const issued = await cardsApi.issueAndActivate(selected.id);
       setCard(issued);
-      setOk(`Carte générée — n° ${issued.serial_number} (${issued.status})`);
+      const commune = issued.commune_name || issued.commune_code || "la commune";
+      setOk(
+        issued.routing_message ||
+          `Carte + NIC générés — retournés à la commune de ${commune} pour livraison au citoyen.`,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Émission impossible");
     } finally {
@@ -76,8 +76,8 @@ export default function CardsPage() {
       <div className="hero-banner">
         <h1>Cartes d&apos;identité nationale</h1>
         <p>
-          Recherchez un citoyen (avec NIC), générez la carte ONIP, puis imprimez-la. Le QR permet la
-          vérification sans exposer toute l&apos;identité.
+          Modèle RDC (drapeau, patrimoine, MRZ). Après génération, la carte et le numéro retournent
+          automatiquement à la commune pour livraison au titulaire.
         </p>
       </div>
 
@@ -87,7 +87,11 @@ export default function CardsPage() {
         </div>
       ) : (
         <>
-          <form className="panel" onSubmit={(e) => void search(e)} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <form
+            className="panel"
+            onSubmit={(e) => void search(e)}
+            style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
+          >
             <input
               className="form-control"
               style={{ flex: "1 1 240px" }}
@@ -100,8 +104,16 @@ export default function CardsPage() {
             </button>
           </form>
 
-          {error ? <div className="login-error" style={{ marginBottom: 12 }}>{error}</div> : null}
-          {ok ? <div className="success-banner" style={{ marginBottom: 12 }}>{ok}</div> : null}
+          {error ? (
+            <div className="login-error" style={{ marginBottom: 12 }}>
+              {error}
+            </div>
+          ) : null}
+          {ok ? (
+            <div className="success-banner" style={{ marginBottom: 12 }}>
+              {ok}
+            </div>
+          ) : null}
 
           <div className="panel">
             <h2 style={{ marginTop: 0 }}>Citoyens</h2>
@@ -125,7 +137,12 @@ export default function CardsPage() {
                     <td>{c.given_names}</td>
                     <td>{c.date_of_birth}</td>
                     <td>
-                      <button type="button" className="btn-secondary" style={{ width: "auto" }} onClick={() => void pickCitizen(c)}>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        style={{ width: "auto" }}
+                        onClick={() => void pickCitizen(c)}
+                      >
                         Sélectionner
                       </button>
                     </td>
@@ -144,70 +161,47 @@ export default function CardsPage() {
 
           {selected ? (
             <div className="panel no-print-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button type="button" className="btn-primary" disabled={busy} onClick={() => void generateCard()}>
-                {card ? "Régénérer / activer la carte" : "Générer la carte d’identité"}
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={busy}
+                onClick={() => void generateCard()}
+              >
+                {card ? "Réémettre / renvoyer à la commune" : "Générer carte + envoyer à la commune"}
               </button>
               {card ? (
                 <button type="button" className="btn-secondary" onClick={printCard}>
-                  Imprimer la carte
+                  Imprimer recto / verso
                 </button>
               ) : null}
             </div>
           ) : null}
 
           {selected && card ? (
-            <div className="id-card-print-wrap">
-              <article className="id-card" aria-label="Carte d'identité nationale">
-                <header className="id-card-head">
-                  <div className="id-card-stripe" />
-                  <div className="id-card-head-text">
-                    <strong>RÉPUBLIQUE DÉMOCRATIQUE DU CONGO</strong>
-                    <span>ONIP — Carte d&apos;identité nationale</span>
-                  </div>
-                </header>
-                <div className="id-card-body">
-                  <div className="id-card-photo" aria-hidden>
-                    {selected.sex === "F" ? "F" : "M"}
-                  </div>
-                  <div className="id-card-fields">
-                    <div>
-                      <span className="id-label">Nom</span>
-                      <strong>{selected.family_name}</strong>
-                    </div>
-                    <div>
-                      <span className="id-label">Prénom(s)</span>
-                      <strong>{selected.given_names}</strong>
-                    </div>
-                    <div>
-                      <span className="id-label">Date de naissance</span>
-                      <strong>{selected.date_of_birth}</strong>
-                    </div>
-                    <div>
-                      <span className="id-label">NIC</span>
-                      <strong className="nic-code">{selected.nic}</strong>
-                    </div>
-                    <div>
-                      <span className="id-label">N° carte</span>
-                      <strong>{card.serial_number}</strong>
-                    </div>
-                    <div>
-                      <span className="id-label">Statut</span>
-                      <strong>{card.status}</strong>
-                    </div>
-                  </div>
-                  <div className="id-card-qr">
-                    <img src={qrImgUrl(card.qr_payload)} alt="QR code carte" width={140} height={140} />
-                    <small>Scanner pour vérifier</small>
-                  </div>
-                </div>
-                <footer className="id-card-foot">
-                  Émise le {card.issued_at ? new Date(card.issued_at).toLocaleDateString("fr-FR") : "—"}
-                  {card.expires_at
-                    ? ` · Expire le ${new Date(card.expires_at).toLocaleDateString("fr-FR")}`
-                    : ""}
-                </footer>
-              </article>
-            </div>
+            <>
+              <div className="panel no-print-actions">
+                <p style={{ margin: 0 }}>
+                  <strong>Circuit :</strong>{" "}
+                  {card.routing_message ||
+                    `Statut ${card.status} → commune ${card.commune_name || card.commune_code || "—"}`}
+                </p>
+                {card.delivery_address ? (
+                  <p className="muted" style={{ margin: "0.5rem 0 0" }}>
+                    Adresse de livraison : {card.delivery_address}
+                  </p>
+                ) : null}
+              </div>
+              <IdCardRdc
+                card={card}
+                fallback={{
+                  family_name: selected.family_name,
+                  given_names: selected.given_names,
+                  date_of_birth: selected.date_of_birth,
+                  sex: selected.sex,
+                  nic: selected.nic,
+                }}
+              />
+            </>
           ) : null}
         </>
       )}

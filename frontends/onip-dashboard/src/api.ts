@@ -306,9 +306,28 @@ export type NationalCard = {
   status: string;
   version: number;
   replaced_by_id?: string | null;
+  commune_code?: string | null;
+  commune_name?: string | null;
+  delivery_address?: string | null;
+  dispatched_at?: string | null;
+  delivered_at?: string | null;
   created_at: string;
   updated_at: string;
   qr_payload?: Record<string, unknown> | null;
+  holder?: {
+    nic?: string | null;
+    family_name?: string | null;
+    given_names?: string | null;
+    sex?: string | null;
+    date_of_birth?: string | null;
+    place_of_birth?: string | null;
+    nationality?: string;
+    address_line?: string | null;
+    city?: string | null;
+    commune_code?: string | null;
+    province_code?: string | null;
+  } | null;
+  routing_message?: string | null;
 };
 
 export const cardsApi = {
@@ -321,6 +340,12 @@ export const cardsApi = {
     }),
   activate: (cardId: string) =>
     request<NationalCard>(`/cards/${cardId}/activate`, { method: "POST" }),
+  communeInbox: (communeCode: string) =>
+    request<{ commune_code: string; count: number; items: NationalCard[] }>(
+      `/cards/commune/${encodeURIComponent(communeCode)}/inbox`,
+    ),
+  deliver: (cardId: string) =>
+    request<NationalCard>(`/cards/${cardId}/deliver`, { method: "POST" }),
 };
 
 export type MapPoint = {

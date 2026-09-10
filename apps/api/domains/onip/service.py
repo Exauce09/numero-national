@@ -47,7 +47,10 @@ async def build_dashboard(db: AsyncSession) -> dict[str, Any]:
     )
     cards_pending = await _safe_count(
         db,
-        "SELECT COUNT(*) FROM cards.national_cards WHERE status = 'PENDING'",
+        """
+        SELECT COUNT(*) FROM cards.national_cards
+        WHERE status IN ('PENDING', 'SENT_TO_COMMUNE')
+        """,
     )
     civil_pending = await _safe_count(
         db,

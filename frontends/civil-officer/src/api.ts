@@ -153,6 +153,14 @@ export const api = {
     request<{ commune_code: string; counts: Record<string, number>; total: number }>(
       `/civil/statistics/${encodeURIComponent(commune)}`
     ),
+
+  cardsInbox: (communeCode: string) =>
+    request<{ commune_code: string; count: number; items: Array<Record<string, unknown>> }>(
+      `/cards/commune/${encodeURIComponent(communeCode)}/inbox`,
+    ),
+
+  deliverCard: (cardId: string) =>
+    request<Record<string, unknown>>(`/cards/${cardId}/deliver`, { method: "POST" }),
 };
 
 /** Stockage local de démo quand l'API est indisponible. */

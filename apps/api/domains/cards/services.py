@@ -9,6 +9,7 @@ from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from apps.api.domains.cards.enums import (
     LEVEL_2,
@@ -20,11 +21,13 @@ from apps.api.domains.cards.enums import (
 from apps.api.domains.cards.models import CardHistory, DigitalIdentity, NationalCard
 from apps.api.domains.cards.qr import build_qr_payload, verify_qr_signature
 from apps.api.domains.cards.schemas import (
+    CardHolderSnapshot,
     CardIssueRequest,
     OfflineVerifyRequest,
     OnlineVerifyRequest,
     ReplaceCardRequest,
 )
+from apps.api.domains.core_registry.models import Citizen
 
 # Claims allowed in online verification responses (never full identity dump).
 ALLOWED_CLAIMS = frozenset(
@@ -38,9 +41,16 @@ ALLOWED_CLAIMS = frozenset(
     }
 )
 
+COMMUNE_INBOX_STATUSES = frozenset(
+    {
+        CardStatus.SENT_TO_COMMUNE.value,
+        CardStatus.PENDING.value,
+    }
+)
+
 
 def _serial() -> str:
-    return f"NIC-{secrets.token_hex(4).upper()}-{secrets.token_hex(3).upper()}"
+    return f"CD-{secrets.token_hex(4).upper()}-{secrets.token_hex(3).upper()}"
 
 
 async def _append_history(
@@ -61,29 +71,140 @@ async def _append_history(
     )
 
 
+def _primary_address(citizen: Citizen):
+    primary = next((a for a in (citizen.addresses or []) if a.is_primary), None)
+    if primary is None and citizen.addresses:
+        primary = citizen.addresses[0]
+    return primary
+
+
+def resolve_commune_routing(citizen: Citizen) -> dict[str, str | None]:
+    """Détermine la commune de livraison à partir de l'adresse principale."""
+    addr = _primary_address(citizen)
+    if addr is None:
+        return {
+            "commune_code": "KIN-GOMBE",
+            "commune_name": "Gombe",
+            "delivery_address": None,
+            "city": None,
+            "province_code": "KIN",
+        }
+    commune_code = (addr.commune_code or "").strip() or None
+    city = (addr.city or "").strip() or None
+    if not commune_code and city:
+        commune_code = f"AUTO-{city.upper().replace(' ', '-')[:24]}"
+    if not commune_code:
+        commune_code = "KIN-GOMBE"
+    lines = [addr.line1]
+    if addr.line2:
+        lines.append(addr.line2)
+    lines.append(addr.city)
+    if addr.province_code:
+        lines.append(addr.province_code)
+    lines.append("RDC")
+    return {
+        "commune_code": commune_code,
+        "commune_name": commune_code.split("-")[-1].title() if commune_code else city,
+        "delivery_address": ", ".join(p for p in lines if p),
+        "city": city,
+        "province_code": addr.province_code,
+    }
+
+
+def holder_snapshot(citizen: Citizen) -> CardHolderSnapshot:
+    routing = resolve_commune_routing(citizen)
+    addr = _primary_address(citizen)
+    return CardHolderSnapshot(
+        nic=citizen.nic,
+        family_name=citizen.family_name,
+        given_names=citizen.given_names,
+        sex=citizen.sex,
+        date_of_birth=citizen.date_of_birth.isoformat() if citizen.date_of_birth else None,
+        place_of_birth=citizen.place_of_birth,
+        nationality=citizen.nationality or "COD",
+        address_line=routing.get("delivery_address"),
+        city=routing.get("city") or (addr.city if addr else None),
+        commune_code=routing.get("commune_code"),
+        province_code=routing.get("province_code") or (addr.province_code if addr else None),
+    )
+
+
+def routing_message(card: NationalCard) -> str:
+    if card.status == CardStatus.SENT_TO_COMMUNE.value:
+        where = card.commune_name or card.commune_code or "la commune"
+        return (
+            f"Carte et NIC générés — retournés à la commune de {where} "
+            f"pour livraison au titulaire."
+        )
+    if card.status == CardStatus.DELIVERED.value:
+        return "Carte remise au titulaire par la commune."
+    if card.status == CardStatus.ACTIVE.value:
+        return "Carte active."
+    return f"Statut : {card.status}"
+
+
+async def load_citizen_with_addresses(db: AsyncSession, citizen_id: uuid.UUID) -> Citizen | None:
+    stmt = (
+        select(Citizen)
+        .options(selectinload(Citizen.addresses))
+        .where(Citizen.id == citizen_id)
+    )
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
 async def issue_card(
     db: AsyncSession,
     data: CardIssueRequest,
     *,
     actor_id: uuid.UUID | None = None,
+    dispatch_to_commune: bool = True,
 ) -> tuple[NationalCard, dict[str, Any]]:
     now = datetime.now(UTC)
     expires = data.expires_at or (now + timedelta(days=365 * 10))
+    citizen = await load_citizen_with_addresses(db, data.citizen_id)
+    routing = (
+        resolve_commune_routing(citizen)
+        if citizen
+        else {
+            "commune_code": "KIN-GOMBE",
+            "commune_name": "Gombe",
+            "delivery_address": None,
+        }
+    )
+
+    status = (
+        CardStatus.SENT_TO_COMMUNE.value if dispatch_to_commune else CardStatus.PENDING.value
+    )
     card = NationalCard(
         citizen_id=data.citizen_id,
         serial_number=_serial(),
         issued_at=now,
         expires_at=expires,
-        status=CardStatus.PENDING.value,
+        status=status,
         version=data.version,
+        commune_code=routing.get("commune_code"),
+        commune_name=routing.get("commune_name"),
+        delivery_address=routing.get("delivery_address"),
+        dispatched_at=now if dispatch_to_commune else None,
     )
     db.add(card)
     await db.flush()
     await _append_history(
         db, card.card_id, CardHistoryEvent.ISSUED.value, actor_id=actor_id
     )
+    if dispatch_to_commune:
+        await _append_history(
+            db,
+            card.card_id,
+            CardHistoryEvent.DISPATCHED_TO_COMMUNE.value,
+            actor_id=actor_id,
+            payload={
+                "commune_code": card.commune_code,
+                "commune_name": card.commune_name,
+                "delivery_address": card.delivery_address,
+            },
+        )
 
-    # Ensure digital identity shell exists
     existing = (
         await db.execute(
             select(DigitalIdentity).where(DigitalIdentity.citizen_id == data.citizen_id)
@@ -113,11 +234,46 @@ async def get_active_card_for_citizen(
     stmt = (
         select(NationalCard)
         .where(NationalCard.citizen_id == citizen_id)
-        .where(NationalCard.status.in_([CardStatus.ACTIVE.value, CardStatus.PENDING.value]))
+        .where(
+            NationalCard.status.in_(
+                [
+                    CardStatus.ACTIVE.value,
+                    CardStatus.PENDING.value,
+                    CardStatus.SENT_TO_COMMUNE.value,
+                    CardStatus.DELIVERED.value,
+                ]
+            )
+        )
         .order_by(NationalCard.created_at.desc())
         .limit(1)
     )
     return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def list_commune_inbox(
+    db: AsyncSession,
+    commune_code: str,
+    *,
+    limit: int = 200,
+) -> list[NationalCard]:
+    code = commune_code.strip().upper()
+    stmt = (
+        select(NationalCard)
+        .where(NationalCard.status.in_(list(COMMUNE_INBOX_STATUSES)))
+        .where(NationalCard.commune_code.is_not(None))
+        .order_by(NationalCard.dispatched_at.desc().nullslast(), NationalCard.created_at.desc())
+        .limit(limit)
+    )
+    rows = list((await db.execute(stmt)).scalars().all())
+    out: list[NationalCard] = []
+    for c in rows:
+        cc = (c.commune_code or "").upper()
+        cn = (c.commune_name or "").upper()
+        if cc == code or code in cc or cn == code or (len(code) > 3 and code in cn):
+            out.append(c)
+        elif "-" in code and code.split("-")[-1] in (cc, cn):
+            out.append(c)
+    return out
 
 
 async def _set_status(
@@ -136,15 +292,61 @@ async def _set_status(
     return card
 
 
+async def deliver_card_at_commune(
+    db: AsyncSession,
+    card_id: uuid.UUID,
+    *,
+    actor_id: uuid.UUID | None = None,
+) -> NationalCard:
+    """Commune remet la carte au citoyen → DELIVERED puis ACTIVE."""
+    card = await get_card(db, card_id)
+    if card is None:
+        raise ValueError("Card not found")
+    if card.status not in {
+        CardStatus.SENT_TO_COMMUNE.value,
+        CardStatus.PENDING.value,
+        CardStatus.DELIVERED.value,
+    }:
+        raise ValueError(f"Cannot deliver from status {card.status}")
+
+    now = datetime.now(UTC)
+    card.delivered_at = now
+    card.status = CardStatus.DELIVERED.value
+    await _append_history(
+        db,
+        card.card_id,
+        CardHistoryEvent.DELIVERED_TO_HOLDER.value,
+        actor_id=actor_id,
+        payload={"commune_code": card.commune_code},
+    )
+    await db.flush()
+
+    di = (
+        await db.execute(
+            select(DigitalIdentity).where(DigitalIdentity.citizen_id == card.citizen_id)
+        )
+    ).scalar_one_or_none()
+    if di:
+        di.status = DigitalIdentityStatus.ACTIVE.value
+
+    return await _set_status(
+        db, card, CardStatus.ACTIVE, CardHistoryEvent.ACTIVATED, actor_id=actor_id
+    )
+
+
 async def activate_card(
     db: AsyncSession, card_id: uuid.UUID, *, actor_id: uuid.UUID | None = None
 ) -> NationalCard:
     card = await get_card(db, card_id)
     if card is None:
         raise ValueError("Card not found")
-    if card.status not in {CardStatus.PENDING.value, CardStatus.SUSPENDED.value}:
+    if card.status not in {
+        CardStatus.PENDING.value,
+        CardStatus.SUSPENDED.value,
+        CardStatus.SENT_TO_COMMUNE.value,
+        CardStatus.DELIVERED.value,
+    }:
         raise ValueError(f"Cannot activate from status {card.status}")
-    # Activate digital identity
     di = (
         await db.execute(
             select(DigitalIdentity).where(DigitalIdentity.citizen_id == card.citizen_id)
@@ -242,6 +444,7 @@ async def replace_card(
             version=old.version + 1,
         ),
         actor_id=actor_id,
+        dispatch_to_commune=True,
     )
     old.status = CardStatus.REPLACED.value
     old.replaced_by_id = new_card.card_id

@@ -42,6 +42,7 @@ import AdoptionsPage from "./pages/AdoptionsPage";
 import DisplacementsPage from "./pages/DisplacementsPage";
 import DivorcesPage from "./pages/DivorcesPage";
 import DocumentsPage from "./pages/DocumentsPage";
+import CardDeliveryPage from "./pages/CardDeliveryPage";
 import ActsPage from "./pages/ActsPage";
 import SearchPage from "./pages/SearchPage";
 import DeclarationsPage from "./pages/DeclarationsPage";
@@ -602,6 +603,9 @@ function Shell() {
           <NavLink to="/acts">
             <IconFile size={18} /> Actes & documents
           </NavLink>
+          <NavLink to="/cartes-livraison">
+            <IconFile size={18} /> Livraison cartes ID
+          </NavLink>
           <NavLink to="/declarations">
             <IconClipboard size={18} /> Déclarations santé
           </NavLink>
@@ -712,6 +716,7 @@ function Shell() {
             <Route path="/displacements" element={<DisplacementsPage />} />
             <Route path="/divorces" element={<DivorcesPage />} />
             <Route path="/documents" element={<DocumentsPage />} />
+            <Route path="/cartes-livraison" element={<CardDeliveryPage />} />
             <Route path="/acts" element={<ActsPage />} />
             <Route path="/declarations" element={<DeclarationsPage />} />
             <Route path="/territory" element={<TerritoryPage />} />

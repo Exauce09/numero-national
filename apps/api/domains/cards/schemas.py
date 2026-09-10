@@ -17,6 +17,22 @@ class CardIssueRequest(BaseModel):
     version: int = 1
 
 
+class CardHolderSnapshot(BaseModel):
+    """Données affichées sur la carte physique (recto / verso)."""
+
+    nic: str | None = None
+    family_name: str | None = None
+    given_names: str | None = None
+    sex: str | None = None
+    date_of_birth: str | None = None
+    place_of_birth: str | None = None
+    nationality: str = "COD"
+    address_line: str | None = None
+    city: str | None = None
+    commune_code: str | None = None
+    province_code: str | None = None
+
+
 class CardRead(BaseModel):
     card_id: UUID
     citizen_id: UUID
@@ -26,9 +42,16 @@ class CardRead(BaseModel):
     status: str
     version: int
     replaced_by_id: UUID | None
+    commune_code: str | None = None
+    commune_name: str | None = None
+    delivery_address: str | None = None
+    dispatched_at: datetime | None = None
+    delivered_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
     qr_payload: dict[str, Any] | None = None
+    holder: CardHolderSnapshot | None = None
+    routing_message: str | None = None
 
     model_config = {"from_attributes": True}
 

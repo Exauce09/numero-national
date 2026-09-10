@@ -7,6 +7,11 @@ from enum import StrEnum
 
 class CardStatus(StrEnum):
     PENDING = "PENDING"
+    """Émise à l'ONIP, en attente d'envoi commune."""
+    SENT_TO_COMMUNE = "SENT_TO_COMMUNE"
+    """Retournée à la commune pour remise au citoyen."""
+    DELIVERED = "DELIVERED"
+    """Remise physiquement au titulaire (active ensuite)."""
     ACTIVE = "ACTIVE"
     SUSPENDED = "SUSPENDED"
     LOST = "LOST"
@@ -25,6 +30,8 @@ class DigitalIdentityStatus(StrEnum):
 
 class CardHistoryEvent(StrEnum):
     ISSUED = "ISSUED"
+    DISPATCHED_TO_COMMUNE = "DISPATCHED_TO_COMMUNE"
+    DELIVERED_TO_HOLDER = "DELIVERED_TO_HOLDER"
     ACTIVATED = "ACTIVATED"
     SUSPENDED = "SUSPENDED"
     REPORTED_LOST = "REPORTED_LOST"
