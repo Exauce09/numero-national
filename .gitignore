@@ -52,3 +52,7 @@ npm-debug.log*
 # OSM raw dumps (regenerate via scripts/fetch_kinshasa_avenues_osm.py)
 scripts/_osm_*.json
 scripts/kinshasa_avenues_osm.json
+
+# ADB / UI dumps at repo root (local device tests — not source)
+/*.png
+/*.xml
