@@ -8,6 +8,7 @@
     <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.fingerprint" android:required="false"/>
+    <uses-feature android:name="android.hardware.usb.host" android:required="false"/>
     <application
         android:label="ONIP Recensement"
         android:name="${applicationName}"
@@ -26,12 +27,22 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <meta-data
+              android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+              android:resource="@xml/device_filter" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
             <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"/>
+            </intent-filter>
+            <intent-filter>
                 <action android:name="cd.gov.nic.flutter_recensement.PRINT_TEST"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="cd.gov.nic.flutter_recensement.MORPHO_TEST"/>
                 <category android:name="android.intent.category.DEFAULT"/>
             </intent-filter>
         </activity>

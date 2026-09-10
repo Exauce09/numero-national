@@ -4,13 +4,10 @@ import 'package:local_auth/local_auth.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/config.dart';
+import '../../core/morpho_fingerprint.dart';
 import '../../core/theme.dart';
 
-/// Empreinte : BiometricPrompt Android si dispo, sinon capture Morpho terrain.
-///
-/// Le capteur optique MorphoTablet n’est en général **pas** exposé à
-/// `local_auth` (SDK Safran requis pour le template forensique). Sur profil
-/// `fingerprint`, on enregistre une attestation terrain après pose du doigt.
+/// Empreinte MorphoTablet (SDK MorphoSmart) ou BiometricPrompt téléphone.
 class FingerprintCaptureWidget extends StatefulWidget {
   const FingerprintCaptureWidget({
     super.key,
@@ -36,19 +33,52 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
   String? _info;
   bool _busy = false;
   bool _systemBio = false;
+  bool _morphoReady = false;
+  String _morphoSensor = '';
 
   bool get _morpho => AppConfig.isFingerprintDevice;
-
-  String get _deviceLabel => _morpho ? 'MorphoTablet' : 'téléphone';
 
   @override
   void initState() {
     super.initState();
     _ref = widget.initialRef;
-    _check();
+    _boot();
   }
 
-  Future<void> _check() async {
+  Future<void> _boot() async {
+    if (_morpho) {
+      setState(() {
+        _info = 'Initialisation du capteur Morpho optique…';
+        _error = null;
+      });
+      try {
+        final prep = await MorphoFingerprint.prepare();
+        if (!mounted) return;
+        setState(() {
+          _morphoReady = prep['ok'] == true;
+          _morphoSensor = prep['sensor']?.toString() ?? '';
+          _info = _morphoReady
+              ? 'Capteur Morpho prêt (${_morphoSensor.isEmpty ? 'MSO' : _morphoSensor}). Posez le doigt ${widget.hand} puis Capturer.'
+              : 'Capteur Morpho non prêt';
+          _error = null;
+        });
+      } on PlatformException catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _morphoReady = false;
+          _error = e.message ?? 'Échec init Morpho';
+          _info = 'Réessayez « Préparer le capteur » ou accordez la permission USB.';
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _morphoReady = false;
+          _error = e.toString();
+        });
+      }
+      return;
+    }
+
     try {
       final supported = await _auth.isDeviceSupported();
       final can = await _auth.canCheckBiometrics;
@@ -59,109 +89,87 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
       if (!mounted) return;
       setState(() {
         _systemBio = supported && (can || hasFp || bios.isNotEmpty);
-        if (_morpho) {
-          _info = _systemBio
-              ? 'Capteur système OK — ou posez le doigt sur le Morpho optique puis validez.'
-              : 'Posez le doigt sur le capteur optique (haut gauche), puis validez la capture.';
-          _error = null;
-        } else if (!_systemBio) {
-          _error = 'Enregistrez une empreinte dans Réglages → Sécurité du téléphone';
-          _info = null;
+        if (!_systemBio) {
+          _error = 'Enregistrez une empreinte dans Réglages → Sécurité';
         } else {
-          _error = null;
           _info = 'Posez le doigt ${widget.hand} sur le capteur du téléphone';
         }
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _systemBio = false;
-        if (_morpho) {
-          _error = null;
-          _info = 'Mode Morpho terrain — posez le doigt puis validez.';
-        } else {
-          _error = 'Biométrie indisponible';
-        }
+        _error = 'Biométrie indisponible';
       });
     }
   }
 
-  void _commit(String scheme) {
-    final ref =
-        '$scheme://${widget.hand}/${DateTime.now().toUtc().toIso8601String()}#${const Uuid().v4()}';
-    setState(() {
-      _ref = ref;
-      _error = null;
-    });
-    widget.onCaptured(ref);
-  }
-
-  Future<void> _captureSystem() async {
+  Future<void> _captureMorpho() async {
     setState(() {
       _busy = true;
       _error = null;
+      _info = 'Posez fermement le doigt ${widget.hand} sur le capteur rouge…';
     });
     try {
-      await _check();
-      if (!_systemBio) {
-        if (_morpho) {
-          _commit('morpho-fp');
-        } else {
-          setState(() => _error = 'Aucun capteur biométrique système');
+      if (!_morphoReady) {
+        await _boot();
+        if (!_morphoReady) {
+          throw PlatformException(code: 'NOT_READY', message: _error ?? 'Capteur non prêt');
         }
-        return;
       }
-
-      var ok = false;
-      try {
-        ok = await _auth.authenticate(
-          localizedReason: _morpho
-              ? 'Empreinte ${widget.hand} — capteur Morpho / système'
-              : 'Empreinte ${widget.hand} — posez le doigt sur le capteur',
-          options: const AuthenticationOptions(
-            biometricOnly: true,
-            stickyAuth: true,
-            useErrorDialogs: true,
-          ),
-        );
-      } on PlatformException {
-        // Retry allowing device credential fallback.
-        ok = await _auth.authenticate(
-          localizedReason: 'Confirmez l’empreinte ${widget.hand}',
-          options: const AuthenticationOptions(
-            biometricOnly: false,
-            stickyAuth: true,
-            useErrorDialogs: true,
-          ),
-        );
-      }
-
-      if (!ok) {
-        setState(() => _error = 'Empreinte non validée — réessayez ou utilisez la capture Morpho');
-        return;
-      }
-      _commit(_morpho ? 'morpho-fp' : 'phone-fp');
+      final out = await MorphoFingerprint.capture(hand: widget.hand, timeout: 35);
+      final payload = MorphoFingerprint.encodePayload(out);
+      final ref = out['ref']?.toString() ??
+          'morpho-fp://${widget.hand}/${DateTime.now().toUtc().toIso8601String()}#${const Uuid().v4()}';
+      // Stocke la ref courte + payload JSON (qualité / template) pour sync.
+      final stored = '$ref|$payload';
+      setState(() {
+        _ref = stored;
+        _info =
+            'Empreinte ${widget.hand} OK — qualité ${out['quality'] ?? '—'} (${out['template_len'] ?? 0} o)';
+        _error = null;
+      });
+      widget.onCaptured(stored);
+    } on PlatformException catch (e) {
+      setState(() {
+        _error = e.message ?? 'Échec capture Morpho';
+        _info = 'Reposez le doigt et réessayez.';
+      });
     } catch (e) {
-      if (_morpho) {
-        // Capteur optique Morpho hors BiometricPrompt → capture terrain.
-        _commit('morpho-fp');
-      } else {
-        setState(() => _error = 'Échec capteur (${e.toString().split('\n').first})');
-      }
+      setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _captureMorphoField() async {
+  Future<void> _capturePhone() async {
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      // Court délai pour laisser l’agent poser le doigt sur le capteur allumé.
-      await Future<void>.delayed(const Duration(milliseconds: 400));
-      _commit('morpho-fp');
+      if (!_systemBio) {
+        setState(() => _error = 'Aucun capteur biométrique système');
+        return;
+      }
+      final ok = await _auth.authenticate(
+        localizedReason: 'Empreinte ${widget.hand}',
+        options: const AuthenticationOptions(
+          biometricOnly: true,
+          stickyAuth: true,
+          useErrorDialogs: true,
+        ),
+      );
+      if (!ok) {
+        setState(() => _error = 'Empreinte non validée');
+        return;
+      }
+      final ref =
+          'phone-fp://${widget.hand}/${DateTime.now().toUtc().toIso8601String()}#${const Uuid().v4()}';
+      setState(() => _ref = ref);
+      widget.onCaptured(ref);
+    } catch (e) {
+      setState(() => _error = 'Échec capteur ($e)');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -185,8 +193,8 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
           const SizedBox(height: 6),
           Text(
             done
-                ? 'Empreinte ${widget.hand} enregistrée ($_deviceLabel)'
-                : (_info ?? 'Utilisez le capteur d’empreinte'),
+                ? 'Empreinte ${widget.hand} enregistrée'
+                : (_info ?? 'Capteur d’empreinte'),
             style: TextStyle(
               color: done ? NnColors.success : NnColors.muted,
               fontWeight: done ? FontWeight.w700 : FontWeight.w500,
@@ -199,24 +207,26 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
           ],
           const SizedBox(height: 12),
           FilledButton.icon(
-            onPressed: _busy ? null : _captureSystem,
+            onPressed: _busy
+                ? null
+                : (_morpho ? _captureMorpho : _capturePhone),
             icon: Icon(done ? Icons.fingerprint : Icons.fingerprint_outlined),
             label: Text(
               _busy
-                  ? 'Capteur…'
+                  ? (_morpho ? 'Lecture Morpho…' : 'Capteur…')
                   : (done
                       ? 'Reprendre (${widget.hand})'
-                      : (_systemBio
-                          ? 'Capturer ${widget.hand}'
-                          : 'Valider empreinte ${widget.hand}')),
+                      : (_morpho
+                          ? 'Capturer Morpho (${widget.hand})'
+                          : 'Capturer ${widget.hand}')),
             ),
           ),
           if (_morpho && !done) ...[
             const SizedBox(height: 8),
             OutlinedButton.icon(
-              onPressed: _busy ? null : _captureMorphoField,
-              icon: const Icon(Icons.touch_app_outlined),
-              label: Text('Morpho optique — doigt ${widget.hand} posé'),
+              onPressed: _busy ? null : _boot,
+              icon: const Icon(Icons.settings_input_component),
+              label: Text(_morphoReady ? 'Reconnecter le capteur' : 'Préparer le capteur Morpho'),
             ),
           ],
         ],

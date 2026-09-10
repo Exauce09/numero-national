@@ -57,6 +57,13 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+            // R8 retire sinon les classes Morpho chargées uniquement via JNI.
+            isMinifyEnabled = false
+            isShrinkResources = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }

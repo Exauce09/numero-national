@@ -3,6 +3,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+# MorphoSmart natives (empreinte MorphoTablet)
+!apps/flutter_recensement/android/app/src/main/jniLibs/**/*.so
 .Python
 build/
 dist/
