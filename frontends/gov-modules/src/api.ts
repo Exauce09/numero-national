@@ -60,6 +60,7 @@ export type Facility = {
   code?: string;
   name: string;
   facility_type?: string;
+  province_code?: string;
   commune_code?: string;
   status?: string;
 };
@@ -153,6 +154,18 @@ export const api = {
     }),
 
   healthFacilities: () => softEmpty<Facility[]>("/health/facilities", []),
+
+  healthFacilityCreate: (body: {
+    code: string;
+    name: string;
+    facility_type: string;
+    province_code: string;
+    commune_code?: string | null;
+  }) =>
+    request<Facility>("/health/facilities", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   civilStats: (commune: string) =>
     softEmpty<{ commune_code: string; counts: Record<string, number>; total: number }>(

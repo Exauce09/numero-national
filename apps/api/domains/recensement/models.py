@@ -304,3 +304,27 @@ class SyncBatch(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class FieldCoupon(Base):
+    """Coupon terrain émis par l'APK — synchronisé via /census/sync/push."""
+
+    __tablename__ = "field_coupons"
+    __table_args__ = {"schema": "recensement"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("recensement.campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    local_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    household_local_id: Mapped[str | None] = mapped_column(String(128))
+    family_name: Mapped[str | None] = mapped_column(String(255))
+    given_names: Mapped[str | None] = mapped_column(String(255))
+    sex: Mapped[str | None] = mapped_column(String(16))
+    date_of_birth: Mapped[str | None] = mapped_column(String(32))
+    qr_payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    agent_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
+    device_uid: Mapped[str | None] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

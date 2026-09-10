@@ -41,6 +41,7 @@ class HealthFacility(Base):
         nullable=False,
     )
     commune_code: Mapped[str | None] = mapped_column(String(32))
+    province_code: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -8,9 +8,10 @@ import 'package:printing/printing.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/theme.dart';
+import '../../sync/sync_queue.dart';
 
-/// Coupon terrain imprimable : infos de base + QR scannable.
-class CouponPrintScreen extends StatelessWidget {
+/// Coupon terrain imprimable : infos de base + QR scannable + sync serveur.
+class CouponPrintScreen extends StatefulWidget {
   const CouponPrintScreen({
     super.key,
     required this.localId,
@@ -30,24 +31,66 @@ class CouponPrintScreen extends StatelessWidget {
   final String? campaignId;
   final String? householdLocalId;
 
-  String get _qrPayload {
-    final map = <String, Object?>{
-      'type': 'nn_census_coupon',
-      'v': 1,
-      'local_id': localId,
-      'family_name': familyName,
-      'given_names': givenNames,
-      'sex': sex,
-      'dob': dateOfBirth,
-      if (campaignId != null) 'campaign_id': campaignId,
-      if (householdLocalId != null) 'household_id': householdLocalId,
-      'ts': DateTime.now().toUtc().toIso8601String(),
-    };
-    return jsonEncode(map);
+  @override
+  State<CouponPrintScreen> createState() => _CouponPrintScreenState();
+}
+
+class _CouponPrintScreenState extends State<CouponPrintScreen> {
+  String _syncNote = 'Synchronisation coupon…';
+
+  Map<String, Object?> get _payloadMap => <String, Object?>{
+        'type': 'nn_census_coupon',
+        'v': 1,
+        'local_id': widget.localId,
+        'family_name': widget.familyName,
+        'given_names': widget.givenNames,
+        'sex': widget.sex,
+        'dob': widget.dateOfBirth,
+        'date_of_birth': widget.dateOfBirth,
+        if (widget.campaignId != null) 'campaign_id': widget.campaignId,
+        if (widget.householdLocalId != null) 'household_local_id': widget.householdLocalId,
+        'ts': DateTime.now().toUtc().toIso8601String(),
+      };
+
+  String get _qrPayload => jsonEncode(_payloadMap);
+
+  @override
+  void initState() {
+    super.initState();
+    _enqueueCoupon();
+  }
+
+  Future<void> _enqueueCoupon() async {
+    try {
+      final campaignId = widget.campaignId;
+      if (campaignId == null || campaignId.isEmpty) {
+        setState(() => _syncNote = 'Coupon local (campagne inconnue) — sync au prochain push.');
+        return;
+      }
+      await SyncQueue().enqueue(
+        SyncQueueItem(
+          entityType: 'coupon',
+          localId: widget.localId,
+          version: 1,
+          payload: {
+            ..._payloadMap,
+            'campaign_id': campaignId,
+            'qr_payload': _payloadMap,
+          },
+        ),
+      );
+      if (mounted) {
+        setState(() => _syncNote = 'Coupon mis en file de sync — sera envoyé au serveur.');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _syncNote = 'Coupon local OK — sync reportée ($e)');
+      }
+    }
   }
 
   Future<void> _print(BuildContext context) async {
-    final name = '$familyName $givenNames'.trim();
+    final name = '${widget.familyName} ${widget.givenNames}'.trim();
     final doc = pw.Document();
     final qrImage = await QrPainter(
       data: _qrPayload,
@@ -71,9 +114,9 @@ class CouponPrintScreen extends StatelessWidget {
             pw.SizedBox(height: 10),
             pw.Text(name.isEmpty ? '—' : name, style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 6),
-            pw.Text('Sexe : ${sex == 'F' ? 'Féminin' : 'Masculin'}', style: const pw.TextStyle(fontSize: 10)),
-            pw.Text('Naissance : ${dateOfBirth.isEmpty ? '—' : dateOfBirth}', style: const pw.TextStyle(fontSize: 10)),
-            pw.Text('Réf. : $localId', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+            pw.Text('Sexe : ${widget.sex == 'F' ? 'Féminin' : 'Masculin'}', style: const pw.TextStyle(fontSize: 10)),
+            pw.Text('Naissance : ${widget.dateOfBirth.isEmpty ? '—' : widget.dateOfBirth}', style: const pw.TextStyle(fontSize: 10)),
+            pw.Text('Réf. : ${widget.localId}', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
             pw.SizedBox(height: 8),
             pw.Text(
               'Pas une carte d’identité. Carte officielle = ONIP après validation.',
@@ -90,7 +133,7 @@ class CouponPrintScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = '$familyName $givenNames'.trim();
+    final name = '${widget.familyName} ${widget.givenNames}'.trim();
     return Scaffold(
       backgroundColor: NnColors.page,
       appBar: AppBar(
@@ -103,7 +146,7 @@ class CouponPrintScreen extends StatelessWidget {
           IconButton(
             tooltip: 'Copier la référence',
             onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: localId));
+              await Clipboard.setData(ClipboardData(text: widget.localId));
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Référence copiée')),
@@ -117,9 +160,9 @@ class CouponPrintScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          const Text(
-            'Présentez ce coupon. Le QR pourra être scanné pour retrouver la fiche.',
-            style: TextStyle(color: NnColors.muted, height: 1.35),
+          Text(
+            'Présentez ce coupon. Le QR pourra être scanné pour retrouver la fiche.\n$_syncNote',
+            style: const TextStyle(color: NnColors.muted, height: 1.35),
           ),
           const SizedBox(height: 16),
           Container(
@@ -148,26 +191,25 @@ class CouponPrintScreen extends StatelessWidget {
                       const SizedBox(height: 16),
                       QrImageView(
                         data: _qrPayload,
-                        version: QrVersions.auto,
                         size: 200,
                         backgroundColor: Colors.white,
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 16),
                       Text(
                         name.isEmpty ? '—' : name,
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
                       ),
                       const SizedBox(height: 8),
-                      _line('Sexe', sex == 'F' ? 'Féminin' : 'Masculin'),
-                      _line('Naissance', dateOfBirth.isEmpty ? '—' : dateOfBirth),
-                      _line('Réf. locale', localId.length > 12 ? '${localId.substring(0, 12)}…' : localId),
-                      const SizedBox(height: 8),
+                      Text('Sexe : ${widget.sex == 'F' ? 'Féminin' : 'Masculin'}'),
+                      Text('Naissance : ${widget.dateOfBirth.isEmpty ? '—' : widget.dateOfBirth}'),
+                      Text('Réf. : ${widget.localId}', style: const TextStyle(color: NnColors.muted, fontSize: 12)),
+                      const SizedBox(height: 12),
                       const Text(
                         'Ce coupon n’est pas une carte d’identité. '
-                        'La carte officielle est émise par l’ONIP après validation.',
+                        'La carte officielle est délivrée par l’ONIP après validation.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 11, color: NnColors.muted, height: 1.35),
+                        style: TextStyle(color: NnColors.muted, fontSize: 12, height: 1.3),
                       ),
                     ],
                   ),
@@ -178,31 +220,8 @@ class CouponPrintScreen extends StatelessWidget {
           const SizedBox(height: 20),
           FilledButton.icon(
             onPressed: () => _print(context),
-            icon: const Icon(Icons.print_outlined),
+            icon: const Icon(Icons.print),
             label: const Text('Imprimer le coupon'),
-            style: FilledButton.styleFrom(backgroundColor: NnColors.rdcRed),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Terminer'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static Widget _line(String k, String v) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 90,
-            child: Text(k, style: const TextStyle(color: NnColors.muted, fontSize: 13)),
-          ),
-          Expanded(
-            child: Text(v, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
           ),
         ],
       ),

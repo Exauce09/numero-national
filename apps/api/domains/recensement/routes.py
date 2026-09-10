@@ -118,7 +118,7 @@ async def create_zone(
     except ValueError as exc:
         if str(exc) == "campaign_not_found":
             raise HTTPException(status_code=404, detail="Campaign not found") from exc
-        raise
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/campaigns/{campaign_id}/zones", response_model=list[ZoneOut])

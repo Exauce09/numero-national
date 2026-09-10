@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.db.session import get_db
@@ -23,7 +23,10 @@ router = APIRouter(prefix="/health", tags=["health-domain"])
 
 @router.post("/facilities", response_model=FacilityOut, status_code=status.HTTP_201_CREATED)
 async def create_facility(body: FacilityCreate, db: AsyncSession = Depends(get_db)) -> FacilityOut:
-    return await service.create_facility(db, body)  # type: ignore[return-value]
+    try:
+        return await service.create_facility(db, body)  # type: ignore[return-value]
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/verify-identity", response_model=VerifyIdentityResponse)

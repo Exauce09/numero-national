@@ -335,6 +335,10 @@ export function ministryExportPayload() {
 }
 
 export const FACILITY_TYPE_LABELS: Record<string, string> = {
+  HOSPITAL: "Hôpital",
+  CLINIC: "Clinique",
+  MATERNITY: "Maternité",
+  OTHER: "Autre",
   HOPITAL: "Hôpital",
   CLINIQUE: "Clinique",
   CS: "Centre de santé",

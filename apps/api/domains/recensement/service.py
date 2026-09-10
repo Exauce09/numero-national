@@ -299,6 +299,63 @@ async def sync_push(db: AsyncSession, req: SyncPushRequest) -> SyncPushResult:
                     "version": max(item.version, 1),
                 }
             )
+        elif item.entity_type == "coupon":
+            from apps.api.domains.recensement.models import FieldCoupon
+
+            existing_c = (
+                await db.execute(
+                    select(FieldCoupon).where(
+                        FieldCoupon.campaign_id == req.campaign_id,
+                        FieldCoupon.local_id == item.local_id,
+                    )
+                )
+            ).scalar_one_or_none()
+            payload = {
+                "type": "nn_census_coupon",
+                "v": 1,
+                "local_id": item.local_id,
+                "family_name": item.data.get("family_name"),
+                "given_names": item.data.get("given_names"),
+                "sex": item.data.get("sex"),
+                "dob": item.data.get("date_of_birth") or item.data.get("dob"),
+                "campaign_id": str(req.campaign_id),
+                "household_id": item.data.get("household_local_id"),
+                "ts": datetime.now(timezone.utc).isoformat(),
+            }
+            if existing_c is None:
+                db.add(
+                    FieldCoupon(
+                        campaign_id=req.campaign_id,
+                        local_id=item.local_id,
+                        household_local_id=item.data.get("household_local_id"),
+                        family_name=item.data.get("family_name"),
+                        given_names=item.data.get("given_names"),
+                        sex=item.data.get("sex"),
+                        date_of_birth=item.data.get("date_of_birth") or item.data.get("dob"),
+                        qr_payload=item.data.get("qr_payload") or payload,
+                        agent_user_id=req.agent_user_id,
+                        device_uid=req.device_uid,
+                    )
+                )
+            else:
+                existing_c.family_name = item.data.get("family_name", existing_c.family_name)
+                existing_c.given_names = item.data.get("given_names", existing_c.given_names)
+                existing_c.sex = item.data.get("sex", existing_c.sex)
+                existing_c.date_of_birth = (
+                    item.data.get("date_of_birth")
+                    or item.data.get("dob")
+                    or existing_c.date_of_birth
+                )
+                existing_c.qr_payload = item.data.get("qr_payload") or payload
+            accepted += 1
+            details.append(
+                {
+                    "local_id": item.local_id,
+                    "entity_type": "coupon",
+                    "status": "ACCEPTED",
+                    "version": max(item.version, 1),
+                }
+            )
         else:
             conflicts += 1
             details.append(
@@ -462,10 +519,44 @@ def _parse_uuid(value: Any) -> uuid.UUID | None:
 
 
 async def create_zone(db: AsyncSession, campaign_id: uuid.UUID, data: ZoneCreate) -> Zone:
+    from apps.api.domains.geography.models import Commune, Province, Ville
+
     campaign = await get_campaign(db, campaign_id)
     if not campaign:
         raise ValueError("campaign_not_found")
-    zone = Zone(campaign_id=campaign_id, **data.model_dump())
+
+    province_code = (data.province_code or "").strip().upper() or None
+    commune_code = (data.commune_code or "").strip() or None
+    if not province_code:
+        raise ValueError("province_code_required")
+    prov = await db.scalar(select(Province).where(Province.code == province_code))
+    if prov is None:
+        raise ValueError("province_not_found")
+    geo_level = data.geo_level or "COMMUNE"
+    geo_ref_id = data.geo_ref_id
+    if commune_code:
+        commune = await db.scalar(select(Commune).where(Commune.code == commune_code))
+        if commune is None:
+            raise ValueError("commune_not_found")
+        ville = await db.get(Ville, commune.ville_id)
+        if ville is None or ville.province_id != prov.id:
+            raise ValueError("commune_not_in_province")
+        geo_level = "COMMUNE"
+        geo_ref_id = commune.id
+    else:
+        geo_level = geo_level or "PROVINCE"
+        geo_ref_id = geo_ref_id or prov.id
+
+    zone = Zone(
+        campaign_id=campaign_id,
+        code=data.code,
+        name=data.name,
+        province_code=province_code,
+        commune_code=commune_code,
+        geo_level=geo_level,
+        geo_ref_id=geo_ref_id,
+        geo_bounds=data.geo_bounds,
+    )
     db.add(zone)
     await db.commit()
     await db.refresh(zone)

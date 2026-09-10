@@ -15,6 +15,7 @@ class FacilityCreate(BaseModel):
     code: str
     name: str
     facility_type: FacilityType = FacilityType.HOSPITAL
+    province_code: str | None = None
     commune_code: str | None = None
 
 
@@ -23,6 +24,7 @@ class FacilityOut(BaseModel):
     code: str
     name: str
     facility_type: FacilityType
+    province_code: str | None = None
     commune_code: str | None
     created_at: datetime
 

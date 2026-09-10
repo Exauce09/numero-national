@@ -13,6 +13,15 @@ const TYPES = [
   "OTHER",
 ];
 
+const ROLE_BY_TYPE: Record<string, string> = {
+  HOSPITAL: "HEALTH_AGENT",
+  MINISTRY: "MINISTRY_STATS",
+  COMMUNE: "CIVIL_OFFICER",
+  ONIP: "ONIP_OPS",
+  PRESIDENCY: "PRESIDENCY_VIEW",
+  PRIMATURE: "PRIMATURE_VIEW",
+};
+
 export default function InstitutionsPage() {
   const [rows, setRows] = useState<Institution[]>([]);
   const [code, setCode] = useState("");
@@ -20,6 +29,11 @@ export default function InstitutionsPage() {
   const [type, setType] = useState("MINISTRY");
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+
+  const [acctInstId, setAcctInstId] = useState("");
+  const [acctEmail, setAcctEmail] = useState("");
+  const [acctPassword, setAcctPassword] = useState("");
+  const [acctName, setAcctName] = useState("");
 
   async function refresh() {
     setRows(await api.institutionsList());
@@ -44,10 +58,38 @@ export default function InstitutionsPage() {
     }
   }
 
+  async function onCreateAccount(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setOk(null);
+    const inst = rows.find((r) => r.id === acctInstId);
+    if (!inst) {
+      setError("Choisissez une institution.");
+      return;
+    }
+    try {
+      await api.registerUser({
+        email: acctEmail.trim(),
+        password: acctPassword,
+        full_name: acctName.trim() || inst.name,
+        institution_id: inst.id,
+        role_codes: [ROLE_BY_TYPE[inst.type] ?? "CITIZEN"],
+      });
+      setOk(`Compte créé pour ${inst.name} (${acctEmail.trim()}).`);
+      setAcctEmail("");
+      setAcctPassword("");
+      setAcctName("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Création de compte impossible");
+    }
+  }
+
   return (
     <div>
       <h2 className="page-title">Institutions</h2>
-      <p className="page-lead">Référentiel des organismes rattachés au système.</p>
+      <p className="page-lead">
+        Référentiel des organismes. Créez l&apos;institution puis un compte de connexion rattaché.
+      </p>
       {error ? <div className="login-error">{error}</div> : null}
       {ok ? <div className="success-banner">{ok}</div> : null}
 
@@ -99,6 +141,74 @@ export default function InstitutionsPage() {
           <div className="full">
             <button type="submit" className="btn-primary" style={{ width: "auto" }}>
               Créer
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div className="panel" style={{ marginBottom: "1.25rem" }}>
+        <h3 style={{ marginTop: 0 }}>Créer un compte pour une institution</h3>
+        <form className="form-grid" onSubmit={onCreateAccount}>
+          <div className="full">
+            <label className="form-label" htmlFor="acct_inst">
+              Institution
+            </label>
+            <select
+              id="acct_inst"
+              className="form-control"
+              required
+              value={acctInstId}
+              onChange={(ev) => setAcctInstId(ev.target.value)}
+            >
+              <option value="">Choisir…</option>
+              {rows.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.code} — {i.name} ({i.type})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="form-label" htmlFor="acct_email">
+              Email de connexion
+            </label>
+            <input
+              id="acct_email"
+              className="form-control"
+              type="email"
+              required
+              value={acctEmail}
+              onChange={(ev) => setAcctEmail(ev.target.value)}
+            />
+          </div>
+          <div>
+            <label className="form-label" htmlFor="acct_password">
+              Mot de passe
+            </label>
+            <input
+              id="acct_password"
+              className="form-control"
+              type="password"
+              required
+              minLength={8}
+              value={acctPassword}
+              onChange={(ev) => setAcctPassword(ev.target.value)}
+            />
+          </div>
+          <div>
+            <label className="form-label" htmlFor="acct_name">
+              Nom affiché
+            </label>
+            <input
+              id="acct_name"
+              className="form-control"
+              value={acctName}
+              onChange={(ev) => setAcctName(ev.target.value)}
+            />
+          </div>
+          <div className="full">
+            <button type="submit" className="btn-primary" style={{ width: "auto" }}>
+              Créer le compte
             </button>
           </div>
         </form>

@@ -6,9 +6,11 @@ import {
   CampaignStats,
   CensusRecord,
   DirectoryUser,
+  GeoItem,
   Team,
   Zone,
   censusApi,
+  geoApi,
   registryApi,
 } from "../api";
 import { getSession } from "../auth";
@@ -494,8 +496,10 @@ function AssignmentsTab({
   const [teamId, setTeamId] = useState("");
   const [zoneCode, setZoneCode] = useState("");
   const [zoneName, setZoneName] = useState("");
-  const [provinceCode, setProvinceCode] = useState("KIN");
-  const [communeCode, setCommuneCode] = useState("");
+  const [provinces, setProvinces] = useState<GeoItem[]>([]);
+  const [communes, setCommunes] = useState<GeoItem[]>([]);
+  const [provinceId, setProvinceId] = useState("");
+  const [communeId, setCommuneId] = useState("");
   const [teamCode, setTeamCode] = useState("");
   const [teamName, setTeamName] = useState("");
   const [teamZoneId, setTeamZoneId] = useState("");
@@ -517,6 +521,11 @@ function AssignmentsTab({
       } catch {
         setUsers([]);
       }
+      try {
+        setProvinces(await geoApi.provinces());
+      } catch {
+        setProvinces([]);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Chargement affectations impossible");
     }
@@ -525,6 +534,18 @@ function AssignmentsTab({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!provinceId) {
+      setCommunes([]);
+      setCommuneId("");
+      return;
+    }
+    void geoApi
+      .communesByProvince(provinceId)
+      .then(setCommunes)
+      .catch(() => setCommunes([]));
+  }, [provinceId]);
 
   useEffect(() => {
     if (!teamId) {
@@ -539,17 +560,23 @@ function AssignmentsTab({
 
   async function addZone(e: FormEvent) {
     e.preventDefault();
+    const prov = provinces.find((p) => p.id === provinceId);
+    const com = communes.find((c) => c.id === communeId);
+    if (!prov) {
+      setError("Sélectionnez une province du référentiel géographique.");
+      return;
+    }
     try {
       await censusApi.createZone(campaign.id, {
         code: zoneCode.trim(),
         name: zoneName.trim(),
-        province_code: provinceCode.trim() || "KIN",
-        commune_code: communeCode.trim() || undefined,
+        province_code: (prov.code || prov.name).toString(),
+        commune_code: com?.code || undefined,
       });
       setZoneCode("");
       setZoneName("");
-      setCommuneCode("");
-      setMsg("Zone créée");
+      setCommuneId("");
+      setMsg("Zone créée (liée province/commune)");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Zone KO");
@@ -602,16 +629,24 @@ function AssignmentsTab({
           <h3>Nouvelle zone</h3>
           <input placeholder="Code zone" value={zoneCode} onChange={(e) => setZoneCode(e.target.value)} required />
           <input placeholder="Nom zone" value={zoneName} onChange={(e) => setZoneName(e.target.value)} required />
-          <input
-            placeholder="Province (ex. KIN)"
-            value={provinceCode}
-            onChange={(e) => setProvinceCode(e.target.value)}
-          />
-          <input
-            placeholder="Commune (optionnel)"
-            value={communeCode}
-            onChange={(e) => setCommuneCode(e.target.value)}
-          />
+          <select value={provinceId} onChange={(e) => setProvinceId(e.target.value)} required>
+            <option value="">Province…</option>
+            {provinces.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.code ? `${p.code} — ` : ""}
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <select value={communeId} onChange={(e) => setCommuneId(e.target.value)} disabled={!provinceId}>
+            <option value="">Commune (recommandée)…</option>
+            {communes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.code ? `${c.code} — ` : ""}
+                {c.name}
+              </option>
+            ))}
+          </select>
           <button type="submit" className="btn-primary" style={{ marginTop: 8 }}>
             Créer zone
           </button>

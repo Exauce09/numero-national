@@ -72,7 +72,31 @@ def get_civil_port() -> CivilDeclarationPort:
 
 
 async def create_facility(db: AsyncSession, data: FacilityCreate) -> HealthFacility:
-    row = HealthFacility(**data.model_dump())
+    from sqlalchemy import select
+
+    from apps.api.domains.geography.models import Commune, Province, Ville
+
+    province_code = (data.province_code or "").strip().upper() or None
+    commune_code = (data.commune_code or "").strip() or None
+    if not province_code:
+        raise ValueError("province_code_required")
+    prov = await db.scalar(select(Province).where(Province.code == province_code))
+    if prov is None:
+        raise ValueError("province_not_found")
+    if commune_code:
+        commune = await db.scalar(select(Commune).where(Commune.code == commune_code))
+        if commune is None:
+            raise ValueError("commune_not_found")
+        ville = await db.get(Ville, commune.ville_id)
+        if ville is None or ville.province_id != prov.id:
+            raise ValueError("commune_not_in_province")
+    row = HealthFacility(
+        code=data.code,
+        name=data.name,
+        facility_type=data.facility_type,
+        province_code=province_code,
+        commune_code=commune_code,
+    )
     db.add(row)
     await db.commit()
     await db.refresh(row)

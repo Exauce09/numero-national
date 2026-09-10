@@ -204,6 +204,21 @@ async def me(current_user: User = Depends(get_current_user)) -> UserMe:
 # --- Institutions (admin) ---------------------------------------------------
 
 
+@institutions_router.get(
+    "/directory",
+    response_model=list[InstitutionRead],
+    summary="Annuaire public des institutions actives (connexion multi-institution)",
+)
+async def institutions_directory(db: AsyncSession = Depends(get_db)) -> list[InstitutionRead]:
+    """Sans auth — liste code/nom/type pour choisir une institution à la connexion."""
+    items = await identity_services.list_institutions(db)
+    return [
+        InstitutionRead.model_validate(i)
+        for i in items
+        if getattr(i.status, "value", str(i.status)) == "ACTIVE"
+    ]
+
+
 @institutions_router.post(
     "",
     response_model=InstitutionRead,

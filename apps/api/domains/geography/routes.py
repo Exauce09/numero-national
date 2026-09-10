@@ -106,6 +106,7 @@ async def list_villes(
 async def list_communes(
     ville_id: UUID | None = None,
     district_id: UUID | None = None,
+    province_id: UUID | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[GeoItem]:
     await ensure_geography_seeded(db)
@@ -114,6 +115,10 @@ async def list_communes(
         stmt = stmt.where(m.Commune.ville_id == ville_id)
     if district_id:
         stmt = stmt.where(m.Commune.district_id == district_id)
+    if province_id:
+        stmt = stmt.join(m.Ville, m.Commune.ville_id == m.Ville.id).where(
+            m.Ville.province_id == province_id
+        )
     stmt = stmt.order_by(m.Commune.name)
     rows = (await db.execute(stmt)).scalars().all()
     return [GeoItem.model_validate(r) for r in rows]

@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { DEMO_CREDENTIALS, getSession, login, setActivePortal, type Portal } from "../auth";
 
 type Props = {
@@ -7,6 +7,13 @@ type Props = {
   title: string;
   subtitle: string;
 };
+
+const PORTALS: Array<{ id: Portal; label: string }> = [
+  { id: "sante", label: "Santé" },
+  { id: "interieur", label: "Intérieur" },
+  { id: "presidence", label: "Présidence" },
+  { id: "admin", label: "Administration" },
+];
 
 export default function LoginForm({ portal, title, subtitle }: Props) {
   const navigate = useNavigate();
@@ -42,10 +49,27 @@ export default function LoginForm({ portal, title, subtitle }: Props) {
         <img className="login-logo" src="/logo-rdc.jpg" alt="République Démocratique du Congo" />
         <h1 className="login-title">{title}</h1>
         <p className="login-subtitle">{subtitle}</p>
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: "1rem" }}>
+          {PORTALS.map((p) => (
+            <Link
+              key={p.id}
+              to={`/${p.id}/login`}
+              className={p.id === portal ? "btn-primary btn-sm" : "btn-secondary btn-sm"}
+              style={{ textDecoration: "none" }}
+            >
+              {p.label}
+            </Link>
+          ))}
+        </div>
+        <p className="muted small" style={{ marginTop: 0 }}>
+          Changer d&apos;institution / portail sans quitter le système.
+        </p>
+
         <form onSubmit={onSubmit}>
           {error ? <div className="login-error">{error}</div> : null}
           <label className="form-label" htmlFor={`${portal}-username`}>
-            Nom d&apos;utilisateur
+            Email / nom d&apos;utilisateur
           </label>
           <input
             id={`${portal}-username`}

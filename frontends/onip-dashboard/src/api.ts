@@ -215,6 +215,8 @@ export const geoApi = {
     request<GeoItem[]>(`/geo/villes?province_id=${encodeURIComponent(provinceId)}`),
   communes: (villeId: string) =>
     request<GeoItem[]>(`/geo/communes?ville_id=${encodeURIComponent(villeId)}`),
+  communesByProvince: (provinceId: string) =>
+    request<GeoItem[]>(`/geo/communes?province_id=${encodeURIComponent(provinceId)}`),
 };
 
 export const censusApi = {
