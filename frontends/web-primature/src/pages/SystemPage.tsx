@@ -11,9 +11,11 @@ export default function SystemPage() {
     portail: p.name,
     role: p.role,
     port: p.port,
-    url: p.url,
     perimetre: p.scope,
-    acces_primature: p.access === "lecture" ? "Lecture alignée" : "Lecture des agrégats uniquement",
+    acces_primature:
+      p.id === "primature"
+        ? "Portail courant"
+        : "Lecture des agrégats uniquement — pas d'accès opérationnel",
   }));
 
   const ministryByCode = Object.fromEntries(snap.ministries.map((m) => [m.code.toLowerCase(), m]));
@@ -33,8 +35,8 @@ export default function SystemPage() {
       </div>
 
       <div className="read-only-banner no-print">
-        La Primature ne modifie pas les données métier des autres modules — consultation des agrégats et alertes de
-        coordination uniquement.
+        Lecture seule : la Primature consulte les informations consolidées du système. Elle n&apos;ouvre pas les
+        portails des autres institutions et ne réalise aucune tâche d&apos;administration ou d&apos;opération.
       </div>
 
       <ExportToolbar
@@ -75,12 +77,10 @@ export default function SystemPage() {
                   Portail courant — coordination gouvernementale.
                 </p>
               ) : null}
-              {p.id !== "primature" ? (
-                <a className="btn-secondary btn-sm no-print" href={p.url} target="_blank" rel="noreferrer">
-                  Ouvrir le portail
-                </a>
-              ) : (
+              {p.id === "primature" ? (
                 <span className="muted small">Vous êtes ici</span>
+              ) : (
+                <span className="muted small">Consultation d&apos;agrégats uniquement — accès module fermé</span>
               )}
             </article>
           );
