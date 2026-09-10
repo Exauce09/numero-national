@@ -14,7 +14,7 @@
   --egouv-rdc-red: #ce1126;
   --egouv-rdc-yellow: #f7d618;
   --egouv-rdc-blue: #007fff;
-  font-family: "Plus Jakarta Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
   color: var(--egouv-ink);
   background: var(--egouv-page);
 }

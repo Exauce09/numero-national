@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/api_client.dart';
 import '../../sync/local_database.dart';
+import '../../sync/sync_lifecycle.dart';
 import '../../sync/sync_queue.dart';
 import 'fingerprint_capture.dart';
 import 'geo_cascade_field.dart';
@@ -680,6 +681,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
           },
         ),
       );
+      SyncLifecycle.instance.nudge();
 
       // Brouillon partagé aussi via API form-drafts (web / autre agent).
       if (draft) {

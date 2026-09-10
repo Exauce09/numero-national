@@ -1283,35 +1283,6 @@
   }
 
   .act-print-card {
-  border: 0;
-}
-}
-
-/* GPS localisation (formulaires) */
-.gps-panel {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-  padding: 0.85rem 1rem;
-  margin: 0 0 1rem;
-  border-radius: 12px;
-  border: 1px solid var(--egouv-line, #e5eaf2);
-  background: #f7fafc;
-}
-.gps-panel--ok {
-  border-color: #86efac;
-  background: #f0fdf4;
-}
-.gps-panel--err {
-  border-color: #fca5a5;
-  background: #fef2f2;
-}
-.gps-panel--loading {
-  border-color: #93c5fd;
-  background: #eff6ff;
-}
-.gps-panel-main strong {
-  font-size: 0.92rem;
+    border: 0;
+  }
 }

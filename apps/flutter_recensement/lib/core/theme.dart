@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-/// E-GOUV RDC tokens — layout inspiré dashboards modernes, pas le look HR.
+/// Charte RDC — blanc + bleu / jaune / rouge.
 class NnColors {
   static const rdcBlue = Color(0xFF007FFF);
   static const rdcYellow = Color(0xFFF7D618);
@@ -14,12 +13,12 @@ class NnColors {
   static const page = Color(0xFFF7F9FC);
   static const card = Color(0xFFFFFFFF);
   static const save = rdcRed;
-  static const success = Color(0xFF22A06B);
-  static const warning = Color(0xFFE2A03F);
-  static const danger = Color(0xFFE11D48);
+  static const success = Color(0xFF0F6B45);
+  static const warning = Color(0xFFB8860B);
+  static const danger = Color(0xFFB42318);
   static const softBlue = Color(0xFFEAF4FF);
   static const softGreen = Color(0xFFEEFBF4);
-  static const softOrange = Color(0xFFFFF8E8);
+  static const softOrange = Color(0xFFFFF8E6);
   static const softRed = Color(0xFFFFF5F5);
 }
 
@@ -29,6 +28,7 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.light,
       scaffoldBackgroundColor: NnColors.page,
+      fontFamily: 'Segoe UI',
       colorScheme: ColorScheme.fromSeed(
         seedColor: NnColors.rdcBlue,
         primary: NnColors.rdcBlue,
@@ -39,19 +39,16 @@ class AppTheme {
       ),
     );
     return base.copyWith(
-      textTheme: GoogleFonts.plusJakartaSansTextTheme(base.textTheme).apply(
-        bodyColor: NnColors.ink,
-        displayColor: NnColors.ink,
-      ),
-      appBarTheme: AppBarTheme(
+      appBarTheme: const AppBarTheme(
         centerTitle: false,
         elevation: 0,
         backgroundColor: NnColors.card,
         foregroundColor: NnColors.ink,
-        titleTextStyle: GoogleFonts.plusJakartaSans(
+        titleTextStyle: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w700,
           color: NnColors.ink,
+          fontFamily: 'Segoe UI',
         ),
       ),
       cardTheme: CardThemeData(
@@ -59,7 +56,7 @@ class AppTheme {
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           side: const BorderSide(color: NnColors.line),
         ),
       ),
@@ -73,7 +70,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: NnColors.blue, width: 1.5),
+          borderSide: const BorderSide(color: NnColors.rdcBlue, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       ),
@@ -83,15 +80,12 @@ class AppTheme {
           foregroundColor: Colors.white,
           minimumSize: const Size.fromHeight(48),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+          textStyle: const TextStyle(fontWeight: FontWeight.w700),
         ),
       ),
-      navigationBarTheme: NavigationBarThemeData(
+      navigationBarTheme: const NavigationBarThemeData(
         backgroundColor: NnColors.card,
         indicatorColor: NnColors.softBlue,
-        labelTextStyle: WidgetStatePropertyAll(
-          GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w600),
-        ),
       ),
     );
   }

@@ -1,7 +1,6 @@
-@import "../../shared/egouv.css";
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap");
+﻿@import "../../shared/egouv.css";
 
-/* ——— Thème ONIP : blanc professionnel + couleurs drapeau RDC ——— */
+/* ThÃ¨me ONIP : blanc + couleurs RDC â€” polices systÃ¨me pour compatibilitÃ© Edge */
 :root {
   --egouv-primary: var(--egouv-rdc-blue);
   --egouv-primary-hover: #0066cc;
@@ -19,7 +18,7 @@
 }
 
 body {
-  font-family: Manrope, "Segoe UI", sans-serif;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   background: var(--egouv-page);
   color: var(--egouv-ink);
 }
@@ -29,7 +28,7 @@ body {
   background: var(--egouv-page);
 }
 
-/* ——— Sidebar blanche ——— */
+/* â€”â€”â€” Sidebar blanche â€”â€”â€” */
 .sidebar {
   background: #fff;
   color: var(--egouv-ink);
@@ -67,7 +66,7 @@ body {
 }
 
 .sidebar-brand strong {
-  font-family: "Source Serif 4", Georgia, serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 1.35rem;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -137,7 +136,7 @@ body {
   background: #fff5f5;
 }
 
-/* ——— Topbar ——— */
+/* â€”â€”â€” Topbar â€”â€”â€” */
 .topbar {
   background: #fff;
   border-bottom: 1px solid var(--egouv-line);
@@ -145,7 +144,7 @@ body {
 }
 
 .topbar-title {
-  font-family: "Source Serif 4", Georgia, serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-weight: 700;
   font-size: 1.1rem;
   letter-spacing: -0.02em;
@@ -178,7 +177,7 @@ body {
   color: var(--nn-blue);
 }
 
-/* ——— Contenu ——— */
+/* â€”â€”â€” Contenu â€”â€”â€” */
 .shell {
   padding: 1.4rem 1.55rem 2.25rem;
   background:
@@ -191,7 +190,7 @@ body {
 .shell > h1,
 .panel > h1,
 .shell h1 {
-  font-family: "Source Serif 4", Georgia, serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 1.55rem;
   font-weight: 700;
   letter-spacing: -0.025em;
@@ -263,7 +262,7 @@ body {
 .panel h2,
 .panel h3 {
   margin-top: 0;
-  font-family: "Source Serif 4", Georgia, serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -383,7 +382,7 @@ body {
   box-shadow: 0 0 0 3px rgba(0, 127, 255, 0.14);
 }
 
-/* ——— Hero ——— */
+/* â€”â€”â€” Hero â€”â€”â€” */
 .hero-banner {
   position: relative;
   overflow: hidden;
@@ -417,7 +416,7 @@ body {
 .hero-banner h1 {
   margin: 0.35rem 0 0.4rem;
   color: var(--egouv-ink);
-  font-family: "Source Serif 4", Georgia, serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 1.65rem;
   font-weight: 700;
 }
@@ -555,7 +554,7 @@ body {
   border: 1px solid rgba(0, 127, 255, 0.15);
 }
 
-/* ——— Login ——— */
+/* â€”â€”â€” Login â€”â€”â€” */
 .login-page {
   min-height: 100vh;
   display: flex;
@@ -609,7 +608,7 @@ body {
 .login-title {
   text-align: center;
   margin: 0 0 0.3rem;
-  font-family: "Source Serif 4", Georgia, serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 1.45rem;
   font-weight: 700;
   color: var(--egouv-ink);
@@ -657,3 +656,4 @@ body {
 .login-hints p:last-child {
   margin-bottom: 0;
 }
+

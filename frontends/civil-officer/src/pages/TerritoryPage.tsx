@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import GeoCascade, { type GeoSelection } from "../components/GeoCascade";
+import GpsLocatePanel, { applyGpsToGeo } from "../components/GpsLocatePanel";
 
 const BASE = import.meta.env.VITE_API_BASE ?? "/api/v1";
 
@@ -82,6 +83,10 @@ export default function TerritoryPage() {
         Données en base PostgreSQL (schéma <code>geography</code>). Sélectionnez une province pour afficher toutes
         les villes, districts, communes, quartiers et voies liées — puis affinez ville → commune → quartier.
       </p>
+      <GpsLocatePanel
+        title="GPS — préremplir le référentiel"
+        onResolved={(g) => setGeo((prev) => applyGpsToGeo(prev, g))}
+      />
       <GeoCascade value={geo} onChange={setGeo} />
 
       {geo.province_id ? (

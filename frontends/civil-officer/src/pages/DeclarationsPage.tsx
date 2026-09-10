@@ -18,6 +18,7 @@ import {
   type FacilityAccount,
   type FacilityAccountPublic,
 } from "../healthAuth";
+import GpsLocatePanel from "../components/GpsLocatePanel";
 
 const FACILITY_TYPES: { value: FacilityAccount["facilityType"]; label: string }[] = [
   { value: "HOPITAL", label: "Hôpital" },
@@ -585,6 +586,19 @@ export default function DeclarationsPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div className="full">
+                <GpsLocatePanel
+                  title="GPS de la structure"
+                  onResolved={(g) =>
+                    setForm((f) => ({
+                      ...f,
+                      province: g.province || f.province,
+                      ville: g.ville || f.ville,
+                      communeName: g.commune || f.communeName,
+                    }))
+                  }
+                />
               </div>
               <div>
                 <label className="form-label">Province</label>

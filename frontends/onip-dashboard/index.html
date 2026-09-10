@@ -6,10 +6,17 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <title>ONIP — Tableau de bord · RDC</title>
+    <title>ONIP — Tableau de bord</title>
+    <style>
+      html, body { margin: 0; min-height: 100%; background: #f7f9fc; color: #1a2332; font-family: "Segoe UI", system-ui, sans-serif; }
+      #boot-fallback { padding: 24px; max-width: 480px; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx?v=rdc-white-2"></script>
+    <noscript>Activez JavaScript pour utiliser ONIP.</noscript>
+    <div id="root">
+      <div id="boot-fallback">Chargement ONIP… Si cette page reste blanche sur Edge, ouvrez une fenêtre InPrivate ou Ctrl+Shift+R.</div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -2,7 +2,7 @@ import { FormEvent, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
 import DataToolbar from "../components/DataToolbar";
 import GeoCascade, { GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
-import GpsCapturePanel, { type GpsCoords } from "../components/GpsCapturePanel";
+import GpsLocatePanel from "../components/GpsLocatePanel";
 import PersonPicker from "../components/PersonPicker";
 import {
   addAct,
@@ -32,7 +32,8 @@ export default function BirthsPage() {
   const [viewAct, setViewAct] = useState<Act | null>(null);
   const [editAct, setEditAct] = useState<Act | null>(null);
   const [editJson, setEditJson] = useState("");
-  const [gps, setGps] = useState<GpsCoords | null>(null);
+  const [gpsLat, setGpsLat] = useState<number | null>(null);
+  const [gpsLng, setGpsLng] = useState<number | null>(null);
   const [, bump] = useState(0);
 
   const acts = listActs("BIRTH");
@@ -91,9 +92,9 @@ export default function BirthsPage() {
         secteur_chefferie_commune: link.geo.secteur || null,
         village_origine: link.geo.village || null,
         note: "Nouveau-né lié aux informations du père/mère",
-        latitude: gps?.latitude ?? null,
-        longitude: gps?.longitude ?? null,
-        gps_captured_at: gps ? new Date().toISOString() : null,
+        latitude: gpsLat,
+        longitude: gpsLng,
+        gps_captured_at: gpsLat != null ? new Date().toISOString() : null,
       };
       const act = addAct("BIRTH", payload, child.nic);
       setCreated(act);
@@ -104,6 +105,8 @@ export default function BirthsPage() {
       setGeoNaissance({});
       setMother(null);
       setFather(null);
+      setGpsLat(null);
+      setGpsLng(null);
       bump((n) => n + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Enregistrement impossible.");
@@ -136,7 +139,23 @@ export default function BirthsPage() {
       <p className="page-lead">
         Enregistrement des nouveau-nés non enregistrés en structure sanitaire.
       </p>
-      <GpsCapturePanel onChange={setGps} />
+      <GpsLocatePanel
+        title="Localisation GPS du lieu"
+        onResolved={(g) => {
+          setGpsLat(g.latitude);
+          setGpsLng(g.longitude);
+          setGeoNaissance((prev) => ({
+            ...prev,
+            province_name: g.province || prev.province_name,
+            ville_name: g.ville || prev.ville_name,
+            commune_name: g.commune || prev.commune_name,
+            label:
+              g.display_name ||
+              [g.province, g.ville, g.commune].filter(Boolean).join(" · ") ||
+              prev.label,
+          }));
+        }}
+      />
 
       <div className="panel">
         <form className="form-grid" onSubmit={onSubmit}>

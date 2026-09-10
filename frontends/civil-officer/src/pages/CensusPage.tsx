@@ -27,8 +27,8 @@ import {
 import { api } from "../api";
 import { getOfficerCommune } from "../commune";
 import { RDC_TRIBUS, RDC_TRIBUS_NOTE } from "../data/tribusRdc";
-import { captureGpsOnSave } from "../gpsCapture";
-import GpsCapturePanel, { type GpsCoords } from "../components/GpsCapturePanel";
+import GpsLocatePanel from "../components/GpsLocatePanel";
+import { captureGpsOnSave, captureGpsWithAddress, type ReverseGeo } from "../gpsCapture";
 import {
   emptySituationFamiliale,
   formatSituationFamiliale,
@@ -147,7 +147,7 @@ export default function CensusPage() {
   const [draftNotice, setDraftNotice] = useState<string | null>(null);
   const [created, setCreated] = useState<Act | null>(null);
   const [camError, setCamError] = useState<string | null>(null);
-  const [gps, setGps] = useState<GpsCoords | null>(null);
+  const [gpsInfo, setGpsInfo] = useState<ReverseGeo | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -399,7 +399,8 @@ export default function CensusPage() {
     if (!validateStep(7)) return;
     if (!validateFamille()) return;
     try {
-      const gpsLive = gps ?? (await captureGpsOnSave());
+      const gps = (await captureGpsWithAddress()) ?? (await captureGpsOnSave());
+      if (gps && "latitude" in gps) setGpsInfo(gps as ReverseGeo);
       const commune = getOfficerCommune();
       const adresse = buildAdresse();
       const lieuNaissance = geoNaissance.label || "";
@@ -485,9 +486,10 @@ export default function CensusPage() {
         tribu: tribu.trim() || null,
         numero_admin: formatIdentiteAdmin(identiteAdmin) || null,
         identite_administrative_detail: identiteAdmin,
-        latitude: gpsLive?.latitude ?? null,
-        longitude: gpsLive?.longitude ?? null,
-        gps_captured_at: gpsLive ? new Date().toISOString() : null,
+        latitude: gps && "latitude" in gps ? gps.latitude : null,
+        longitude: gps && "longitude" in gps ? gps.longitude : null,
+        gps_captured_at: gps && "latitude" in gps ? new Date().toISOString() : null,
+        gps_address: gps && "display_name" in gps ? (gps as ReverseGeo).display_name ?? null : null,
       };
       const act = addAct("CENSUS", payload, person.nic);
       clearDraft();
@@ -508,9 +510,8 @@ export default function CensusPage() {
       <h2 className="page-title">Recensement</h2>
       <p className="page-lead">
         Formulaire d&apos;identification de la personne — identité selon le modèle officiel ; photos et empreintes à
-        l&apos;étape Biométrie. La localisation GPS est capturée pour la cartographie.
+        l&apos;étape Biométrie.
       </p>
-      <GpsCapturePanel onChange={setGps} />
 
       <div className="wizard-steps census-wizard-steps">
         {STEPS.map((s) => (
@@ -650,9 +651,27 @@ export default function CensusPage() {
 
             <fieldset className="id-fieldset">
               <legend>Adresse actuelle</legend>
+              <GpsLocatePanel
+                title="Localisation GPS de l’adresse"
+                onResolved={(g) => {
+                  setGpsInfo(g);
+                  setGeoActuelle((prev) => ({
+                    ...prev,
+                    province_name: g.province || prev.province_name,
+                    ville_name: g.ville || prev.ville_name,
+                    commune_name: g.commune || prev.commune_name,
+                    quartier_name: g.quartier || prev.quartier_name,
+                    avenue_name: g.avenue || prev.avenue_name,
+                    label:
+                      g.display_name ||
+                      [g.province, g.ville, g.commune, g.quartier, g.avenue].filter(Boolean).join(" · ") ||
+                      prev.label,
+                  }));
+                }}
+              />
               <GeoCascade
                 embedded
-                label="Adresse actuelle"
+                label="Adresse actuelle (saisie manuelle ou après GPS)"
                 levels={GEO_PRESETS.address}
                 fieldLabels={ADDRESS_FIELD_LABELS}
                 value={geoActuelle}
@@ -834,8 +853,19 @@ export default function CensusPage() {
                 </button>
               </div>
             </div>
+            <div className="full" style={{ marginBottom: "0.75rem" }}>
+              <GpsLocatePanel
+                title="GPS à la finalisation"
+                onResolved={(g) => setGpsInfo(g)}
+              />
+              {gpsInfo ? (
+                <p className="muted small" style={{ marginTop: "0.35rem" }}>
+                  Position prête pour la cartographie.
+                </p>
+              ) : null}
+            </div>
             <p className="muted small full" style={{ marginTop: "0.35rem" }}>
-              Temporaire = brouillon local. Finaliser = création de la fiche + capture GPS pour la cartographie.
+              Temporaire = brouillon local. Finaliser = fiche + GPS pour la cartographie.
             </p>
           </form>
         ) : null}

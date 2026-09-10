@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../core/gps_capture.dart';
+import '../../core/geo_from_gps.dart';
 import '../../sync/local_database.dart';
+import '../../sync/sync_lifecycle.dart';
 import '../../sync/sync_queue.dart';
 import 'geo_cascade_field.dart';
 
-/// Create a household — GPS is captured automatically on save for cartography.
+/// Nouveau ménage — GPS (online/offline) + cascade manuelle.
 class HouseholdFormScreen extends StatefulWidget {
   const HouseholdFormScreen({
     super.key,
@@ -26,6 +27,10 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
   final _detail = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   String _geoLabel = '';
+  double? _lat;
+  double? _lng;
+  String? _gpsLabel;
+  String? _gpsSource;
   bool _busy = false;
   String? _status;
 
@@ -38,10 +43,47 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
 
   void _rebuildAddress() {
     final parts = <String>[
+      if (_gpsLabel != null && _gpsLabel!.trim().isNotEmpty) _gpsLabel!.trim(),
       if (_geoLabel.trim().isNotEmpty) _geoLabel.trim(),
       if (_detail.text.trim().isNotEmpty) _detail.text.trim(),
     ];
-    _address.text = parts.join(' — ');
+    // Prefer GPS-derived label when present
+    if (_gpsLabel != null && _gpsLabel!.isNotEmpty) {
+      final manual = <String>[
+        if (_detail.text.trim().isNotEmpty) _detail.text.trim(),
+      ];
+      _address.text = [_gpsLabel!, ...manual].where((e) => e.isNotEmpty).join(' — ');
+    } else {
+      _address.text = parts.join(' — ');
+    }
+  }
+
+  Future<void> _locateGps() async {
+    setState(() {
+      _busy = true;
+      _status = 'Lecture GPS…';
+    });
+    try {
+      final addr = await GeoFromGps.resolve();
+      if (addr == null) {
+        setState(() => _status = 'GPS indisponible');
+        return;
+      }
+      setState(() {
+        _lat = addr.latitude;
+        _lng = addr.longitude;
+        _gpsLabel = addr.label;
+        _gpsSource = addr.source;
+        _status = addr.source == 'online'
+            ? 'Adresse GPS précise (en ligne)'
+            : 'GPS OK — approx. hors ligne (complétez la cascade si besoin)';
+      });
+      _rebuildAddress();
+    } catch (e) {
+      setState(() => _status = 'GPS: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _save() async {
@@ -49,47 +91,43 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() {
       _busy = true;
-      _status = 'Capture GPS pour la cartographie…';
+      _status = _lat == null ? 'Capture GPS…' : 'Enregistrement…';
     });
 
-    double? lat;
-    double? lng;
-    String? gpsNote;
-    try {
-      final pos = await GpsCapture.capture();
-      if (pos != null) {
-        lat = pos.lat;
-        lng = pos.lng;
-      }
-    } catch (e) {
-      gpsNote = e is StateError ? e.message : 'GPS indisponible';
-      if (!mounted) return;
-      final cont = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('GPS non capturé'),
-          content: Text(
-            '$gpsNote\n\nEnregistrer le ménage sans point cartographique ?',
+    if (_lat == null || _lng == null) {
+      try {
+        final addr = await GeoFromGps.resolve();
+        if (addr != null) {
+          _lat = addr.latitude;
+          _lng = addr.longitude;
+          _gpsLabel = addr.label;
+          _gpsSource = addr.source;
+          _rebuildAddress();
+        }
+      } catch (_) {
+        if (!mounted) return;
+        final cont = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('GPS non capturé'),
+            content: const Text('Enregistrer le ménage sans point GPS ?'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Sans GPS')),
+            ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Enregistrer sans GPS')),
-          ],
-        ),
-      );
-      if (cont != true) {
-        if (mounted) {
+        );
+        if (cont != true) {
           setState(() {
             _busy = false;
             _status = null;
           });
+          return;
         }
-        return;
       }
     }
 
     try {
-      setState(() => _status = 'Enregistrement…');
       final localId = const Uuid().v4();
       final now = DateTime.now().toUtc().toIso8601String();
       final data = <String, Object?>{
@@ -97,8 +135,8 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
         'local_id': localId,
         'campaign_id': widget.campaignId,
         'address_line': _address.text.trim(),
-        'latitude': lat,
-        'longitude': lng,
+        'latitude': _lat,
+        'longitude': _lng,
         'member_count': 0,
         'updated_at': now,
       };
@@ -114,9 +152,11 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
             'campaign_id': widget.campaignId,
             if (widget.zoneId != null) 'zone_id': widget.zoneId,
             if (_geoLabel.isNotEmpty) 'geo_label': _geoLabel,
+            if (_gpsSource != null) 'gps_source': _gpsSource,
           },
         ),
       );
+      SyncLifecycle.instance.nudge();
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } finally {
@@ -138,6 +178,29 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            FilledButton.tonalIcon(
+              onPressed: _busy ? null : _locateGps,
+              icon: const Icon(Icons.my_location),
+              label: const Text('Localiser par GPS'),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _status ??
+                  'GPS : en ligne = adresse précise · hors ligne = position + approx. commune Kinshasa. '
+                      'Vous pouvez aussi saisir la cascade manuellement.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: const Color(0xFF5A6A85)),
+            ),
+            if (_lat != null && _lng != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'GPS ${_lat!.toStringAsFixed(5)}, ${_lng!.toStringAsFixed(5)}'
+                '${_gpsLabel != null ? '\n$_gpsLabel' : ''}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Text('Ou saisie manuelle', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
             GeoCascadeField(
               onLabelChanged: (label) {
                 setState(() => _geoLabel = label);
@@ -148,46 +211,23 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
             TextFormField(
               controller: _detail,
               decoration: const InputDecoration(
-                labelText: 'Complément (n°, parcelle, repère) *',
+                labelText: 'Complément (n°, parcelle, repère)',
                 border: OutlineInputBorder(),
-                hintText: 'Parcelle 12, en face du marché…',
               ),
               maxLines: 2,
               onChanged: (_) => _rebuildAddress(),
               validator: (_) {
                 _rebuildAddress();
-                final t = _address.text.trim();
-                if (t.length < 5) {
-                  return 'Précisez la localisation (cascade ou complément)';
+                if (_address.text.trim().length < 5 && _lat == null) {
+                  return 'GPS ou adresse requise';
                 }
                 return null;
               },
             ),
-            const SizedBox(height: 16),
-            Card(
-              color: const Color(0xFFEFF6FF),
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.map_outlined, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        _status ??
-                            'La position GPS sera capturée automatiquement à l’enregistrement pour alimenter la cartographie.',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
             const SizedBox(height: 24),
             FilledButton(
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFE11D48),
+                backgroundColor: const Color(0xFFCE1126),
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               onPressed: _busy ? null : _save,

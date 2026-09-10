@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
 import GeoCascade, { GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
+import GpsLocatePanel, { applyGpsToGeo } from "../components/GpsLocatePanel";
 import PersonPicker from "../components/PersonPicker";
 import {
   addAct,
@@ -81,6 +82,7 @@ export default function MarriagesPage() {
     <div>
       <h2 className="page-title">Mariages</h2>
       <p className="page-lead">Célébration et enregistrement d&apos;un mariage civil.</p>
+      <GpsLocatePanel title="GPS — lieu d’état civil" onResolved={(g) => setGeo((prev) => applyGpsToGeo(prev, g))} />
 
       <div className="panel">
         <form className="form-grid" onSubmit={onSubmit}>

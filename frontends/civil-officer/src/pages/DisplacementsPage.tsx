@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
 import GeoCascade, { ADDRESS_FIELD_LABELS, GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
+import GpsLocatePanel, { applyGpsToGeo } from "../components/GpsLocatePanel";
 import PersonPicker from "../components/PersonPicker";
 import { addAct, displayName, type Act, type Person } from "../registry";
 
@@ -41,6 +42,10 @@ export default function DisplacementsPage() {
     <div>
       <h2 className="page-title">Déplacement</h2>
       <p className="page-lead">Enregistrement d&apos;un déplacement de personne.</p>
+      <GpsLocatePanel
+        title="GPS — destination"
+        onResolved={(g) => setGeo((prev) => applyGpsToGeo(prev, g))}
+      />
 
       <div className="panel">
         <form className="form-grid" onSubmit={onSubmit}>

@@ -9,11 +9,12 @@ import 'features/census/home_dashboard_screen.dart';
 import 'features/census/stats_screen.dart';
 import 'features/device/device_registration.dart';
 import 'sync/local_database.dart';
-import 'sync/sync_engine.dart';
+import 'sync/sync_lifecycle.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await LocalDatabase.instance.init();
+  SyncLifecycle.instance.start();
   runApp(const RecensementApp());
 }
 
@@ -47,7 +48,6 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
-  final _sync = SyncEngine();
   final _auth = AuthService();
 
   Future<void> _logout() async {
@@ -75,19 +75,6 @@ class _HomeShellState extends State<HomeShell> {
       appBar: AppBar(
         title: Text(titles[_index]),
         actions: [
-          if (_index != 0)
-            IconButton(
-              tooltip: 'Synchroniser',
-              onPressed: () async {
-                await LocalDatabase.instance.setMeta('sync_status', 'SYNCING');
-                final result = await _sync.runOnce();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result)));
-                  setState(() {});
-                }
-              },
-              icon: const Icon(Icons.sync_rounded),
-            ),
           IconButton(
             tooltip: 'Conflits',
             onPressed: () => Navigator.of(context).pushNamed('/conflicts'),

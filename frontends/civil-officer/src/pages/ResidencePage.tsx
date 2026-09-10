@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api, type Residence } from "../api";
 import GeoCascade, { ADDRESS_FIELD_LABELS, GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
+import GpsLocatePanel from "../components/GpsLocatePanel";
 
 export default function ResidencePage() {
   const [commune, setCommune] = useState("KIN-GOMBE");
@@ -73,6 +74,24 @@ export default function ResidencePage() {
             />
           </div>
           <div className="full">
+            <GpsLocatePanel
+              onResolved={(g) => {
+                setGeo((prev) => ({
+                  ...prev,
+                  province_name: g.province || prev.province_name,
+                  ville_name: g.ville || prev.ville_name,
+                  commune_name: g.commune || prev.commune_name,
+                  quartier_name: g.quartier || prev.quartier_name,
+                  avenue_name: g.avenue || prev.avenue_name,
+                  label:
+                    g.display_name ||
+                    [g.province, g.ville, g.commune, g.quartier, g.avenue].filter(Boolean).join(" · ") ||
+                    prev.label,
+                }));
+                if (g.display_name) setAddress(g.display_name);
+                else if (g.commune) setAddress([g.province, g.ville, g.commune].filter(Boolean).join(" · "));
+              }}
+            />
             <GeoCascade
               embedded
               levels={GEO_PRESETS.address}
@@ -83,7 +102,7 @@ export default function ResidencePage() {
                 if (g.commune_code) setCommune(g.commune_code);
                 if (g.label) setAddress(g.label);
               }}
-              label="Adresse territoriale"
+              label="Adresse territoriale (manuelle ou après GPS)"
             />
           </div>
           <div className="full">
