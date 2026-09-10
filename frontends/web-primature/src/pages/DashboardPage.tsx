@@ -117,11 +117,11 @@ export default function DashboardPage() {
       />
 
       <div className="grid">
-        <Metric label="Population" value={kpi.population.toLocaleString("fr-FR")} onClick={() => navigate("/indicateurs")} />
-        <Metric label="Actes civil (mois)" value={kpi.civil_acts.toLocaleString("fr-FR")} onClick={() => navigate("/indicateurs")} />
-        <Metric label="Santé (mois)" value={kpi.health} onClick={() => navigate("/ministeres")} />
+        <Metric label="Population" value={population.toLocaleString("fr-FR")} onClick={() => navigate("/indicateurs")} />
+        <Metric label="Actes civil" value={civilActs.toLocaleString("fr-FR")} onClick={() => navigate("/indicateurs")} />
+        <Metric label="Santé" value={health} onClick={() => navigate("/ministeres")} />
         <Metric label="Mouvements" value={kpi.movements} onClick={() => navigate("/ministeres")} />
-        <Metric label="Cartes actives" value={kpi.cards.toLocaleString("fr-FR")} onClick={() => navigate("/indicateurs")} />
+        <Metric label="Cartes actives" value={cards.toLocaleString("fr-FR")} onClick={() => navigate("/indicateurs")} />
         <Metric label="Alertes ouvertes" value={kpi.alerts_open} onClick={() => navigate("/alertes")} />
         <Metric label="Dossiers ouverts" value={kpi.dossiers_open} onClick={() => navigate("/dossiers")} />
         <Metric label="Attention ministères" value={kpi.ministries_attention} onClick={() => navigate("/ministeres")} />
