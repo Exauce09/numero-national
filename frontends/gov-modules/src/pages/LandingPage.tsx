@@ -4,25 +4,25 @@ const PORTALS = [
   {
     to: "/sante/login",
     title: "Ministère de la Santé",
-    desc: "Indicateurs nationaux, structures sanitaires et exports anonymisés.",
+    desc: "Structures, déclarations et indicateurs — registre vierge, saisie réelle.",
     external: false,
   },
   {
-    to: "/interieur/login",
+    to: "http://localhost:5178/login",
     title: "Ministère de l'Intérieur",
-    desc: "Mouvements, déplacements, documents manquants et parcours (dédié : localhost:5178).",
-    external: false,
+    desc: "Mouvements, déplacements et parcours — portail dédié : localhost:5178.",
+    external: true,
   },
   {
-    to: "/presidence/login",
+    to: "http://localhost:5174/login",
     title: "Présidence",
-    desc: "Vue nationale — portail dédié recommandé : localhost:5174.",
-    external: false,
+    desc: "Vue nationale — portail dédié : localhost:5174.",
+    external: true,
   },
   {
     to: "http://localhost:5179/login",
     title: "Primature",
-    desc: "Coordination gouvernementale — lecture seule (portail dédié : localhost:5179).",
+    desc: "Coordination gouvernementale — portail dédié : localhost:5179.",
     external: true,
   },
   {
@@ -39,7 +39,10 @@ export default function LandingPage() {
       <div className="landing-hero">
         <img src="/logo-rdc.jpg" alt="République Démocratique du Congo" />
         <h1>E-GOUV — Modules gouvernementaux</h1>
-        <p>Portails nationaux du registre d&apos;identité — accès réservé aux institutions.</p>
+        <p>
+          Portails nationaux — sans données fictives. Les tableaux démarrent vides ; saisissez les
+          informations réelles après connexion.
+        </p>
       </div>
       <div className="grid" style={{ maxWidth: 960, margin: "0 auto" }}>
         {PORTALS.map((p) =>

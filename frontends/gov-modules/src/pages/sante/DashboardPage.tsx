@@ -110,10 +110,10 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid">
-        <Metric label="Structures" value={facilitiesTotal} onClick={() => navigate("/structures")} />
-        <Metric label="Naissances" value={births} onClick={() => navigate("/declarations")} />
-        <Metric label="Décès" value={deaths} onClick={() => navigate("/declarations")} />
-        <Metric label="En attente" value={dashLocal.pending} onClick={() => navigate("/declarations")} />
+        <Metric label="Structures" value={facilitiesTotal} onClick={() => navigate("/sante/structures")} />
+        <Metric label="Naissances" value={births} onClick={() => navigate("/sante/declarations")} />
+        <Metric label="Décès" value={deaths} onClick={() => navigate("/sante/declarations")} />
+        <Metric label="En attente" value={dashLocal.pending} onClick={() => navigate("/sante/declarations")} />
       </div>
 
       <div className="charts-grid" style={{ marginTop: "1.25rem" }}>

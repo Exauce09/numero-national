@@ -8,8 +8,13 @@ CI : GitHub Actions (pytest + Postgres + Redis) sur chaque push `main`.
 
 > **Phases livrées : 1 → 9 (domaine) + ops + frontends e-gov**  
 > Fondation · IAM · Core Registry · Recensement Flutter · État civil · Cartes ·  
-> Biométrie · ONIP · Santé · Analytics · **Géographie RDC · Portail officier commune** ·  
+> Biométrie · ONIP · Santé · Analytics · **Géographie RDC · Portails institutionnels** ·  
 > Redis rate-limit · refresh rotation · CI
+
+### Données
+
+Les portails **Présidence**, **Primature**, **Intérieur** et **Santé** démarrent **sans données fictives**.  
+Les tableaux sont vides jusqu’à saisie réelle (formulaires locaux) ou branchement API PostgreSQL.
 
 ### Sync Git automatique
 
@@ -38,9 +43,9 @@ copy .githooks\post-commit .git\hooks\post-commit   # Windows
 | 6 | Biométrie (vault + stubs ABIS) | `domains/biometric`, `007` |
 | 7 | Dashboard ONIP | `domains/onip`, `frontends/onip-dashboard` |
 | 8 | Santé (schéma confidentiel) | `domains/health`, `008` |
-| 9 | Analytics agrégés, gov portals, relying party, notifications | `domains/analytics`, `notifications`, `009`, `frontends/web-institutional` |
-| Geo | Cascade province → territoire/ville → commune → quartier/village → ZD (PostGIS) | `domains/geography`, `alembic/012`, `019` |
-| UI | Portail officier d’état civil (style E-GOUV / Justicia) | `frontends/civil-officer` |
+| 9 | Analytics agrégés, gov portals, relying party, notifications | `domains/analytics`, `notifications`, `009` |
+| Geo | Cascade province → territoire/ville → commune → quartier/village → ZD (PostGIS) | `domains/geography`, `alembic/012`–`020` |
+| UI | Portails E-GOUV (ONIP, Présidence, Primature, Intérieur, Santé, citoyen, état civil) | `frontends/*` |
 
 ---
 
@@ -51,217 +56,171 @@ copy .githooks\post-commit .git\hooks\post-commit   # Windows
 ├── apps/
 │   ├── api/                      # FastAPI national
 │   │   ├── main.py
-│   │   ├── api/v1_router.py      # Agrège tous les domaines
+│   │   ├── api/v1_router.py
 │   │   ├── core/
 │   │   ├── db/
-│   │   └── domains/              # identity, registry, geography, …
-│   └── flutter_recensement/      # App terrain offline-first (Phase 3)
+│   │   └── domains/
+│   └── flutter_recensement/      # App terrain offline-first
 ├── frontends/
-│   ├── civil-officer/            # Officier d’état civil — commune (port 5176)
-│   ├── onip-dashboard/           # React Vite ONIP (port 5173)
-│   ├── web-institutional/        # Multi-portail État (port 5174)
-│   ├── citizen-portal/           # Portail citoyen (port 5175)
-│   ├── gov-modules/              # Modules ministériels (port 5177)
-│   └── shared/                   # CSS e-gov partagé (egouv.css)
-├── alembic/versions/             # 001 … 012
+│   ├── onip-dashboard/           # ONIP (port 5183)
+│   ├── web-institutional/        # Présidence (port 5174)
+│   ├── citizen-portal/           # Citoyen (port 5175)
+│   ├── civil-officer/            # État civil commune (port 5176)
+│   ├── gov-modules/              # Hub Santé / Admin (port 5177)
+│   ├── web-interior/             # Intérieur (port 5178)
+│   ├── web-primature/            # Primature (port 5179)
+│   └── shared/                   # CSS e-gov partagé
+├── alembic/versions/             # 001 … 020
 ├── scripts/
 ├── tests/
-├── docs/architecture/
+├── docs/
 ├── docker-compose.yml
 └── README.md
 ```
-
-| Dossier / fichier | Rôle |
-|-------------------|------|
-| `apps/api` | API HTTP nationale multi-domaines |
-| `apps/api/domains` | Modules métier (schemas PostgreSQL séparés) |
-| `apps/api/domains/geography` | Référentiel territorial RDC + seed + anti-doublon |
-| `apps/api/api/v1_router.py` | Montage unique `/api/v1/*` |
-| `apps/flutter_recensement` | Agents recensement offline-first |
-| `frontends/civil-officer` | Console commune : actes, population, manage-* |
-| `frontends/onip-dashboard` | Console ONIP |
-| `frontends/web-institutional` | État civil + stats ministères + gov |
-| `frontends/citizen-portal` | Portail citoyen |
-| `frontends/gov-modules` | Modules Présidence / Intérieur / Santé / Admin |
-| `alembic/` | Migrations 001–012 |
 
 ---
 
 ## Prérequis
 
-- Python **3.11+** (sous Windows : lanceur `py`)
-- Node.js **18+** (frontends Vite)
-- Docker & Docker Compose (**recommandé** pour API + PostgreSQL)
-- ou PostgreSQL 16 local si Docker n’est pas disponible
+- Python **3.11+** (Windows : `py`)
+- Node.js **18+**
+- PostgreSQL **16+** local (recommandé sous Windows si Docker Desktop indisponible) **ou** Docker Compose
+- Extension **PostGIS** (superutilisateur : `CREATE EXTENSION postgis;`)
 
-Sans PostgreSQL joignable, `GET /health` répond `503` avec `"database": "down"`
-(l’API reste démarrable ; les tests acceptent ce cas).
+Sans PostgreSQL joignable, `GET /health` répond `503` avec `"database": "down"`.
 
 ---
 
-## Démarrage rapide (Docker — recommandé)
+## Démarrage API (Windows natif — recommandé)
+
+```powershell
+# Racine du repo
+copy .env.example .env
+# POSTGRES_HOST=localhost, POSTGRES_PORT=5433 (ou 5432), ALLOW_OPEN_REGISTRATION=true
+
+# PostGIS (une fois, en superuser postgres) :
+# psql -U postgres -d nic_core -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+
+.\.venv\Scripts\alembic.exe upgrade head
+.\.venv\Scripts\uvicorn.exe apps.api.main:app --host 127.0.0.1 --port 8000
+
+# Seed comptes recensement (API démarrée) :
+.\.venv\Scripts\python.exe scripts\seed_census_agent.py
+```
+
+Health attendu : `http://127.0.0.1:8000/health` → `"status":"ok","database":"up"`.
+
+Docs OpenAPI : [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+### Docker (si disponible)
 
 ```bash
-# 1. Configuration
 cp .env.example .env
-# Éditer .env : remplacer SECRET_KEY et POSTGRES_PASSWORD
-
-# 2. Lancer API + PostgreSQL
 docker compose up --build -d
-
-# 3. Vérifier la santé
 curl http://localhost:8000/health
-```
-
-Réponse attendue :
-
-```json
-{
-  "status": "ok",
-  "api": "up",
-  "database": "up"
-}
-```
-
-Documentation interactive (hors production) : [http://localhost:8000/docs](http://localhost:8000/docs)
-
-Arrêt :
-
-```bash
-docker compose down
-```
-
----
-
-## Démarrage local (sans Docker pour l'API)
-
-```bash
-# 1. Environnement Python
-# Windows :
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
-# Linux / macOS :
-# python3 -m venv .venv && source .venv/bin/activate
-
-# 2. Dépendances
-pip install -e ".[dev]"
-
-# 3. Configuration
-cp .env.example .env
-
-# 4. PostgreSQL (Docker DB seule, si Docker est installé)
-docker compose up -d db
-
-# 5. Migrations (nécessite PostgreSQL joignable)
-alembic upgrade head
-
-# 6. API
-uvicorn apps.api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ---
 
 ## Frontends (Vite)
 
-| Application | Dossier | Port | Lancer |
-|-------------|---------|------|--------|
-| Officier d’état civil | `frontends/civil-officer` | **5176** | `npm run dev` |
-| ONIP | `frontends/onip-dashboard` | 5173 | `npm run dev` |
-| Web institutionnel | `frontends/web-institutional` | 5174 | `npm run dev` |
-| Portail citoyen | `frontends/citizen-portal` | 5175 | `npm run dev` |
-| Modules gov | `frontends/gov-modules` | 5177 | `npm run dev` |
+| Application | Dossier | Port | URL |
+|-------------|---------|------|-----|
+| **ONIP** | `frontends/onip-dashboard` | **5183** | http://127.0.0.1:5183/login |
+| Présidence | `frontends/web-institutional` | 5174 | http://localhost:5174/ |
+| Citoyen | `frontends/citizen-portal` | 5175 | http://localhost:5175/ |
+| État civil | `frontends/civil-officer` | 5176 | http://localhost:5176/ |
+| **Gov / Santé** | `frontends/gov-modules` | **5177** | http://localhost:5177/ |
+| Intérieur | `frontends/web-interior` | 5178 | http://localhost:5178/ |
+| Primature | `frontends/web-primature` | 5179 | http://localhost:5179/ |
 
-### Portail officier d’état civil (principal)
+> **ONIP** n’utilise plus le port 5173 : utilisez **5183** (ou une fenêtre InPrivate).
 
-Console commune style [E-GOUV Justicia](https://www.justicia.website/egouv/COMMUNE/) : tableau de bord cliquable, pages **manage-*** (liste / recherche / export / détail), formulaires d’enregistrement, géographie cascade, thème clair/sombre.
+### Lancer un frontend
 
-```bash
-cd frontends/civil-officer
-npm install
-npm run dev
-```
-
-- URL : [http://localhost:5176/](http://localhost:5176/)
-- Démo : utilisateur `officier` / mot de passe `DemoCivil2026!`
-
-| Zone | Routes |
-|------|--------|
-| Tableau de bord | `/` — cartes → population, nouveaux-nés, manage actes |
-| Listes manage | `/manage/naissance`, `/manage/deces`, `/manage/mariage`, `/manage/divorce`, `/manage/adoption`, `/manage/deplacement`, `/manage/document` |
-| Création d’actes | `/births`, `/deaths`, `/marriages`, … (bouton **+ Ajouter**) |
-| Population / N-nés | `/population`, `/newborns` |
-| Territoire | `/territory` |
-| Actes / Recherche | `/acts`, `/search` |
-
-Les données d’actes sont persistées en `localStorage` ; les appels API (`/api` → proxy Vite vers `localhost:8000`) sont optionnels (échec silencieux en démo).
-
-Ouvrir dans Edge (Windows) :
+Les `node_modules` peuvent être partagés via junction vers `D:\egouv-shared-deps\node_modules` si le disque C: est saturé.
 
 ```powershell
-Start-Process msedge http://localhost:5176/
+cd frontends\gov-modules
+npm run dev
+# → http://localhost:5177/
 ```
+
+Ouvrir tous les portails dans Edge :
+
+```powershell
+@(
+  'http://127.0.0.1:5183/login',
+  'http://localhost:5174/',
+  'http://localhost:5175/',
+  'http://localhost:5176/',
+  'http://localhost:5177/',
+  'http://localhost:5178/',
+  'http://localhost:5179/'
+) | ForEach-Object { Start-Process msedge $_ }
+```
+
+### Portail gov-modules (5177)
+
+Page d’accueil : choix Santé / Admin (+ liens vers Présidence, Intérieur, Primature).  
+Santé : tableaux **vides** par défaut ; formulaire d’ajout de structures ; proxy `/api` → `localhost:8000`.
+
+### ONIP (5183)
+
+Connexion **API uniquement** (JWT). Exemple après seed :
+
+- Email : `admin.recensement@example.gov`
+- Mot de passe : `CensusAdmin123!`
+
+Aucune session démo hors API.
 
 ---
 
 ## Migrations
 
 ```bash
-# Appliquer
 alembic upgrade head
-
-# Historique
 alembic history
-
-# Nouvelle migration (phases suivantes)
-alembic revision -m "description" --autogenerate
 ```
 
-La migration `001_foundation` crée les **schemas PostgreSQL** logiques
-(`identity`, `core_registry`, `audit`, …) et une table technique
-`identity.system_meta`. La géographie RDC est dans `012_geography`
-(seed via `POST /api/v1/geo/seed?force=true`).
+Versions actuelles : `001` … `020` (PostGIS / ZD / comptes géo / coupons terrain).
+
+Seed géographie : `POST /api/v1/geo/seed?force=true` (API authentifiée admin).
 
 ---
 
 ## Tests
 
 ```bash
-# Avec PostgreSQL joignable (idéal) :
 pytest -q
-
-# Les tests /health acceptent 200 (DB up) ou 503 (DB down),
-# et vérifient toujours la forme du JSON et api=up.
 ```
 
----
-
-## Sécurité (Phase 1)
-
-- Aucun secret dans le code source
-- `.env` ignoré par Git (voir `.gitignore`)
-- Utiliser `.env.example` comme modèle uniquement
-- Remplacer `SECRET_KEY` et `POSTGRES_PASSWORD` avant tout déploiement
-
-Les briques OAuth2 / OIDC / MFA / RBAC / audit sont livrées en Phase 1.6+ (voir table ci-dessus).
-
-Le mot de passe démo du portail officier (`DemoCivil2026!`) est **uniquement** pour le développement local.
+Les tests `/health` acceptent `200` (DB up) ou `503` (DB down).
 
 ---
 
-## Endpoints clés (Phases 3, 6–9 + géo)
+## Sécurité
+
+- Aucun secret dans le code source ; `.env` ignoré par Git
+- Utiliser `.env.example` comme modèle
+- Remplacer `SECRET_KEY` et `POSTGRES_PASSWORD` avant déploiement
+- En production : `ALLOW_OPEN_REGISTRATION=false`, `ALLOW_DEV_AUTH_HEADERS=false`
+
+---
+
+## Endpoints clés
 
 | Méthode | Chemin | Domaine |
 |---------|--------|---------|
+| POST | `/api/v1/auth/login` | IAM |
 | CRUD | `/api/v1/census/campaigns` | Recensement |
 | POST | `/api/v1/census/sync/push` / `pull` | Sync offline |
-| POST | `/api/v1/biometric/verify` / `identify` | Biométrie (stub ABIS) |
+| POST | `/api/v1/biometric/verify` / `identify` | Biométrie |
 | GET | `/api/v1/onip/dashboard` | ONIP |
-| POST | `/api/v1/health/births/declare` / `deaths/declare` | Santé → état civil |
-| GET / POST | `/api/v1/analytics/*` | Agrégats sans PII |
-| GET | `/api/v1/gov/{org}/{domain}` | Portails gouvernementaux |
-| POST | `/api/v1/identity/verify` | Relying party (`verified`, `status`, `claims` only) |
-| GET / POST | `/api/v1/geo/*` | Géographie RDC (cascade + seed + create) |
+| POST | `/api/v1/health/births/declare` / `deaths/declare` | Santé |
+| GET / POST | `/api/v1/analytics/*` | Agrégats |
+| GET | `/api/v1/gov/{org}/{domain}` | Portails gov |
+| GET / POST | `/api/v1/geo/*` | Géographie RDC |
 
 ---
 
