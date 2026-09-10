@@ -18,6 +18,7 @@ COPY apps ./apps
 COPY alembic ./alembic
 COPY alembic.ini ./
 COPY scripts ./scripts
+COPY tests ./tests
 
 RUN sed -i 's/\r$//' /app/scripts/entrypoint.sh \
     && chmod +x /app/scripts/entrypoint.sh \

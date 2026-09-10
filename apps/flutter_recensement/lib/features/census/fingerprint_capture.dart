@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/config.dart';
 import '../../core/theme.dart';
 
-/// Empreinte via le **capteur biométrique du téléphone** (Android BiometricPrompt).
+/// Empreinte via le capteur biométrique (téléphone ou MorphoTablet).
 class FingerprintCaptureWidget extends StatefulWidget {
   const FingerprintCaptureWidget({
     super.key,
@@ -31,6 +32,10 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
   bool _available = false;
   String _sensorHint = '';
 
+  bool get _morpho => AppConfig.isFingerprintDevice;
+
+  String get _deviceLabel => _morpho ? 'MorphoTablet' : 'téléphone';
+
   @override
   void initState() {
     super.initState();
@@ -50,13 +55,17 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
       setState(() {
         _available = supported && (can || bios.isNotEmpty);
         if (!_available) {
-          _error = 'Enregistrez une empreinte dans Réglages → Sécurité du téléphone';
+          _error = _morpho
+              ? 'Activez l’empreinte dans Réglages MorphoTablet (Sécurité)'
+              : 'Enregistrez une empreinte dans Réglages → Sécurité du téléphone';
           _sensorHint = '';
         } else if (hasFp || bios.isNotEmpty) {
           _error = null;
-          _sensorHint = 'Posez le doigt ${widget.hand} sur le capteur du téléphone';
+          _sensorHint = _morpho
+              ? 'Posez le doigt ${widget.hand} sur le capteur optique Morpho (haut gauche)'
+              : 'Posez le doigt ${widget.hand} sur le capteur du téléphone';
         } else {
-          _sensorHint = 'Utilisez le capteur biométrique du téléphone';
+          _sensorHint = 'Utilisez le capteur biométrique du $_deviceLabel';
         }
       });
     } catch (e) {
@@ -78,7 +87,9 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
       if (!_available) return;
 
       final ok = await _auth.authenticate(
-        localizedReason: 'Empreinte ${widget.hand} — posez le doigt sur le capteur',
+        localizedReason: _morpho
+            ? 'Empreinte ${widget.hand} — posez le doigt sur le capteur Morpho'
+            : 'Empreinte ${widget.hand} — posez le doigt sur le capteur',
         options: const AuthenticationOptions(
           biometricOnly: true,
           stickyAuth: true,
@@ -89,8 +100,9 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
         setState(() => _error = 'Empreinte non validée — réessayez');
         return;
       }
+      final scheme = _morpho ? 'morpho-fp' : 'phone-fp';
       final ref =
-          'phone-fp://${widget.hand}/${DateTime.now().toUtc().toIso8601String()}#${const Uuid().v4()}';
+          '$scheme://${widget.hand}/${DateTime.now().toUtc().toIso8601String()}#${const Uuid().v4()}';
       setState(() => _ref = ref);
       widget.onCaptured(ref);
     } catch (e) {
@@ -118,10 +130,10 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
           const SizedBox(height: 6),
           Text(
             done
-                ? 'Validée via le capteur du téléphone (${widget.hand})'
+                ? 'Validée via le capteur $_deviceLabel (${widget.hand})'
                 : (_sensorHint.isNotEmpty
                     ? _sensorHint
-                    : 'Utilise le capteur d’empreinte du téléphone'),
+                    : 'Utilise le capteur d’empreinte du $_deviceLabel'),
             style: TextStyle(
               color: done ? NnColors.success : NnColors.muted,
               fontWeight: done ? FontWeight.w700 : FontWeight.w500,

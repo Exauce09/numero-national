@@ -72,6 +72,22 @@ def _act_list(act_type: ActType):
     return _endpoint
 
 
+def _mount_act_collection(path: str, act_type: ActType) -> None:
+    router.add_api_route(
+        path,
+        _act_create(act_type),
+        methods=["POST"],
+        response_model=CivilActRead,
+        status_code=status.HTTP_201_CREATED,
+    )
+    router.add_api_route(
+        path,
+        _act_list(act_type),
+        methods=["GET"],
+        response_model=list[CivilActRead],
+    )
+
+
 @router.get("/population/search", response_model=list[PopulationHit])
 async def population_search(
     q: str | None = None,
@@ -110,26 +126,16 @@ async def get_act(
 
 
 # Typed act collections
-router.add_api_route("/births", _act_create(ActType.BIRTH), methods=["POST"], response_model=CivilActRead)
-router.add_api_route("/births", _act_list(ActType.BIRTH), methods=["GET"], response_model=list[CivilActRead])
-router.add_api_route("/marriages", _act_create(ActType.MARRIAGE), methods=["POST"], response_model=CivilActRead)
-router.add_api_route("/marriages", _act_list(ActType.MARRIAGE), methods=["GET"], response_model=list[CivilActRead])
-router.add_api_route("/divorces", _act_create(ActType.DIVORCE), methods=["POST"], response_model=CivilActRead)
-router.add_api_route("/divorces", _act_list(ActType.DIVORCE), methods=["GET"], response_model=list[CivilActRead])
-router.add_api_route("/deaths", _act_create(ActType.DEATH), methods=["POST"], response_model=CivilActRead)
-router.add_api_route("/deaths", _act_list(ActType.DEATH), methods=["GET"], response_model=list[CivilActRead])
-router.add_api_route("/recognitions", _act_create(ActType.RECOGNITION), methods=["POST"], response_model=CivilActRead)
-router.add_api_route("/recognitions", _act_list(ActType.RECOGNITION), methods=["GET"], response_model=list[CivilActRead])
-router.add_api_route("/rectifications", _act_create(ActType.RECTIFICATION), methods=["POST"], response_model=CivilActRead)
-router.add_api_route("/rectifications", _act_list(ActType.RECTIFICATION), methods=["GET"], response_model=list[CivilActRead])
-router.add_api_route("/adoptions", _act_create(ActType.ADOPTION), methods=["POST"], response_model=CivilActRead)
-router.add_api_route("/adoptions", _act_list(ActType.ADOPTION), methods=["GET"], response_model=list[CivilActRead])
-router.add_api_route("/displacements", _act_create(ActType.DISPLACEMENT), methods=["POST"], response_model=CivilActRead)
-router.add_api_route("/displacements", _act_list(ActType.DISPLACEMENT), methods=["GET"], response_model=list[CivilActRead])
-router.add_api_route("/census", _act_create(ActType.CENSUS), methods=["POST"], response_model=CivilActRead)
-router.add_api_route("/census", _act_list(ActType.CENSUS), methods=["GET"], response_model=list[CivilActRead])
-router.add_api_route("/documents-acts", _act_create(ActType.DOCUMENT), methods=["POST"], response_model=CivilActRead)
-router.add_api_route("/documents-acts", _act_list(ActType.DOCUMENT), methods=["GET"], response_model=list[CivilActRead])
+_mount_act_collection("/births", ActType.BIRTH)
+_mount_act_collection("/marriages", ActType.MARRIAGE)
+_mount_act_collection("/divorces", ActType.DIVORCE)
+_mount_act_collection("/deaths", ActType.DEATH)
+_mount_act_collection("/recognitions", ActType.RECOGNITION)
+_mount_act_collection("/rectifications", ActType.RECTIFICATION)
+_mount_act_collection("/adoptions", ActType.ADOPTION)
+_mount_act_collection("/displacements", ActType.DISPLACEMENT)
+_mount_act_collection("/census", ActType.CENSUS)
+_mount_act_collection("/documents-acts", ActType.DOCUMENT)
 
 
 @router.post("/residence", response_model=ResidenceRead, status_code=status.HTTP_201_CREATED)

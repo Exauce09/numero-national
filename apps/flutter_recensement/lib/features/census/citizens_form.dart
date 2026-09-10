@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/api_client.dart';
+import '../../core/config.dart';
+import '../../core/provisional_nic.dart';
 import '../../sync/local_database.dart';
 import '../../sync/sync_lifecycle.dart';
 import '../../sync/sync_queue.dart';
@@ -725,13 +727,26 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     setState(() => _busy = true);
     try {
       final db = LocalDatabase.instance.db;
-    final now = DateTime.now().toUtc().toIso8601String();
+      final now = DateTime.now().toUtc().toIso8601String();
+      final dob = _dob.text.trim();
       final payload = _buildPayload();
+      // Numéro national dès finalisation (coupon + QR).
+      String? nationalId = payload['national_id']?.toString() ?? payload['nic']?.toString();
+      if (!draft && (nationalId == null || nationalId.isEmpty)) {
+        nationalId = ProvisionalNic.generate(
+          sex: _sex,
+          dateOfBirth: dob,
+          provinceCode: _geoActuelle['province_code'] ?? _geoNaissance['province_code'],
+          ville: _geoActuelle['ville_name'] ?? _geoNaissance['ville_name'],
+          commune: _geoActuelle['commune_name'] ?? _geoNaissance['commune_name'],
+        );
+        payload['national_id'] = nationalId;
+        payload['nic'] = nationalId;
+      }
       final payloadJson = jsonEncode(payload);
       final given = _prenom.text.trim().isEmpty ? '(brouillon)' : _prenom.text.trim();
       final family = _nom.text.trim().isEmpty ? 'Sans nom' : _nom.text.trim();
       final status = draft ? 'DRAFT' : 'QUEUED';
-      final dob = _dob.text.trim();
 
       final isUpdate = _localId != null;
       final localId = _localId ?? const Uuid().v4();
@@ -851,6 +866,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               givenNames: given,
               sex: _sex,
               dateOfBirth: dob,
+              nationalId: nationalId,
               campaignId: widget.campaignId,
               householdLocalId: widget.householdLocalId,
             ),
@@ -1256,7 +1272,46 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (AppConfig.isFingerprintDevice)
+          Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF4E5),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE6A23C).withValues(alpha: 0.45)),
+            ),
+            child: const Text(
+              'MorphoTablet — commencez par les empreintes (capteur optique en haut à gauche), puis la photo.',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, height: 1.35),
+            ),
+          ),
         _section('3. Biométrie', [
+          if (AppConfig.isFingerprintDevice) ...[
+            FingerprintCaptureWidget(
+              label: 'Empreinte main gauche',
+              hand: 'gauche',
+              initialRef: _empreinteGauche.text.trim().isEmpty ? null : _empreinteGauche.text.trim(),
+              onCaptured: (ref) => setState(() {
+                _empreinteGauche.text = ref;
+                _fingerprintRef = ref;
+              }),
+            ),
+            FingerprintCaptureWidget(
+              label: 'Empreinte main droite',
+              hand: 'droite',
+              initialRef: _empreinteDroite.text.trim().isEmpty ? null : _empreinteDroite.text.trim(),
+              onCaptured: (ref) => setState(() {
+                _empreinteDroite.text = ref;
+                _fingerprintRef ??= ref;
+              }),
+            ),
+            const SizedBox(height: 8),
+            PhotoCaptureWidget(
+              initialRef: _photoRef,
+              onCaptured: (ref) => setState(() => _photoRef = ref),
+            ),
+          ] else ...[
           PhotoCaptureWidget(
             initialRef: _photoRef,
             onCaptured: (ref) => setState(() => _photoRef = ref),
@@ -1280,6 +1335,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               _fingerprintRef ??= ref;
             }),
           ),
+          ],
           IrisCaptureWidget(
             initialRef: _iris.text.trim().isEmpty ? null : _iris.text.trim(),
             onCaptured: (ref) => setState(() => _iris.text = ref),

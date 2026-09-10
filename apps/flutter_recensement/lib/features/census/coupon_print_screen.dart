@@ -21,6 +21,7 @@ class CouponPrintScreen extends StatefulWidget {
     required this.givenNames,
     required this.sex,
     required this.dateOfBirth,
+    this.nationalId,
     this.campaignId,
     this.householdLocalId,
   });
@@ -30,6 +31,8 @@ class CouponPrintScreen extends StatefulWidget {
   final String givenNames;
   final String sex;
   final String dateOfBirth;
+  /// N° national attribué à l'enregistrement (affiché + QR).
+  final String? nationalId;
   final String? campaignId;
   final String? householdLocalId;
 
@@ -45,6 +48,10 @@ class _CouponPrintScreenState extends State<CouponPrintScreen> {
         'type': 'nn_census_coupon',
         'v': 1,
         'local_id': widget.localId,
+        if (widget.nationalId != null && widget.nationalId!.isNotEmpty)
+          'nic': widget.nationalId,
+        if (widget.nationalId != null && widget.nationalId!.isNotEmpty)
+          'national_id': widget.nationalId,
         'family_name': widget.familyName,
         'given_names': widget.givenNames,
         'sex': widget.sex,
@@ -105,14 +112,18 @@ class _CouponPrintScreenState extends State<CouponPrintScreen> {
           'type': 'nn_census_coupon',
           'v': 1,
           'local_id': widget.localId,
+          if (widget.nationalId != null && widget.nationalId!.isNotEmpty)
+            'nic': widget.nationalId,
         });
         await PosPrinter.printCoupon(
           title: 'ONIP - Recensement',
-          subtitle: 'Coupon provisoire',
+          subtitle: 'Coupon + N national',
           name: _ascii(name.isEmpty ? '-' : name),
           sex: sexLabel == 'Féminin' ? 'Feminin' : 'Masculin',
           dob: _ascii(widget.dateOfBirth.isEmpty ? '-' : widget.dateOfBirth),
-          localId: widget.localId,
+          localId: widget.nationalId?.isNotEmpty == true
+              ? 'NIC ${widget.nationalId}'
+              : widget.localId,
           qr: compactQr,
         );
         if (context.mounted) {
@@ -144,6 +155,13 @@ class _CouponPrintScreenState extends State<CouponPrintScreen> {
               pw.SizedBox(height: 10),
               pw.Image(pw.MemoryImage(qrBytes), width: 120, height: 120),
               pw.SizedBox(height: 10),
+              if (widget.nationalId != null && widget.nationalId!.isNotEmpty)
+                pw.Text(
+                  'N° ${widget.nationalId}',
+                  style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+                ),
+              if (widget.nationalId != null && widget.nationalId!.isNotEmpty)
+                pw.SizedBox(height: 6),
               pw.Text(name.isEmpty ? '—' : name, style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 6),
               pw.Text('Sexe : $sexLabel', style: const pw.TextStyle(fontSize: 10)),
@@ -151,7 +169,7 @@ class _CouponPrintScreenState extends State<CouponPrintScreen> {
               pw.Text('Réf. : ${widget.localId}', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
               pw.SizedBox(height: 8),
               pw.Text(
-                'Pas une carte d’identité. Carte officielle = ONIP après validation.',
+                'N° attribué à l\'enregistrement. Carte officielle = ONIP après validation.',
                 textAlign: pw.TextAlign.center,
                 style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
               ),
@@ -267,6 +285,22 @@ class _CouponPrintScreenState extends State<CouponPrintScreen> {
                         backgroundColor: Colors.white,
                       ),
                       const SizedBox(height: 16),
+                      if (widget.nationalId != null && widget.nationalId!.isNotEmpty) ...[
+                        const Text(
+                          'Numéro national',
+                          style: TextStyle(color: NnColors.muted, fontSize: 12),
+                        ),
+                        Text(
+                          widget.nationalId!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 22,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       Text(
                         name.isEmpty ? '—' : name,
                         textAlign: TextAlign.center,

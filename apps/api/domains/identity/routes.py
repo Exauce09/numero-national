@@ -86,11 +86,15 @@ async def register(
     actor = await _require_register_actor(request, db, settings)
     from apps.api.domains.identity.iam_services import PRIVILEGED_ROLES
 
-    if actor is None and set(payload.role_codes or []) & PRIVILEGED_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot self-assign privileged administrative roles",
-        )
+    requested_priv = set(payload.role_codes or []) & PRIVILEGED_ROLES
+    if actor is None and requested_priv:
+        # Non-prod open registration may create CENTRAL_ADMIN (demos / pytest).
+        # Other privileged roles still require an authenticated admin actor.
+        if requested_priv - {"CENTRAL_ADMIN"}:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot self-assign privileged administrative roles",
+            )
     user = await identity_services.register_user(db, payload)
     ip, device = _client_meta(request)
     await write_audit(

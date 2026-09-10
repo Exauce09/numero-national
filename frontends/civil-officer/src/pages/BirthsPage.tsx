@@ -39,7 +39,7 @@ export default function BirthsPage() {
   const acts = listActs("BIRTH");
   const inherited = inheritParentOrigin(father, mother);
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     if (!mother) {

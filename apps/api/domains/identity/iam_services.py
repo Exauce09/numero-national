@@ -415,7 +415,15 @@ async def approve_account_request(
     role_codes = payload.role_codes or [row.requested_role]
     if row.requested_role == "OFFICIER_ETAT_CIVIL" and "CIVIL_OFFICER" not in role_codes:
         role_codes = list({*role_codes, "CIVIL_OFFICER", "OFFICIER_ETAT_CIVIL"})
-    assert_not_self_privilege(actor, actor.id, role_codes)
+    # Creating a *new* account — never treat as self-elevation of the approver.
+    actor_roles = user_role_codes(actor)
+    if set(role_codes) & PRIVILEGED_ROLES and not (
+        actor_roles & {"SUPER_ADMIN_NATIONAL", "CENTRAL_ADMIN"}
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Approver cannot grant privileged administrative roles",
+        )
 
     roles = await _resolve_roles(db, role_codes)
     user = User(

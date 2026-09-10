@@ -12,7 +12,16 @@ class AppConfig {
   /// Max hours an agent may work offline after last successful auth.
   static const int offlineAuthMaxHours = 72;
 
-  static const String appVersion = '0.3.2';
+  static const String appVersion = '0.3.3';
+
+  /// Profil appareil : `standard` | `fingerprint` (MorphoTablet) | `pos`.
+  static const String deviceProfile = String.fromEnvironment(
+    'DEVICE_PROFILE',
+    defaultValue: 'standard',
+  );
+
+  static bool get isFingerprintDevice => deviceProfile == 'fingerprint';
+  static bool get isPosDevice => deviceProfile == 'pos';
 
   /// Runtime override stored on device (login screen) wins over compile-time.
   static Future<String> effectiveApiBaseUrl() async {
