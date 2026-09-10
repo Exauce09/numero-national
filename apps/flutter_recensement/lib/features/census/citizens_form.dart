@@ -16,6 +16,9 @@ import 'rdc_tribus.dart';
 import 'situation_familiale.dart';
 import 'etudes_et_admin.dart';
 
+/// Type de fiche terrain — l’identité obligatoire dépend de ce choix.
+enum FicheKind { personne, bebe, decede }
+
 /// Fiche personne — wizard 7 étapes aligné sur le site civil-officer.
 class CitizensFormScreen extends StatefulWidget {
   const CitizensFormScreen({
@@ -42,6 +45,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   late final TextEditingController _profession;
   late final TextEditingController _lieuNaissance;
   late final TextEditingController _dob;
+  late final TextEditingController _dateDeces;
   late final TextEditingController _hopitalNaissance;
   late final TextEditingController _langues;
   late final TextEditingController _pere;
@@ -70,6 +74,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   late final TextEditingController _familleRemarques;
 
   String _sex = 'M';
+  FicheKind _ficheKind = FicheKind.personne;
   String _etatCivil = 'CELIBATAIRE';
   String _handicap = 'NORMAL';
   String _relation = 'AUTRE';
@@ -149,7 +154,12 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     _lieuNaissance = TextEditingController(
       text: payload['lieu_naissance']?.toString() ?? '',
     );
-    _dob = TextEditingController(text: e?['date_of_birth']?.toString() ?? '');
+    _dob = TextEditingController(
+      text: e?['date_of_birth']?.toString() ??
+          payload['date_naissance']?.toString() ??
+          '',
+    );
+    _dateDeces = TextEditingController(text: payload['date_deces']?.toString() ?? '');
     _hopitalNaissance = TextEditingController(
       text: payload['hopital_naissance']?.toString() ?? '',
     );
@@ -222,7 +232,8 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
       _documents.add(_DocEditors(d));
     }
 
-    _sex = e?['sex']?.toString() ?? 'M';
+    _sex = e?['sex']?.toString() ?? payload['sex']?.toString() ?? 'M';
+    _ficheKind = _parseFicheKind(payload['fiche_kind'] ?? e?['fiche_kind']);
     _etatCivil = payload['etat_civil']?.toString() ?? 'CELIBATAIRE';
     _handicap = payload['handicap']?.toString() ?? 'NORMAL';
     _relation = payload['relationship_to_head']?.toString() ?? 'AUTRE';
@@ -269,6 +280,35 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     return {};
   }
 
+  FicheKind _parseFicheKind(Object? raw) {
+    switch (raw?.toString().toLowerCase()) {
+      case 'bebe':
+      case 'bébé':
+      case 'baby':
+      case 'newborn':
+        return FicheKind.bebe;
+      case 'decede':
+      case 'décédé':
+      case 'deceased':
+      case 'death':
+        return FicheKind.decede;
+      default:
+        return FicheKind.personne;
+    }
+  }
+
+  String get _ficheKindCode => switch (_ficheKind) {
+        FicheKind.personne => 'personne',
+        FicheKind.bebe => 'bebe',
+        FicheKind.decede => 'decede',
+      };
+
+  String get _ficheKindLabel => switch (_ficheKind) {
+        FicheKind.personne => 'Personne vivante',
+        FicheKind.bebe => 'Bébé (nouveau-né)',
+        FicheKind.decede => 'Personne décédée',
+      };
+
   @override
   void dispose() {
     _nom.dispose();
@@ -277,6 +317,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     _profession.dispose();
     _lieuNaissance.dispose();
     _dob.dispose();
+    _dateDeces.dispose();
     _hopitalNaissance.dispose();
     _langues.dispose();
     _pere.dispose();
@@ -369,18 +410,74 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     setState(() => _dob.text = '$y-$m-$d');
   }
 
-  bool _validateStep1() {
-    if (_nom.text.trim().isEmpty ||
-        _prenom.text.trim().isEmpty ||
-        !_validDate(_dob.text.trim())) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Étape Identité : nom, prénom et date (AAAA-MM-JJ) requis'),
-        ),
-      );
+  bool _validateStep1({bool showMessage = true}) {
+    String? err;
+    final nom = _nom.text.trim();
+    final prenom = _prenom.text.trim();
+    final dob = _dob.text.trim();
+    final mere = _mere.text.trim();
+    final pere = _pere.text.trim();
+    final dod = _dateDeces.text.trim();
+
+    switch (_ficheKind) {
+      case FicheKind.personne:
+        if (nom.isEmpty || prenom.isEmpty || !_validDate(dob)) {
+          err = 'Identité personne : nom, prénom et date de naissance (AAAA-MM-JJ) requis';
+        }
+      case FicheKind.bebe:
+        if (nom.isEmpty || !_validDate(dob) || (mere.isEmpty && pere.isEmpty)) {
+          err =
+              'Identité bébé : nom (ou « Enfant de … »), date de naissance, et nom de la mère ou du père requis';
+        }
+      case FicheKind.decede:
+        if (nom.isEmpty ||
+            prenom.isEmpty ||
+            !_validDate(dob) ||
+            !_validDate(dod)) {
+          err =
+              'Identité décédé : nom, prénom, date de naissance et date de décès (AAAA-MM-JJ) requis';
+        } else if (_validDate(dob) && _validDate(dod)) {
+          final b = DateTime.parse(dob);
+          final d = DateTime.parse(dod);
+          if (d.isBefore(b)) {
+            err = 'La date de décès ne peut pas être antérieure à la naissance';
+          }
+        }
+    }
+
+    if (err != null) {
+      if (showMessage && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+      }
       return false;
     }
     return true;
+  }
+
+  Future<void> _pickDeathDate() async {
+    final now = DateTime.now();
+    DateTime initial = now;
+    final parts = _dateDeces.text.trim().split('-');
+    if (parts.length == 3) {
+      final y = int.tryParse(parts[0]);
+      final m = int.tryParse(parts[1]);
+      final d = int.tryParse(parts[2]);
+      if (y != null && m != null && d != null) {
+        initial = DateTime(y, m, d);
+      }
+    }
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial.isAfter(now) ? now : initial,
+      firstDate: DateTime(1900),
+      lastDate: now,
+      helpText: 'Date de décès',
+    );
+    if (picked == null) return;
+    final y = picked.year.toString().padLeft(4, '0');
+    final m = picked.month.toString().padLeft(2, '0');
+    final d = picked.day.toString().padLeft(2, '0');
+    setState(() => _dateDeces.text = '$y-$m-$d');
   }
 
   Map<String, dynamic> _buildPayload() {
@@ -388,6 +485,8 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
         ? _geoNaissance['label']
         : _lieuNaissance.text.trim();
     return {
+      'fiche_kind': _ficheKindCode,
+      'date_deces': _dateDeces.text.trim(),
       'nom': _nom.text.trim(),
       'postnom': _postnom.text.trim(),
       'prenom': _prenom.text.trim(),
@@ -587,22 +686,12 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   }
 
   Future<void> _save({bool draft = false}) async {
-    if (!draft && !_validateStep1()) return;
+    // Identité obligatoire avant brouillon ou finalisation.
+    if (!_validateStep1()) return;
     if (!draft && (_aConjoint || _etatCivil == 'MARIE') && !_conjointLocked) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Conjoint(e) : recherchez et liez une personne déjà enregistrée'),
-        ),
-      );
-      return;
-    }
-    if (draft &&
-        _nom.text.trim().isEmpty &&
-        _prenom.text.trim().isEmpty &&
-        _postnom.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Brouillon : saisissez au moins un nom, post-nom ou prénom'),
         ),
       );
       return;
@@ -804,6 +893,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
                 onPressed: _busy
                     ? null
                     : () {
+                        if (_step == 1 && !_validateStep1()) return;
                         if (!isLast) {
                           setState(() => _step += 1);
                           return;
@@ -836,25 +926,59 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   }
 
   Widget _buildIdentityBlock() {
+    final isBebe = _ficheKind == FicheKind.bebe;
+    final isDecede = _ficheKind == FicheKind.decede;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _section('1. Identité de la personne', [
+        _section('Type de fiche *', [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final kind in FicheKind.values)
+                ChoiceChip(
+                  label: Text(switch (kind) {
+                    FicheKind.personne => 'Personne vivante',
+                    FicheKind.bebe => 'Bébé',
+                    FicheKind.decede => 'Décédé(e)',
+                  }),
+                  selected: _ficheKind == kind,
+                  onSelected: (sel) {
+                    if (!sel) return;
+                    setState(() => _ficheKind = kind);
+                  },
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isBebe
+                ? 'Identité bébé obligatoire (nom, sexe, naissance, mère ou père).'
+                : isDecede
+                    ? 'Identité décédé obligatoire (nom, prénom, naissance, décès).'
+                    : 'Identité personne obligatoire (nom, prénom, sexe, naissance).',
+            style: const TextStyle(fontSize: 12, color: Color(0xFF5A6A85), height: 1.3),
+          ),
+        ]),
+        _section('1. Identité — $_ficheKindLabel', [
           TextFormField(
             controller: _nom,
-            decoration: _dec('Nom de la personne *'),
+            decoration: _dec(
+              isBebe ? 'Nom du bébé * (ou « Enfant de … »)' : 'Nom de la personne *',
+            ),
             textCapitalization: TextCapitalization.characters,
           ),
           const SizedBox(height: 10),
           TextFormField(
             controller: _postnom,
-            decoration: _dec('Post-nom de la personne'),
+            decoration: _dec('Post-nom'),
             textCapitalization: TextCapitalization.characters,
           ),
           const SizedBox(height: 10),
           TextFormField(
             controller: _prenom,
-            decoration: _dec('Prénom *'),
+            decoration: _dec(isBebe ? 'Prénom' : 'Prénom *'),
             textCapitalization: TextCapitalization.words,
           ),
           const SizedBox(height: 10),
@@ -863,7 +987,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               Expanded(
                 child: DropdownButtonFormField<String>(
                   value: _sex,
-                  decoration: _dec('Sexe'),
+                  decoration: _dec('Sexe *'),
                   items: const [
                     DropdownMenuItem(value: 'M', child: Text('Masculin')),
                     DropdownMenuItem(value: 'F', child: Text('Féminin')),
@@ -871,25 +995,29 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
                   onChanged: (v) => setState(() => _sex = v ?? 'M'),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _etatCivil,
-                  decoration: _dec('État-civil'),
-                  items: [
-                    for (final o in _etatCivilOptions)
-                      DropdownMenuItem(value: o.$1, child: Text(o.$2)),
-                  ],
-                  onChanged: (v) => setState(() {
-                    _etatCivil = v ?? 'CELIBATAIRE';
-                    if (_etatCivil == 'MARIE') _aConjoint = true;
-                  }),
+              if (!isBebe) ...[
+                const SizedBox(width: 10),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _etatCivil,
+                    decoration: _dec('État-civil'),
+                    items: [
+                      for (final o in _etatCivilOptions)
+                        DropdownMenuItem(value: o.$1, child: Text(o.$2)),
+                    ],
+                    onChanged: (v) => setState(() {
+                      _etatCivil = v ?? 'CELIBATAIRE';
+                      if (_etatCivil == 'MARIE') _aConjoint = true;
+                    }),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
-          const SizedBox(height: 10),
-          TextFormField(controller: _profession, decoration: _dec('Profession')),
+          if (!isBebe) ...[
+            const SizedBox(height: 10),
+            TextFormField(controller: _profession, decoration: _dec('Profession')),
+          ],
           const SizedBox(height: 10),
           GeoCascadeField(
             preset: GeoCascadePreset.place,
@@ -903,9 +1031,6 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
           TextFormField(
             controller: _dob,
             readOnly: false,
-            onTap: () {
-              // Laisser saisir AAAA-MM-JJ au clavier ; calendrier via icône.
-            },
             decoration: _dec('Date de naissance *', hint: 'AAAA-MM-JJ ou calendrier').copyWith(
               suffixIcon: IconButton(
                 icon: const Icon(Icons.calendar_today),
@@ -913,50 +1038,73 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               ),
             ),
           ),
+          if (isDecede) ...[
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: _dateDeces,
+              readOnly: false,
+              decoration: _dec('Date de décès *', hint: 'AAAA-MM-JJ ou calendrier').copyWith(
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.event_busy),
+                  onPressed: _pickDeathDate,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           TextFormField(
             controller: _hopitalNaissance,
-            decoration: _dec('Hôpital de naissance'),
+            decoration: _dec(isBebe ? 'Lieu / hôpital de naissance' : 'Hôpital de naissance'),
+          ),
+          if (!isBebe) ...[
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: _langues,
+              decoration: _dec('Langues parlées', hint: 'Français, Lingala…'),
+            ),
+          ],
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _pere,
+            decoration: _dec(isBebe ? 'Nom du père * (si pas de mère)' : 'Nom du père'),
           ),
           const SizedBox(height: 10),
           TextFormField(
-            controller: _langues,
-            decoration: _dec('Langues parlées', hint: 'Français, Lingala…'),
+            controller: _mere,
+            decoration: _dec(isBebe ? 'Nom de la mère * (si pas de père)' : 'Nom de la mère'),
           ),
-          const SizedBox(height: 10),
-          TextFormField(controller: _pere, decoration: _dec('Nom du père')),
-          const SizedBox(height: 10),
-          TextFormField(controller: _mere, decoration: _dec('Nom de la mère')),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _nationalite,
-                  decoration: _dec('Nationalité'),
+          if (!isBebe) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _nationalite,
+                    decoration: _dec('Nationalité'),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextFormField(
-                  controller: _paysResidence,
-                  decoration: _dec('Pays de résidence'),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextFormField(
+                    controller: _paysResidence,
+                    decoration: _dec('Pays de résidence'),
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          DropdownButtonFormField<String>(
-            value: _handicap,
-            decoration: _dec('Type de handicap'),
-            items: [
-              for (final o in _handicapOptions)
-                DropdownMenuItem(value: o.$1, child: Text(o.$2)),
-            ],
-            onChanged: (v) => setState(() => _handicap = v ?? 'NORMAL'),
-          ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              value: _handicap,
+              decoration: _dec('Type de handicap'),
+              items: [
+                for (final o in _handicapOptions)
+                  DropdownMenuItem(value: o.$1, child: Text(o.$2)),
+              ],
+              onChanged: (v) => setState(() => _handicap = v ?? 'NORMAL'),
+            ),
+          ],
         ]),
-        _section('1b. Adresse actuelle', [
+        if (!isBebe) _section('1b. Adresse actuelle', [
           GeoCascadeField(
             preset: GeoCascadePreset.address,
             title: 'Adresse actuelle',
@@ -1115,6 +1263,11 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
                   Text(
                     'Étape $_step / 7 — ${_stepTitles[_step - 1]}',
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Identité obligatoire — le reste peut être complété plus tard.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF5A6A85), height: 1.3),
                   ),
                   const SizedBox(height: 8),
                   ClipRRect(

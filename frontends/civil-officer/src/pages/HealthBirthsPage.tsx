@@ -23,12 +23,12 @@ export default function HealthBirthsPage() {
     e.preventDefault();
     setError(null);
     setMessage(null);
-    if (!nom.trim() || !prenom.trim() || !dateNaissance) {
-      setError("Nom, prénom et date de naissance de l'enfant sont requis.");
+    if (!nom.trim() || !dateNaissance) {
+      setError("Nom et date de naissance de l'enfant sont requis.");
       return;
     }
-    if (!mother) {
-      setError("La mère est obligatoire (recherche ou ajout).");
+    if (!mother && !father) {
+      setError("La mère ou le père est obligatoire (recherche ou ajout).");
       return;
     }
     const decl = notifyEtatCivil({
@@ -40,13 +40,13 @@ export default function HealthBirthsPage() {
         commune_code: session.commune_code,
         commune_name: session.commune_name,
         child_nom: nom.trim(),
-        child_postnom: postnom.trim() || mother.postnom || father?.postnom || "",
+        child_postnom: postnom.trim() || mother?.postnom || father?.postnom || "",
         child_prenom: prenom.trim(),
         sexe,
         date_naissance: dateNaissance,
-        mother_id: mother.id,
-        mother_nic: mother.nic,
-        mother_name: displayName(mother),
+        mother_id: mother?.id ?? null,
+        mother_nic: mother?.nic ?? null,
+        mother_name: mother ? displayName(mother) : null,
         father_id: father?.id ?? null,
         father_nic: father?.nic ?? null,
         father_name: father ? displayName(father) : null,

@@ -67,11 +67,13 @@ const STEPS = [
 ] as const;
 
 type StepId = (typeof STEPS)[number]["id"];
+type FicheKind = "personne" | "bebe" | "decede";
 
 const CENSUS_DRAFT_KEY = "civil-officer:census-draft";
 
 type CensusDraft = {
   step: StepId;
+  ficheKind: FicheKind;
   handicap: HandicapType;
   nom: string;
   postnom: string;
@@ -81,10 +83,13 @@ type CensusDraft = {
   profession: string;
   geoNaissance: GeoSelection;
   dateNaissance: string;
+  dateDeces: string;
   hopitalNaissance: string;
   languesParlees: string;
   pereId: string | null;
   mereId: string | null;
+  nomPereText: string;
+  nomMereText: string;
   nationalite: string;
   paysResidence: string;
   geoActuelle: GeoSelection;
@@ -114,6 +119,7 @@ export default function CensusPage() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const [step, setStep] = useState<StepId>(1);
+  const [ficheKind, setFicheKind] = useState<FicheKind>("personne");
   const [handicap, setHandicap] = useState<HandicapType>("NORMAL");
   const [nom, setNom] = useState("");
   const [postnom, setPostnom] = useState("");
@@ -123,10 +129,13 @@ export default function CensusPage() {
   const [profession, setProfession] = useState("");
   const [geoNaissance, setGeoNaissance] = useState<GeoSelection>({});
   const [dateNaissance, setDateNaissance] = useState("");
+  const [dateDeces, setDateDeces] = useState("");
   const [hopitalNaissance, setHopitalNaissance] = useState("");
   const [languesParlees, setLanguesParlees] = useState("");
   const [pere, setPere] = useState<Person | null>(null);
   const [mere, setMere] = useState<Person | null>(null);
+  const [nomPereText, setNomPereText] = useState("");
+  const [nomMereText, setNomMereText] = useState("");
   const [nationalite, setNationalite] = useState("Congolaise");
   const [paysResidence, setPaysResidence] = useState("RDC");
   const [geoActuelle, setGeoActuelle] = useState<GeoSelection>({});
@@ -162,6 +171,7 @@ export default function CensusPage() {
       if (!raw) return;
       const d = JSON.parse(raw) as CensusDraft;
       setStep(d.step ?? 1);
+      setFicheKind(d.ficheKind ?? "personne");
       setHandicap(d.handicap ?? "NORMAL");
       setNom(d.nom ?? "");
       setPostnom(d.postnom ?? "");
@@ -171,7 +181,10 @@ export default function CensusPage() {
       setProfession(d.profession ?? "");
       setGeoNaissance(d.geoNaissance ?? {});
       setDateNaissance(d.dateNaissance ?? "");
+      setDateDeces(d.dateDeces ?? "");
       setHopitalNaissance(d.hopitalNaissance ?? "");
+      setNomPereText(d.nomPereText ?? "");
+      setNomMereText(d.nomMereText ?? "");
       setLanguesParlees(d.languesParlees ?? "");
       setPere(d.pereId ? getPerson(d.pereId) ?? null : null);
       setMere(d.mereId ? getPerson(d.mereId) ?? null : null);
@@ -301,13 +314,52 @@ export default function CensusPage() {
     };
   }, [step]);
 
-  function validateStep(target: StepId): boolean {
-    setError(null);
-    if (target > 1 && (!nom.trim() || !prenom.trim() || !dateNaissance)) {
-      setError("Étape Identité : nom, prénom et date de naissance sont requis.");
-      setStep(1);
+  function isValidDate(raw: string): boolean {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return false;
+    const d = new Date(`${raw}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return false;
+    if (d.getTime() > Date.now()) return false;
+    return true;
+  }
+
+  function validateIdentity(showError = true): boolean {
+    const n = nom.trim();
+    const p = prenom.trim();
+    const mereOk = Boolean(mere) || nomMereText.trim().length > 0;
+    const pereOk = Boolean(pere) || nomPereText.trim().length > 0;
+    let msg: string | null = null;
+
+    if (ficheKind === "personne") {
+      if (!n || !p || !isValidDate(dateNaissance)) {
+        msg = "Identité personne : nom, prénom et date de naissance sont requis.";
+      }
+    } else if (ficheKind === "bebe") {
+      if (!n || !isValidDate(dateNaissance) || (!mereOk && !pereOk)) {
+        msg =
+          "Identité bébé : nom (ou « Enfant de … »), date de naissance, et mère ou père requis.";
+      }
+    } else if (ficheKind === "decede") {
+      if (!n || !p || !isValidDate(dateNaissance) || !isValidDate(dateDeces)) {
+        msg =
+          "Identité décédé : nom, prénom, date de naissance et date de décès sont requis.";
+      } else if (dateDeces < dateNaissance) {
+        msg = "La date de décès ne peut pas être antérieure à la naissance.";
+      }
+    }
+
+    if (msg) {
+      if (showError) {
+        setError(msg);
+        setStep(1);
+      }
       return false;
     }
+    return true;
+  }
+
+  function validateStep(target: StepId): boolean {
+    setError(null);
+    if (target > 1 && !validateIdentity(true)) return false;
     return true;
   }
 
@@ -327,6 +379,7 @@ export default function CensusPage() {
   }
 
   function goNext() {
+    if (step === 1 && !validateIdentity(true)) return;
     if (step < 7) goTo((step + 1) as StepId);
   }
 
@@ -361,8 +414,11 @@ export default function CensusPage() {
 
   function saveDraft() {
     setError(null);
+    setDraftNotice(null);
+    if (!validateIdentity(true)) return;
     const draft: CensusDraft = {
       step,
+      ficheKind,
       handicap,
       nom,
       postnom,
@@ -372,10 +428,13 @@ export default function CensusPage() {
       profession,
       geoNaissance,
       dateNaissance,
+      dateDeces,
       hopitalNaissance,
       languesParlees,
       pereId: pere?.id ?? null,
       mereId: mere?.id ?? null,
+      nomPereText,
+      nomMereText,
       nationalite,
       paysResidence,
       geoActuelle,
@@ -490,6 +549,8 @@ export default function CensusPage() {
       const payload = {
         person_id: person.id,
         formulaire: "IDENTIFICATION_PERSONNE",
+        fiche_kind: ficheKind,
+        date_deces: ficheKind === "decede" ? dateDeces : null,
         nom: person.nom,
         postnom: person.postnom,
         prenom: person.prenom,
@@ -500,8 +561,8 @@ export default function CensusPage() {
         date_naissance: person.date_naissance,
         hopital_naissance: hopitalNaissance.trim() || null,
         langues_parlees: languesParlees.trim() || null,
-        nom_pere: pere ? displayName(pere) : null,
-        nom_mere: mere ? displayName(mere) : null,
+        nom_pere: pere ? displayName(pere) : nomPereText.trim() || null,
+        nom_mere: mere ? displayName(mere) : nomMereText.trim() || null,
         pere_id: pere?.id ?? null,
         mere_id: mere?.id ?? null,
         nationalite: nationalite.trim() || null,
@@ -563,8 +624,8 @@ export default function CensusPage() {
     <div>
       <h2 className="page-title">Recensement</h2>
       <p className="page-lead">
-        Formulaire d&apos;identification de la personne — identité selon le modèle officiel ; photos et empreintes à
-        l&apos;étape Biométrie.{" "}
+        Identité obligatoire (personne, bébé ou décédé) avant les autres étapes — le reste peut être complété plus
+        tard.{" "}
         <Link to="/census/scan-coupon">Scanner un coupon APK</Link>
       </p>
 
@@ -587,48 +648,92 @@ export default function CensusPage() {
       <div className="panel">
         {step === 1 ? (
           <div className="id-form">
-            <h3 className="id-form-title">Formulaire d&apos;identification de la personne</h3>
+            <h3 className="id-form-title">Formulaire d&apos;identification</h3>
+            <p className="muted small" style={{ marginBottom: "0.75rem" }}>
+              Identité obligatoire — le reste peut être complété plus tard.
+            </p>
 
             <fieldset className="id-fieldset">
-              <legend>Identité de la personne</legend>
+              <legend>Type de fiche *</legend>
+              <div className="form-grid">
+                <div className="full" style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                  {(
+                    [
+                      ["personne", "Personne vivante"],
+                      ["bebe", "Bébé (nouveau-né)"],
+                      ["decede", "Personne décédée"],
+                    ] as const
+                  ).map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      className={`btn-secondary${ficheKind === id ? " active" : ""}`}
+                      style={{
+                        width: "auto",
+                        borderColor: ficheKind === id ? "var(--rdc-blue, #007fff)" : undefined,
+                        background: ficheKind === id ? "#eaf3ff" : undefined,
+                      }}
+                      onClick={() => setFicheKind(id)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset className="id-fieldset">
+              <legend>
+                {ficheKind === "bebe"
+                  ? "Identité du bébé *"
+                  : ficheKind === "decede"
+                    ? "Identité de la personne décédée *"
+                    : "Identité de la personne *"}
+              </legend>
               <div className="form-grid">
                 <div className="full">
-                  <label className="form-label">Nom de la personne</label>
+                  <label className="form-label">
+                    {ficheKind === "bebe" ? "Nom du bébé * (ou « Enfant de … »)" : "Nom de la personne *"}
+                  </label>
                   <input className="form-control" value={nom} onChange={(e) => setNom(e.target.value)} />
                 </div>
                 <div className="full">
-                  <label className="form-label">Post-nom de la personne</label>
+                  <label className="form-label">Post-nom</label>
                   <input className="form-control" value={postnom} onChange={(e) => setPostnom(e.target.value)} />
                 </div>
                 <div className="full">
-                  <label className="form-label">Prénom</label>
+                  <label className="form-label">{ficheKind === "bebe" ? "Prénom" : "Prénom *"}</label>
                   <input className="form-control" value={prenom} onChange={(e) => setPrenom(e.target.value)} />
                 </div>
                 <div>
-                  <label className="form-label">Sexe</label>
+                  <label className="form-label">Sexe *</label>
                   <select className="form-control" value={sexe} onChange={(e) => setSexe(e.target.value as Sexe)}>
                     <option value="M">Masculin</option>
                     <option value="F">Féminin</option>
                   </select>
                 </div>
-                <div>
-                  <label className="form-label">État-civil</label>
-                  <select
-                    className="form-control"
-                    value={etatCivil}
-                    onChange={(e) => setEtatCivil(e.target.value as EtatCivil)}
-                  >
-                    {ETAT_CIVIL_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="full">
-                  <label className="form-label">Profession</label>
-                  <input className="form-control" value={profession} onChange={(e) => setProfession(e.target.value)} />
-                </div>
+                {ficheKind !== "bebe" ? (
+                  <div>
+                    <label className="form-label">État-civil</label>
+                    <select
+                      className="form-control"
+                      value={etatCivil}
+                      onChange={(e) => setEtatCivil(e.target.value as EtatCivil)}
+                    >
+                      {ETAT_CIVIL_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+                {ficheKind !== "bebe" ? (
+                  <div className="full">
+                    <label className="form-label">Profession</label>
+                    <input className="form-control" value={profession} onChange={(e) => setProfession(e.target.value)} />
+                  </div>
+                ) : null}
                 <div className="full">
                   <label className="form-label">Lieu de naissance</label>
                   <GeoCascade
@@ -640,7 +745,7 @@ export default function CensusPage() {
                   />
                 </div>
                 <div>
-                  <label className="form-label">Date de naissance</label>
+                  <label className="form-label">Date de naissance *</label>
                   <input
                     className="form-control"
                     type="date"
@@ -648,6 +753,17 @@ export default function CensusPage() {
                     onChange={(e) => setDateNaissance(e.target.value)}
                   />
                 </div>
+                {ficheKind === "decede" ? (
+                  <div>
+                    <label className="form-label">Date de décès *</label>
+                    <input
+                      className="form-control"
+                      type="date"
+                      value={dateDeces}
+                      onChange={(e) => setDateDeces(e.target.value)}
+                    />
+                  </div>
+                ) : null}
                 <div>
                   <label className="form-label">Hôpital de naissance</label>
                   <input
@@ -656,51 +772,93 @@ export default function CensusPage() {
                     onChange={(e) => setHopitalNaissance(e.target.value)}
                   />
                 </div>
-                <div>
-                  <label className="form-label">Langues parlées</label>
+                {ficheKind !== "bebe" ? (
+                  <div>
+                    <label className="form-label">Langues parlées</label>
+                    <input
+                      className="form-control"
+                      value={languesParlees}
+                      onChange={(e) => setLanguesParlees(e.target.value)}
+                      placeholder="Français, Lingala…"
+                    />
+                  </div>
+                ) : null}
+                <div className="full">
+                  <label className="form-label">
+                    {ficheKind === "bebe" ? "Nom du père * (si pas de mère)" : "Nom du père (texte)"}
+                  </label>
                   <input
                     className="form-control"
-                    value={languesParlees}
-                    onChange={(e) => setLanguesParlees(e.target.value)}
-                    placeholder="Français, Lingala…"
+                    value={nomPereText}
+                    onChange={(e) => setNomPereText(e.target.value)}
+                    placeholder="Saisie libre"
                   />
                 </div>
                 <div className="full">
-                  <PersonPicker label="Nom du père" value={pere} onChange={setPere} />
+                  <PersonPicker
+                    label={ficheKind === "bebe" ? "Lier le père (optionnel)" : "Nom du père (registre)"}
+                    value={pere}
+                    onChange={(p) => {
+                      setPere(p);
+                      if (p) setNomPereText(displayName(p));
+                    }}
+                  />
                 </div>
                 <div className="full">
-                  <PersonPicker label="Nom de la mère" value={mere} onChange={setMere} />
-                </div>
-                <div>
-                  <label className="form-label">Nationalité</label>
+                  <label className="form-label">
+                    {ficheKind === "bebe" ? "Nom de la mère * (si pas de père)" : "Nom de la mère (texte)"}
+                  </label>
                   <input
                     className="form-control"
-                    value={nationalite}
-                    onChange={(e) => setNationalite(e.target.value)}
+                    value={nomMereText}
+                    onChange={(e) => setNomMereText(e.target.value)}
+                    placeholder="Saisie libre"
                   />
                 </div>
-                <div>
-                  <label className="form-label">Pays de résidence</label>
-                  <input
-                    className="form-control"
-                    value={paysResidence}
-                    onChange={(e) => setPaysResidence(e.target.value)}
+                <div className="full">
+                  <PersonPicker
+                    label={ficheKind === "bebe" ? "Lier la mère (optionnel)" : "Nom de la mère (registre)"}
+                    value={mere}
+                    onChange={(p) => {
+                      setMere(p);
+                      if (p) setNomMereText(displayName(p));
+                    }}
                   />
                 </div>
-                <div>
-                  <label className="form-label">Type de handicap</label>
-                  <select
-                    className="form-control"
-                    value={handicap}
-                    onChange={(e) => setHandicap(e.target.value as HandicapType)}
-                  >
-                    {HANDICAP_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {ficheKind !== "bebe" ? (
+                  <>
+                    <div>
+                      <label className="form-label">Nationalité</label>
+                      <input
+                        className="form-control"
+                        value={nationalite}
+                        onChange={(e) => setNationalite(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Pays de résidence</label>
+                      <input
+                        className="form-control"
+                        value={paysResidence}
+                        onChange={(e) => setPaysResidence(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Type de handicap</label>
+                      <select
+                        className="form-control"
+                        value={handicap}
+                        onChange={(e) => setHandicap(e.target.value as HandicapType)}
+                      >
+                        {HANDICAP_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                ) : null}
               </div>
             </fieldset>
 
