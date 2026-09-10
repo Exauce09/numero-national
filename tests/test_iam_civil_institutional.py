@@ -212,6 +212,14 @@ async def test_birth_validate_mention_and_soft_delete_guard(client: AsyncClient)
     )
     assert verify.status_code == 200
     assert verify.json()["status"] == "DOCUMENT_VALIDE"
+    assert verify.json().get("authenticated") is True
+
+    extract = await client.get(f"/api/v1/civil/acts/{act_id}/extract", headers=officer_h)
+    assert extract.status_code == 200, extract.text
+    body = extract.json()
+    assert body["verification_code"] == code
+    assert body["authentication"]
+    assert body["conservation"]["immutable_when_validated"] is True
 
     mention = await client.post(
         "/api/v1/civil/mentions",
@@ -220,8 +228,77 @@ async def test_birth_validate_mention_and_soft_delete_guard(client: AsyncClient)
     )
     assert mention.status_code == 201, mention.text
 
+    mentions = await client.get(f"/api/v1/civil/acts/{act_id}/mentions", headers=officer_h)
+    assert mentions.status_code == 200
+    assert len(mentions.json()) >= 1
+
+    trx = await client.post(
+        "/api/v1/civil/transcriptions",
+        headers=officer_h,
+        json={
+            "source_act_ref": "ACTE-EXT-001",
+            "source_place": "Lubumbashi",
+            "source_authority": "État civil Lubumbashi",
+            "resulting_act_id": act_id,
+        },
+    )
+    assert trx.status_code == 201, trx.text
+
     delete = await client.delete(f"/api/v1/civil/acts/{act_id}", headers=officer_h)
     assert delete.status_code == 403, delete.text
+
+
+@pytest.mark.asyncio
+async def test_bureau_scope_blocks_civil_write(client: AsyncClient) -> None:
+    admin_h = await _admin(client)
+    b1 = await client.post(
+        "/api/v1/iam/bureaux",
+        headers=admin_h,
+        json={"code": f"B1-{uuid.uuid4().hex[:4]}", "name": "Bureau 1"},
+    )
+    b2 = await client.post(
+        "/api/v1/iam/bureaux",
+        headers=admin_h,
+        json={"code": f"B2-{uuid.uuid4().hex[:4]}", "name": "Bureau 2"},
+    )
+    assert b1.status_code == 201 and b2.status_code == 201, (b1.text, b2.text)
+    id1, id2 = b1.json()["id"], b2.json()["id"]
+
+    officer_h, _ = await _register_role(client, "CIVIL_OFFICER")
+    me = (await client.get("/api/v1/auth/me", headers=officer_h)).json()
+    await client.post(
+        "/api/v1/iam/scopes",
+        headers=admin_h,
+        json={
+            "user_id": me["id"],
+            "scope_type": "BUREAU",
+            "bureau_id": id1,
+        },
+    )
+
+    blocked = await client.post(
+        "/api/v1/civil/births",
+        headers=officer_h,
+        json={
+            "commune_code": "KIN-LING",
+            "bureau_id": id2,
+            "payload": {"prenom": "Test"},
+            "status": "DRAFT",
+        },
+    )
+    assert blocked.status_code == 403, blocked.text
+
+    ok = await client.post(
+        "/api/v1/civil/births",
+        headers=officer_h,
+        json={
+            "commune_code": "KIN-GOMBE",
+            "bureau_id": id1,
+            "payload": {"prenom": "Ok"},
+            "status": "DRAFT",
+        },
+    )
+    assert ok.status_code in {200, 201}, ok.text
 
 
 @pytest.mark.asyncio

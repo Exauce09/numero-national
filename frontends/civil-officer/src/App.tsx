@@ -51,6 +51,7 @@ import CardDeliveryPage from "./pages/CardDeliveryPage";
 import ActsPage from "./pages/ActsPage";
 import SearchPage from "./pages/SearchPage";
 import DeclarationsPage from "./pages/DeclarationsPage";
+import TranscriptionsPage from "./pages/TranscriptionsPage";
 import HealthDashboardPage from "./pages/HealthDashboardPage";
 import HealthBirthsPage from "./pages/HealthBirthsPage";
 import HealthDeathsPage from "./pages/HealthDeathsPage";
@@ -617,6 +618,9 @@ function Shell() {
           <NavLink to="/declarations">
             <IconClipboard size={18} /> Déclarations santé
           </NavLink>
+          <NavLink to="/transcriptions">
+            <IconFile size={18} /> Transcriptions
+          </NavLink>
           <NavLink to="/admin/bureaux">
             <IconHome size={18} /> Bureaux EC
           </NavLink>
@@ -740,6 +744,7 @@ function Shell() {
             <Route path="/cartes-livraison" element={<CardDeliveryPage />} />
             <Route path="/acts" element={<ActsPage />} />
             <Route path="/declarations" element={<DeclarationsPage />} />
+            <Route path="/transcriptions" element={<TranscriptionsPage />} />
             <Route path="/admin/bureaux" element={<BureauxPage />} />
             <Route path="/admin/personnel" element={<PersonnelPage />} />
             <Route path="/admin/account-requests" element={<AccountRequestsPage />} />

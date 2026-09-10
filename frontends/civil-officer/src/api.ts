@@ -237,6 +237,25 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  createTranscription: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>("/civil/transcriptions", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getOfficialExtract: (actId: string) =>
+    request<{
+      act: CivilAct;
+      mentions: Array<Record<string, unknown>>;
+      verification_code: string | null;
+      qr: Record<string, unknown> | null;
+      authentication: Record<string, unknown> | null;
+      conservation: Record<string, unknown>;
+    }>(`/civil/acts/${actId}/extract`),
+  transitionAct: (actId: string, body: Record<string, unknown>) =>
+    request<CivilAct>(`/civil/acts/${actId}/transition`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };
 
 /** Stockage local de démo quand l'API est indisponible. */

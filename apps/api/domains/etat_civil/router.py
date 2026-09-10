@@ -32,11 +32,14 @@ from apps.api.domains.etat_civil.schemas import (
     FiliationRead,
     MentionCreate,
     MentionRead,
+    OfficialExtract,
     PopulationHit,
     PopulationSearchQuery,
     ResidenceCreate,
     ResidenceRead,
     StatsByActType,
+    TranscriptionCreate,
+    TranscriptionRead,
 )
 from apps.api.domains.etat_civil import services
 
@@ -123,6 +126,37 @@ async def get_act(
     if act is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Act not found")
     return CivilActRead.model_validate(act)
+
+
+@router.get("/acts/{act_id}/extract", response_model=OfficialExtract)
+async def get_official_extract(
+    act_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _: Principal = Depends(require_permissions(PERM_CIVIL_READ)),
+) -> OfficialExtract:
+    """Extrait officiel : acte + mentions marginales + QR + cachet."""
+    data = await services.get_official_extract(db, act_id)
+    return OfficialExtract(
+        act=CivilActRead.model_validate(data["act"]),
+        mentions=[MentionRead.model_validate(m) for m in data["mentions"]],
+        verification_code=data["verification_code"],
+        qr=data["qr"],
+        authentication=data["authentication"],
+        conservation=data["conservation"],
+    )
+
+
+@router.get("/acts/{act_id}/mentions", response_model=list[MentionRead])
+async def list_act_mentions(
+    act_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _: Principal = Depends(require_permissions(PERM_CIVIL_READ)),
+) -> list[MentionRead]:
+    act = await services.get_act(db, act_id)
+    if act is None or act.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Act not found")
+    rows = await services.list_mentions_for_act(db, act_id)
+    return [MentionRead.model_validate(r) for r in rows]
 
 
 # Typed act collections
@@ -266,7 +300,14 @@ async def transition_act(
     principal: Principal = Depends(require_permissions(PERM_CIVIL_VALIDATE)),
 ) -> CivilActRead:
     act = await services.transition_act_status(
-        db, act_id, body.status.value, actor_id=principal.actor_id
+        db,
+        act_id,
+        body.status.value,
+        actor_id=principal.actor_id,
+        officer_name=body.officer_name,
+        officer_matricule=body.officer_matricule,
+        seal_ref=body.seal_ref,
+        signature_ref=body.signature_ref,
     )
     return CivilActRead.model_validate(act)
 
@@ -317,6 +358,28 @@ async def create_filiation(
         actor_id=principal.actor_id,
     )
     return FiliationRead.model_validate(row)
+
+
+@router.post("/transcriptions", response_model=TranscriptionRead, status_code=status.HTTP_201_CREATED)
+async def create_transcription(
+    body: TranscriptionCreate,
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(require_permissions(PERM_CIVIL_WRITE)),
+) -> TranscriptionRead:
+    row = await services.create_transcription(
+        db,
+        source_act_ref=body.source_act_ref,
+        source_place=body.source_place,
+        source_authority=body.source_authority,
+        source_date=body.source_date,
+        source_number=body.source_number,
+        bureau_id=body.bureau_id,
+        citizen_id=body.citizen_id,
+        resulting_act_id=body.resulting_act_id,
+        status=body.status,
+        actor_id=principal.actor_id,
+    )
+    return TranscriptionRead.model_validate(row)
 
 
 @router.get("/persons/{citizen_id}/history")

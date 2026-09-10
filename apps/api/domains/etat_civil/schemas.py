@@ -70,10 +70,6 @@ class CivilActRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class ActTransitionRequest(BaseModel):
-    status: ActStatus
-
-
 class MentionCreate(BaseModel):
     target_act_id: UUID
     mention_type: str
@@ -119,6 +115,52 @@ class FiliationRead(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class TranscriptionCreate(BaseModel):
+    source_act_ref: str = Field(min_length=2, max_length=255)
+    source_place: str | None = None
+    source_authority: str | None = None
+    source_date: str | None = None  # YYYY-MM-DD
+    source_number: str | None = None
+    bureau_id: UUID | None = None
+    citizen_id: UUID | None = None
+    resulting_act_id: UUID | None = None
+    status: str = "REGISTERED"
+
+
+class TranscriptionRead(BaseModel):
+    id: UUID
+    source_act_ref: str
+    source_place: str | None
+    source_authority: str | None
+    source_date: Any | None
+    source_number: str | None
+    bureau_id: UUID | None
+    citizen_id: UUID | None
+    resulting_act_id: UUID | None
+    status: str
+    created_by: UUID | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ActTransitionRequest(BaseModel):
+    status: ActStatus
+    officer_name: str | None = None
+    officer_matricule: str | None = None
+    seal_ref: str | None = None
+    signature_ref: str | None = None
+
+
+class OfficialExtract(BaseModel):
+    act: CivilActRead
+    mentions: list[MentionRead]
+    verification_code: str | None
+    qr: dict[str, Any] | None = None
+    authentication: dict[str, Any] | None = None
+    conservation: dict[str, Any]
 
 
 class DocumentVerifyRequest(BaseModel):

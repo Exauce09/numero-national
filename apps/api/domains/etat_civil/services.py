@@ -36,6 +36,68 @@ def _act_number(prefix: str, commune_code: str) -> str:
     return f"{prefix}-{commune_code}-{stamp}-{short}"
 
 
+async def resolve_and_enforce_bureau(
+    db: AsyncSession,
+    *,
+    actor_id: uuid.UUID | None,
+    bureau_id: uuid.UUID | None,
+) -> uuid.UUID | None:
+    """Auto-fill bureau from active assignment; enforce territorial scope when set."""
+    from fastapi import HTTPException
+
+    from apps.api.domains.identity.iam_services import (
+        get_active_assignment_for_user,
+        load_user_with_rbac,
+        user_has_bureau_access,
+    )
+
+    resolved = bureau_id
+    if actor_id is None:
+        return resolved
+
+    user = await load_user_with_rbac(db, actor_id)
+    if user is None:
+        return resolved
+
+    if resolved is None:
+        assignment = await get_active_assignment_for_user(db, user)
+        if assignment is not None:
+            resolved = assignment.bureau_id
+
+    if resolved is not None and not await user_has_bureau_access(db, user, resolved):
+        raise HTTPException(status_code=403, detail="Bureau hors périmètre d'affectation / scope")
+    return resolved
+
+
+def _attach_authentication(
+    act: CivilAct,
+    *,
+    actor_id: uuid.UUID | None,
+    officer_name: str | None = None,
+    officer_matricule: str | None = None,
+    seal_ref: str | None = None,
+    signature_ref: str | None = None,
+    at: datetime | None = None,
+) -> None:
+    """Cachet / signature officier — bloc immuable dans le payload à la validation."""
+    now = at or datetime.now(UTC)
+    payload = dict(act.payload or {})
+    auth = {
+        "officer_id": str(actor_id) if actor_id else None,
+        "officer_name": officer_name or payload.get("officer_name") or "Officier d'état civil",
+        "officer_matricule": officer_matricule or "OFFICIER_ETAT_CIVIL",
+        "seal_ref": seal_ref
+        or (f"SEAL-{act.bureau_id}" if act.bureau_id else f"SEAL-{act.commune_code}"),
+        "signature_ref": signature_ref
+        or (f"SIG-{actor_id}" if actor_id else f"SIG-{act.act_number}"),
+        "authenticated_at": now.isoformat(),
+        "act_version": int(act.version or 1),
+    }
+    payload["authentication"] = auth
+    payload["officer_name"] = auth["officer_name"]
+    act.payload = payload
+
+
 async def search_population(
     db: AsyncSession,
     query: PopulationSearchQuery,
@@ -111,6 +173,11 @@ async def create_act(
         )
     if data.act_type.value not in ACT_TYPES_ENABLED:
         raise HTTPException(status_code=400, detail=f"Act type {data.act_type.value} disabled by config")
+
+    bureau_id = await resolve_and_enforce_bureau(
+        db, actor_id=actor_id, bureau_id=getattr(data, "bureau_id", None)
+    )
+
     prefix = data.act_type.value[:3]
     number = data.act_number or _act_number(prefix, data.commune_code)
     payload = dict(data.payload or {})
@@ -131,12 +198,13 @@ async def create_act(
         payload=payload,
         created_by=actor_id,
         verification_code=uuid.uuid4().hex[:16].upper(),
-        bureau_id=getattr(data, "bureau_id", None),
+        bureau_id=bureau_id,
     )
     if data.status == ActStatus.VALIDATED:
         act.issued_at = datetime.now(UTC)
         act.validated_by = actor_id
         act.registered_at = act.issued_at
+        _attach_authentication(act, actor_id=actor_id, at=act.issued_at)
     db.add(act)
     await db.flush()
     # QR = référence signée vers l'acte (pas de PII)
@@ -162,6 +230,10 @@ async def transition_act_status(
     target_status: str,
     *,
     actor_id: uuid.UUID | None = None,
+    officer_name: str | None = None,
+    officer_matricule: str | None = None,
+    seal_ref: str | None = None,
+    signature_ref: str | None = None,
 ) -> CivilAct:
     from fastapi import HTTPException
 
@@ -176,6 +248,9 @@ async def transition_act_status(
             status_code=409,
             detail=f"Illegal transition {act.status} → {target_status}",
         )
+
+    await resolve_and_enforce_bureau(db, actor_id=actor_id, bureau_id=act.bureau_id)
+
     old = act.status
     act.status = target_status
     act.version = int(act.version or 1) + 1
@@ -184,6 +259,23 @@ async def transition_act_status(
         act.issued_at = now
         act.validated_by = actor_id
         act.registered_at = now
+        # Enrich officer name from user profile when omitted.
+        name = officer_name
+        if name is None and actor_id is not None:
+            from apps.api.domains.identity.iam_services import load_user_with_rbac
+
+            user = await load_user_with_rbac(db, actor_id)
+            if user is not None:
+                name = user.full_name
+        _attach_authentication(
+            act,
+            actor_id=actor_id,
+            officer_name=name,
+            officer_matricule=officer_matricule,
+            seal_ref=seal_ref,
+            signature_ref=signature_ref,
+            at=now,
+        )
     if target_status == ActStatus.ARCHIVED.value:
         act.archived_at = now
     await write_audit(
@@ -193,7 +285,7 @@ async def transition_act_status(
         resource_type="civil_act",
         resource_id=str(act.id),
         old_value={"status": old},
-        new_value={"status": target_status},
+        new_value={"status": target_status, "authenticated": target_status == ActStatus.VALIDATED.value},
         commit=False,
     )
     await db.commit()
@@ -253,6 +345,7 @@ async def add_mention(
         raise HTTPException(status_code=404, detail="Target act not found")
     if target.status not in {ActStatus.VALIDATED.value, ActStatus.ARCHIVED.value}:
         raise HTTPException(status_code=409, detail="Mentions only on validated/archived acts")
+    await resolve_and_enforce_bureau(db, actor_id=actor_id, bureau_id=target.bureau_id)
     row = Mention(
         target_act_id=target_act_id,
         mention_type=mention_type,
@@ -319,6 +412,107 @@ async def create_filiation(
     return row
 
 
+async def create_transcription(
+    db: AsyncSession,
+    *,
+    source_act_ref: str,
+    source_place: str | None = None,
+    source_authority: str | None = None,
+    source_date: str | None = None,
+    source_number: str | None = None,
+    bureau_id: uuid.UUID | None = None,
+    citizen_id: uuid.UUID | None = None,
+    resulting_act_id: uuid.UUID | None = None,
+    status: str = "REGISTERED",
+    actor_id: uuid.UUID | None = None,
+) -> Any:
+    from datetime import date as date_cls
+
+    from fastapi import HTTPException
+
+    from apps.api.domains.audit.services import write_audit
+    from apps.api.domains.etat_civil.models import Transcription
+
+    resolved_bureau = await resolve_and_enforce_bureau(db, actor_id=actor_id, bureau_id=bureau_id)
+    parsed_date = None
+    if source_date:
+        try:
+            parsed_date = date_cls.fromisoformat(source_date[:10])
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="source_date must be YYYY-MM-DD") from exc
+
+    if resulting_act_id is not None:
+        target = await get_act(db, resulting_act_id)
+        if target is None or target.deleted_at is not None:
+            raise HTTPException(status_code=404, detail="resulting_act_id not found")
+
+    row = Transcription(
+        source_act_ref=source_act_ref,
+        source_place=source_place,
+        source_authority=source_authority,
+        source_date=parsed_date,
+        source_number=source_number,
+        bureau_id=resolved_bureau,
+        citizen_id=citizen_id,
+        resulting_act_id=resulting_act_id,
+        status=status or "REGISTERED",
+        created_by=actor_id,
+    )
+    db.add(row)
+    await db.flush()
+    await write_audit(
+        db,
+        action="civil.transcription.create",
+        actor_id=actor_id,
+        resource_type="transcription",
+        resource_id=str(row.id),
+        new_value={"source_act_ref": source_act_ref, "bureau_id": str(resolved_bureau) if resolved_bureau else None},
+        commit=False,
+    )
+    await db.commit()
+    await db.refresh(row)
+    return row
+
+
+async def list_mentions_for_act(db: AsyncSession, act_id: uuid.UUID) -> list[Any]:
+    from apps.api.domains.etat_civil.models import Mention
+
+    stmt = (
+        select(Mention)
+        .where(Mention.target_act_id == act_id)
+        .order_by(Mention.created_at.asc())
+    )
+    return list((await db.execute(stmt)).scalars().all())
+
+
+async def get_official_extract(db: AsyncSession, act_id: uuid.UUID) -> dict[str, Any]:
+    from fastapi import HTTPException
+
+    act = await get_act(db, act_id)
+    if act is None or act.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Act not found")
+    mentions = await list_mentions_for_act(db, act_id)
+    payload = dict(act.payload or {})
+    qr = payload.get("qr") if isinstance(payload.get("qr"), dict) else None
+    authentication = payload.get("authentication") if isinstance(payload.get("authentication"), dict) else None
+    return {
+        "act": act,
+        "mentions": mentions,
+        "verification_code": act.verification_code,
+        "qr": qr,
+        "authentication": authentication,
+        "conservation": {
+            "status": act.status,
+            "version": int(act.version or 1),
+            "registered_at": act.registered_at.isoformat() if act.registered_at else None,
+            "archived_at": act.archived_at.isoformat() if act.archived_at else None,
+            "deleted": act.deleted_at is not None,
+            "immutable_when_validated": act.status
+            in {ActStatus.VALIDATED.value, ActStatus.ARCHIVED.value},
+        },
+    }
+
+
 async def person_civil_history(db: AsyncSession, citizen_id: uuid.UUID) -> list[dict[str, Any]]:
     """Chronologie dérivée des actes (pas un champ texte manuel)."""
     stmt = (
@@ -370,12 +564,19 @@ async def verify_document_code(db: AsyncSession, code: str) -> dict[str, Any]:
     )
     if act is None or act.status not in {ActStatus.VALIDATED.value, ActStatus.ARCHIVED.value}:
         return {"status": "DOCUMENT_INVALIDE"}
+    mentions = await list_mentions_for_act(db, act.id)
+    payload = dict(act.payload or {})
+    auth = payload.get("authentication") if isinstance(payload.get("authentication"), dict) else {}
     return {
         "status": "DOCUMENT_VALIDE",
         "act_type": act.act_type,
         "act_number": act.act_number,
         "commune_code": act.commune_code,
         "issued_at": act.issued_at.isoformat() if act.issued_at else None,
+        "mentions_count": len(mentions),
+        "authenticated": bool(auth),
+        "officer_matricule": auth.get("officer_matricule"),
+        "seal_ref": auth.get("seal_ref"),
     }
 
 

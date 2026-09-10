@@ -7,7 +7,7 @@ PERSONNEL → AFFECTATION (bureau/fonction) → COMPTE → RÔLE → PERMISSIONS
                                                                       ↓
                                                               AUDIT (append-only)
 
-ÉTAT CIVIL: civil_acts (+ bureau_id, verification_code, soft delete)
+ÉTAT CIVIL: civil_acts (+ bureau_id, verification_code, soft delete, authentication payload)
             filiations / mentions / transcriptions / declarants / documents_justificatifs
 ```
 
@@ -36,13 +36,25 @@ Ne pas présenter ces valeurs comme obligations du Code de la famille sans sourc
 ### État civil — `/api/v1/civil`
 
 - Actes typés (births, marriages, divorces, deaths, …)
-- `POST /acts/{id}/transition` — machine d’états
+- `POST /acts/{id}/transition` — machine d’états (+ cachet/signature officier à `VALIDATED`)
+- `GET /acts/{id}/extract` — extrait officiel (acte + mentions + QR + conservation)
+- `GET /acts/{id}/mentions`
 - `DELETE /acts/{id}` — soft delete (interdit si VALIDATED)
-- `POST /mentions`, `POST /filiations`
+- `POST /mentions`, `POST /filiations`, `POST /transcriptions`
 - `GET /persons/{citizen_id}/history`
-- `POST /documents/verify` — public, réponse minimale
+- `POST /documents/verify` — public, réponse minimale (+ mentions_count, cachet)
 - `GET /config`
 - Écriture `DISPLACEMENT` / `CENSUS` / `RESIDENCE_ATTESTATION` **refusée** (modules futurs)
+- Scope bureau : auto-affectation + refus 403 hors périmètre sur écritures / transitions / mentions / transcriptions
+
+## Authentification d’acte (cachet)
+
+À la validation, le payload reçoit un bloc `authentication` :
+
+- `officer_id`, `officer_name`, `officer_matricule`
+- `seal_ref`, `signature_ref`, `authenticated_at`, `act_version`
+
+Affiché sur l’extrait UI (`ActPrintCard`) et contrôlé via `/documents/verify`.
 
 ## Rôles institutionnels (seed)
 
@@ -55,8 +67,9 @@ Pas d’auto-attribution de rôles privilégiés.
 ## UI civil-officer
 
 - `/admin/bureaux`, `/admin/personnel`, `/admin/account-requests`
-- `/verify-document`
+- `/transcriptions`, `/verify-document`
 - Sync API obligatoire pour naissances/mariages/divorces/décès/adoptions si JWT présent
+  (QR / `verification_code` serveur réinjectés dans le registre local)
 
 ## Migrations
 

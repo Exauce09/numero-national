@@ -542,22 +542,29 @@ function nextActNumber(type: ActType): string {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}`;
 }
 
-async function tryPostCivil(type: ActType, payload: Record<string, unknown>): Promise<void> {
+async function tryPostCivil(
+  type: ActType,
+  payload: Record<string, unknown>
+): Promise<Record<string, unknown> | null> {
   const session = getSession();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (session?.accessToken) headers.Authorization = `Bearer ${session.accessToken}`;
   const core: ActType[] = ["BIRTH", "MARRIAGE", "DIVORCE", "DEATH", "ADOPTION", "RECOGNITION", "RECTIFICATION"];
+  // Types hors état civil authentique : pas d'écriture API (source de vérité locale uniquement).
+  if (!core.includes(type)) return null;
   const res = await fetch(`${API_BASE}/civil/${ACT_ENDPOINT[type]}`, {
     method: "POST",
     headers,
     body: JSON.stringify({ commune_code: COMMUNE_CODE, payload, status: "DRAFT" }),
   });
   if (!res.ok) {
-    if (session?.accessToken && core.includes(type)) {
+    if (session?.accessToken) {
       const detail = await res.text();
       throw new Error(detail || `Sync API état civil échouée (${res.status})`);
     }
+    return null;
   }
+  return (await res.json()) as Record<string, unknown>;
 }
 
 export async function addAct(
@@ -590,7 +597,46 @@ export async function addAct(
   const session = getSession();
   const core: ActType[] = ["BIRTH", "MARRIAGE", "DIVORCE", "DEATH", "ADOPTION", "RECOGNITION", "RECTIFICATION"];
   try {
-    await tryPostCivil(type, { ...payload, act_number, national_id: subjectNic, commune_code: COMMUNE_CODE });
+    const server = await tryPostCivil(type, {
+      ...payload,
+      act_number,
+      national_id: subjectNic,
+      commune_code: COMMUNE_CODE,
+    });
+    if (server) {
+      const serverId = String(server.id ?? id);
+      const serverNumber = String(server.act_number ?? act_number);
+      const serverPayload = (server.payload as Record<string, unknown>) ?? {};
+      const verification = server.verification_code ? String(server.verification_code) : undefined;
+      const nextPayload = {
+        ...payload,
+        ...serverPayload,
+        verification_code: verification,
+        server_act_id: serverId,
+      };
+      const qr =
+        serverPayload.qr && typeof serverPayload.qr === "object"
+          ? JSON.stringify(serverPayload.qr)
+          : JSON.stringify({
+              act_id: serverId,
+              act_number: serverNumber,
+              national_id: subjectNic,
+              verification_code: verification,
+            });
+      const idx = registry.acts.findIndex((a) => a.id === id);
+      if (idx >= 0) {
+        registry.acts[idx] = {
+          ...registry.acts[idx],
+          id: serverId,
+          act_number: serverNumber,
+          qr_payload: qr,
+          payload: nextPayload,
+          updated_at: new Date().toISOString(),
+        };
+        save(registry);
+        return registry.acts[idx];
+      }
+    }
   } catch (err) {
     if (session?.accessToken && core.includes(type)) {
       registry.acts = registry.acts.filter((a) => a.id !== id);
