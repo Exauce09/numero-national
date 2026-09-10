@@ -84,9 +84,43 @@ async def refresh_aggregates(db: AsyncSession, period: str | None = None) -> Ref
             await _count(db, "SELECT COUNT(*) FROM etat_civil.civil_acts"),
         ),
         (
+            "civil.births",
+            {"source": "etat_civil"},
+            await _count(
+                db,
+                "SELECT COUNT(*) FROM etat_civil.civil_acts WHERE act_type = 'BIRTH'",
+            ),
+        ),
+        (
+            "civil.deaths",
+            {"source": "etat_civil"},
+            await _count(
+                db,
+                "SELECT COUNT(*) FROM etat_civil.civil_acts WHERE act_type = 'DEATH'",
+            ),
+        ),
+        (
+            "civil.marriages",
+            {"source": "etat_civil"},
+            await _count(
+                db,
+                "SELECT COUNT(*) FROM etat_civil.civil_acts WHERE act_type = 'MARRIAGE'",
+            ),
+        ),
+        (
             "health.birth_notifications",
             {"source": "health"},
             await _count(db, "SELECT COUNT(*) FROM health.birth_notifications"),
+        ),
+        (
+            "health.death_notifications",
+            {"source": "health"},
+            await _count(db, "SELECT COUNT(*) FROM health.death_notifications"),
+        ),
+        (
+            "health.facilities",
+            {"source": "health"},
+            await _count(db, "SELECT COUNT(*) FROM health.health_facilities"),
         ),
     ]
 
@@ -128,6 +162,9 @@ async def gov_domain_view(
         return {"error": "unknown_domain", "domain": domain}
 
     metrics = await list_metrics(db)
+    if not metrics:
+        await refresh_aggregates(db)
+        metrics = await list_metrics(db)
     filtered = [
         {
             "metric_key": m.metric_key,
@@ -144,6 +181,8 @@ async def gov_domain_view(
         "domain": domain,
         "pii_policy": "aggregates_only",
         "metrics": filtered,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "source": "postgresql",
     }
 
 
@@ -186,9 +225,8 @@ async def relying_party_verify(
                 citizen_status = "NOT_FOUND"
         except Exception:
             await db.rollback()
-            # Demo: accept NIC format length only
-            verified = len(req.nic) >= 10
-            citizen_status = "ACTIVE" if verified else "INVALID"
+            verified = False
+            citizen_status = "UNAVAILABLE"
 
     if "status" in requested:
         claims["status"] = citizen_status

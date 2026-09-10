@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BarChart, GroupedBarChart, PieChart } from "../components/Charts";
 import ExportToolbar from "../components/ExportToolbar";
+import { fetchGovOverview, metricValue } from "../govApi";
 import {
   STATUS_LABELS,
   dashboardKpis,
@@ -22,15 +23,35 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [tick, setTick] = useState(0);
   const [live, setLive] = useState(true);
+  const [apiPop, setApiPop] = useState(0);
+  const [apiCivil, setApiCivil] = useState(0);
+  const [apiHealth, setApiHealth] = useState(0);
+  const [apiCards, setApiCards] = useState(0);
+  const [apiSource, setApiSource] = useState("…");
   const snap = useMemo(() => getPrimatureSnapshot(), [tick]);
   const kpi = useMemo(() => dashboardKpis(), [tick]);
   const trends = useMemo(() => monthlyCoordinationTrends(), [tick]);
+
+  useEffect(() => {
+    void fetchGovOverview("primature").then((g) => {
+      setApiPop(metricValue(g.metrics, "population.total"));
+      setApiCivil(metricValue(g.metrics, "civil.acts.total"));
+      setApiHealth(metricValue(g.metrics, "health.birth_notifications"));
+      setApiCards(metricValue(g.metrics, "cards.active"));
+      setApiSource(g.source);
+    });
+  }, [tick]);
 
   useEffect(() => {
     if (!live) return;
     const id = window.setInterval(() => setTick((n) => n + 1), 45000);
     return () => window.clearInterval(id);
   }, [live]);
+
+  const population = apiPop || kpi.population;
+  const civilActs = apiCivil || kpi.civil_acts;
+  const health = apiHealth || kpi.health;
+  const cards = apiCards || kpi.cards;
 
   const statusPie = Object.entries(
     snap.ministries.reduce<Record<string, number>>((acc, m) => {
@@ -50,15 +71,16 @@ export default function DashboardPage() {
   }));
 
   const kpiRows = [
-    { indicateur: "Population consolidée", valeur: kpi.population },
-    { indicateur: "Actes état civil (mois)", valeur: kpi.civil_acts },
-    { indicateur: "Déclarations santé (mois)", valeur: kpi.health },
-    { indicateur: "Mouvements intérieur (mois)", valeur: kpi.movements },
-    { indicateur: "Cartes actives", valeur: kpi.cards },
+    { indicateur: "Population consolidée", valeur: population },
+    { indicateur: "Actes état civil", valeur: civilActs },
+    { indicateur: "Déclarations santé", valeur: health },
+    { indicateur: "Mouvements intérieur", valeur: kpi.movements },
+    { indicateur: "Cartes actives", valeur: cards },
     { indicateur: "Ministères nominaux", valeur: kpi.ministries_ok },
     { indicateur: "Ministères en attention", valeur: kpi.ministries_attention },
     { indicateur: "Alertes ouvertes", valeur: kpi.alerts_open },
     { indicateur: "Dossiers ouverts", valeur: kpi.dossiers_open },
+    { indicateur: "Source API", valeur: apiSource },
     { indicateur: "Mis à jour", valeur: kpi.updated_at },
   ];
 
@@ -68,7 +90,7 @@ export default function DashboardPage() {
         <div>
           <h2 className="page-title">Tableau de bord — Primature</h2>
           <p className="page-lead">
-            Lecture consolidée des données du système qui concernent la coordination gouvernementale (sans modification métier).
+            Agrégats PostgreSQL uniquement (pas de simulation). Source : {apiSource}.
           </p>
         </div>
         <div className="page-actions no-print">

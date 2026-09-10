@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { api } from "../../api";
 import { BarChart, GroupedBarChart, HorizontalBarChart, PieChart } from "../../components/Charts";
 import { FACILITY_TYPE_LABELS, getMinistryDashboard, listMinistryDeclarations } from "../../santeData";
 
@@ -23,41 +24,72 @@ function Metric({
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [tick, setTick] = useState(0);
-  const dash = useMemo(() => getMinistryDashboard(), [tick]);
+  const [apiBirths, setApiBirths] = useState<number | null>(null);
+  const [apiDeaths, setApiDeaths] = useState<number | null>(null);
+  const [apiFacilities, setApiFacilities] = useState<number | null>(null);
+  const [source, setSource] = useState("local");
+
+  const dashLocal = useMemo(() => getMinistryDashboard(), [tick]);
   const decls = useMemo(() => listMinistryDeclarations(), [tick]);
 
-  const typePie = Object.entries(dash.by_type).map(([type, value]) => ({
+  useEffect(() => {
+    void (async () => {
+      const [stats, facilities] = await Promise.all([api.healthStats(), api.healthFacilities()]);
+      const births = Number(
+        stats.birth_notifications ?? stats.births_declared ?? 0,
+      );
+      const deaths = Number(
+        stats.death_notifications ?? stats.deaths_declared ?? 0,
+      );
+      const fac =
+        Number(stats.facilities_count ?? stats.facilities ?? 0) || facilities.length;
+      setApiBirths(births);
+      setApiDeaths(deaths);
+      setApiFacilities(fac);
+      setSource(fac + births + deaths > 0 || facilities.length > 0 ? "postgresql" : dashLocal.source);
+    })();
+  }, [tick, dashLocal.source]);
+
+  const births = apiBirths ?? dashLocal.births;
+  const deaths = apiDeaths ?? dashLocal.deaths;
+  const facilitiesTotal = apiFacilities ?? dashLocal.facilities_total;
+
+  const typePie = Object.entries(dashLocal.by_type).map(([type, value]) => ({
     label: FACILITY_TYPE_LABELS[type] ?? type,
     value,
   }));
 
   const statusPie = [
-    { label: "En attente", value: dash.pending, color: "#c9a227" },
-    { label: "Validés", value: dash.validated, color: "#1a5f4a" },
-    { label: "Rejetés", value: dash.rejected, color: "#b03a3a" },
+    { label: "En attente", value: dashLocal.pending, color: "#c9a227" },
+    { label: "Validés", value: dashLocal.validated, color: "#1a5f4a" },
+    { label: "Rejetés", value: dashLocal.rejected, color: "#b03a3a" },
   ];
 
   const eventsBar = [
-    { label: "Naissances", value: dash.births, color: "#2d7a5f" },
-    { label: "Décès", value: dash.deaths, color: "#8a4b1a" },
-    { label: "Structures", value: dash.facilities_total, color: "#3b6ea5" },
+    { label: "Naissances", value: births, color: "#2d7a5f" },
+    { label: "Décès", value: deaths, color: "#8a4b1a" },
+    { label: "Structures", value: facilitiesTotal, color: "#3b6ea5" },
   ];
 
   const birthSex = [
     {
       label: "Garçons",
-      value: decls.filter((d) => d.declaration_type === "BIRTH" && String(d.sexe ?? "M").toUpperCase() !== "F").length,
+      value: decls.filter(
+        (d) => d.declaration_type === "BIRTH" && String(d.sexe ?? "M").toUpperCase() !== "F",
+      ).length,
       color: "#3b6ea5",
     },
     {
       label: "Filles",
-      value: decls.filter((d) => d.declaration_type === "BIRTH" && String(d.sexe ?? "").toUpperCase() === "F").length,
+      value: decls.filter(
+        (d) => d.declaration_type === "BIRTH" && String(d.sexe ?? "").toUpperCase() === "F",
+      ).length,
       color: "#c45d8a",
     },
   ];
 
-  const provinces = dash.by_province.slice(0, 8);
-  const facilityBars = Object.entries(dash.by_type).map(([type, value]) => ({
+  const provinces = dashLocal.by_province.slice(0, 8);
+  const facilityBars = Object.entries(dashLocal.by_type).map(([type, value]) => ({
     label: FACILITY_TYPE_LABELS[type] ?? type,
     value,
   }));
@@ -68,7 +100,8 @@ export default function DashboardPage() {
         <div>
           <h2 className="page-title">Tableau de bord — Santé</h2>
           <p className="page-lead">
-            Vue nationale dynamique avec indicateurs et graphiques (histogrammes, camemberts, barres).
+            Indicateurs issus des enregistrements réels (API PostgreSQL + déclarations saisies). Source :{" "}
+            {source}.
           </p>
         </div>
         <button type="button" className="btn-secondary btn-sm" onClick={() => setTick((n) => n + 1)}>
@@ -77,95 +110,26 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid">
-        <Metric
-          label="Structures sanitaires"
-          value={dash.facilities_total.toLocaleString("fr-FR")}
-          onClick={() => navigate("/sante/structures")}
-        />
-        <Metric
-          label="Structures actives"
-          value={dash.facilities_active.toLocaleString("fr-FR")}
-          onClick={() => navigate("/sante/structures")}
-        />
-        <Metric
-          label="Naissances déclarées"
-          value={dash.births.toLocaleString("fr-FR")}
-          onClick={() => navigate("/sante/synoptique/naissances")}
-        />
-        <Metric
-          label="Décès déclarés"
-          value={dash.deaths.toLocaleString("fr-FR")}
-          onClick={() => navigate("/sante/synoptique/deces")}
-        />
-        <Metric
-          label="En attente état civil"
-          value={dash.pending.toLocaleString("fr-FR")}
-          onClick={() => navigate("/sante/declarations")}
-        />
-        <Metric
-          label="Validés"
-          value={dash.validated.toLocaleString("fr-FR")}
-          onClick={() => navigate("/sante/declarations")}
-        />
+        <Metric label="Structures" value={facilitiesTotal} onClick={() => navigate("/structures")} />
+        <Metric label="Naissances" value={births} onClick={() => navigate("/declarations")} />
+        <Metric label="Décès" value={deaths} onClick={() => navigate("/declarations")} />
+        <Metric label="En attente" value={dashLocal.pending} onClick={() => navigate("/declarations")} />
       </div>
 
-      <div className="chart-grid" style={{ marginTop: "1rem" }}>
-        <PieChart title="Répartition des structures (camembert)" data={typePie} />
-        <PieChart title="Statut des déclarations (donut)" data={statusPie} donut />
-        <BarChart title="Histogramme — activité nationale" data={eventsBar} />
-        <PieChart title="Naissances par sexe" data={birthSex} />
-      </div>
-
-      <div className="chart-grid" style={{ marginTop: "1rem" }}>
+      <div className="charts-grid" style={{ marginTop: "1.25rem" }}>
+        <PieChart title="Types de structures (enregistrées)" data={typePie} />
+        <PieChart title="Statut déclarations" data={statusPie} />
+        <BarChart title="Événements" data={eventsBar} />
+        <BarChart title="Naissances par sexe (déclarations)" data={birthSex} />
+        <HorizontalBarChart
+          title="Par province"
+          data={provinces.map((p) => ({ label: p.province, value: p.births + p.deaths }))}
+        />
         <GroupedBarChart
-          title="Histogramme groupé — naissances & décès par province"
-          categories={provinces.map((p) => p.province)}
-          series={[
-            { name: "Naissances", color: "#1a5f4a", values: provinces.map((p) => p.births) },
-            { name: "Décès", color: "#8a4b1a", values: provinces.map((p) => p.deaths) },
-          ]}
+          title="Structures par type"
+          series={[{ name: "Structures", color: "#3b6ea5", values: facilityBars.map((f) => f.value) }]}
+          labels={facilityBars.map((f) => f.label)}
         />
-        <HorizontalBarChart title="Structures par type (barres horizontales)" data={facilityBars} />
-      </div>
-
-      <div className="panel" style={{ marginTop: "1rem" }}>
-        <div className="panel-head">
-          <h3 className="panel-title" style={{ margin: 0 }}>
-            Dernières déclarations
-          </h3>
-          <button type="button" className="btn-secondary btn-sm" onClick={() => navigate("/sante/declarations")}>
-            Tout voir
-          </button>
-        </div>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Structure</th>
-              <th>Résumé</th>
-              <th>Statut</th>
-              <th>Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {dash.recent.map((d) => (
-              <tr key={d.id}>
-                <td>{d.declaration_type === "BIRTH" ? "Naissance" : "Décès"}</td>
-                <td>{d.facility_name}</td>
-                <td>{d.summary}</td>
-                <td>{d.status}</td>
-                <td>{new Date(d.created_at).toLocaleString("fr-FR")}</td>
-              </tr>
-            ))}
-            {!dash.recent.length ? (
-              <tr>
-                <td colSpan={5} className="muted">
-                  Aucune déclaration — les structures sanitaires alimentent cette file.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BarChart, GroupedBarChart, HorizontalBarChart, PieChart } from "../components/Charts";
 import ExportToolbar from "../components/ExportToolbar";
+import { fetchGovOverview, metricValue } from "../govApi";
 import {
   TYPE_LABELS,
   dashboardKpiRows,
@@ -22,14 +23,33 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [tick, setTick] = useState(0);
   const [live, setLive] = useState(true);
+  const [apiPop, setApiPop] = useState(0);
+  const [apiBirths, setApiBirths] = useState(0);
+  const [apiDeaths, setApiDeaths] = useState(0);
+  const [apiCards, setApiCards] = useState(0);
+  const [apiSource, setApiSource] = useState("…");
   const snap = useMemo(() => getNationalSnapshot(), [tick]);
   const trends = useMemo(() => monthlyTrends(), [tick]);
+
+  useEffect(() => {
+    void fetchGovOverview("presidency").then((g) => {
+      setApiPop(metricValue(g.metrics, "population.total"));
+      setApiBirths(metricValue(g.metrics, "civil.births"));
+      setApiDeaths(metricValue(g.metrics, "civil.deaths"));
+      setApiCards(metricValue(g.metrics, "cards.active"));
+      setApiSource(g.source);
+    });
+  }, [tick]);
 
   useEffect(() => {
     if (!live) return;
     const id = window.setInterval(() => setTick((n) => n + 1), 45000);
     return () => window.clearInterval(id);
   }, [live]);
+
+  const population = apiPop || snap.population_total;
+  const births = apiBirths || snap.births;
+  const deaths = apiDeaths || snap.deaths;
 
   const typePie = Object.entries(
     snap.health_facilities.reduce<Record<string, number>>((acc, f) => {
@@ -44,8 +64,8 @@ export default function DashboardPage() {
   ];
 
   const eventsBar = [
-    { label: "Naissances", value: snap.births, color: "#1a5f4a" },
-    { label: "Décès", value: snap.deaths, color: "#8a4b1a" },
+    { label: "Naissances", value: births, color: "#1a5f4a" },
+    { label: "Décès", value: deaths, color: "#8a4b1a" },
     { label: "Mariages", value: snap.marriages, color: "#3b6ea5" },
     { label: "Divorces", value: snap.divorces, color: "#6b4c9a" },
   ];
@@ -73,7 +93,8 @@ export default function DashboardPage() {
         <div>
           <h2 className="page-title">Tableau de bord — Présidence</h2>
           <p className="page-lead">
-            Pilotage national dynamique : population, état civil, santé et actes — actualisation et exports.
+            Données enregistrées uniquement (PostgreSQL + actes saisis). Source API : {apiSource}.
+            Cartes actives : {apiCards.toLocaleString("fr-FR")}.
           </p>
         </div>
         <div className="page-actions no-print">
@@ -96,11 +117,11 @@ export default function DashboardPage() {
       />
 
       <div className="grid">
-        <Metric label="Population" value={snap.population_total.toLocaleString("fr-FR")} onClick={() => navigate("/population")} />
+        <Metric label="Population" value={population.toLocaleString("fr-FR")} onClick={() => navigate("/population")} />
         <Metric label="États civils" value={snap.civil_offices.length} onClick={() => navigate("/etat-civil")} />
         <Metric label="Structures sanitaires" value={snap.health_facilities.length} onClick={() => navigate("/structures")} />
-        <Metric label="Naissances" value={snap.births.toLocaleString("fr-FR")} onClick={() => navigate("/naissances")} />
-        <Metric label="Décès" value={snap.deaths.toLocaleString("fr-FR")} onClick={() => navigate("/deces")} />
+        <Metric label="Naissances" value={births.toLocaleString("fr-FR")} onClick={() => navigate("/naissances")} />
+        <Metric label="Décès" value={deaths.toLocaleString("fr-FR")} onClick={() => navigate("/deces")} />
         <Metric label="Mariages" value={snap.marriages.toLocaleString("fr-FR")} onClick={() => navigate("/mariages")} />
         <Metric label="Divorces" value={snap.divorces.toLocaleString("fr-FR")} onClick={() => navigate("/divorces")} />
         <Metric label="Documents" value={snap.documents.toLocaleString("fr-FR")} />

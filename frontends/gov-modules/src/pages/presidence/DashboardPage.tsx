@@ -33,19 +33,19 @@ export default function DashboardPage() {
       <div className="grid">
         <Metric
           label="Population"
-          value={Number(pick("population.total") ?? 18500000).toLocaleString("fr-FR")}
+          value={Number(pick("population.total") ?? 0).toLocaleString("fr-FR")}
         />
         <Metric
           label="Naissances"
-          value={Number(pick("civil.births") ?? 24560).toLocaleString("fr-FR")}
+          value={Number(pick("civil.births") ?? pick("civil.acts.total") ?? 0).toLocaleString("fr-FR")}
         />
         <Metric
           label="Cartes actives"
-          value={Number(pick("cards.active") ?? 9400000).toLocaleString("fr-FR")}
+          value={Number(pick("cards.active") ?? 0).toLocaleString("fr-FR")}
         />
         <Metric
           label="Doublons ouverts"
-          value={Number(pick("duplicates.open") ?? 428).toLocaleString("fr-FR")}
+          value={Number(pick("duplicates.open") ?? 0).toLocaleString("fr-FR")}
         />
       </div>
       <div className="panel" style={{ marginTop: "1.25rem" }}>

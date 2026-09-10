@@ -108,47 +108,7 @@ function loadHospitalDeclarations(): DeclRaw[] {
 }
 
 function ensureSeedIfEmpty(): void {
-  const accounts = loadAccounts();
-  if (accounts.length > 0) return;
-  const seed: AccountRaw[] = [
-    {
-      id: "fac-demo-kin-gombe",
-      username: "hopital",
-      facilityName: "Hôpital Général de Référence — Gombe",
-      facilityType: "HOPITAL",
-      commune_code: "KIN-GOMBE",
-      commune_name: "Gombe",
-      province: "Kinshasa",
-      ville: "Kinshasa",
-      active: true,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: "fac-demo-kin-lingwala",
-      username: "clinique.lingwala",
-      facilityName: "Clinique Saint-Joseph — Lingwala",
-      facilityType: "CLINIQUE",
-      commune_code: "KIN-LINGWALA",
-      commune_name: "Lingwala",
-      province: "Kinshasa",
-      ville: "Kinshasa",
-      active: true,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: "fac-demo-kin-masina",
-      username: "cs.masina",
-      facilityName: "Centre de santé — Masina",
-      facilityType: "CS",
-      commune_code: "KIN-MASINA",
-      commune_name: "Masina",
-      province: "Kinshasa",
-      ville: "Kinshasa",
-      active: true,
-      created_at: new Date().toISOString(),
-    },
-  ];
-  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(seed));
+  // No fictitious facilities — empty until real accounts / API data exist.
 }
 
 function toDeclRow(d: DeclRaw): DeclRow {
