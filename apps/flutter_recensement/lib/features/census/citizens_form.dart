@@ -17,7 +17,7 @@ import 'situation_familiale.dart';
 import 'etudes_et_admin.dart';
 
 /// Type de fiche terrain — l’identité obligatoire dépend de ce choix.
-enum FicheKind { personne, bebe, decede }
+enum FicheKind { personne, bebe, decede, marie }
 
 /// Fiche personne — wizard 7 étapes aligné sur le site civil-officer.
 class CitizensFormScreen extends StatefulWidget {
@@ -292,6 +292,12 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
       case 'deceased':
       case 'death':
         return FicheKind.decede;
+      case 'marie':
+      case 'marié':
+      case 'mariee':
+      case 'mariée':
+      case 'married':
+        return FicheKind.marie;
       default:
         return FicheKind.personne;
     }
@@ -301,12 +307,14 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
         FicheKind.personne => 'personne',
         FicheKind.bebe => 'bebe',
         FicheKind.decede => 'decede',
+        FicheKind.marie => 'marie',
       };
 
   String get _ficheKindLabel => switch (_ficheKind) {
         FicheKind.personne => 'Personne vivante',
         FicheKind.bebe => 'Bébé (nouveau-né)',
         FicheKind.decede => 'Personne décédée',
+        FicheKind.marie => 'Marié(e)',
       };
 
   @override
@@ -443,6 +451,17 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             err = 'La date de décès ne peut pas être antérieure à la naissance';
           }
         }
+      case FicheKind.marie:
+        if (nom.isEmpty || prenom.isEmpty || !_validDate(dob)) {
+          err = 'Identité marié(e) : nom, prénom et date de naissance (AAAA-MM-JJ) requis';
+        } else {
+          final cNom = _conjoint.nom.text.trim();
+          final cPrenom = _conjoint.prenom.text.trim();
+          if (!_conjointLocked && (cNom.isEmpty || cPrenom.isEmpty)) {
+            err =
+                'Identité marié(e) : nom et prénom du conjoint(e) requis (ou liez une fiche existante)';
+          }
+        }
     }
 
     if (err != null) {
@@ -490,7 +509,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
       'nom': _nom.text.trim(),
       'postnom': _postnom.text.trim(),
       'prenom': _prenom.text.trim(),
-      'etat_civil': _etatCivil,
+      'etat_civil': _ficheKind == FicheKind.marie ? 'MARIE' : _etatCivil,
       'profession': _profession.text.trim(),
       'lieu_naissance': lieu,
       'geo_naissance': _geoNaissance,
@@ -928,6 +947,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   Widget _buildIdentityBlock() {
     final isBebe = _ficheKind == FicheKind.bebe;
     final isDecede = _ficheKind == FicheKind.decede;
+    final isMarie = _ficheKind == FicheKind.marie;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -942,11 +962,18 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
                     FicheKind.personne => 'Personne vivante',
                     FicheKind.bebe => 'Bébé',
                     FicheKind.decede => 'Décédé(e)',
+                    FicheKind.marie => 'Marié(e)',
                   }),
                   selected: _ficheKind == kind,
                   onSelected: (sel) {
                     if (!sel) return;
-                    setState(() => _ficheKind = kind);
+                    setState(() {
+                      _ficheKind = kind;
+                      if (kind == FicheKind.marie) {
+                        _etatCivil = 'MARIE';
+                        _aConjoint = true;
+                      }
+                    });
                   },
                 ),
             ],
@@ -957,7 +984,9 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
                 ? 'Identité bébé obligatoire (nom, sexe, naissance, mère ou père).'
                 : isDecede
                     ? 'Identité décédé obligatoire (nom, prénom, naissance, décès).'
-                    : 'Identité personne obligatoire (nom, prénom, sexe, naissance).',
+                    : isMarie
+                        ? 'Identité marié(e) obligatoire + conjoint(e) (nom et prénom).'
+                        : 'Identité personne obligatoire (nom, prénom, sexe, naissance).',
             style: const TextStyle(fontSize: 12, color: Color(0xFF5A6A85), height: 1.3),
           ),
         ]),
@@ -999,16 +1028,18 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: _etatCivil,
+                    value: isMarie ? 'MARIE' : _etatCivil,
                     decoration: _dec('État-civil'),
                     items: [
                       for (final o in _etatCivilOptions)
                         DropdownMenuItem(value: o.$1, child: Text(o.$2)),
                     ],
-                    onChanged: (v) => setState(() {
-                      _etatCivil = v ?? 'CELIBATAIRE';
-                      if (_etatCivil == 'MARIE') _aConjoint = true;
-                    }),
+                    onChanged: isMarie
+                        ? null
+                        : (v) => setState(() {
+                              _etatCivil = v ?? 'CELIBATAIRE';
+                              if (_etatCivil == 'MARIE') _aConjoint = true;
+                            }),
                   ),
                 ),
               ],
@@ -1104,6 +1135,30 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             ),
           ],
         ]),
+        if (isMarie)
+          _section('1c. Conjoint(e) *', [
+            const Text(
+              'Obligatoire pour une fiche marié(e). Recherchez une fiche ou saisissez nom et prénom.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF5A6A85), height: 1.3),
+            ),
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: _conjointSearch,
+              decoration: _dec('Rechercher conjoint(e) enregistré(e)'),
+              onChanged: _searchConjoint,
+            ),
+            if (_conjointSuggestions.isNotEmpty)
+              ..._conjointSuggestions.map(
+                (h) => ListTile(
+                  dense: true,
+                  title: Text('${h['nom'] ?? ''} ${h['prenom'] ?? ''}'.trim()),
+                  subtitle: Text(h['date_naissance'] ?? ''),
+                  onTap: () => _applyConjointHit(h),
+                ),
+              ),
+            const SizedBox(height: 8),
+            _memberFields(_conjoint, showTelephone: true, locked: _conjointLocked),
+          ]),
         if (!isBebe) _section('1b. Adresse actuelle', [
           GeoCascadeField(
             preset: GeoCascadePreset.address,

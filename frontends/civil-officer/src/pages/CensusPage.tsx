@@ -67,13 +67,22 @@ const STEPS = [
 ] as const;
 
 type StepId = (typeof STEPS)[number]["id"];
-type FicheKind = "personne" | "bebe" | "decede";
+
+type FicheKind = "personne" | "bebe" | "decede" | "marie";
+
+const FICHE_KIND_OPTIONS: { value: FicheKind; label: string }[] = [
+  { value: "personne", label: "Personne vivante" },
+  { value: "bebe", label: "Bébé (nouveau-né)" },
+  { value: "decede", label: "Personne décédée" },
+  { value: "marie", label: "Marié(e)" },
+];
 
 const CENSUS_DRAFT_KEY = "civil-officer:census-draft";
 
 type CensusDraft = {
   step: StepId;
-  ficheKind: FicheKind;
+  ficheKind?: FicheKind;
+  dateDeces?: string;
   handicap: HandicapType;
   nom: string;
   postnom: string;
@@ -83,13 +92,10 @@ type CensusDraft = {
   profession: string;
   geoNaissance: GeoSelection;
   dateNaissance: string;
-  dateDeces: string;
   hopitalNaissance: string;
   languesParlees: string;
   pereId: string | null;
   mereId: string | null;
-  nomPereText: string;
-  nomMereText: string;
   nationalite: string;
   paysResidence: string;
   geoActuelle: GeoSelection;
@@ -120,6 +126,7 @@ export default function CensusPage() {
   const [searchParams] = useSearchParams();
   const [step, setStep] = useState<StepId>(1);
   const [ficheKind, setFicheKind] = useState<FicheKind>("personne");
+  const [dateDeces, setDateDeces] = useState("");
   const [handicap, setHandicap] = useState<HandicapType>("NORMAL");
   const [nom, setNom] = useState("");
   const [postnom, setPostnom] = useState("");
@@ -129,13 +136,10 @@ export default function CensusPage() {
   const [profession, setProfession] = useState("");
   const [geoNaissance, setGeoNaissance] = useState<GeoSelection>({});
   const [dateNaissance, setDateNaissance] = useState("");
-  const [dateDeces, setDateDeces] = useState("");
   const [hopitalNaissance, setHopitalNaissance] = useState("");
   const [languesParlees, setLanguesParlees] = useState("");
   const [pere, setPere] = useState<Person | null>(null);
   const [mere, setMere] = useState<Person | null>(null);
-  const [nomPereText, setNomPereText] = useState("");
-  const [nomMereText, setNomMereText] = useState("");
   const [nationalite, setNationalite] = useState("Congolaise");
   const [paysResidence, setPaysResidence] = useState("RDC");
   const [geoActuelle, setGeoActuelle] = useState<GeoSelection>({});
@@ -172,6 +176,7 @@ export default function CensusPage() {
       const d = JSON.parse(raw) as CensusDraft;
       setStep(d.step ?? 1);
       setFicheKind(d.ficheKind ?? "personne");
+      setDateDeces(d.dateDeces ?? "");
       setHandicap(d.handicap ?? "NORMAL");
       setNom(d.nom ?? "");
       setPostnom(d.postnom ?? "");
@@ -181,10 +186,7 @@ export default function CensusPage() {
       setProfession(d.profession ?? "");
       setGeoNaissance(d.geoNaissance ?? {});
       setDateNaissance(d.dateNaissance ?? "");
-      setDateDeces(d.dateDeces ?? "");
       setHopitalNaissance(d.hopitalNaissance ?? "");
-      setNomPereText(d.nomPereText ?? "");
-      setNomMereText(d.nomMereText ?? "");
       setLanguesParlees(d.languesParlees ?? "");
       setPere(d.pereId ? getPerson(d.pereId) ?? null : null);
       setMere(d.mereId ? getPerson(d.mereId) ?? null : null);
@@ -314,61 +316,67 @@ export default function CensusPage() {
     };
   }, [step]);
 
-  function isValidDate(raw: string): boolean {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return false;
-    const d = new Date(`${raw}T00:00:00`);
-    if (Number.isNaN(d.getTime())) return false;
-    if (d.getTime() > Date.now()) return false;
-    return true;
-  }
-
-  function validateIdentity(showError = true): boolean {
-    const n = nom.trim();
-    const p = prenom.trim();
-    const mereOk = Boolean(mere) || nomMereText.trim().length > 0;
-    const pereOk = Boolean(pere) || nomPereText.trim().length > 0;
-    let msg: string | null = null;
-
-    if (ficheKind === "personne") {
-      if (!n || !p || !isValidDate(dateNaissance)) {
-        msg = "Identité personne : nom, prénom et date de naissance sont requis.";
-      }
-    } else if (ficheKind === "bebe") {
-      if (!n || !isValidDate(dateNaissance) || (!mereOk && !pereOk)) {
-        msg =
-          "Identité bébé : nom (ou « Enfant de … »), date de naissance, et mère ou père requis.";
-      }
-    } else if (ficheKind === "decede") {
-      if (!n || !p || !isValidDate(dateNaissance) || !isValidDate(dateDeces)) {
-        msg =
-          "Identité décédé : nom, prénom, date de naissance et date de décès sont requis.";
-      } else if (dateDeces < dateNaissance) {
-        msg = "La date de décès ne peut pas être antérieure à la naissance.";
+  function validateIdentity(): boolean {
+    setError(null);
+    if (!nom.trim()) {
+      setError("Identité : le nom est requis.");
+      return false;
+    }
+    if (!dateNaissance) {
+      setError("Identité : la date de naissance est requise.");
+      return false;
+    }
+    if (ficheKind === "personne" || ficheKind === "decede" || ficheKind === "marie") {
+      if (!prenom.trim()) {
+        setError("Identité : le prénom est requis.");
+        return false;
       }
     }
-
-    if (msg) {
-      if (showError) {
-        setError(msg);
-        setStep(1);
+    if (ficheKind === "bebe") {
+      if (!mere && !pere) {
+        setError("Identité bébé : nommez la mère ou le père (recherche personne).");
+        return false;
       }
-      return false;
+    }
+    if (ficheKind === "decede") {
+      if (!dateDeces) {
+        setError("Identité décédé : la date de décès est requise.");
+        return false;
+      }
+      if (dateDeces < dateNaissance) {
+        setError("La date de décès ne peut pas être antérieure à la naissance.");
+        return false;
+      }
+    }
+    if (ficheKind === "marie") {
+      const c = situationFamiliale.conjoint;
+      if (!c.person_id && (!c.nom.trim() || !c.prenom.trim())) {
+        setError("Identité marié(e) : nom et prénom du conjoint(e) requis (ou liez une fiche).");
+        return false;
+      }
     }
     return true;
   }
 
   function validateStep(target: StepId): boolean {
     setError(null);
-    if (target > 1 && !validateIdentity(true)) return false;
+    if (target > 1 && !validateIdentity()) {
+      setStep(1);
+      return false;
+    }
     return true;
   }
 
   function validateFamille(): boolean {
-    const needConjoint = situationFamiliale.a_conjoint || etatCivil === "MARIE";
-    if (needConjoint && !situationFamiliale.conjoint.person_id) {
-      setError("Conjoint(e) : liez une personne enregistrée (recherche obligatoire).");
-      setStep(7);
-      return false;
+    const needConjoint =
+      situationFamiliale.a_conjoint || etatCivil === "MARIE" || ficheKind === "marie";
+    if (needConjoint) {
+      const c = situationFamiliale.conjoint;
+      if (!c.person_id && (!c.nom.trim() || !c.prenom.trim())) {
+        setError("Conjoint(e) : liez une personne ou saisissez nom et prénom.");
+        setStep(7);
+        return false;
+      }
     }
     return true;
   }
@@ -379,7 +387,6 @@ export default function CensusPage() {
   }
 
   function goNext() {
-    if (step === 1 && !validateIdentity(true)) return;
     if (step < 7) goTo((step + 1) as StepId);
   }
 
@@ -413,12 +420,15 @@ export default function CensusPage() {
   }
 
   function saveDraft() {
+    if (!validateIdentity()) {
+      setStep(1);
+      return;
+    }
     setError(null);
-    setDraftNotice(null);
-    if (!validateIdentity(true)) return;
     const draft: CensusDraft = {
       step,
       ficheKind,
+      dateDeces,
       handicap,
       nom,
       postnom,
@@ -428,13 +438,10 @@ export default function CensusPage() {
       profession,
       geoNaissance,
       dateNaissance,
-      dateDeces,
       hopitalNaissance,
       languesParlees,
       pereId: pere?.id ?? null,
       mereId: mere?.id ?? null,
-      nomPereText,
-      nomMereText,
       nationalite,
       paysResidence,
       geoActuelle,
@@ -509,6 +516,10 @@ export default function CensusPage() {
     e.preventDefault();
     setError(null);
     setDraftNotice(null);
+    if (!validateIdentity()) {
+      setStep(1);
+      return;
+    }
     if (!validateStep(7)) return;
     if (!validateFamille()) return;
     try {
@@ -528,7 +539,7 @@ export default function CensusPage() {
         sexe,
         date_naissance: dateNaissance,
         lieu_naissance: lieuNaissance,
-        etat_civil: etatCivil,
+        etat_civil: ficheKind === "marie" ? "MARIE" : etatCivil,
         handicap_type: handicap,
         mother_id: mere?.id,
         father_id: pere?.id,
@@ -550,19 +561,19 @@ export default function CensusPage() {
         person_id: person.id,
         formulaire: "IDENTIFICATION_PERSONNE",
         fiche_kind: ficheKind,
-        date_deces: ficheKind === "decede" ? dateDeces : null,
+        date_deces: ficheKind === "decede" ? dateDeces || null : null,
         nom: person.nom,
         postnom: person.postnom,
         prenom: person.prenom,
         sexe: person.sexe,
-        etat_civil: person.etat_civil,
+        etat_civil: ficheKind === "marie" ? "MARIE" : person.etat_civil,
         profession: profession.trim() || null,
         lieu_naissance: person.lieu_naissance,
         date_naissance: person.date_naissance,
         hopital_naissance: hopitalNaissance.trim() || null,
         langues_parlees: languesParlees.trim() || null,
-        nom_pere: pere ? displayName(pere) : nomPereText.trim() || null,
-        nom_mere: mere ? displayName(mere) : nomMereText.trim() || null,
+        nom_pere: pere ? displayName(pere) : null,
+        nom_mere: mere ? displayName(mere) : null,
         pere_id: pere?.id ?? null,
         mere_id: mere?.id ?? null,
         nationalite: nationalite.trim() || null,
@@ -624,7 +635,7 @@ export default function CensusPage() {
     <div>
       <h2 className="page-title">Recensement</h2>
       <p className="page-lead">
-        Identité obligatoire (personne, bébé ou décédé) avant les autres étapes — le reste peut être complété plus
+        Identité obligatoire (personne, bébé, décédé ou marié) avant le reste — le complément peut être saisi plus
         tard.{" "}
         <Link to="/census/scan-coupon">Scanner un coupon APK</Link>
       </p>
@@ -657,25 +668,25 @@ export default function CensusPage() {
               <legend>Type de fiche *</legend>
               <div className="form-grid">
                 <div className="full" style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                  {(
-                    [
-                      ["personne", "Personne vivante"],
-                      ["bebe", "Bébé (nouveau-né)"],
-                      ["decede", "Personne décédée"],
-                    ] as const
-                  ).map(([id, label]) => (
+                  {FICHE_KIND_OPTIONS.map((o) => (
                     <button
-                      key={id}
+                      key={o.value}
                       type="button"
-                      className={`btn-secondary${ficheKind === id ? " active" : ""}`}
-                      style={{
-                        width: "auto",
-                        borderColor: ficheKind === id ? "var(--rdc-blue, #007fff)" : undefined,
-                        background: ficheKind === id ? "#eaf3ff" : undefined,
+                      className={`btn-secondary${ficheKind === o.value ? " active" : ""}`}
+                      style={
+                        ficheKind === o.value
+                          ? { borderColor: "var(--rdc-blue, #007fff)", fontWeight: 700 }
+                          : undefined
+                      }
+                      onClick={() => {
+                        setFicheKind(o.value);
+                        if (o.value === "marie") {
+                          setEtatCivil("MARIE");
+                          setSituationFamiliale((prev) => ({ ...prev, a_conjoint: true }));
+                        }
                       }}
-                      onClick={() => setFicheKind(id)}
                     >
-                      {label}
+                      {o.label}
                     </button>
                   ))}
                 </div>
@@ -683,13 +694,7 @@ export default function CensusPage() {
             </fieldset>
 
             <fieldset className="id-fieldset">
-              <legend>
-                {ficheKind === "bebe"
-                  ? "Identité du bébé *"
-                  : ficheKind === "decede"
-                    ? "Identité de la personne décédée *"
-                    : "Identité de la personne *"}
-              </legend>
+              <legend>Identité de la personne</legend>
               <div className="form-grid">
                 <div className="full">
                   <label className="form-label">
@@ -698,7 +703,7 @@ export default function CensusPage() {
                   <input className="form-control" value={nom} onChange={(e) => setNom(e.target.value)} />
                 </div>
                 <div className="full">
-                  <label className="form-label">Post-nom</label>
+                  <label className="form-label">Post-nom de la personne</label>
                   <input className="form-control" value={postnom} onChange={(e) => setPostnom(e.target.value)} />
                 </div>
                 <div className="full">
@@ -717,7 +722,8 @@ export default function CensusPage() {
                     <label className="form-label">État-civil</label>
                     <select
                       className="form-control"
-                      value={etatCivil}
+                      value={ficheKind === "marie" ? "MARIE" : etatCivil}
+                      disabled={ficheKind === "marie"}
                       onChange={(e) => setEtatCivil(e.target.value as EtatCivil)}
                     >
                       {ETAT_CIVIL_OPTIONS.map((o) => (
@@ -772,95 +778,122 @@ export default function CensusPage() {
                     onChange={(e) => setHopitalNaissance(e.target.value)}
                   />
                 </div>
-                {ficheKind !== "bebe" ? (
-                  <div>
-                    <label className="form-label">Langues parlées</label>
-                    <input
-                      className="form-control"
-                      value={languesParlees}
-                      onChange={(e) => setLanguesParlees(e.target.value)}
-                      placeholder="Français, Lingala…"
-                    />
-                  </div>
-                ) : null}
-                <div className="full">
-                  <label className="form-label">
-                    {ficheKind === "bebe" ? "Nom du père * (si pas de mère)" : "Nom du père (texte)"}
-                  </label>
+                <div>
+                  <label className="form-label">Langues parlées</label>
                   <input
                     className="form-control"
-                    value={nomPereText}
-                    onChange={(e) => setNomPereText(e.target.value)}
-                    placeholder="Saisie libre"
+                    value={languesParlees}
+                    onChange={(e) => setLanguesParlees(e.target.value)}
+                    placeholder="Français, Lingala…"
                   />
                 </div>
                 <div className="full">
                   <PersonPicker
-                    label={ficheKind === "bebe" ? "Lier le père (optionnel)" : "Nom du père (registre)"}
+                    label={ficheKind === "bebe" ? "Nom du père * (si pas de mère)" : "Nom du père"}
                     value={pere}
-                    onChange={(p) => {
-                      setPere(p);
-                      if (p) setNomPereText(displayName(p));
-                    }}
-                  />
-                </div>
-                <div className="full">
-                  <label className="form-label">
-                    {ficheKind === "bebe" ? "Nom de la mère * (si pas de père)" : "Nom de la mère (texte)"}
-                  </label>
-                  <input
-                    className="form-control"
-                    value={nomMereText}
-                    onChange={(e) => setNomMereText(e.target.value)}
-                    placeholder="Saisie libre"
+                    onChange={setPere}
                   />
                 </div>
                 <div className="full">
                   <PersonPicker
-                    label={ficheKind === "bebe" ? "Lier la mère (optionnel)" : "Nom de la mère (registre)"}
+                    label={ficheKind === "bebe" ? "Nom de la mère * (si pas de père)" : "Nom de la mère"}
                     value={mere}
-                    onChange={(p) => {
-                      setMere(p);
-                      if (p) setNomMereText(displayName(p));
-                    }}
+                    onChange={setMere}
                   />
                 </div>
-                {ficheKind !== "bebe" ? (
-                  <>
-                    <div>
-                      <label className="form-label">Nationalité</label>
-                      <input
-                        className="form-control"
-                        value={nationalite}
-                        onChange={(e) => setNationalite(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="form-label">Pays de résidence</label>
-                      <input
-                        className="form-control"
-                        value={paysResidence}
-                        onChange={(e) => setPaysResidence(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="form-label">Type de handicap</label>
-                      <select
-                        className="form-control"
-                        value={handicap}
-                        onChange={(e) => setHandicap(e.target.value as HandicapType)}
-                      >
-                        {HANDICAP_OPTIONS.map((o) => (
-                          <option key={o.value} value={o.value}>
-                            {o.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </>
-                ) : null}
+                <div>
+                  <label className="form-label">Nationalité</label>
+                  <input
+                    className="form-control"
+                    value={nationalite}
+                    onChange={(e) => setNationalite(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="form-label">Pays de résidence</label>
+                  <input
+                    className="form-control"
+                    value={paysResidence}
+                    onChange={(e) => setPaysResidence(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="form-label">Type de handicap</label>
+                  <select
+                    className="form-control"
+                    value={handicap}
+                    onChange={(e) => setHandicap(e.target.value as HandicapType)}
+                  >
+                    {HANDICAP_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </fieldset>
+
+            {ficheKind === "marie" ? (
+              <fieldset className="id-fieldset">
+                <legend>Conjoint(e) *</legend>
+                <div className="form-grid">
+                  <div className="full">
+                    <PersonPicker
+                      label="Lier un conjoint enregistré (optionnel)"
+                      value={
+                        situationFamiliale.conjoint.person_id
+                          ? getPerson(situationFamiliale.conjoint.person_id) ?? null
+                          : null
+                      }
+                      onChange={(p) =>
+                        setSituationFamiliale((prev) => ({
+                          ...prev,
+                          a_conjoint: true,
+                          conjoint: {
+                            ...prev.conjoint,
+                            person_id: p?.id ?? null,
+                            nom: p?.nom ?? prev.conjoint.nom,
+                            postnom: p?.postnom ?? prev.conjoint.postnom,
+                            prenom: p?.prenom ?? prev.conjoint.prenom,
+                            sexe: (p?.sexe as Sexe | "") || prev.conjoint.sexe,
+                            date_naissance: p?.date_naissance ?? prev.conjoint.date_naissance,
+                          },
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Nom conjoint(e) *</label>
+                    <input
+                      className="form-control"
+                      value={situationFamiliale.conjoint.nom}
+                      onChange={(e) =>
+                        setSituationFamiliale((prev) => ({
+                          ...prev,
+                          a_conjoint: true,
+                          conjoint: { ...prev.conjoint, nom: e.target.value },
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Prénom conjoint(e) *</label>
+                    <input
+                      className="form-control"
+                      value={situationFamiliale.conjoint.prenom}
+                      onChange={(e) =>
+                        setSituationFamiliale((prev) => ({
+                          ...prev,
+                          a_conjoint: true,
+                          conjoint: { ...prev.conjoint, prenom: e.target.value },
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              </fieldset>
+            ) : null}
 
             <fieldset className="id-fieldset">
               <legend>Adresse actuelle</legend>
