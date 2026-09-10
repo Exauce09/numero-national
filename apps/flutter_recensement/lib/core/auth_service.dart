@@ -36,6 +36,9 @@ class AuthService {
   final SecureStore _store;
 
   Future<AuthUser> login(String email, String password) async {
+    // Drop stale JWT from a previous API/secret before requesting a new pair.
+    await _store.clearSession();
+
     final res = await _api.post(
       '/auth/login',
       auth: false,
@@ -54,10 +57,12 @@ class AuthService {
       _api.throwFor(res, 'Connexion impossible');
     }
     final tokens = _api.decodeMap(res);
-    await _store.saveTokens(
-      access: tokens['access_token'] as String,
-      refresh: tokens['refresh_token'] as String,
-    );
+    final access = tokens['access_token']?.toString();
+    final refresh = tokens['refresh_token']?.toString();
+    if (access == null || access.isEmpty || refresh == null || refresh.isEmpty) {
+      throw ApiException('Réponse login incomplete (jetons manquants)');
+    }
+    await _store.saveTokens(access: access, refresh: refresh);
 
     final me = await this.me();
     await _store.saveUser(id: me.id, email: me.email);
@@ -99,7 +104,7 @@ class AuthService {
     }
 
     try {
-      final res = await _api.post('/census/devices/register', body: body);
+      final res = await _api.post('/census/devices/register', body: body, auth: true);
       if (res.statusCode >= 200 && res.statusCode < 300) {
         return uid;
       }

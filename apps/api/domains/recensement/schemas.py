@@ -285,3 +285,25 @@ class FormDraftOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
+class CouponResolveIn(BaseModel):
+    """Raw QR string from APK coupon (`nn_census_coupon`) or a local_id."""
+
+    raw: str = Field(min_length=1, max_length=8192)
+
+
+class CouponResolveOut(BaseModel):
+    found: bool
+    source: str  # db | qr_only | not_found
+    local_id: str | None = None
+    campaign_id: uuid.UUID | None = None
+    household_local_id: str | None = None
+    family_name: str | None = None
+    given_names: str | None = None
+    sex: str | None = None
+    date_of_birth: str | None = None
+    coupon_id: uuid.UUID | None = None
+    census_record_id: uuid.UUID | None = None
+    qr_payload: dict[str, Any] | None = None
+    message: str | None = None
+

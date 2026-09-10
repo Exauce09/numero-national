@@ -1148,3 +1148,138 @@ async def update_form_draft(
     await db.commit()
     await db.refresh(draft)
     return draft
+
+
+async def resolve_field_coupon(db: AsyncSession, raw: str) -> dict[str, Any]:
+    """Resolve an APK census coupon QR (`nn_census_coupon`) for commune officers."""
+    import json
+
+    from apps.api.domains.recensement.models import CensusRecord, FieldCoupon
+
+    text = (raw or "").strip()
+    if not text:
+        return {
+            "found": False,
+            "source": "not_found",
+            "message": "QR vide",
+        }
+
+    payload: dict[str, Any] | None = None
+    local_id: str | None = None
+    campaign_id: uuid.UUID | None = None
+
+    if text.startswith("{"):
+        try:
+            decoded = json.loads(text)
+        except json.JSONDecodeError:
+            return {
+                "found": False,
+                "source": "not_found",
+                "message": "QR JSON invalide",
+            }
+        if not isinstance(decoded, dict):
+            return {
+                "found": False,
+                "source": "not_found",
+                "message": "QR non reconnu",
+            }
+        payload = decoded
+        qtype = str(decoded.get("type") or "")
+        if qtype and qtype != "nn_census_coupon":
+            return {
+                "found": False,
+                "source": "not_found",
+                "message": f"Type QR non supporté ({qtype})",
+            }
+        local_id = str(decoded.get("local_id") or "").strip() or None
+        campaign_id = _parse_uuid(decoded.get("campaign_id"))
+    else:
+        local_id = text
+
+    coupon: FieldCoupon | None = None
+    if local_id and campaign_id:
+        coupon = (
+            await db.execute(
+                select(FieldCoupon).where(
+                    FieldCoupon.campaign_id == campaign_id,
+                    FieldCoupon.local_id == local_id,
+                )
+            )
+        ).scalar_one_or_none()
+    if coupon is None and local_id:
+        coupon = (
+            await db.execute(
+                select(FieldCoupon)
+                .where(FieldCoupon.local_id == local_id)
+                .order_by(FieldCoupon.created_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+
+    record: CensusRecord | None = None
+    if local_id:
+        rec_q = select(CensusRecord).where(CensusRecord.local_id == local_id)
+        if campaign_id:
+            rec_q = rec_q.where(CensusRecord.campaign_id == campaign_id)
+        record = (
+            await db.execute(rec_q.order_by(CensusRecord.updated_at.desc()).limit(1))
+        ).scalar_one_or_none()
+
+    if coupon is not None:
+        return {
+            "found": True,
+            "source": "db",
+            "local_id": coupon.local_id,
+            "campaign_id": coupon.campaign_id,
+            "household_local_id": coupon.household_local_id,
+            "family_name": coupon.family_name,
+            "given_names": coupon.given_names,
+            "sex": coupon.sex,
+            "date_of_birth": coupon.date_of_birth,
+            "coupon_id": coupon.id,
+            "census_record_id": record.id if record else None,
+            "qr_payload": coupon.qr_payload,
+            "message": "Coupon synchronisé depuis l’APK",
+        }
+
+    if payload and local_id:
+        return {
+            "found": True,
+            "source": "qr_only",
+            "local_id": local_id,
+            "campaign_id": campaign_id,
+            "household_local_id": payload.get("household_local_id") or payload.get("household_id"),
+            "family_name": payload.get("family_name"),
+            "given_names": payload.get("given_names"),
+            "sex": payload.get("sex"),
+            "date_of_birth": payload.get("date_of_birth") or payload.get("dob"),
+            "coupon_id": None,
+            "census_record_id": record.id if record else None,
+            "qr_payload": payload,
+            "message": "Lu depuis le QR (pas encore synchronisé sur le serveur)",
+        }
+
+    if record is not None:
+        return {
+            "found": True,
+            "source": "db",
+            "local_id": record.local_id,
+            "campaign_id": record.campaign_id,
+            "household_local_id": None,
+            "family_name": record.family_name,
+            "given_names": (record.payload or {}).get("given_names") if isinstance(record.payload, dict) else None,
+            "sex": record.sex,
+            "date_of_birth": record.date_of_birth,
+            "coupon_id": None,
+            "census_record_id": record.id,
+            "qr_payload": None,
+            "message": "Fiche terrain trouvée (sans coupon)",
+        }
+
+    return {
+        "found": False,
+        "source": "not_found",
+        "local_id": local_id,
+        "campaign_id": campaign_id,
+        "message": "Aucun coupon trouvé — synchronisez l’APK puis réessayez",
+    }

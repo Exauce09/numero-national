@@ -13,6 +13,7 @@ class SecureStore {
   static const _kLastAuth = 'last_auth_at';
   static const _kUserId = 'user_id';
   static const _kUserEmail = 'user_email';
+  static const _kApiBase = 'api_base_url';
 
   Future<void> saveTokens({required String access, required String refresh}) async {
     await _storage.write(key: _kAccess, value: access);
@@ -24,6 +25,11 @@ class SecureStore {
     await _storage.write(key: _kUserId, value: id);
     await _storage.write(key: _kUserEmail, value: email);
   }
+
+  Future<void> saveApiBaseUrl(String url) =>
+      _storage.write(key: _kApiBase, value: url.trim().replaceAll(RegExp(r'/+$'), ''));
+
+  Future<String?> get apiBaseUrl => _storage.read(key: _kApiBase);
 
   Future<String?> get accessToken => _storage.read(key: _kAccess);
   Future<String?> get refreshToken => _storage.read(key: _kRefresh);
@@ -47,5 +53,6 @@ class SecureStore {
     await clearSession();
     await _storage.delete(key: _kDevice);
     await _storage.delete(key: _kLastAuth);
+    await _storage.delete(key: _kApiBase);
   }
 }

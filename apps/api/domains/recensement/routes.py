@@ -29,6 +29,8 @@ from apps.api.domains.recensement.schemas import (
     CampaignStatsOut,
     CampaignUpdate,
     CensusRecordOut,
+    CouponResolveIn,
+    CouponResolveOut,
     DeviceOut,
     DeviceRegister,
     FormDraftCreate,
@@ -467,3 +469,17 @@ async def patch_form_draft(
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return updated  # type: ignore[return-value]
+
+
+@router.post(
+    "/coupons/resolve",
+    response_model=CouponResolveOut,
+    summary="Résoudre un coupon QR APK (nn_census_coupon) pour la commune",
+)
+async def resolve_coupon(
+    body: CouponResolveIn,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> CouponResolveOut:
+    result = await service.resolve_field_coupon(db, body.raw)
+    return CouponResolveOut(**result)

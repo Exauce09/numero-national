@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../auth/offline_auth_policy.dart';
 import '../core/api_client.dart';
 import '../core/auth_service.dart';
+import '../core/config.dart';
 import '../core/secure_storage.dart';
 import '../core/theme.dart';
 
@@ -23,27 +24,32 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _apiUrl = TextEditingController();
   final _policy = OfflineAuthPolicy();
   final _auth = AuthService();
   bool _busy = false;
   bool _obscure = true;
+  bool _showApi = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _prefillEmail();
+    _prefill();
     if (_autoLogin && widget.allowAutoLogin) {
       _email.text = _demoEmail;
       _password.text = _demoPassword;
     }
   }
 
-  Future<void> _prefillEmail() async {
+  Future<void> _prefill() async {
     final email = await SecureStore.instance.userEmail;
-    if (email != null && email.isNotEmpty && mounted) {
-      _email.text = email;
-    }
+    final api = await AppConfig.effectiveApiBaseUrl();
+    if (!mounted) return;
+    setState(() {
+      if (email != null && email.isNotEmpty) _email.text = email;
+      _apiUrl.text = api;
+    });
   }
 
   Future<void> _submit() async {
@@ -57,6 +63,17 @@ class _LoginScreenState extends State<LoginScreen> {
       if (email.isEmpty || password.isEmpty) {
         setState(() => _error = 'Email et mot de passe requis');
         return;
+      }
+      var api = _apiUrl.text.trim();
+      if (api.isNotEmpty) {
+        if (!api.startsWith('http://') && !api.startsWith('https://')) {
+          api = 'http://$api';
+        }
+        if (!api.contains('/api/')) {
+          api = api.replaceAll(RegExp(r'/+$'), '') + '/api/v1';
+        }
+        await SecureStore.instance.saveApiBaseUrl(api);
+        _apiUrl.text = api;
       }
       await _auth.login(email, password);
       if (!mounted) return;
@@ -91,6 +108,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _apiUrl.dispose();
     super.dispose();
   }
 
@@ -186,6 +204,25 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ),
                               ),
+                              const SizedBox(height: 8),
+                              TextButton(
+                                onPressed: () => setState(() => _showApi = !_showApi),
+                                child: Text(_showApi ? 'Masquer l’adresse API' : 'Configurer l’adresse API'),
+                              ),
+                              if (_showApi) ...[
+                                TextField(
+                                  controller: _apiUrl,
+                                  keyboardType: TextInputType.url,
+                                  autocorrect: false,
+                                  decoration: const InputDecoration(
+                                    labelText: 'URL API (PC Wi‑Fi)',
+                                    hintText: 'http://192.168.x.x:8000/api/v1',
+                                    prefixIcon: Icon(Icons.dns_outlined),
+                                    helperText: 'Même Wi‑Fi que le serveur. Timeout 12 s.',
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                              ],
                               if (_error != null) ...[
                                 const SizedBox(height: 12),
                                 Text(

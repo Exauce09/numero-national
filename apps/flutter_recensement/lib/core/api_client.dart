@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -16,7 +18,7 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
-/// HTTP client against [AppConfig.apiBaseUrl] with Bearer + refresh.
+/// HTTP client against [AppConfig.apiBaseUrl] with Bearer + refresh + timeouts.
 class ApiClient {
   ApiClient({http.Client? client, SecureStore? store})
       : _client = client ?? http.Client(),
@@ -25,8 +27,11 @@ class ApiClient {
   final http.Client _client;
   final SecureStore _store;
 
-  Uri _uri(String path) {
-    final base = AppConfig.apiBaseUrl.replaceAll(RegExp(r'/+$'), '');
+  /// Keep requests snappy on bad Wi‑Fi / wrong IP (was hanging 1–2+ minutes).
+  static const Duration requestTimeout = Duration(seconds: 12);
+
+  Future<Uri> _uri(String path) async {
+    final base = (await AppConfig.effectiveApiBaseUrl()).replaceAll(RegExp(r'/+$'), '');
     final p = path.startsWith('/') ? path : '/$path';
     return Uri.parse('$base$p');
   }
@@ -46,7 +51,10 @@ class ApiClient {
   }
 
   Future<http.Response> get(String path, {bool auth = true}) async {
-    return _send(() async => _client.get(_uri(path), headers: await _headers(auth: auth)));
+    return _send(() async {
+      final uri = await _uri(path);
+      return _client.get(uri, headers: await _headers(auth: auth)).timeout(requestTimeout);
+    });
   }
 
   Future<http.Response> post(
@@ -54,33 +62,61 @@ class ApiClient {
     Map<String, dynamic>? body,
     bool auth = true,
   }) async {
-    return _send(
-      () async => _client.post(
-        _uri(path),
-        headers: await _headers(auth: auth),
-        body: body == null ? null : jsonEncode(body),
-      ),
-    );
+    return _send(() async {
+      final uri = await _uri(path);
+      return _client
+          .post(
+            uri,
+            headers: await _headers(auth: auth),
+            body: body == null ? null : jsonEncode(body),
+          )
+          .timeout(requestTimeout);
+    });
   }
 
   Future<http.Response> _send(Future<http.Response> Function() call) async {
-    var res = await call();
-    if (res.statusCode != 401) return res;
+    try {
+      var res = await call();
+      if (res.statusCode != 401) return res;
 
-    final refreshed = await _tryRefresh();
-    if (!refreshed) return res;
-    return call();
+      final refreshed = await _tryRefresh();
+      if (!refreshed) return res;
+      return call();
+    } on TimeoutException {
+      final base = await AppConfig.effectiveApiBaseUrl();
+      throw ApiException(
+        'Délai dépassé — l’API ne répond pas ($base). '
+        'Vérifiez le Wi‑Fi et l’adresse IP du serveur.',
+        statusCode: 408,
+      );
+    } on SocketException catch (e) {
+      final base = await AppConfig.effectiveApiBaseUrl();
+      throw ApiException(
+        'Réseau inaccessible ($base). '
+        'Le téléphone doit être sur le même Wi‑Fi que le PC. (${e.message})',
+        statusCode: 503,
+      );
+    } on http.ClientException catch (e) {
+      final base = await AppConfig.effectiveApiBaseUrl();
+      throw ApiException(
+        'Connexion API impossible ($base). ${e.message}',
+        statusCode: 503,
+      );
+    }
   }
 
   Future<bool> _tryRefresh() async {
     final refresh = await _store.refreshToken;
     if (refresh == null || refresh.isEmpty) return false;
     try {
-      final res = await _client.post(
-        _uri('/auth/refresh'),
-        headers: await _headers(auth: false),
-        body: jsonEncode({'refresh_token': refresh}),
-      );
+      final uri = await _uri('/auth/refresh');
+      final res = await _client
+          .post(
+            uri,
+            headers: await _headers(auth: false),
+            body: jsonEncode({'refresh_token': refresh}),
+          )
+          .timeout(requestTimeout);
       if (res.statusCode < 200 || res.statusCode >= 300) {
         await _store.clearSession();
         return false;
@@ -119,6 +155,17 @@ class ApiClient {
         detail = d is String ? d : d.toString();
       }
     } catch (_) {}
+    // Map JWT noise to actionable French.
+    if (detail.contains('Could not validate credentials') ||
+        detail.contains('Not authenticated') ||
+        detail.contains('Invalid token')) {
+      detail =
+          'Session invalide ou serveur différent (jeton JWT). '
+          'Reconnectez-vous. Si ça continue : reconstruit l’APK avec la bonne IP API.';
+    }
+    if (detail.contains('Incorrect email or password')) {
+      detail = 'Email ou mot de passe incorrect';
+    }
     throw ApiException(detail, statusCode: res.statusCode, body: res.body);
   }
 }
