@@ -47,6 +47,7 @@ class CivilActCreate(BaseModel):
     related_citizen_ids: list[UUID] | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
     status: ActStatus = ActStatus.DRAFT
+    bureau_id: UUID | None = None
 
 
 class CivilActRead(BaseModel):
@@ -60,10 +61,68 @@ class CivilActRead(BaseModel):
     payload: dict[str, Any]
     issued_at: datetime | None
     validated_by: UUID | None
+    bureau_id: UUID | None = None
+    verification_code: str | None = None
+    version: int | None = None
     created_at: datetime
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ActTransitionRequest(BaseModel):
+    status: ActStatus
+
+
+class MentionCreate(BaseModel):
+    target_act_id: UUID
+    mention_type: str
+    source_act_id: UUID | None = None
+    authority: str | None = None
+    reference: str | None = None
+    justificatif: str | None = None
+
+
+class MentionRead(BaseModel):
+    id: UUID
+    target_act_id: UUID
+    mention_type: str
+    source_act_id: UUID | None
+    authority: str | None
+    mention_date: Any | None
+    reference: str | None
+    justificatif: str | None
+    created_by: UUID | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class FiliationCreate(BaseModel):
+    relation_type: str
+    parent_citizen_id: UUID | None = None
+    child_citizen_id: UUID | None = None
+    parent_label: str | None = None
+    child_label: str | None = None
+    act_id: UUID | None = None
+
+
+class FiliationRead(BaseModel):
+    id: UUID
+    relation_type: str
+    parent_citizen_id: UUID | None
+    child_citizen_id: UUID | None
+    parent_label: str | None
+    child_label: str | None
+    act_id: UUID | None
+    status: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class DocumentVerifyRequest(BaseModel):
+    code: str = Field(min_length=4, max_length=64)
 
 
 class DeclarationCreate(BaseModel):

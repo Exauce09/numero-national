@@ -96,7 +96,7 @@ export default function BirthsPage() {
         longitude: gpsLng,
         gps_captured_at: gpsLat != null ? new Date().toISOString() : null,
       };
-      const act = addAct("BIRTH", payload, child.nic);
+      const act = await addAct("BIRTH", payload, child.nic);
       setCreated(act);
       setNom("");
       setPostnom("");

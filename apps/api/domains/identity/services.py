@@ -179,6 +179,8 @@ async def register_user(db: AsyncSession, payload: UserRegister) -> User:
         ville_id=ville_id,
         commune_id=commune_id,
         roles=roles,
+        account_status="ACTIVE",
+        is_active=True,
     )
     db.add(user)
     await db.commit()
@@ -259,7 +261,11 @@ async def authenticate_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
         )
-    if not user.is_active:
+    if not user.is_active or getattr(user, "account_status", "ACTIVE") in {
+        "SUSPENDED",
+        "DISABLED",
+        "EXPIRED",
+    }:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is inactive",

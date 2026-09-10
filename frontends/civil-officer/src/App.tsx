@@ -38,6 +38,10 @@ import BirthsPage from "./pages/BirthsPage";
 import CensusPage from "./pages/CensusPage";
 import CouponScanPage from "./pages/CouponScanPage";
 import DeathsPage from "./pages/DeathsPage";
+import BureauxPage from "./pages/BureauxPage";
+import PersonnelPage from "./pages/PersonnelPage";
+import AccountRequestsPage from "./pages/AccountRequestsPage";
+import DocumentVerifyPage from "./pages/DocumentVerifyPage";
 import MarriagesPage from "./pages/MarriagesPage";
 import AdoptionsPage from "./pages/AdoptionsPage";
 import DisplacementsPage from "./pages/DisplacementsPage";
@@ -613,6 +617,18 @@ function Shell() {
           <NavLink to="/declarations">
             <IconClipboard size={18} /> Déclarations santé
           </NavLink>
+          <NavLink to="/admin/bureaux">
+            <IconHome size={18} /> Bureaux EC
+          </NavLink>
+          <NavLink to="/admin/personnel">
+            <IconUsers size={18} /> Personnel
+          </NavLink>
+          <NavLink to="/admin/account-requests">
+            <IconClipboard size={18} /> Demandes de compte
+          </NavLink>
+          <NavLink to="/verify-document">
+            <IconFile size={18} /> Vérifier document
+          </NavLink>
         </nav>
         <div className="sidebar-foot">
           <button type="button" className="btn-logout" style={{ width: "100%" }} onClick={logout}>
@@ -724,6 +740,10 @@ function Shell() {
             <Route path="/cartes-livraison" element={<CardDeliveryPage />} />
             <Route path="/acts" element={<ActsPage />} />
             <Route path="/declarations" element={<DeclarationsPage />} />
+            <Route path="/admin/bureaux" element={<BureauxPage />} />
+            <Route path="/admin/personnel" element={<PersonnelPage />} />
+            <Route path="/admin/account-requests" element={<AccountRequestsPage />} />
+            <Route path="/verify-document" element={<DocumentVerifyPage />} />
             <Route path="/territory" element={<TerritoryPage />} />
             <Route path="/search" element={<SearchPage />} />
           </Routes>

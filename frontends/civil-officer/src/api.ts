@@ -181,6 +181,62 @@ export const api = {
 
   deliverCard: (cardId: string) =>
     request<Record<string, unknown>>(`/cards/${cardId}/deliver`, { method: "POST" }),
+
+  listPersonnel: () => request<Array<Record<string, unknown>>>("/iam/personnel"),
+  createPersonnel: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>("/iam/personnel", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  listBureaux: (communeCode?: string) => {
+    const q = new URLSearchParams();
+    if (communeCode) q.set("commune_code", communeCode);
+    return request<Array<Record<string, unknown>>>(`/iam/bureaux?${q}`);
+  },
+  createBureau: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>("/iam/bureaux", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  listAccountRequests: (status?: string) => {
+    const q = new URLSearchParams();
+    if (status) q.set("status", status);
+    return request<Array<Record<string, unknown>>>(`/iam/account-requests?${q}`);
+  },
+  createAccountRequest: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>("/iam/account-requests", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  approveAccountRequest: (id: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/iam/account-requests/${id}/approve`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  rejectAccountRequest: (id: string, reason: string) =>
+    request<Record<string, unknown>>(`/iam/account-requests/${id}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ rejection_reason: reason }),
+    }),
+  createAssignment: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>("/iam/assignments", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  personHistory: (citizenId: string) =>
+    request<{ citizen_id: string; events: Array<Record<string, unknown>> }>(
+      `/civil/persons/${citizenId}/history`,
+    ),
+  verifyDocument: (code: string) =>
+    request<{ status: string; act_type?: string; act_number?: string }>(
+      "/civil/documents/verify",
+      { method: "POST", body: JSON.stringify({ code }) },
+    ),
+  createMention: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>("/civil/mentions", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };
 
 /** Stockage local de démo quand l'API est indisponible. */

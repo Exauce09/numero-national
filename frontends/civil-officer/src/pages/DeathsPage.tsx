@@ -52,7 +52,7 @@ export default function DeathsPage() {
       responsable_id: responsable?.id ?? null,
       responsable_name: responsable ? displayName(responsable) : null,
     };
-    const act = addAct("DEATH", payload, deceased.nic);
+    const act = await addAct("DEATH", payload, deceased.nic);
     setCreated(act);
   }
 

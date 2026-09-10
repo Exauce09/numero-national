@@ -617,7 +617,7 @@ export default function CensusPage() {
         gps_captured_at: gps && "latitude" in gps ? new Date().toISOString() : null,
         gps_address: gps && "display_name" in gps ? (gps as ReverseGeo).display_name ?? null : null,
       };
-      const act = addAct("CENSUS", payload, person.nic);
+      const act = await addAct("CENSUS", payload, person.nic);
       clearDraft();
       setSituationFamiliale(emptySituationFamiliale());
       setEtudes(emptyEtudes());

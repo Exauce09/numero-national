@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import enum
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 from sqlalchemy import (
     Boolean,
     Column,
+    Date,
     DateTime,
     Enum,
     ForeignKey,
@@ -18,11 +19,53 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from apps.api.db.base import Base
+
+
+class AccountStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    ACTIVE = "ACTIVE"
+    SUSPENDED = "SUSPENDED"
+    DISABLED = "DISABLED"
+    EXPIRED = "EXPIRED"
+
+
+class PersonnelStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+    LEFT = "LEFT"
+
+
+class AssignmentStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    CLOSED = "CLOSED"
+    SUSPENDED = "SUSPENDED"
+
+
+class ScopeType(str, enum.Enum):
+    NATIONAL = "NATIONAL"
+    PROVINCE = "PROVINCE"
+    VILLE = "VILLE"
+    COMMUNE = "COMMUNE"
+    BUREAU = "BUREAU"
+
+
+class AccountRequestStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    CANCELLED = "CANCELLED"
+
+
+class BureauStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+    CLOSED = "CLOSED"
 
 
 class InstitutionType(str, enum.Enum):
@@ -196,6 +239,17 @@ class User(Base):
         ForeignKey("identity.institutions.id", ondelete="SET NULL"),
         nullable=True,
     )
+    personnel_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("identity.personnel.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    account_status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default=AccountStatus.ACTIVE.value, server_default="ACTIVE"
+    )
+    disabled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # Périmètre géographique type élections RDC : province → ville (+ commune optionnelle).
     province_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
@@ -227,10 +281,192 @@ class User(Base):
     institution: Mapped[Optional[Institution]] = relationship(
         "Institution", back_populates="users"
     )
+    personnel: Mapped[Optional["Personnel"]] = relationship(
+        "Personnel", back_populates="users", foreign_keys=[personnel_id]
+    )
     roles: Mapped[list[Role]] = relationship(
         "Role",
         secondary=user_roles,
         back_populates="users",
+    )
+    territorial_scopes: Mapped[list["TerritorialScope"]] = relationship(
+        "TerritorialScope", back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class Personnel(Base):
+    """Agent administratif (avant compte informatique)."""
+
+    __tablename__ = "personnel"
+    __table_args__ = (
+        UniqueConstraint("matricule", name="uq_personnel_matricule"),
+        {"schema": "identity"},
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
+    matricule: Mapped[str] = mapped_column(String(64), nullable=False)
+    family_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    postnom: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    given_names: Mapped[str] = mapped_column(String(128), nullable=False)
+    function_title: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    phone_pro: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    email_pro: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="ACTIVE")
+    date_entree: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    date_sortie: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    users: Mapped[list[User]] = relationship(
+        "User", back_populates="personnel", foreign_keys="User.personnel_id"
+    )
+    assignments: Mapped[list["Assignment"]] = relationship(
+        "Assignment", back_populates="personnel", cascade="all, delete-orphan"
+    )
+
+
+class BureauEtatCivil(Base):
+    """Bureau d'état civil rattaché au référentiel territorial."""
+
+    __tablename__ = "bureaux_etat_civil"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_bureaux_etat_civil_code"),
+        {"schema": "etat_civil"},
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
+    code: Mapped[str] = mapped_column(String(64), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    bureau_type: Mapped[str] = mapped_column(String(32), nullable=False, default="PRINCIPAL")
+    province_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("geography.provinces.id", ondelete="SET NULL"), nullable=True
+    )
+    ville_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("geography.villes.id", ondelete="SET NULL"), nullable=True
+    )
+    commune_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("geography.communes.id", ondelete="SET NULL"), nullable=True
+    )
+    commune_code: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    address: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    ressort: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="ACTIVE")
+    opened_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class Assignment(Base):
+    """Affectation officielle personnel × bureau/fonction."""
+
+    __tablename__ = "assignments"
+    __table_args__ = {"schema": "identity"}
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
+    personnel_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("identity.personnel.id", ondelete="CASCADE"), nullable=False
+    )
+    bureau_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("etat_civil.bureaux_etat_civil.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    province_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("geography.provinces.id", ondelete="SET NULL"), nullable=True
+    )
+    function_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="ACTIVE")
+    assigned_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="SET NULL"), nullable=True
+    )
+    justification: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    document_reference: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    personnel: Mapped[Personnel] = relationship("Personnel", back_populates="assignments")
+
+
+class TerritorialScope(Base):
+    """Périmètre territorial d'accès d'un compte."""
+
+    __tablename__ = "territorial_scopes"
+    __table_args__ = {"schema": "identity"}
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="CASCADE"), nullable=False
+    )
+    scope_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    territory_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    bureau_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("etat_civil.bureaux_etat_civil.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped[User] = relationship("User", back_populates="territorial_scopes")
+
+
+class AccountRequest(Base):
+    """Demande de création de compte (workflow d'approbation)."""
+
+    __tablename__ = "account_requests"
+    __table_args__ = {"schema": "identity"}
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
+    personnel_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("identity.personnel.id", ondelete="CASCADE"), nullable=False
+    )
+    requested_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="SET NULL"), nullable=True
+    )
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    requested_role: Mapped[str] = mapped_column(String(64), nullable=False)
+    requested_scope_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    requested_bureau_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    requested_province_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="PENDING")
+    approved_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="SET NULL"), nullable=True
+    )
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="SET NULL"), nullable=True
     )
 
 

@@ -543,25 +543,28 @@ function nextActNumber(type: ActType): string {
 }
 
 async function tryPostCivil(type: ActType, payload: Record<string, unknown>): Promise<void> {
-  try {
-    const session = getSession();
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (session?.accessToken) headers.Authorization = `Bearer ${session.accessToken}`;
-    await fetch(`${API_BASE}/civil/${ACT_ENDPOINT[type]}`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ commune_code: COMMUNE_CODE, payload }),
-    });
-  } catch {
-    /* ignore API failure */
+  const session = getSession();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (session?.accessToken) headers.Authorization = `Bearer ${session.accessToken}`;
+  const core: ActType[] = ["BIRTH", "MARRIAGE", "DIVORCE", "DEATH", "ADOPTION", "RECOGNITION", "RECTIFICATION"];
+  const res = await fetch(`${API_BASE}/civil/${ACT_ENDPOINT[type]}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ commune_code: COMMUNE_CODE, payload, status: "DRAFT" }),
+  });
+  if (!res.ok) {
+    if (session?.accessToken && core.includes(type)) {
+      const detail = await res.text();
+      throw new Error(detail || `Sync API état civil échouée (${res.status})`);
+    }
   }
 }
 
-export function addAct(
+export async function addAct(
   type: ActType,
   payload: Record<string, unknown>,
   subjectNic: string
-): Act {
+): Promise<Act> {
   const registry = load();
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
@@ -584,7 +587,17 @@ export function addAct(
   };
   registry.acts.unshift(act);
   save(registry);
-  void tryPostCivil(type, { ...payload, act_number, national_id: subjectNic, commune_code: COMMUNE_CODE });
+  const session = getSession();
+  const core: ActType[] = ["BIRTH", "MARRIAGE", "DIVORCE", "DEATH", "ADOPTION", "RECOGNITION", "RECTIFICATION"];
+  try {
+    await tryPostCivil(type, { ...payload, act_number, national_id: subjectNic, commune_code: COMMUNE_CODE });
+  } catch (err) {
+    if (session?.accessToken && core.includes(type)) {
+      registry.acts = registry.acts.filter((a) => a.id !== id);
+      save(registry);
+      throw err;
+    }
+  }
   return act;
 }
 

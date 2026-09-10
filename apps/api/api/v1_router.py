@@ -21,6 +21,7 @@ _OPTIONAL_ROUTERS: tuple[tuple[str, str], ...] = (
     ("apps.api.domains.identity.routes", "auth_router"),
     ("apps.api.domains.identity.routes", "institutions_router"),
     ("apps.api.domains.identity.routes", "rbac_router"),
+    ("apps.api.domains.identity.iam_routes", "iam_router"),
     ("apps.api.domains.audit.routes", "router"),
     ("apps.api.domains.interop.routes", "router"),
     ("apps.api.domains.core_registry.router", "router"),

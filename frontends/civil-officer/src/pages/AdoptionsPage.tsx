@@ -35,7 +35,7 @@ export default function AdoptionsPage() {
       commune_code: geo.commune_code ?? null,
       date_adoption: dateAdoption,
     };
-    const act = addAct("ADOPTION", payload, enfant.nic);
+    const act = await addAct("ADOPTION", payload, enfant.nic);
     setCreated(act);
   }
 

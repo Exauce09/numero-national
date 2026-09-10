@@ -47,6 +47,17 @@ PERM_ONIP_DASHBOARD = "onip:dashboard"
 PERM_ANALYTICS_READ = "analytics:read"
 PERM_IDENTITY_VERIFY = "identity:verify"
 
+# Institutional IAM (personnel / bureaux / scopes)
+PERM_PERSONNEL_READ = "personnel:read"
+PERM_PERSONNEL_MANAGE = "personnel:manage"
+PERM_ASSIGNMENT_READ = "assignment:read"
+PERM_ASSIGNMENT_MANAGE = "assignment:manage"
+PERM_BUREAU_READ = "bureau:read"
+PERM_BUREAU_MANAGE = "bureau:manage"
+PERM_ACCOUNT_REQUEST_CREATE = "account_request:create"
+PERM_ACCOUNT_REQUEST_MANAGE = "account_request:manage"
+PERM_CIVIL_AUTHENTICATE = "civil:act:authenticate"
+
 ALL_DOMAIN_PERMISSIONS: tuple[str, ...] = (
     PERM_CITIZEN_CREATE,
     PERM_CITIZEN_READ,
@@ -59,6 +70,7 @@ ALL_DOMAIN_PERMISSIONS: tuple[str, ...] = (
     PERM_CIVIL_VALIDATE,
     PERM_CIVIL_STATS,
     PERM_CIVIL_DECLARE,
+    PERM_CIVIL_AUTHENTICATE,
     PERM_CARD_ISSUE,
     PERM_CARD_MANAGE,
     PERM_CARD_VERIFY,
@@ -73,6 +85,14 @@ ALL_DOMAIN_PERMISSIONS: tuple[str, ...] = (
     PERM_ONIP_DASHBOARD,
     PERM_ANALYTICS_READ,
     PERM_IDENTITY_VERIFY,
+    PERM_PERSONNEL_READ,
+    PERM_PERSONNEL_MANAGE,
+    PERM_ASSIGNMENT_READ,
+    PERM_ASSIGNMENT_MANAGE,
+    PERM_BUREAU_READ,
+    PERM_BUREAU_MANAGE,
+    PERM_ACCOUNT_REQUEST_CREATE,
+    PERM_ACCOUNT_REQUEST_MANAGE,
 )
 
 

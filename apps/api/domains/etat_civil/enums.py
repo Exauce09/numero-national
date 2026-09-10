@@ -22,6 +22,7 @@ class ActType(StrEnum):
 class ActStatus(StrEnum):
     DRAFT = "DRAFT"
     SUBMITTED = "SUBMITTED"
+    UNDER_REVIEW = "UNDER_REVIEW"
     VALIDATED = "VALIDATED"
     REJECTED = "REJECTED"
     ARCHIVED = "ARCHIVED"

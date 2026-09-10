@@ -98,8 +98,19 @@ async def create_act(
     *,
     actor_id: uuid.UUID | None = None,
 ) -> CivilAct:
+    from fastapi import HTTPException
+
+    from apps.api.domains.civil_config import ACT_TYPES_DEPRECATED_WRITE, ACT_TYPES_ENABLED
+
     if data.act_type is None:
         raise ValueError("act_type is required")
+    if data.act_type.value in ACT_TYPES_DEPRECATED_WRITE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Act type {data.act_type.value} is not an état-civil write path (use mobility/census modules)",
+        )
+    if data.act_type.value not in ACT_TYPES_ENABLED:
+        raise HTTPException(status_code=400, detail=f"Act type {data.act_type.value} disabled by config")
     prefix = data.act_type.value[:3]
     number = data.act_number or _act_number(prefix, data.commune_code)
     payload = dict(data.payload or {})
@@ -118,10 +129,14 @@ async def create_act(
         if data.related_citizen_ids
         else None,
         payload=payload,
+        created_by=actor_id,
+        verification_code=uuid.uuid4().hex[:16].upper(),
+        bureau_id=getattr(data, "bureau_id", None),
     )
     if data.status == ActStatus.VALIDATED:
         act.issued_at = datetime.now(UTC)
         act.validated_by = actor_id
+        act.registered_at = act.issued_at
     db.add(act)
     await db.flush()
     # QR = référence signée vers l'acte (pas de PII)
@@ -139,6 +154,229 @@ async def create_act(
     await db.commit()
     await db.refresh(act)
     return act
+
+
+async def transition_act_status(
+    db: AsyncSession,
+    act_id: uuid.UUID,
+    target_status: str,
+    *,
+    actor_id: uuid.UUID | None = None,
+) -> CivilAct:
+    from fastapi import HTTPException
+
+    from apps.api.domains.civil_config import can_transition
+    from apps.api.domains.audit.services import write_audit
+
+    act = await get_act(db, act_id)
+    if act is None or act.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Act not found")
+    if not can_transition(act.status, target_status):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Illegal transition {act.status} → {target_status}",
+        )
+    old = act.status
+    act.status = target_status
+    act.version = int(act.version or 1) + 1
+    now = datetime.now(UTC)
+    if target_status == ActStatus.VALIDATED.value:
+        act.issued_at = now
+        act.validated_by = actor_id
+        act.registered_at = now
+    if target_status == ActStatus.ARCHIVED.value:
+        act.archived_at = now
+    await write_audit(
+        db,
+        action="civil.act.transition",
+        actor_id=actor_id,
+        resource_type="civil_act",
+        resource_id=str(act.id),
+        old_value={"status": old},
+        new_value={"status": target_status},
+        commit=False,
+    )
+    await db.commit()
+    await db.refresh(act)
+    return act
+
+
+async def soft_delete_act(
+    db: AsyncSession, act_id: uuid.UUID, *, actor_id: uuid.UUID | None = None
+) -> CivilAct:
+    from fastapi import HTTPException
+
+    from apps.api.domains.audit.services import write_audit
+
+    act = await get_act(db, act_id)
+    if act is None:
+        raise HTTPException(status_code=404, detail="Act not found")
+    if act.status == ActStatus.VALIDATED.value:
+        raise HTTPException(
+            status_code=403,
+            detail="Validated acts cannot be deleted; archive or rectify instead",
+        )
+    act.deleted_at = datetime.now(UTC)
+    await write_audit(
+        db,
+        action="civil.act.soft_delete",
+        actor_id=actor_id,
+        resource_type="civil_act",
+        resource_id=str(act.id),
+        commit=False,
+    )
+    await db.commit()
+    await db.refresh(act)
+    return act
+
+
+async def add_mention(
+    db: AsyncSession,
+    *,
+    target_act_id: uuid.UUID,
+    mention_type: str,
+    source_act_id: uuid.UUID | None = None,
+    authority: str | None = None,
+    reference: str | None = None,
+    justificatif: str | None = None,
+    actor_id: uuid.UUID | None = None,
+) -> Any:
+    from datetime import date as date_cls
+
+    from fastapi import HTTPException
+
+    from apps.api.domains.audit.services import write_audit
+    from apps.api.domains.etat_civil.models import Mention
+
+    target = await get_act(db, target_act_id)
+    if target is None or target.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Target act not found")
+    if target.status not in {ActStatus.VALIDATED.value, ActStatus.ARCHIVED.value}:
+        raise HTTPException(status_code=409, detail="Mentions only on validated/archived acts")
+    row = Mention(
+        target_act_id=target_act_id,
+        mention_type=mention_type,
+        source_act_id=source_act_id,
+        authority=authority,
+        mention_date=date_cls.today(),
+        reference=reference,
+        justificatif=justificatif,
+        created_by=actor_id,
+    )
+    db.add(row)
+    await db.flush()
+    await write_audit(
+        db,
+        action="civil.mention.add",
+        actor_id=actor_id,
+        resource_type="mention",
+        resource_id=str(row.id),
+        new_value={"target_act_id": str(target_act_id), "mention_type": mention_type},
+        commit=False,
+    )
+    await db.commit()
+    await db.refresh(row)
+    return row
+
+
+async def create_filiation(
+    db: AsyncSession,
+    *,
+    relation_type: str,
+    parent_citizen_id: uuid.UUID | None = None,
+    child_citizen_id: uuid.UUID | None = None,
+    parent_label: str | None = None,
+    child_label: str | None = None,
+    act_id: uuid.UUID | None = None,
+    actor_id: uuid.UUID | None = None,
+) -> Any:
+    from apps.api.domains.audit.services import write_audit
+    from apps.api.domains.etat_civil.models import Filiation
+
+    row = Filiation(
+        relation_type=relation_type,
+        parent_citizen_id=parent_citizen_id,
+        child_citizen_id=child_citizen_id,
+        parent_label=parent_label,
+        child_label=child_label,
+        act_id=act_id,
+        source="ACT",
+        status="ACTIVE",
+    )
+    db.add(row)
+    await db.flush()
+    await write_audit(
+        db,
+        action="civil.filiation.create",
+        actor_id=actor_id,
+        resource_type="filiation",
+        resource_id=str(row.id),
+        new_value={"relation_type": relation_type},
+        commit=False,
+    )
+    await db.commit()
+    await db.refresh(row)
+    return row
+
+
+async def person_civil_history(db: AsyncSession, citizen_id: uuid.UUID) -> list[dict[str, Any]]:
+    """Chronologie dérivée des actes (pas un champ texte manuel)."""
+    stmt = (
+        select(CivilAct)
+        .where(CivilAct.citizen_id == citizen_id, CivilAct.deleted_at.is_(None))
+        .order_by(CivilAct.created_at.asc())
+    )
+    acts = list((await db.execute(stmt)).scalars().all())
+    # Related parties stored in JSONB — filter in Python for portability.
+    extra = list(
+        (
+            await db.execute(
+                select(CivilAct).where(CivilAct.deleted_at.is_(None)).limit(500)
+            )
+        ).scalars().all()
+    )
+    cid = str(citizen_id)
+    related = [
+        a
+        for a in extra
+        if a.related_citizen_ids and cid in [str(x) for x in (a.related_citizen_ids or [])]
+    ]
+    seen: set[uuid.UUID] = set()
+    events: list[dict[str, Any]] = []
+    for act in acts + related:
+        if act.id in seen:
+            continue
+        seen.add(act.id)
+        events.append(
+            {
+                "at": act.issued_at or act.created_at,
+                "act_type": act.act_type,
+                "act_number": act.act_number,
+                "status": act.status,
+                "act_id": str(act.id),
+            }
+        )
+    events.sort(key=lambda e: e["at"] or datetime.min.replace(tzinfo=UTC))
+    return events
+
+
+async def verify_document_code(db: AsyncSession, code: str) -> dict[str, Any]:
+    """Public verification — minimal disclosure."""
+    act = await db.scalar(
+        select(CivilAct).where(
+            CivilAct.verification_code == code.upper().strip(),
+            CivilAct.deleted_at.is_(None),
+        )
+    )
+    if act is None or act.status not in {ActStatus.VALIDATED.value, ActStatus.ARCHIVED.value}:
+        return {"status": "DOCUMENT_INVALIDE"}
+    return {
+        "status": "DOCUMENT_VALIDE",
+        "act_type": act.act_type,
+        "act_number": act.act_number,
+        "commune_code": act.commune_code,
+        "issued_at": act.issued_at.isoformat() if act.issued_at else None,
+    }
 
 
 async def get_act(db: AsyncSession, act_id: uuid.UUID) -> CivilAct | None:

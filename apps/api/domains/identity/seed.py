@@ -11,10 +11,17 @@ from apps.api.domains.identity.models import Permission, Role
 
 SEED_ROLES: list[dict[str, str]] = [
     {"code": "CENTRAL_ADMIN", "name": "Administrateur central", "description": "Administration complète"},
+    {"code": "SUPER_ADMIN_NATIONAL", "name": "Super admin national", "description": "Configuration globale (exceptionnel)"},
+    {"code": "ADMIN_NATIONAL", "name": "Administrateur national", "description": "Gestion utilisateurs nationaux"},
+    {"code": "ADMIN_PROVINCIAL", "name": "Administrateur provincial", "description": "Périmètre une province"},
+    {"code": "RESPONSABLE_BUREAU", "name": "Responsable de bureau", "description": "Supervision d'un bureau d'état civil"},
+    {"code": "OFFICIER_ETAT_CIVIL", "name": "Officier d'état civil", "description": "Validation/authentification d'actes"},
+    {"code": "AGENT_ETAT_CIVIL", "name": "Agent d'état civil", "description": "Préparation des dossiers (sans validation)"},
+    {"code": "AUDITEUR", "name": "Auditeur", "description": "Consultation des journaux d'audit"},
     {"code": "CENSUS_AGENT", "name": "Agent de recensement", "description": "Recensement terrain"},
     {"code": "CENSUS_SUPERVISOR", "name": "Superviseur recensement", "description": "Validation fiches terrain"},
     {"code": "ZD_ADMIN", "name": "Administrateur ZD", "description": "Administration d'une ou plusieurs zones de dénombrement"},
-    {"code": "CIVIL_OFFICER", "name": "Officier d'état civil", "description": "Actes d'état civil"},
+    {"code": "CIVIL_OFFICER", "name": "Officier d'état civil (compat)", "description": "Alias compat — préférer OFFICIER_ETAT_CIVIL"},
     {"code": "HEALTH_AGENT", "name": "Agent de santé", "description": "Déclarations sanitaires"},
     {"code": "MINISTRY_HEALTH", "name": "Ministère de la Santé", "description": "Statistiques santé nationales anonymisées"},
     {"code": "MINISTRY_STATS", "name": "Statistiques ministérielles", "description": "Stats ministère"},
@@ -36,8 +43,79 @@ IAM_PERMISSIONS: list[dict[str, str]] = [
     {"code": "interop:manage", "name": "Gérer l'interopérabilité", "resource": "interop", "action": "manage"},
 ]
 
-# Role → permission codes (least privilege; CENTRAL_ADMIN gets all via grant-all).
+# Role → permission codes (least privilege; CENTRAL_ADMIN / SUPER_ADMIN get all via grant-all).
 ROLE_PERMISSION_MAP: dict[str, tuple[str, ...]] = {
+    "SUPER_ADMIN_NATIONAL": (),  # filled with all in seed loop
+    "ADMIN_NATIONAL": (
+        "users:manage",
+        "roles:manage",
+        "permissions:read",
+        "audit:read",
+        "institutions:manage",
+        "personnel:read",
+        "personnel:manage",
+        "assignment:read",
+        "assignment:manage",
+        "bureau:read",
+        "bureau:manage",
+        "account_request:create",
+        "account_request:manage",
+    ),
+    "ADMIN_PROVINCIAL": (
+        "users:manage",
+        "personnel:read",
+        "personnel:manage",
+        "assignment:read",
+        "assignment:manage",
+        "bureau:read",
+        "bureau:manage",
+        "account_request:create",
+        "account_request:manage",
+        "civil:act:read",
+        "civil:stats:read",
+        "audit:read",
+    ),
+    "RESPONSABLE_BUREAU": (
+        "personnel:read",
+        "assignment:read",
+        "bureau:read",
+        "account_request:create",
+        "civil:act:read",
+        "civil:stats:read",
+    ),
+    "OFFICIER_ETAT_CIVIL": (
+        "civil:act:read",
+        "civil:act:write",
+        "civil:act:validate",
+        "civil:act:authenticate",
+        "civil:stats:read",
+        "civil:declaration:create",
+        "registry:citizen:read",
+        "registry:citizen:create",
+        "registry:citizen:validate",
+        "documents:read",
+        "documents:write",
+        "cards:issue",
+        "cards:manage",
+        "bureau:read",
+    ),
+    "AGENT_ETAT_CIVIL": (
+        "civil:act:read",
+        "civil:act:write",
+        "civil:declaration:create",
+        "registry:citizen:read",
+        "registry:citizen:create",
+        "documents:read",
+        "documents:write",
+        "bureau:read",
+    ),
+    "AUDITEUR": (
+        "audit:read",
+        "civil:act:read",
+        "permissions:read",
+        "personnel:read",
+        "bureau:read",
+    ),
     "CENSUS_AGENT": (
         "census:sync",
         "registry:citizen:create",
@@ -62,6 +140,7 @@ ROLE_PERMISSION_MAP: dict[str, tuple[str, ...]] = {
         "civil:act:read",
         "civil:act:write",
         "civil:act:validate",
+        "civil:act:authenticate",
         "civil:stats:read",
         "civil:declaration:create",
         "registry:citizen:read",
@@ -71,6 +150,7 @@ ROLE_PERMISSION_MAP: dict[str, tuple[str, ...]] = {
         "documents:write",
         "cards:issue",
         "cards:manage",
+        "bureau:read",
     ),
     "HEALTH_AGENT": (
         "health:declare",
@@ -169,7 +249,7 @@ async def seed_roles_and_permissions(db: AsyncSession) -> None:
             assert role is not None
 
         current = {p.code for p in role.permissions}
-        if role.code == "CENTRAL_ADMIN":
+        if role.code in {"CENTRAL_ADMIN", "SUPER_ADMIN_NATIONAL"}:
             wanted = set(perm_by_code.keys())
         else:
             wanted = set(ROLE_PERMISSION_MAP.get(role.code, ()))

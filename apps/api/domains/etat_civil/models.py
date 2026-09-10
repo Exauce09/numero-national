@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text, UniqueConstraint, func, text
+from sqlalchemy import Date, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -55,6 +55,19 @@ class CivilAct(Base):
     )
     issued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     validated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    bureau_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("etat_civil.bureaux_etat_civil.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    declaration_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    registered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    verification_code: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -169,6 +182,174 @@ class CorrectionRequest(Base):
         String(32), nullable=False, default="SUBMITTED", server_default="SUBMITTED"
     )
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class Filiation(Base):
+    """Lien de filiation historisé (ne remplace pas silencieusement)."""
+
+    __tablename__ = "filiations"
+    __table_args__ = {"schema": "etat_civil"}
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
+    parent_citizen_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    child_citizen_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    parent_label: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    child_label: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    relation_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    source: Mapped[str] = mapped_column(String(64), nullable=False, default="ACT")
+    act_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("etat_civil.civil_acts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="ACTIVE")
+    established_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    ended_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class Mention(Base):
+    """Mention marginale associée à un acte existant."""
+
+    __tablename__ = "mentions"
+    __table_args__ = {"schema": "etat_civil"}
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
+    target_act_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("etat_civil.civil_acts.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    mention_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_act_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("etat_civil.civil_acts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    authority: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mention_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    justificatif: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class Transcription(Base):
+    """Transcription d'un acte établi ailleurs."""
+
+    __tablename__ = "transcriptions"
+    __table_args__ = {"schema": "etat_civil"}
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
+    source_act_ref: Mapped[str] = mapped_column(String(255), nullable=False)
+    source_place: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_authority: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    source_number: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    bureau_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("etat_civil.bureaux_etat_civil.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    citizen_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    resulting_act_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("etat_civil.civil_acts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="REGISTERED")
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class Declarant(Base):
+    """Déclarant distinct de la personne concernée."""
+
+    __tablename__ = "declarants"
+    __table_args__ = {"schema": "etat_civil"}
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
+    act_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("etat_civil.civil_acts.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    declaration_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("etat_civil.civil_declarations.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    citizen_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    relation_to_subject: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    justificatif: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class DocumentJustificatif(Base):
+    """Métadonnées de pièce — fichier hors SQL via storage_key."""
+
+    __tablename__ = "documents_justificatifs"
+    __table_args__ = {"schema": "etat_civil"}
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
+    act_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("etat_civil.civil_acts.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    doc_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    number: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    issued_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    issuer: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    storage_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    file_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="DEPOSITED")
+    deposited_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    deposited_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 

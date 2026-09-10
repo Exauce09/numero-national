@@ -36,7 +36,7 @@ export default function DocumentsPage() {
       beneficiaire_id: beneficiaire.id,
       beneficiaire_name: displayName(beneficiaire),
     };
-    const act = addAct("DOCUMENT", payload, beneficiaire.nic);
+    const act = await addAct("DOCUMENT", payload, beneficiaire.nic);
     setCreated(act);
   }
 

@@ -88,7 +88,7 @@ export default function DeclarationsPage() {
         lieu_naissance: String(d.payload.lieu_naissance ?? d.payload.facility_name ?? ""),
         etat_civil: "CELIBATAIRE",
       });
-      addAct(
+      await addAct(
         "BIRTH",
         {
           ...d.payload,
@@ -110,7 +110,7 @@ export default function DeclarationsPage() {
     if (d.declaration_type === "DEATH") {
       const name = String(d.payload.deceased_name ?? "INCONNU");
       const existing = getPersonByNic(String(d.payload.deceased_nic ?? ""));
-      addAct(
+      await addAct(
         "DEATH",
         {
           ...d.payload,

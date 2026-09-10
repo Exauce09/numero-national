@@ -21,11 +21,17 @@ from apps.api.domains.etat_civil.enums import (
     PERM_CIVIL_WRITE,
 )
 from apps.api.domains.etat_civil.schemas import (
+    ActTransitionRequest,
     CivilActCreate,
     CivilActRead,
     DeclarationCreate,
     DeclarationRead,
     DeclarationValidateRequest,
+    DocumentVerifyRequest,
+    FiliationCreate,
+    FiliationRead,
+    MentionCreate,
+    MentionRead,
     PopulationHit,
     PopulationSearchQuery,
     ResidenceCreate,
@@ -244,3 +250,109 @@ async def attach_document(
         "content_hash": doc.content_hash,
         "status": doc.status,
     }
+
+
+@router.post("/acts/{act_id}/transition", response_model=CivilActRead)
+async def transition_act(
+    act_id: UUID,
+    body: ActTransitionRequest,
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(require_permissions(PERM_CIVIL_VALIDATE)),
+) -> CivilActRead:
+    act = await services.transition_act_status(
+        db, act_id, body.status.value, actor_id=principal.actor_id
+    )
+    return CivilActRead.model_validate(act)
+
+
+@router.delete("/acts/{act_id}", response_model=CivilActRead)
+async def soft_delete_act(
+    act_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(require_permissions(PERM_CIVIL_WRITE)),
+) -> CivilActRead:
+    act = await services.soft_delete_act(db, act_id, actor_id=principal.actor_id)
+    return CivilActRead.model_validate(act)
+
+
+@router.post("/mentions", response_model=MentionRead, status_code=status.HTTP_201_CREATED)
+async def create_mention(
+    body: MentionCreate,
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(require_permissions(PERM_CIVIL_VALIDATE)),
+) -> MentionRead:
+    row = await services.add_mention(
+        db,
+        target_act_id=body.target_act_id,
+        mention_type=body.mention_type,
+        source_act_id=body.source_act_id,
+        authority=body.authority,
+        reference=body.reference,
+        justificatif=body.justificatif,
+        actor_id=principal.actor_id,
+    )
+    return MentionRead.model_validate(row)
+
+
+@router.post("/filiations", response_model=FiliationRead, status_code=status.HTTP_201_CREATED)
+async def create_filiation(
+    body: FiliationCreate,
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(require_permissions(PERM_CIVIL_WRITE)),
+) -> FiliationRead:
+    row = await services.create_filiation(
+        db,
+        relation_type=body.relation_type,
+        parent_citizen_id=body.parent_citizen_id,
+        child_citizen_id=body.child_citizen_id,
+        parent_label=body.parent_label,
+        child_label=body.child_label,
+        act_id=body.act_id,
+        actor_id=principal.actor_id,
+    )
+    return FiliationRead.model_validate(row)
+
+
+@router.get("/persons/{citizen_id}/history")
+async def person_history(
+    citizen_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _: Principal = Depends(require_permissions(PERM_CIVIL_READ)),
+) -> dict:
+    events = await services.person_civil_history(db, citizen_id)
+    return {"citizen_id": str(citizen_id), "events": events}
+
+
+@router.post("/documents/verify")
+async def verify_document(
+    body: DocumentVerifyRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Public document authenticity check — no full PII."""
+    return await services.verify_document_code(db, body.code)
+
+
+@router.get("/config")
+async def civil_config(
+    _: Principal = Depends(require_permissions(PERM_CIVIL_READ)),
+) -> dict:
+    from apps.api.domains.civil_config import public_config
+
+    return public_config()
+
+
+# Alias for frontend mismatch documents vs documents-acts
+router.add_api_route(
+    "/documents",
+    _act_create(ActType.DOCUMENT),
+    methods=["POST"],
+    response_model=CivilActRead,
+    include_in_schema=False,
+)
+router.add_api_route(
+    "/documents",
+    _act_list(ActType.DOCUMENT),
+    methods=["GET"],
+    response_model=list[CivilActRead],
+    include_in_schema=False,
+)

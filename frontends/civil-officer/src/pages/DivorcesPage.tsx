@@ -55,7 +55,7 @@ export default function DivorcesPage() {
       temoin2_name: temoin2 ? displayName(temoin2) : null,
       date_divorce: dateDivorce,
     };
-    const act = addAct("DIVORCE", payload, epoux.nic);
+    const act = await addAct("DIVORCE", payload, epoux.nic);
     markMarriageDivorced(numeroMariage);
     updatePerson(epoux.id, { etat_civil: "DIVORCE" });
     updatePerson(epouse.id, { etat_civil: "DIVORCE" });

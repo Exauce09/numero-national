@@ -84,6 +84,13 @@ async def register(
     """
     await seed_roles_and_permissions(db)
     actor = await _require_register_actor(request, db, settings)
+    from apps.api.domains.identity.iam_services import PRIVILEGED_ROLES
+
+    if actor is None and set(payload.role_codes or []) & PRIVILEGED_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot self-assign privileged administrative roles",
+        )
     user = await identity_services.register_user(db, payload)
     ip, device = _client_meta(request)
     await write_audit(
@@ -440,6 +447,9 @@ async def assign_roles(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> UserMe:
+    from apps.api.domains.identity.iam_services import assert_not_self_privilege
+
+    assert_not_self_privilege(current_user, user_id, payload.role_codes)
     user = await identity_services.assign_roles_to_user(db, user_id, payload.role_codes)
     ip, device = _client_meta(request)
     await write_audit(

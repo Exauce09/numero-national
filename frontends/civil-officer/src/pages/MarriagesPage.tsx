@@ -71,7 +71,7 @@ export default function MarriagesPage() {
       motif,
       date_mariage: dateMariage,
     };
-    const act = addAct("MARRIAGE", payload, conjoint.nic);
+    const act = await addAct("MARRIAGE", payload, conjoint.nic);
     addMarriageLink(act.act_number, conjoint.id, conjointe.id);
     updatePerson(conjoint.id, { etat_civil: "MARIE" });
     updatePerson(conjointe.id, { etat_civil: "MARIE" });

@@ -34,7 +34,7 @@ export default function DisplacementsPage() {
       officier_id: officier?.id ?? null,
       officier_name: officier ? displayName(officier) : null,
     };
-    const act = addAct("DISPLACEMENT", payload, personne.nic);
+    const act = await addAct("DISPLACEMENT", payload, personne.nic);
     setCreated(act);
   }
 
