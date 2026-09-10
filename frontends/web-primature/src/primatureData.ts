@@ -1,6 +1,6 @@
 /**
  * Données Primature — lecture seule des informations relevant
- * de la coordination gouvernementale dans le système E-GOUV.
+ * de la coordination gouvernementale (stockage local vierge).
  */
 
 export type MinistryStatus = "OK" | "ATTENTION" | "CRITIQUE" | "HORS_LIGNE";
@@ -80,14 +80,6 @@ export type PrimatureSnapshot = {
 
 const STORE_KEY = "nn_primature_store_v2";
 
-function hoursAgo(h: number): string {
-  return new Date(Date.now() - h * 3600_000).toISOString();
-}
-
-function daysAgo(d: number): string {
-  return new Date(Date.now() - d * 86400000).toISOString();
-}
-
 function emptySnapshot(): PrimatureSnapshot {
   return {
     ministries: [],
@@ -104,10 +96,6 @@ function emptySnapshot(): PrimatureSnapshot {
   };
 }
 
-function seedSnapshot(): PrimatureSnapshot {
-  return emptySnapshot();
-}
-
 function readStore(): PrimatureSnapshot | null {
   try {
     const raw = localStorage.getItem(STORE_KEY);
@@ -119,11 +107,6 @@ function readStore(): PrimatureSnapshot | null {
 }
 
 export function getPrimatureSnapshot(): PrimatureSnapshot {
-  try {
-    localStorage.removeItem("nn_primature_store_v1");
-  } catch {
-    /* ignore */
-  }
   let snap = readStore();
   if (!snap) {
     snap = emptySnapshot();
@@ -132,10 +115,71 @@ export function getPrimatureSnapshot(): PrimatureSnapshot {
   return { ...snap, updated_at: new Date().toISOString() };
 }
 
+export function savePrimatureSnapshot(snap: PrimatureSnapshot): PrimatureSnapshot {
+  const next = { ...snap, updated_at: new Date().toISOString() };
+  localStorage.setItem(STORE_KEY, JSON.stringify(next));
+  return next;
+}
+
 export function refreshPrimatureSnapshot(): PrimatureSnapshot {
-  const snap = seedSnapshot();
+  const snap = emptySnapshot();
   localStorage.setItem(STORE_KEY, JSON.stringify(snap));
   return snap;
+}
+
+export function upsertMinistry(row: MinistryRow): PrimatureSnapshot {
+  const s = getPrimatureSnapshot();
+  const idx = s.ministries.findIndex((m) => m.id === row.id);
+  if (idx >= 0) s.ministries[idx] = row;
+  else s.ministries = [row, ...s.ministries];
+  return savePrimatureSnapshot(s);
+}
+
+export function upsertDossier(row: DossierRow): PrimatureSnapshot {
+  const s = getPrimatureSnapshot();
+  const idx = s.dossiers.findIndex((d) => d.id === row.id);
+  if (idx >= 0) s.dossiers[idx] = row;
+  else s.dossiers = [row, ...s.dossiers];
+  return savePrimatureSnapshot(s);
+}
+
+export function upsertAlert(row: AlertRow): PrimatureSnapshot {
+  const s = getPrimatureSnapshot();
+  const idx = s.alerts.findIndex((a) => a.id === row.id);
+  if (idx >= 0) s.alerts[idx] = row;
+  else s.alerts = [row, ...s.alerts];
+  return savePrimatureSnapshot(s);
+}
+
+export function upsertIndicator(row: IndicatorRow): PrimatureSnapshot {
+  const s = getPrimatureSnapshot();
+  const idx = s.indicators.findIndex((i) => i.id === row.id);
+  if (idx >= 0) s.indicators[idx] = row;
+  else s.indicators = [row, ...s.indicators];
+  return savePrimatureSnapshot(s);
+}
+
+export function upsertBriefing(row: BriefingItem): PrimatureSnapshot {
+  const s = getPrimatureSnapshot();
+  const idx = s.briefing.findIndex((b) => b.id === row.id);
+  if (idx >= 0) s.briefing[idx] = row;
+  else s.briefing = [row, ...s.briefing];
+  return savePrimatureSnapshot(s);
+}
+
+export function setPrimatureKpis(
+  partial: Partial<
+    Pick<
+      PrimatureSnapshot,
+      | "population_total"
+      | "civil_acts_month"
+      | "health_declarations_month"
+      | "interior_movements_month"
+      | "cards_active"
+    >
+  >,
+): PrimatureSnapshot {
+  return savePrimatureSnapshot({ ...getPrimatureSnapshot(), ...partial });
 }
 
 export function dashboardKpis() {
@@ -155,23 +199,14 @@ export function dashboardKpis() {
 }
 
 export function monthlyCoordinationTrends() {
-  const s = getPrimatureSnapshot();
   const months: string[] = [];
   const now = new Date();
   for (let i = 11; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     months.push(`${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(2)}`);
   }
-  const zero = months.map(() => 0);
-  // Pas de série simulée : afficher 0 jusqu'à branchement sur agrégats PostgreSQL datés.
-  void s;
-  return {
-    months,
-    civil: zero,
-    sante: zero,
-    interieur: zero,
-    alertes: zero,
-  };
+  const zeros = months.map(() => 0);
+  return { months, civil: zeros, sante: zeros, interieur: zeros, alertes: zeros };
 }
 
 export const STATUS_LABELS: Record<MinistryStatus, string> = {

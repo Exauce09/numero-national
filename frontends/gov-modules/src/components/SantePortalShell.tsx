@@ -2,7 +2,7 @@ import type { FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
-  DEMO_CREDENTIALS,
+  PORTAL_CREDENTIALS,
   clearSession,
   getSession,
   setActivePortal,
@@ -81,7 +81,7 @@ export default function SantePortalShell({ nav, children }: Props) {
     e.preventDefault();
     setPwdMsg(null);
     setPwdError(null);
-    const demo = DEMO_CREDENTIALS.sante;
+    const demo = PORTAL_CREDENTIALS.sante;
     const current = prefs.passwordOverride || demo.password;
     if (currentPwd !== current) {
       setPwdError("Mot de passe actuel incorrect.");

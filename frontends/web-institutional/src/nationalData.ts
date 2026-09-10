@@ -1,6 +1,7 @@
 /**
  * Agrégats nationaux — Présidence.
- * Uniquement données enregistrées (registre civil / santé). Aucun seed fictif.
+ * Stockage local vierge ; fusionne uniquement les données réellement
+ * présentes (registre civil / santé / comptes officiers) dans ce navigateur.
  */
 
 export type Gft = { g: number; f: number; t: number };
@@ -52,11 +53,10 @@ export type NationalSnapshot = {
   updated_at: string;
 };
 
-/** v2 invalide l'ancien store de seed fictive */
 const STORE_KEY = "nn_presidence_national_v2";
 const REGISTRY_KEY = "nn_civil_registry_v1";
-const HEALTH_ACCOUNTS_KEY = "nn_health_facility_accounts";
-const DEMO_STORE_KEY = "nn_civil_demo_store";
+const HEALTH_ACCOUNTS_KEY = "nn_health_facility_accounts_v2";
+const CIVIL_DECL_STORE_KEY = "nn_civil_demo_store";
 const OFFICER_ACCOUNTS_KEY = "nn_civil_officer_accounts";
 
 function emptyGft(): Gft {
@@ -98,13 +98,7 @@ function readJson<T>(key: string): T | null {
 }
 
 function mergeLiveData(base: NationalSnapshot): NationalSnapshot {
-  const next: NationalSnapshot = {
-    ...base,
-    population_by_province: [...base.population_by_province],
-    civil_offices: [...base.civil_offices],
-    health_facilities: [...base.health_facilities],
-    acts: [...base.acts],
-  };
+  const next = { ...base };
 
   const registry = readJson<{
     persons?: Array<{ sexe?: string; province?: string; lieu_naissance?: string }>;
@@ -119,33 +113,20 @@ function mergeLiveData(base: NationalSnapshot): NationalSnapshot {
 
   if (registry?.persons?.length) {
     const persons = registry.persons;
-    next.population_total = persons.length;
+    next.population_total = Math.max(next.population_total, persons.length);
     next.population_m = persons.filter((p) => String(p.sexe ?? "M").toUpperCase() !== "F").length;
     next.population_f = persons.filter((p) => String(p.sexe ?? "").toUpperCase() === "F").length;
-    const byProv = new Map<string, { total: number; m: number; f: number }>();
-    for (const p of persons) {
-      const prov = String(p.province || p.lieu_naissance || "Non renseigné");
-      const row = byProv.get(prov) ?? { total: 0, m: 0, f: 0 };
-      row.total += 1;
-      if (String(p.sexe ?? "").toUpperCase() === "F") row.f += 1;
-      else row.m += 1;
-      byProv.set(prov, row);
-    }
-    next.population_by_province = [...byProv.entries()].map(([province, v]) => ({
-      province,
-      ...v,
-    }));
   }
 
   if (registry?.acts?.length) {
     const acts = registry.acts;
     const count = (t: string) => acts.filter((a) => String(a.type).toUpperCase() === t).length;
-    next.births = count("BIRTH");
-    next.deaths = count("DEATH");
-    next.marriages = count("MARRIAGE");
-    next.divorces = count("DIVORCE");
-    next.documents = count("DOCUMENT");
-    next.acts = acts.map((a) => ({
+    next.births = Math.max(next.births, count("BIRTH"));
+    next.deaths = Math.max(next.deaths, count("DEATH"));
+    next.marriages = Math.max(next.marriages, count("MARRIAGE"));
+    next.divorces = Math.max(next.divorces, count("DIVORCE"));
+    next.documents = Math.max(next.documents, count("DOCUMENT"));
+    const liveActs: ActRow[] = acts.slice(0, 40).map((a) => ({
       id: a.id,
       type: String(a.type ?? "DOCUMENT").toUpperCase(),
       commune: String(a.payload?.commune_name ?? a.payload?.commune_code ?? "—"),
@@ -158,6 +139,7 @@ function mergeLiveData(base: NationalSnapshot): NationalSnapshot {
       sexe: a.payload?.sexe ? String(a.payload.sexe) : undefined,
       created_at: String(a.created_at ?? new Date().toISOString()),
     }));
+    next.acts = [...liveActs, ...next.acts].slice(0, 50);
   }
 
   const healthAccounts = readJson<
@@ -172,14 +154,10 @@ function mergeLiveData(base: NationalSnapshot): NationalSnapshot {
   >(HEALTH_ACCOUNTS_KEY);
 
   if (healthAccounts?.length) {
-    const store = readJson<{
-      declarations?: Array<{
-        declaration_type?: string;
-        payload?: Record<string, unknown>;
-        status?: string;
-      }>;
-    }>(DEMO_STORE_KEY);
-    const decls = store?.declarations ?? [];
+    const demo = readJson<{ declarations?: Array<{ declaration_type?: string; payload?: Record<string, unknown>; status?: string }> }>(
+      CIVIL_DECL_STORE_KEY,
+    );
+    const decls = demo?.declarations ?? [];
     next.health_facilities = healthAccounts.map((a) => {
       const mine = decls.filter((d) => String(d.payload?.facility_id ?? "") === a.id);
       return {
@@ -195,15 +173,9 @@ function mergeLiveData(base: NationalSnapshot): NationalSnapshot {
     });
   }
 
-  const officers = readJson<
-    Array<{
-      id?: string;
-      username?: string;
-      commune_name?: string;
-      commune_code?: string;
-      province?: string;
-    }>
-  >(OFFICER_ACCOUNTS_KEY);
+  const officers = readJson<Array<{ id?: string; username?: string; commune_name?: string; commune_code?: string; province?: string }>>(
+    OFFICER_ACCOUNTS_KEY,
+  );
   if (officers?.length) {
     next.civil_offices = officers.map((o, i) => ({
       id: o.id ?? `off-${i}`,
@@ -221,21 +193,68 @@ function mergeLiveData(base: NationalSnapshot): NationalSnapshot {
 }
 
 export function getNationalSnapshot(): NationalSnapshot {
-  try {
-    localStorage.removeItem("nn_presidence_national_v1");
-  } catch {
-    /* ignore */
+  let base = readJson<NationalSnapshot>(STORE_KEY);
+  if (!base) {
+    base = emptySnapshot();
+    localStorage.setItem(STORE_KEY, JSON.stringify(base));
   }
-  const base = readJson<NationalSnapshot>(STORE_KEY) ?? emptySnapshot();
-  const merged = mergeLiveData({ ...emptySnapshot(), ...base, acts: base.acts ?? [] });
-  localStorage.setItem(STORE_KEY, JSON.stringify(merged));
-  return merged;
+  return mergeLiveData(base);
+}
+
+export function saveNationalSnapshot(snap: NationalSnapshot): NationalSnapshot {
+  const next = { ...snap, updated_at: new Date().toISOString() };
+  localStorage.setItem(STORE_KEY, JSON.stringify(next));
+  return mergeLiveData(next);
 }
 
 export function refreshNationalSnapshot(): NationalSnapshot {
-  const snap = mergeLiveData(emptySnapshot());
+  const snap = emptySnapshot();
   localStorage.setItem(STORE_KEY, JSON.stringify(snap));
-  return snap;
+  return mergeLiveData(snap);
+}
+
+export function upsertCivilOffice(office: CivilOffice): NationalSnapshot {
+  const base = readJson<NationalSnapshot>(STORE_KEY) ?? emptySnapshot();
+  const idx = base.civil_offices.findIndex((o) => o.id === office.id);
+  if (idx >= 0) base.civil_offices[idx] = office;
+  else base.civil_offices = [office, ...base.civil_offices];
+  return saveNationalSnapshot(base);
+}
+
+export function upsertHealthFacility(facility: HealthFacility): NationalSnapshot {
+  const base = readJson<NationalSnapshot>(STORE_KEY) ?? emptySnapshot();
+  const idx = base.health_facilities.findIndex((f) => f.id === facility.id);
+  if (idx >= 0) base.health_facilities[idx] = facility;
+  else base.health_facilities = [facility, ...base.health_facilities];
+  return saveNationalSnapshot(base);
+}
+
+export function upsertAct(act: ActRow): NationalSnapshot {
+  const base = readJson<NationalSnapshot>(STORE_KEY) ?? emptySnapshot();
+  const idx = base.acts.findIndex((a) => a.id === act.id);
+  if (idx >= 0) base.acts[idx] = act;
+  else base.acts = [act, ...base.acts];
+  const count = (t: string) => base.acts.filter((a) => a.type === t).length;
+  base.births = count("BIRTH");
+  base.deaths = count("DEATH");
+  base.marriages = count("MARRIAGE");
+  base.divorces = count("DIVORCE");
+  base.documents = count("DOCUMENT");
+  return saveNationalSnapshot(base);
+}
+
+export function setPopulationTotals(input: {
+  total: number;
+  m: number;
+  f: number;
+  by_province?: NationalSnapshot["population_by_province"];
+}): NationalSnapshot {
+  const base = readJson<NationalSnapshot>(STORE_KEY) ?? emptySnapshot();
+  base.population_total = input.total;
+  base.population_m = input.m;
+  base.population_f = input.f;
+  if (input.by_province) base.population_by_province = input.by_province;
+  return saveNationalSnapshot(base);
 }
 
 export function synopticBirthsNational() {
@@ -308,7 +327,7 @@ export const TYPE_LABELS: Record<string, string> = {
   DOCUMENT: "Document",
 };
 
-/** Série mensuelle uniquement sur actes enregistrés (pas de courbe simulée). */
+/** Série mensuelle (12 mois) — uniquement à partir des actes réellement saisis. */
 export function monthlyTrends() {
   const snap = getNationalSnapshot();
   const months: string[] = [];
@@ -328,6 +347,7 @@ export function monthlyTrends() {
         return at.getFullYear() === y && at.getMonth() === m;
       }).length;
     });
+
   return {
     months,
     births: bucket("BIRTH"),

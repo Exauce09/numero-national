@@ -7,8 +7,8 @@ export type Session = {
 
 const KEY = "nn_session_primature";
 
-export const DEMO_USER = "primature";
-export const DEMO_PASSWORD = "DemoPrimature2026!";
+export const PORTAL_USER = "primature";
+export const PORTAL_PASSWORD = "Primature2026!";
 
 export function getSession(): Session | null {
   const raw = sessionStorage.getItem(KEY);
@@ -25,7 +25,7 @@ export function clearSession(): void {
 }
 
 function effectivePassword(): string {
-  return getPrimaturePrefs().passwordOverride || DEMO_PASSWORD;
+  return getPrimaturePrefs().passwordOverride || PORTAL_PASSWORD;
 }
 
 export function updatePrimaturePassword(currentPassword: string, nextPassword: string): void {
@@ -55,8 +55,8 @@ export async function login(username: string, password: string): Promise<Session
     /* API indisponible */
   }
 
-  if (user !== DEMO_USER || password !== effectivePassword()) {
-    throw new Error(`Identifiants incorrects. Démo : ${DEMO_USER} / ${DEMO_PASSWORD}`);
+  if (user !== PORTAL_USER || password !== effectivePassword()) {
+    throw new Error("Identifiants incorrects.");
   }
 
   const session: Session = { username: user };

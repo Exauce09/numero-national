@@ -1,6 +1,6 @@
 /**
  * Données Ministère de l'Intérieur — mouvements, déplacements,
- * documents manquants et parcours citoyen (démo dynamique).
+ * documents manquants et parcours citoyen (stockage local vierge).
  */
 
 export type MovementKind = "ENTREE" | "SORTIE" | "TRANSIT" | "RETOUR";
@@ -88,9 +88,7 @@ export type InteriorSnapshot = {
 
 const STORE_KEY = "nn_interior_store_v2";
 
-function fullName(c: Citizen): string {
-  return `${c.nom} ${c.postnom} ${c.prenom}`;
-}
+const PROVINCES = ["Kinshasa", "Kongo-Central", "Haut-Katanga", "Nord-Kivu", "Sud-Kivu", "Kasaï-Central"];
 
 function emptySnapshot(): InteriorSnapshot {
   return {
@@ -101,10 +99,6 @@ function emptySnapshot(): InteriorSnapshot {
     journey: [],
     updated_at: new Date().toISOString(),
   };
-}
-
-function seedSnapshot(): InteriorSnapshot {
-  return emptySnapshot();
 }
 
 function readStore(): InteriorSnapshot | null {
@@ -126,11 +120,6 @@ function tickDynamics(snap: InteriorSnapshot): InteriorSnapshot {
 }
 
 export function getInteriorSnapshot(): InteriorSnapshot {
-  try {
-    localStorage.removeItem("nn_interior_store_v1");
-  } catch {
-    /* ignore */
-  }
   let snap = readStore();
   if (!snap) {
     snap = emptySnapshot();
@@ -139,21 +128,60 @@ export function getInteriorSnapshot(): InteriorSnapshot {
   return tickDynamics(snap);
 }
 
+export function saveInteriorSnapshot(snap: InteriorSnapshot): InteriorSnapshot {
+  const next = { ...snap, updated_at: new Date().toISOString() };
+  localStorage.setItem(STORE_KEY, JSON.stringify(next));
+  return next;
+}
+
 export function refreshInteriorSnapshot(): InteriorSnapshot {
-  const snap = seedSnapshot();
+  const snap = emptySnapshot();
   localStorage.setItem(STORE_KEY, JSON.stringify(snap));
   return snap;
 }
 
+export function upsertCitizen(row: Citizen): InteriorSnapshot {
+  const s = getInteriorSnapshot();
+  const idx = s.citizens.findIndex((c) => c.id === row.id);
+  if (idx >= 0) s.citizens[idx] = row;
+  else s.citizens = [row, ...s.citizens];
+  return saveInteriorSnapshot(s);
+}
+
+export function upsertMovement(row: Movement): InteriorSnapshot {
+  const s = getInteriorSnapshot();
+  const idx = s.movements.findIndex((m) => m.id === row.id);
+  if (idx >= 0) s.movements[idx] = row;
+  else s.movements = [row, ...s.movements];
+  return saveInteriorSnapshot(s);
+}
+
+export function upsertDisplacement(row: Displacement): InteriorSnapshot {
+  const s = getInteriorSnapshot();
+  const idx = s.displacements.findIndex((d) => d.id === row.id);
+  if (idx >= 0) s.displacements[idx] = row;
+  else s.displacements = [row, ...s.displacements];
+  return saveInteriorSnapshot(s);
+}
+
+export function upsertMissingDoc(row: MissingDocument): InteriorSnapshot {
+  const s = getInteriorSnapshot();
+  const idx = s.missing_docs.findIndex((d) => d.id === row.id);
+  if (idx >= 0) s.missing_docs[idx] = row;
+  else s.missing_docs = [row, ...s.missing_docs];
+  return saveInteriorSnapshot(s);
+}
+
+export function upsertJourneyEvent(row: JourneyEvent): InteriorSnapshot {
+  const s = getInteriorSnapshot();
+  const idx = s.journey.findIndex((e) => e.id === row.id);
+  if (idx >= 0) s.journey[idx] = row;
+  else s.journey = [row, ...s.journey];
+  return saveInteriorSnapshot(s);
+}
+
 export function listProvinces(): string[] {
-  const snap = getInteriorSnapshot();
-  const set = new Set<string>();
-  snap.citizens.forEach((c) => set.add(c.province_residence));
-  snap.movements.forEach((m) => {
-    set.add(m.from_province);
-    set.add(m.to_province);
-  });
-  return [...set].sort((a, b) => a.localeCompare(b, "fr"));
+  return [...PROVINCES];
 }
 
 export function findCitizens(query: string): Citizen[] {
@@ -200,25 +228,40 @@ export function monthlyMovementTrends() {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     months.push(`${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(2)}`);
   }
-  const inMonth = (iso: string, y: number, m: number) => {
-    const at = new Date(iso);
-    return at.getFullYear() === y && at.getMonth() === m;
+  const countKind = (kind: MovementKind, i: number) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
+    const y = d.getFullYear();
+    const m = d.getMonth();
+    return s.movements.filter((mv) => {
+      if (mv.kind !== kind) return false;
+      const at = new Date(mv.date);
+      return at.getFullYear() === y && at.getMonth() === m;
+    }).length;
   };
-  const bucket = (items: { date?: string; date_depart?: string; detecte_le?: string; kind?: string }[], pred: (x: (typeof items)[0]) => boolean) =>
-    months.map((_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
-      return items.filter((x) => {
-        const iso = x.date ?? x.date_depart ?? x.detecte_le;
-        if (!iso || !pred(x)) return false;
-        return inMonth(iso, d.getFullYear(), d.getMonth());
-      }).length;
-    });
+  const countDisp = (i: number) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
+    const y = d.getFullYear();
+    const m = d.getMonth();
+    return s.displacements.filter((dp) => {
+      const at = new Date(dp.date_depart);
+      return at.getFullYear() === y && at.getMonth() === m;
+    }).length;
+  };
+  const countDocs = (i: number) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
+    const y = d.getFullYear();
+    const m = d.getMonth();
+    return s.missing_docs.filter((doc) => {
+      const at = new Date(doc.detecte_le);
+      return at.getFullYear() === y && at.getMonth() === m;
+    }).length;
+  };
   return {
     months,
-    entrees: bucket(s.movements, (m) => m.kind === "ENTREE" || m.kind === "RETOUR"),
-    sorties: bucket(s.movements, (m) => m.kind === "SORTIE"),
-    deplacements: bucket(s.displacements, () => true),
-    docs: bucket(s.missing_docs, () => true),
+    entrees: months.map((_, i) => countKind("ENTREE", i)),
+    sorties: months.map((_, i) => countKind("SORTIE", i)),
+    deplacements: months.map((_, i) => countDisp(i)),
+    docs: months.map((_, i) => countDocs(i)),
   };
 }
 

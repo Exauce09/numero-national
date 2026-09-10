@@ -13,12 +13,16 @@ const STORAGE_KEYS: Record<Portal, string> = {
   admin: "nn_session_gov_admin",
 };
 
-export const DEMO_CREDENTIALS: Record<Portal, { username: string; password: string }> = {
-  sante: { username: "sante", password: "DemoSante2026!" },
-  interieur: { username: "interieur", password: "DemoInterieur2026!" },
-  presidence: { username: "presidence", password: "DemoPresidence2026!" },
-  admin: { username: "admin", password: "DemoAdmin2026!" },
+/** Identifiants locaux (hors API) — non affichés dans l'UI. */
+export const PORTAL_CREDENTIALS: Record<Portal, { username: string; password: string }> = {
+  sante: { username: "sante", password: "Sante2026!" },
+  interieur: { username: "interieur", password: "Interieur2026!" },
+  presidence: { username: "presidence", password: "Presidence2026!" },
+  admin: { username: "admin", password: "Admin2026!" },
 };
+
+/** @deprecated alias pour compatibilité */
+export const DEMO_CREDENTIALS = PORTAL_CREDENTIALS;
 
 let activePortal: Portal | null = null;
 
@@ -70,12 +74,12 @@ export async function login(portal: Portal, username: string, password: string):
       return session;
     }
   } catch {
-    /* API indisponible — repli démo */
+    /* API indisponible — repli local */
   }
 
-  const demo = DEMO_CREDENTIALS[portal];
+  const portalCreds = PORTAL_CREDENTIALS[portal];
   const prefsRaw = portal === "sante" ? localStorage.getItem("nn_gov_sante_prefs") : null;
-  let effectivePassword = demo.password;
+  let effectivePassword = portalCreds.password;
   if (prefsRaw) {
     try {
       const parsed = JSON.parse(prefsRaw) as { passwordOverride?: string };
@@ -84,8 +88,8 @@ export async function login(portal: Portal, username: string, password: string):
       /* ignore */
     }
   }
-  if (user !== demo.username || password !== effectivePassword) {
-    throw new Error(`Identifiants incorrects. Compte démo : ${demo.username}`);
+  if (user !== portalCreds.username || password !== effectivePassword) {
+    throw new Error("Identifiants incorrects.");
   }
 
   const session: Session = { username: user, portal };

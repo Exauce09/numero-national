@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import ExportToolbar from "../components/ExportToolbar";
 import {
@@ -7,6 +7,7 @@ import {
   KIND_LABELS,
   getInteriorSnapshot,
   listProvinces,
+  upsertMovement,
   type DisplacementStatus,
   type DocStatus,
   type MovementKind,
@@ -53,6 +54,15 @@ export function MovementsPage() {
   const [kind, setKind] = useState("");
   const [province, setProvince] = useState("");
   const provinces = listProvinces();
+  const [nn, setNn] = useState("");
+  const [nom, setNom] = useState("");
+  const [newKind, setNewKind] = useState<MovementKind>("ENTREE");
+  const [fromP, setFromP] = useState("");
+  const [toP, setToP] = useState("");
+  const [fromC, setFromC] = useState("");
+  const [toC, setToC] = useState("");
+  const [motif, setMotif] = useState("");
+  const [formMsg, setFormMsg] = useState<string | null>(null);
 
   const rows = snap.movements.filter((m) => {
     if (kind && m.kind !== kind) return false;
@@ -73,12 +83,69 @@ export function MovementsPage() {
     canal: m.canal,
   }));
 
+  function onAdd(e: FormEvent) {
+    e.preventDefault();
+    setFormMsg(null);
+    if (!nn.trim() || !nom.trim() || !fromP.trim() || !toP.trim()) {
+      setFormMsg("NN, nom, provinces départ/arrivée requis.");
+      return;
+    }
+    upsertMovement({
+      id: `m-${Date.now().toString(36)}`,
+      citizen_id: "",
+      nn: nn.trim(),
+      nom_complet: nom.trim(),
+      kind: newKind,
+      from_province: fromP.trim(),
+      to_province: toP.trim(),
+      from_commune: fromC.trim() || "—",
+      to_commune: toC.trim() || "—",
+      motif: motif.trim() || "—",
+      date: new Date().toISOString(),
+      canal: "INTERIEUR",
+    });
+    setNn("");
+    setNom("");
+    setFromP("");
+    setToP("");
+    setFromC("");
+    setToC("");
+    setMotif("");
+    setFormMsg("Mouvement enregistré.");
+    setTick((n) => n + 1);
+  }
+
   return (
     <PageShell
       title="Mouvements"
-      lead="Entrées, sorties, transits et retours consolidés au niveau national."
+      lead="Registre vierge — saisissez les entrées, sorties, transits et retours."
       onRefresh={() => setTick((n) => n + 1)}
     >
+      <div className="panel no-print" style={{ marginBottom: "1rem" }}>
+        <h3 className="panel-title" style={{ marginTop: 0 }}>
+          Nouveau mouvement
+        </h3>
+        <form onSubmit={onAdd} className="toolbar" style={{ flexWrap: "wrap" }}>
+          <input className="form-control" placeholder="NN" value={nn} onChange={(e) => setNn(e.target.value)} />
+          <input className="form-control" placeholder="Nom complet" value={nom} onChange={(e) => setNom(e.target.value)} />
+          <select className="form-control" value={newKind} onChange={(e) => setNewKind(e.target.value as MovementKind)}>
+            {Object.entries(KIND_LABELS).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+          <input className="form-control" placeholder="Province départ" value={fromP} onChange={(e) => setFromP(e.target.value)} />
+          <input className="form-control" placeholder="Commune départ" value={fromC} onChange={(e) => setFromC(e.target.value)} />
+          <input className="form-control" placeholder="Province arrivée" value={toP} onChange={(e) => setToP(e.target.value)} />
+          <input className="form-control" placeholder="Commune arrivée" value={toC} onChange={(e) => setToC(e.target.value)} />
+          <input className="form-control" placeholder="Motif" value={motif} onChange={(e) => setMotif(e.target.value)} />
+          <button type="submit" className="btn-primary btn-sm">
+            Ajouter
+          </button>
+        </form>
+        {formMsg ? <p className="muted small">{formMsg}</p> : null}
+      </div>
       <div className="toolbar filters-bar no-print">
         <input className="form-control" placeholder="Rechercher citoyen, NN, motif…" value={q} onChange={(e) => setQ(e.target.value)} />
         <select className="form-control" value={kind} onChange={(e) => setKind(e.target.value)}>

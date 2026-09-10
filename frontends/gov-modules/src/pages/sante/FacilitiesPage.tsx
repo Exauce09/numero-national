@@ -1,184 +1,87 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { api, type Facility } from "../../api";
-import { FACILITY_TYPE_LABELS, listMinistryFacilities } from "../../santeData";
-
-type GeoItem = { id: string; code?: string; name: string };
-
-const BASE = import.meta.env.VITE_API_BASE ?? "/api/v1";
-
-async function fetchGeo<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`);
-  if (!res.ok) throw new Error(await res.text());
-  return (await res.json()) as T;
-}
+import { FormEvent, useMemo, useState } from "react";
+import { FACILITY_TYPE_LABELS, listMinistryFacilities, upsertFacilityAccount } from "../../santeData";
 
 export default function FacilitiesPage() {
-  const [tick, setTick] = useState(0);
-  const localRows = useMemo(() => listMinistryFacilities(), [tick]);
-  const [apiRows, setApiRows] = useState<Facility[]>([]);
+  const [tick, bump] = useState(0);
+  const rows = useMemo(() => listMinistryFacilities(), [tick]);
   const [q, setQ] = useState("");
   const [type, setType] = useState("ALL");
   const [onlyActive, setOnlyActive] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [ok, setOk] = useState<string | null>(null);
-
-  const [provinces, setProvinces] = useState<GeoItem[]>([]);
-  const [communes, setCommunes] = useState<GeoItem[]>([]);
-  const [provinceId, setProvinceId] = useState("");
-  const [communeId, setCommuneId] = useState("");
-  const [code, setCode] = useState("");
   const [name, setName] = useState("");
-  const [facilityType, setFacilityType] = useState("HOSPITAL");
+  const [facilityType, setFacilityType] = useState("HOPITAL");
+  const [province, setProvince] = useState("");
+  const [commune, setCommune] = useState("");
+  const [username, setUsername] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    void api.healthFacilities().then(setApiRows).catch(() => setApiRows([]));
-    void fetchGeo<GeoItem[]>("/geo/provinces")
-      .then(setProvinces)
-      .catch(() => setProvinces([]));
-  }, [tick]);
-
-  useEffect(() => {
-    if (!provinceId) {
-      setCommunes([]);
-      setCommuneId("");
-      return;
-    }
-    void fetchGeo<GeoItem[]>(`/geo/communes?province_id=${encodeURIComponent(provinceId)}`)
-      .then(setCommunes)
-      .catch(() => setCommunes([]));
-  }, [provinceId]);
-
-  async function onCreate(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setOk(null);
-    const prov = provinces.find((p) => p.id === provinceId);
-    const com = communes.find((c) => c.id === communeId);
-    if (!prov?.code) {
-      setError("Sélectionnez une province du référentiel.");
-      return;
-    }
-    try {
-      await api.healthFacilityCreate({
-        code: code.trim(),
-        name: name.trim(),
-        facility_type: facilityType,
-        province_code: prov.code,
-        commune_code: com?.code ?? null,
-      });
-      setOk("Structure créée et liée à la province/commune.");
-      setCode("");
-      setName("");
-      setCommuneId("");
-      setTick((n) => n + 1);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Création impossible");
-    }
-  }
-
-  const merged = [
-    ...apiRows.map((f) => ({
-      id: f.id,
-      name: f.name,
-      facility_type: f.facility_type ?? "HOSPITAL",
-      province: f.province_code ?? "—",
-      commune_name: f.commune_code ?? "—",
-      commune_code: f.commune_code ?? "",
-      username: f.code,
-      active: (f.status ?? "ACTIVE") !== "INACTIVE",
-    })),
-    ...localRows.map((f) => ({
-      id: f.id,
-      name: f.name,
-      facility_type: f.facility_type,
-      province: f.province,
-      commune_name: f.commune_name,
-      commune_code: f.commune_code,
-      username: f.username,
-      active: f.active,
-    })),
-  ];
-
-  const filtered = merged.filter((f) => {
+  const filtered = rows.filter((f) => {
     if (onlyActive && !f.active) return false;
     if (type !== "ALL" && f.facility_type !== type) return false;
     const hay = `${f.name} ${f.commune_name} ${f.province} ${f.username ?? ""}`.toLowerCase();
     return hay.includes(q.trim().toLowerCase());
   });
 
+  function onAdd(e: FormEvent) {
+    e.preventDefault();
+    setMsg(null);
+    if (!name.trim() || !province.trim() || !commune.trim()) {
+      setMsg("Nom, province et commune sont requis.");
+      return;
+    }
+    const id = `fac-${Date.now().toString(36)}`;
+    upsertFacilityAccount({
+      id,
+      username: username.trim() || undefined,
+      facilityName: name.trim(),
+      facilityType,
+      commune_code: commune.trim().toUpperCase().replace(/\s+/g, "-"),
+      commune_name: commune.trim(),
+      province: province.trim(),
+      ville: province.trim(),
+      active: true,
+      created_at: new Date().toISOString(),
+    });
+    setName("");
+    setProvince("");
+    setCommune("");
+    setUsername("");
+    setMsg("Structure enregistrée.");
+    bump((n) => n + 1);
+  }
+
   return (
     <div>
       <div className="eg-page-head">
         <div>
           <h2 className="page-title">Structures sanitaires</h2>
-          <p className="page-lead">
-            Structures enregistrées (API PostgreSQL) liées à une province et une commune.
-          </p>
+          <p className="page-lead">Registre vierge — ajoutez les structures sanitaires du système.</p>
         </div>
-        <button type="button" className="btn-secondary btn-sm" onClick={() => setTick((n) => n + 1)}>
+        <button type="button" className="btn-secondary btn-sm" onClick={() => bump((n) => n + 1)}>
           Actualiser
         </button>
       </div>
 
-      {error ? <div className="login-error">{error}</div> : null}
-      {ok ? <div className="success-banner">{ok}</div> : null}
-
-      <div className="panel" style={{ marginBottom: "1.25rem" }}>
-        <h3 style={{ marginTop: 0 }}>Créer une structure</h3>
-        <form className="form-grid" onSubmit={onCreate}>
-          <div>
-            <label className="form-label">Code</label>
-            <input className="form-control" required value={code} onChange={(e) => setCode(e.target.value)} />
-          </div>
-          <div>
-            <label className="form-label">Nom</label>
-            <input className="form-control" required value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div>
-            <label className="form-label">Type</label>
-            <select className="form-control" value={facilityType} onChange={(e) => setFacilityType(e.target.value)}>
-              {Object.entries(FACILITY_TYPE_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="form-label">Province</label>
-            <select className="form-control" required value={provinceId} onChange={(e) => setProvinceId(e.target.value)}>
-              <option value="">Choisir…</option>
-              {provinces.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.code ? `${p.code} — ` : ""}
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="form-label">Commune</label>
-            <select
-              className="form-control"
-              value={communeId}
-              onChange={(e) => setCommuneId(e.target.value)}
-              disabled={!provinceId}
-            >
-              <option value="">Choisir…</option>
-              {communes.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.code ? `${c.code} — ` : ""}
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="full">
-            <button type="submit" className="btn-primary" style={{ width: "auto" }}>
-              Enregistrer
-            </button>
-          </div>
+      <div className="panel" style={{ marginBottom: "1rem" }}>
+        <h3 className="panel-title" style={{ marginTop: 0 }}>
+          Nouvelle structure
+        </h3>
+        <form onSubmit={onAdd} className="toolbar" style={{ flexWrap: "wrap" }}>
+          <input className="form-control" placeholder="Nom de la structure" value={name} onChange={(e) => setName(e.target.value)} />
+          <select className="form-control" value={facilityType} onChange={(e) => setFacilityType(e.target.value)}>
+            {Object.entries(FACILITY_TYPE_LABELS).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+          <input className="form-control" placeholder="Province" value={province} onChange={(e) => setProvince(e.target.value)} />
+          <input className="form-control" placeholder="Commune" value={commune} onChange={(e) => setCommune(e.target.value)} />
+          <input className="form-control" placeholder="Identifiant (optionnel)" value={username} onChange={(e) => setUsername(e.target.value)} />
+          <button type="submit" className="btn-primary btn-sm">
+            Ajouter
+          </button>
         </form>
+        {msg ? <p className="muted small">{msg}</p> : null}
       </div>
 
       <div className="toolbar">
@@ -204,7 +107,7 @@ export default function FacilitiesPage() {
 
       <div className="panel">
         <p className="muted small" style={{ marginTop: 0 }}>
-          {filtered.length} structure(s)
+          {filtered.length} / {rows.length} structure(s)
         </p>
         <table className="data-table">
           <thead>
@@ -215,6 +118,9 @@ export default function FacilitiesPage() {
               <th>Commune</th>
               <th>Identifiant</th>
               <th>Statut</th>
+              <th>Naissances</th>
+              <th>Décès</th>
+              <th>En attente</th>
             </tr>
           </thead>
           <tbody>
@@ -227,13 +133,18 @@ export default function FacilitiesPage() {
                 <td>
                   <code>{f.username ?? "—"}</code>
                 </td>
-                <td>{f.active ? "ACTIVE" : "INACTIVE"}</td>
+                <td style={{ color: f.active ? "#1a5f4a" : "#8a4b1a", fontWeight: 700 }}>
+                  {f.active ? "Actif" : "Désactivé"}
+                </td>
+                <td>{f.births}</td>
+                <td>{f.deaths}</td>
+                <td>{f.pending}</td>
               </tr>
             ))}
             {!filtered.length ? (
               <tr>
-                <td colSpan={6} className="muted">
-                  Aucune structure enregistrée.
+                <td colSpan={9} className="muted">
+                  Aucune structure — utilisez le formulaire ci-dessus pour en ajouter.
                 </td>
               </tr>
             ) : null}

@@ -1,12 +1,12 @@
 import { FormEvent, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { DEMO_PASSWORD, DEMO_USER, getSession, login } from "../auth";
+import { getSession, login } from "../auth";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const existing = getSession();
-  const [username, setUsername] = useState(DEMO_USER);
-  const [password, setPassword] = useState(DEMO_PASSWORD);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -31,7 +31,7 @@ export default function LoginPage() {
       <div className="login-card">
         <img className="login-logo" src="/logo-rdc.jpg" alt="République Démocratique du Congo" />
         <h1 className="login-title">E-GOUV — Primature</h1>
-        <p className="login-subtitle">Coordination gouvernementale · Lecture des données concernées</p>
+        <p className="login-subtitle">Coordination gouvernementale · Lecture et saisie des données</p>
         <form onSubmit={(e) => void onSubmit(e)} autoComplete="off">
           {error ? <div className="login-error">{error}</div> : null}
           <label className="form-label" htmlFor="username">
@@ -52,9 +52,6 @@ export default function LoginPage() {
             {busy ? "Connexion…" : "Se connecter"}
           </button>
         </form>
-        <p className="login-subtitle" style={{ marginTop: "1.25rem", marginBottom: 0 }}>
-          Démo : <strong>{DEMO_USER}</strong> / <strong>{DEMO_PASSWORD}</strong>
-        </p>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import ExportToolbar from "../components/ExportToolbar";
-import { TYPE_LABELS, getNationalSnapshot, listProvinces } from "../nationalData";
+import { TYPE_LABELS, getNationalSnapshot, listProvinces, upsertCivilOffice } from "../nationalData";
 
 function PageShell({
   title,
@@ -98,6 +98,12 @@ export function CivilOfficesPage() {
   const [province, setProvince] = useState("");
   const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
   const provinces = useMemo(() => listProvinces(), [tick]);
+  const [commune, setCommune] = useState("");
+  const [code, setCode] = useState("");
+  const [prov, setProv] = useState("");
+  const [ville, setVille] = useState("");
+  const [officer, setOfficer] = useState("");
+  const [formMsg, setFormMsg] = useState<string | null>(null);
 
   const rows = snap.civil_offices.filter((o) => {
     if (province && o.province !== province) return false;
@@ -115,12 +121,53 @@ export function CivilOfficesPage() {
     statut: o.active ? "Actif" : "Inactif",
   }));
 
+  function onAdd(e: FormEvent) {
+    e.preventDefault();
+    setFormMsg(null);
+    if (!commune.trim() || !prov.trim()) {
+      setFormMsg("Commune et province requis.");
+      return;
+    }
+    upsertCivilOffice({
+      id: `co-${Date.now().toString(36)}`,
+      commune: commune.trim(),
+      code: code.trim() || commune.trim().toUpperCase().replace(/\s+/g, "-"),
+      province: prov.trim(),
+      ville: ville.trim() || prov.trim(),
+      officer: officer.trim() || "—",
+      active: true,
+    });
+    setCommune("");
+    setCode("");
+    setProv("");
+    setVille("");
+    setOfficer("");
+    setFormMsg("Bureau d'état civil enregistré.");
+    setTick((n) => n + 1);
+  }
+
   return (
     <PageShell
       title="États civils"
-      lead="Toutes les communes / bureaux d'état civil — filtres et exports."
+      lead="Registre vierge — ajoutez les communes / bureaux d'état civil."
       onRefresh={() => setTick((n) => n + 1)}
     >
+      <div className="panel no-print" style={{ marginBottom: "1rem" }}>
+        <h3 className="panel-title" style={{ marginTop: 0 }}>
+          Nouveau bureau
+        </h3>
+        <form onSubmit={onAdd} className="toolbar" style={{ flexWrap: "wrap" }}>
+          <input className="form-control" placeholder="Commune" value={commune} onChange={(e) => setCommune(e.target.value)} />
+          <input className="form-control" placeholder="Code" value={code} onChange={(e) => setCode(e.target.value)} />
+          <input className="form-control" placeholder="Province" value={prov} onChange={(e) => setProv(e.target.value)} />
+          <input className="form-control" placeholder="Ville" value={ville} onChange={(e) => setVille(e.target.value)} />
+          <input className="form-control" placeholder="Officier" value={officer} onChange={(e) => setOfficer(e.target.value)} />
+          <button type="submit" className="btn-primary btn-sm">
+            Ajouter
+          </button>
+        </form>
+        {formMsg ? <p className="muted small">{formMsg}</p> : null}
+      </div>
       <div className="toolbar filters-bar no-print">
         <input className="form-control" placeholder="Rechercher…" value={q} onChange={(e) => setQ(e.target.value)} />
         <select className="form-control" value={province} onChange={(e) => setProvince(e.target.value)}>

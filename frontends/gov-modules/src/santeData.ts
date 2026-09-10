@@ -1,6 +1,6 @@
 /**
- * Agrégats Ministère de la Santé — lit le même stockage démo que l'état civil /
- * structures sanitaires (localStorage navigateur), avec repli API.
+ * Agrégats Ministère de la Santé — lit le stockage local des structures /
+ * déclarations (vierge par défaut), avec repli API.
  */
 
 export type FacilityRow = {
@@ -49,8 +49,8 @@ export type MinistryDashboard = {
   source: "local" | "mixed" | "empty";
 };
 
-const ACCOUNTS_KEY = "nn_health_facility_accounts";
-const DEMO_STORE_KEY = "nn_civil_demo_store";
+const ACCOUNTS_KEY = "nn_health_facility_accounts_v2";
+const DECL_STORE_KEY = "nn_civil_demo_store";
 
 type AccountRaw = {
   id: string;
@@ -97,7 +97,7 @@ function loadAccounts(): AccountRaw[] {
 
 function loadHospitalDeclarations(): DeclRaw[] {
   try {
-    const raw = localStorage.getItem(DEMO_STORE_KEY);
+    const raw = localStorage.getItem(DECL_STORE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as { declarations?: DeclRaw[] };
     const list = parsed.declarations ?? [];
@@ -107,8 +107,18 @@ function loadHospitalDeclarations(): DeclRaw[] {
   }
 }
 
-function ensureSeedIfEmpty(): void {
-  // No fictitious facilities — empty until real accounts / API data exist.
+export function upsertFacilityAccount(account: AccountRaw): FacilityRow[] {
+  const accounts = loadAccounts();
+  const idx = accounts.findIndex((a) => a.id === account.id);
+  const next = { ...account, created_at: account.created_at ?? new Date().toISOString() };
+  if (idx >= 0) accounts[idx] = { ...accounts[idx], ...next };
+  else accounts.unshift(next);
+  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+  return listMinistryFacilities();
+}
+
+export function clearFacilityAccounts(): void {
+  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify([]));
 }
 
 function toDeclRow(d: DeclRaw): DeclRow {
@@ -134,7 +144,6 @@ function toDeclRow(d: DeclRaw): DeclRow {
 }
 
 export function listMinistryFacilities(): FacilityRow[] {
-  ensureSeedIfEmpty();
   const decls = loadHospitalDeclarations().map(toDeclRow);
   return loadAccounts().map((a) => {
     const id = a.id;
@@ -146,8 +155,8 @@ export function listMinistryFacilities(): FacilityRow[] {
       facility_type: String(a.facilityType ?? "HOPITAL"),
       commune_code: String(a.commune_code ?? ""),
       commune_name: String(a.commune_name ?? ""),
-      province: String(a.province ?? "Kinshasa"),
-      ville: String(a.ville ?? "Kinshasa"),
+      province: String(a.province ?? "—"),
+      ville: String(a.ville ?? "—"),
       active: a.active !== false,
       created_at: String(a.created_at ?? ""),
       births: mine.filter((d) => d.declaration_type === "BIRTH").length,
@@ -158,7 +167,6 @@ export function listMinistryFacilities(): FacilityRow[] {
 }
 
 export function listMinistryDeclarations(): DeclRow[] {
-  ensureSeedIfEmpty();
   return loadHospitalDeclarations()
     .map(toDeclRow)
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -335,10 +343,6 @@ export function ministryExportPayload() {
 }
 
 export const FACILITY_TYPE_LABELS: Record<string, string> = {
-  HOSPITAL: "Hôpital",
-  CLINIC: "Clinique",
-  MATERNITY: "Maternité",
-  OTHER: "Autre",
   HOPITAL: "Hôpital",
   CLINIQUE: "Clinique",
   CS: "Centre de santé",

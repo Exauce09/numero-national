@@ -23,12 +23,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-/** On API failure return empty real-shaped data — never invent demo numbers. */
-async function softEmpty<T>(path: string, empty: T, init?: RequestInit): Promise<T> {
+async function softRequest<T>(path: string, fallback: T, init?: RequestInit): Promise<T> {
   try {
     return await request<T>(path, init);
   } catch {
-    return empty;
+    return fallback;
   }
 }
 
@@ -60,7 +59,6 @@ export type Facility = {
   code?: string;
   name: string;
   facility_type?: string;
-  province_code?: string;
   commune_code?: string;
   status?: string;
 };
@@ -130,56 +128,47 @@ const EMPTY_ONIP: OnipDashboard = {
   anomalies: [],
 };
 
+const EMPTY_HEALTH: HealthStats = {
+  facilities: 0,
+  births_declared: 0,
+  deaths_declared: 0,
+  verifications: 0,
+  period: "",
+};
+
 export const api = {
   gov: (org: string, domain: string) =>
-    softEmpty<Record<string, unknown>>(`/gov/${org}/${domain}`, {
+    softRequest<Record<string, unknown>>(`/gov/${org}/${domain}`, {
       org,
       domain,
       metrics: [],
       generated_at: new Date().toISOString(),
     }),
 
-  onipDashboard: () => softEmpty<OnipDashboard>("/onip/dashboard", EMPTY_ONIP),
+  onipDashboard: () => softRequest<OnipDashboard>("/onip/dashboard", EMPTY_ONIP),
 
-  analyticsMetrics: () => softEmpty<AggregateMetric[]>("/analytics/metrics", []),
+  analyticsMetrics: () => softRequest<AggregateMetric[]>("/analytics/metrics", []),
 
   analyticsRefresh: () =>
     request<{ period: string; updated: number }>("/analytics/refresh", { method: "POST" }),
 
-  healthStats: () =>
-    softEmpty<HealthStats>("/health/stats/national", {
-      facilities: 0,
-      births_declared: 0,
-      deaths_declared: 0,
-    }),
+  healthStats: () => softRequest<HealthStats>("/health/stats/national", EMPTY_HEALTH),
 
-  healthFacilities: () => softEmpty<Facility[]>("/health/facilities", []),
-
-  healthFacilityCreate: (body: {
-    code: string;
-    name: string;
-    facility_type: string;
-    province_code: string;
-    commune_code?: string | null;
-  }) =>
-    request<Facility>("/health/facilities", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+  healthFacilities: () => softRequest<Facility[]>("/health/facilities", []),
 
   civilStats: (commune: string) =>
-    softEmpty<{ commune_code: string; counts: Record<string, number>; total: number }>(
+    softRequest<{ commune_code: string; counts: Record<string, number>; total: number }>(
       `/civil/statistics/${encodeURIComponent(commune)}`,
       {
         commune_code: commune,
         counts: {},
         total: 0,
-      }
+      },
     ),
 
   civilDeclarations: (status = "PENDING_OFFICER") => {
     const q = new URLSearchParams({ status });
-    return softEmpty<Declaration[]>(`/civil/declarations?${q}`, []);
+    return softRequest<Declaration[]>(`/civil/declarations?${q}`, []);
   },
 
   cardsIssue: (body: Record<string, unknown>) =>
@@ -197,20 +186,20 @@ export const api = {
     }),
 
   auditList: (page = 1) =>
-    softEmpty<AuditList>(`/audit?page=${page}&page_size=50`, {
+    softRequest<AuditList>(`/audit?page=${page}&page_size=50`, {
       items: [],
       total: 0,
       page,
       page_size: 50,
     }),
 
-  rbacUsers: () => softEmpty<UserMe[]>("/rbac/users", []),
+  rbacUsers: () => softRequest<UserMe[]>("/rbac/users", []),
 
-  rbacRoles: () => softEmpty<Role[]>("/rbac/roles", []),
+  rbacRoles: () => softRequest<Role[]>("/rbac/roles", []),
 
-  rbacPermissions: () => softEmpty<Permission[]>("/rbac/permissions", []),
+  rbacPermissions: () => softRequest<Permission[]>("/rbac/permissions", []),
 
-  institutionsList: () => softEmpty<Institution[]>("/institutions", []),
+  institutionsList: () => softRequest<Institution[]>("/institutions", []),
 
   institutionsCreate: (body: Record<string, unknown>) =>
     request<Institution>("/institutions", {

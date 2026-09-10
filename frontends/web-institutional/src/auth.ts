@@ -7,8 +7,9 @@ export type Session = {
 
 const KEY = "nn_session_presidence";
 
-export const DEMO_USER = "presidence";
-export const DEMO_PASSWORD = "DemoPresidence2026!";
+/** Identifiants locaux (hors API) — non affichés dans l'UI. */
+export const PORTAL_USER = "presidence";
+export const PORTAL_PASSWORD = "Presidence2026!";
 
 export function getSession(): Session | null {
   const raw = sessionStorage.getItem(KEY);
@@ -25,7 +26,7 @@ export function clearSession(): void {
 }
 
 function effectivePassword(): string {
-  return getPresPrefs().passwordOverride || DEMO_PASSWORD;
+  return getPresPrefs().passwordOverride || PORTAL_PASSWORD;
 }
 
 export function updatePresPassword(currentPassword: string, nextPassword: string): void {
@@ -52,11 +53,11 @@ export async function login(username: string, password: string): Promise<Session
       return session;
     }
   } catch {
-    /* API indisponible */
+    /* API indisponible — repli local */
   }
 
-  if (user !== DEMO_USER || password !== effectivePassword()) {
-    throw new Error(`Identifiants incorrects. Démo : ${DEMO_USER} / ${DEMO_PASSWORD}`);
+  if (user !== PORTAL_USER || password !== effectivePassword()) {
+    throw new Error("Identifiants incorrects.");
   }
 
   const session: Session = { username: user };

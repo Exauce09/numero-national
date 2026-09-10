@@ -1,12 +1,12 @@
 import { FormEvent, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { DEMO_PASSWORD, DEMO_USER, getSession, login } from "../auth";
+import { getSession, login } from "../auth";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const existing = getSession();
-  const [username, setUsername] = useState(DEMO_USER);
-  const [password, setPassword] = useState(DEMO_PASSWORD);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -57,9 +57,6 @@ export default function LoginPage() {
             {busy ? "Connexion…" : "Se connecter"}
           </button>
         </form>
-        <p className="login-subtitle" style={{ marginTop: "1.25rem", marginBottom: 0 }}>
-          Démo : <strong>{DEMO_USER}</strong> / <strong>{DEMO_PASSWORD}</strong>
-        </p>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import ExportToolbar from "../components/ExportToolbar";
 import {
   DOSSIER_STATUS_LABELS,
@@ -6,6 +6,7 @@ import {
   STATUS_LABELS,
   TREND_LABELS,
   getPrimatureSnapshot,
+  upsertMinistry,
   type AlertSeverity,
   type DossierStatus,
   type MinistryStatus,
@@ -33,7 +34,7 @@ function PageShell({
           Actualiser
         </button>
       </div>
-      <div className="read-only-banner no-print">Lecture seule — données du système concernant la Primature.</div>
+      <div className="read-only-banner no-print">Saisie locale — ajoutez les données de coordination Primature.</div>
       {children}
     </div>
   );
@@ -51,6 +52,11 @@ export function MinistriesPage() {
   const snap = useMemo(() => getPrimatureSnapshot(), [tick]);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [domain, setDomain] = useState("");
+  const [summary, setSummary] = useState("");
+  const [formMsg, setFormMsg] = useState<string | null>(null);
 
   const rows = snap.ministries.filter((m) => {
     if (status && m.status !== status) return false;
@@ -68,12 +74,53 @@ export function MinistriesPage() {
     resume: m.summary,
   }));
 
+  function onAdd(e: FormEvent) {
+    e.preventDefault();
+    setFormMsg(null);
+    if (!code.trim() || !name.trim()) {
+      setFormMsg("Code et nom requis.");
+      return;
+    }
+    upsertMinistry({
+      id: `min-${Date.now().toString(36)}`,
+      code: code.trim().toUpperCase(),
+      name: name.trim(),
+      domain: domain.trim() || "—",
+      status: "OK",
+      coverage_pct: 0,
+      open_alerts: 0,
+      last_report_at: new Date().toISOString(),
+      summary: summary.trim() || "—",
+    });
+    setCode("");
+    setName("");
+    setDomain("");
+    setSummary("");
+    setFormMsg("Ministère / domaine enregistré.");
+    setTick((n) => n + 1);
+  }
+
   return (
     <PageShell
       title="Ministères & domaines"
-      lead="État de mise en œuvre des modules du système — vue coordination Primature."
+      lead="Registre vierge — saisissez les ministères et domaines à coordonner."
       onRefresh={() => setTick((n) => n + 1)}
     >
+      <div className="panel no-print" style={{ marginBottom: "1rem" }}>
+        <h3 className="panel-title" style={{ marginTop: 0 }}>
+          Ajouter un ministère / domaine
+        </h3>
+        <form onSubmit={onAdd} className="toolbar" style={{ flexWrap: "wrap" }}>
+          <input className="form-control" placeholder="Code" value={code} onChange={(e) => setCode(e.target.value)} />
+          <input className="form-control" placeholder="Nom" value={name} onChange={(e) => setName(e.target.value)} />
+          <input className="form-control" placeholder="Domaine" value={domain} onChange={(e) => setDomain(e.target.value)} />
+          <input className="form-control" placeholder="Résumé" value={summary} onChange={(e) => setSummary(e.target.value)} />
+          <button type="submit" className="btn-primary btn-sm">
+            Ajouter
+          </button>
+        </form>
+        {formMsg ? <p className="muted small">{formMsg}</p> : null}
+      </div>
       <div className="toolbar filters-bar no-print">
         <input className="form-control" placeholder="Rechercher…" value={q} onChange={(e) => setQ(e.target.value)} />
         <select className="form-control" value={status} onChange={(e) => setStatus(e.target.value)}>
