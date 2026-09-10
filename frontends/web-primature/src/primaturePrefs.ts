@@ -45,14 +45,6 @@ const DEFAULT_NOTIFS: PrimatureNotification[] = [
     read: false,
     href: "/ministeres",
   },
-  {
-    id: "pm4",
-    title: "Vue système E-GOUV",
-    body: "Cartographie des portails dont la Primature lit les agrégats de coordination.",
-    created_at: new Date(Date.now() - 1200_000).toISOString(),
-    read: false,
-    href: "/systeme",
-  },
 ];
 export function getPrimaturePrefs(): PrimaturePrefs {
   try {

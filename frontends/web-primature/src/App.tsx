@@ -22,7 +22,6 @@ import {
   IndicatorsPage,
   MinistriesPage,
 } from "./pages/PrimatureLists";
-import SystemPage from "./pages/SystemPage";
 function RequireAuth({ children }: { children: ReactNode }) {
   if (!getSession()) return <Navigate to="/login" replace />;
   return <>{children}</>;
@@ -130,9 +129,6 @@ function Shell() {
           <NavLink to="/briefing" onClick={() => setNavOpen(false)}>
             Briefing
           </NavLink>
-          <NavLink to="/systeme" onClick={() => setNavOpen(false)}>
-            Vue système
-          </NavLink>
         </nav>
         <div className="sidebar-foot">
           <button type="button" className="btn-logout" style={{ width: "100%" }} onClick={logout}>
@@ -215,7 +211,6 @@ function Shell() {
             <Route path="/dossiers" element={<DossiersPage />} />
             <Route path="/alertes" element={<AlertsPage />} />
             <Route path="/briefing" element={<BriefingPage />} />
-            <Route path="/systeme" element={<SystemPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
