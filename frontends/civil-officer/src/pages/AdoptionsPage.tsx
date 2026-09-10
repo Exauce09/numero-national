@@ -15,28 +15,32 @@ export default function AdoptionsPage() {
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Act | null>(null);
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     if (!tuteur || !enfant) {
       setError("Tuteur et enfant sont obligatoires.");
       return;
     }
-    const payload = {
-      tuteur_id: tuteur.id,
-      tuteur_name: displayName(tuteur),
-      enfant_id: enfant.id,
-      enfant_name: displayName(enfant),
-      motif,
-      officier_id: officier?.id ?? null,
-      officier_name: officier ? displayName(officier) : null,
-      lieu_adoption: geo.label || "",
-      geo,
-      commune_code: geo.commune_code ?? null,
-      date_adoption: dateAdoption,
-    };
-    const act = await addAct("ADOPTION", payload, enfant.nic);
-    setCreated(act);
+    try {
+      const payload = {
+        tuteur_id: tuteur.id,
+        tuteur_name: displayName(tuteur),
+        enfant_id: enfant.id,
+        enfant_name: displayName(enfant),
+        motif,
+        officier_id: officier?.id ?? null,
+        officier_name: officier ? displayName(officier) : null,
+        lieu_adoption: geo.label || "",
+        geo,
+        commune_code: geo.commune_code ?? null,
+        date_adoption: dateAdoption,
+      };
+      const act = await addAct("ADOPTION", payload, enfant.nic);
+      setCreated(act);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Enregistrement impossible.");
+    }
   }
 
   return (

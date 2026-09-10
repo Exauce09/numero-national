@@ -29,7 +29,7 @@ export default function DivorcesPage() {
     setNumeroMariage(link?.act_number ?? "");
   }, [epoux, epouse]);
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     if (!epoux || !epouse) {
@@ -40,26 +40,30 @@ export default function DivorcesPage() {
       setError("Aucun mariage actif trouvé pour ces personnes.");
       return;
     }
-    const payload = {
-      epoux_id: epoux.id,
-      epoux_name: displayName(epoux),
-      epouse_id: epouse.id,
-      epouse_name: displayName(epouse),
-      numero_mariage: numeroMariage,
-      cause,
-      officier_id: officier?.id ?? null,
-      officier_name: officier ? displayName(officier) : null,
-      temoin1_id: temoin1?.id ?? null,
-      temoin1_name: temoin1 ? displayName(temoin1) : null,
-      temoin2_id: temoin2?.id ?? null,
-      temoin2_name: temoin2 ? displayName(temoin2) : null,
-      date_divorce: dateDivorce,
-    };
-    const act = await addAct("DIVORCE", payload, epoux.nic);
-    markMarriageDivorced(numeroMariage);
-    updatePerson(epoux.id, { etat_civil: "DIVORCE" });
-    updatePerson(epouse.id, { etat_civil: "DIVORCE" });
-    setCreated(act);
+    try {
+      const payload = {
+        epoux_id: epoux.id,
+        epoux_name: displayName(epoux),
+        epouse_id: epouse.id,
+        epouse_name: displayName(epouse),
+        numero_mariage: numeroMariage,
+        cause,
+        officier_id: officier?.id ?? null,
+        officier_name: officier ? displayName(officier) : null,
+        temoin1_id: temoin1?.id ?? null,
+        temoin1_name: temoin1 ? displayName(temoin1) : null,
+        temoin2_id: temoin2?.id ?? null,
+        temoin2_name: temoin2 ? displayName(temoin2) : null,
+        date_divorce: dateDivorce,
+      };
+      const act = await addAct("DIVORCE", payload, epoux.nic);
+      markMarriageDivorced(numeroMariage);
+      updatePerson(epoux.id, { etat_civil: "DIVORCE" });
+      updatePerson(epouse.id, { etat_civil: "DIVORCE" });
+      setCreated(act);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Enregistrement impossible.");
+    }
   }
 
   return (

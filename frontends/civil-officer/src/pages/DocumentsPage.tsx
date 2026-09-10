@@ -22,22 +22,26 @@ export default function DocumentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Act | null>(null);
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     if (!beneficiaire) {
       setError("Le bénéficiaire est obligatoire.");
       return;
     }
-    const payload = {
-      type_document: typeDocument,
-      nom_document: nomDocument,
-      type_paiement: typePaiement,
-      beneficiaire_id: beneficiaire.id,
-      beneficiaire_name: displayName(beneficiaire),
-    };
-    const act = await addAct("DOCUMENT", payload, beneficiaire.nic);
-    setCreated(act);
+    try {
+      const payload = {
+        type_document: typeDocument,
+        nom_document: nomDocument,
+        type_paiement: typePaiement,
+        beneficiaire_id: beneficiaire.id,
+        beneficiaire_name: displayName(beneficiaire),
+      };
+      const act = await addAct("DOCUMENT", payload, beneficiaire.nic);
+      setCreated(act);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Enregistrement impossible.");
+    }
   }
 
   return (

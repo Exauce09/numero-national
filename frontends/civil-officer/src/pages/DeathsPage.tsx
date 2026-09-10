@@ -19,7 +19,7 @@ export default function DeathsPage() {
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Act | null>(null);
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     if (!deceased) {
@@ -34,26 +34,30 @@ export default function DeathsPage() {
       setError("La date du décès est obligatoire.");
       return;
     }
-    const commune = getOfficerCommune();
-    const payload = {
-      deceased_id: deceased.id,
-      deceased_name: displayName(deceased),
-      cause_deces: cause.trim(),
-      lieu_deces: geoDeces.label || "",
-      geo_deces: geoDeces,
-      lieu_enterrement: geoEnterrement.label || "",
-      geo_enterrement: geoEnterrement,
-      cimetiere: cimetiere.trim(),
-      lieu_enregistrement: geoEnregistrement.label || "",
-      geo_enregistrement: geoEnregistrement,
-      commune_code: geoEnregistrement.commune_code || geoDeces.commune_code || commune.code,
-      date_deces: dateDeces,
-      date_enterrement: dateEnterrement,
-      responsable_id: responsable?.id ?? null,
-      responsable_name: responsable ? displayName(responsable) : null,
-    };
-    const act = await addAct("DEATH", payload, deceased.nic);
-    setCreated(act);
+    try {
+      const commune = getOfficerCommune();
+      const payload = {
+        deceased_id: deceased.id,
+        deceased_name: displayName(deceased),
+        cause_deces: cause.trim(),
+        lieu_deces: geoDeces.label || "",
+        geo_deces: geoDeces,
+        lieu_enterrement: geoEnterrement.label || "",
+        geo_enterrement: geoEnterrement,
+        cimetiere: cimetiere.trim(),
+        lieu_enregistrement: geoEnregistrement.label || "",
+        geo_enregistrement: geoEnregistrement,
+        commune_code: geoEnregistrement.commune_code || geoDeces.commune_code || commune.code,
+        date_deces: dateDeces,
+        date_enterrement: dateEnterrement,
+        responsable_id: responsable?.id ?? null,
+        responsable_name: responsable ? displayName(responsable) : null,
+      };
+      const act = await addAct("DEATH", payload, deceased.nic);
+      setCreated(act);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Enregistrement impossible.");
+    }
   }
 
   return (

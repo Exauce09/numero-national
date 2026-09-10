@@ -31,7 +31,7 @@ export default function MarriagesPage() {
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Act | null>(null);
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     if (!conjoint || !conjointe) {
@@ -51,31 +51,35 @@ export default function MarriagesPage() {
       return;
     }
 
-    const payload = {
-      epoux_id: conjoint.id,
-      epoux_name: displayName(conjoint),
-      epouse_id: conjointe.id,
-      epouse_name: displayName(conjointe),
-      regime_matrimonial: regime,
-      receveur_dote_id: receveurDote?.id ?? null,
-      receveur_dote_name: receveurDote ? displayName(receveurDote) : null,
-      temoin1_id: temoin1?.id ?? null,
-      temoin1_name: temoin1 ? displayName(temoin1) : null,
-      temoin2_id: temoin2?.id ?? null,
-      temoin2_name: temoin2 ? displayName(temoin2) : null,
-      officier_id: officier?.id ?? null,
-      officier_name: officier ? displayName(officier) : null,
-      lieu_etat_civil: geo.label || "",
-      geo,
-      commune_code: geo.commune_code ?? null,
-      motif,
-      date_mariage: dateMariage,
-    };
-    const act = await addAct("MARRIAGE", payload, conjoint.nic);
-    addMarriageLink(act.act_number, conjoint.id, conjointe.id);
-    updatePerson(conjoint.id, { etat_civil: "MARIE" });
-    updatePerson(conjointe.id, { etat_civil: "MARIE" });
-    setCreated(act);
+    try {
+      const payload = {
+        epoux_id: conjoint.id,
+        epoux_name: displayName(conjoint),
+        epouse_id: conjointe.id,
+        epouse_name: displayName(conjointe),
+        regime_matrimonial: regime,
+        receveur_dote_id: receveurDote?.id ?? null,
+        receveur_dote_name: receveurDote ? displayName(receveurDote) : null,
+        temoin1_id: temoin1?.id ?? null,
+        temoin1_name: temoin1 ? displayName(temoin1) : null,
+        temoin2_id: temoin2?.id ?? null,
+        temoin2_name: temoin2 ? displayName(temoin2) : null,
+        officier_id: officier?.id ?? null,
+        officier_name: officier ? displayName(officier) : null,
+        lieu_etat_civil: geo.label || "",
+        geo,
+        commune_code: geo.commune_code ?? null,
+        motif,
+        date_mariage: dateMariage,
+      };
+      const act = await addAct("MARRIAGE", payload, conjoint.nic);
+      addMarriageLink(act.act_number, conjoint.id, conjointe.id);
+      updatePerson(conjoint.id, { etat_civil: "MARIE" });
+      updatePerson(conjointe.id, { etat_civil: "MARIE" });
+      setCreated(act);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Enregistrement impossible.");
+    }
   }
 
   return (

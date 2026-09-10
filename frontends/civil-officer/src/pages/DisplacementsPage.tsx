@@ -15,27 +15,31 @@ export default function DisplacementsPage() {
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Act | null>(null);
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     if (!personne) {
       setError("La personne est obligatoire.");
       return;
     }
-    const payload = {
-      person_id: personne.id,
-      person_name: displayName(personne),
-      lieu_a_aller: geo.label || "",
-      geo,
-      commune_code: geo.commune_code ?? null,
-      motif,
-      date_deplacement: dateDeplacement,
-      date_retour: dateRetour,
-      officier_id: officier?.id ?? null,
-      officier_name: officier ? displayName(officier) : null,
-    };
-    const act = await addAct("DISPLACEMENT", payload, personne.nic);
-    setCreated(act);
+    try {
+      const payload = {
+        person_id: personne.id,
+        person_name: displayName(personne),
+        lieu_a_aller: geo.label || "",
+        geo,
+        commune_code: geo.commune_code ?? null,
+        motif,
+        date_deplacement: dateDeplacement,
+        date_retour: dateRetour,
+        officier_id: officier?.id ?? null,
+        officier_name: officier ? displayName(officier) : null,
+      };
+      const act = await addAct("DISPLACEMENT", payload, personne.nic);
+      setCreated(act);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Enregistrement impossible.");
+    }
   }
 
   return (
