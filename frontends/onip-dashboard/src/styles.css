@@ -801,55 +801,50 @@ body {
 
 .rdc-card-bg img {
   position: absolute;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center bottom;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
 
+/* PNG détourés (fond transparent) — sujets seuls */
 .rdc-bg-arms {
-  right: 5%;
-  top: 16%;
-  width: 30%;
+  right: 4%;
+  top: 14%;
+  width: 28%;
   height: auto;
-  max-height: 64%;
+  max-height: 66%;
   object-fit: contain;
-  opacity: 0.58;
+  opacity: 0.62;
 }
 
 .rdc-bg-tour {
-  left: 0;
+  left: 1%;
   bottom: 0;
-  width: 48%;
-  height: 62%;
-  object-fit: cover;
-  object-position: center top;
-  opacity: 0.5;
-  mask-image: linear-gradient(90deg, #000 45%, transparent);
-  -webkit-mask-image: linear-gradient(90deg, #000 45%, transparent);
+  width: 42%;
+  height: 68%;
+  object-fit: contain;
+  object-position: center bottom;
+  opacity: 0.55;
 }
 
 .rdc-bg-tour-back {
   left: auto;
-  right: 0;
-  bottom: 16%;
-  width: 52%;
-  height: 74%;
-  opacity: 0.55;
-  mask-image: linear-gradient(270deg, #000 55%, transparent);
-  -webkit-mask-image: linear-gradient(270deg, #000 55%, transparent);
+  right: 1%;
+  bottom: 12%;
+  width: 46%;
+  height: 78%;
+  opacity: 0.58;
 }
 
 .rdc-bg-okapi {
   left: 2%;
-  bottom: 22%;
-  width: 36%;
-  height: 50%;
-  object-fit: cover;
-  object-position: center;
-  opacity: 0.52;
-  border-radius: 4px;
-  mask-image: linear-gradient(90deg, #000 65%, transparent);
-  -webkit-mask-image: linear-gradient(90deg, #000 65%, transparent);
+  bottom: 20%;
+  width: 34%;
+  height: 52%;
+  object-fit: contain;
+  object-position: center bottom;
+  opacity: 0.58;
 }
 
 .rdc-bg-arms-back {
