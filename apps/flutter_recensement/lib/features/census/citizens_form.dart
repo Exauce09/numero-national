@@ -10,6 +10,7 @@ import '../../sync/sync_queue.dart';
 import 'fingerprint_capture.dart';
 import 'geo_cascade_field.dart';
 import 'iris_capture.dart';
+import 'coupon_print_screen.dart';
 import 'photo_capture.dart';
 import 'rdc_tribus.dart';
 import 'situation_familiale.dart';
@@ -86,6 +87,17 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   String? _rejectNote;
   String? _localId;
   int _version = 1;
+  /// Wizard séquentiel 1…7 (une section à la fois).
+  int _step = 1;
+  static const _stepTitles = <String>[
+    '1. Identité',
+    '2. Origine',
+    '3. Biométrie',
+    '4. Études',
+    '5. Expérience',
+    '6. Admin',
+    '7. Famille',
+  ];
 
   bool _aConjoint = false;
   late _MemberEditors _conjoint;
@@ -709,7 +721,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
         SnackBar(
           content: Text(
             draft
-                ? 'Brouillon enregistré et synchronisé — un autre agent peut le terminer'
+                ? 'Brouillon enregistré — un autre agent peut le terminer'
                 : (isUpdate
                     ? 'Fiche finalisée — en file de sync'
                     : 'Fiche enregistrée — en file de sync'),
@@ -717,6 +729,20 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
         ),
       );
       if (!draft) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CouponPrintScreen(
+              localId: localId,
+              familyName: family,
+              givenNames: given,
+              sex: _sex,
+              dateOfBirth: dob,
+              campaignId: widget.campaignId,
+              householdLocalId: widget.householdLocalId,
+            ),
+          ),
+        );
+        if (!mounted) return;
         Navigator.of(context).pop(true);
       }
     } finally {
@@ -758,42 +784,51 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   }
 
   Widget _saveButtons() {
+    final isLast = _step >= 7;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Row(
+          children: [
+            if (_step > 1)
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _busy ? null : () => setState(() => _step -= 1),
+                  child: const Text('Retour'),
+                ),
+              ),
+            if (_step > 1) const SizedBox(width: 10),
+            Expanded(
+              flex: 2,
+              child: FilledButton(
+                onPressed: _busy
+                    ? null
+                    : () {
+                        if (!isLast) {
+                          setState(() => _step += 1);
+                          return;
+                        }
+                        _save(draft: false);
+                      },
+                style: FilledButton.styleFrom(
+                  backgroundColor: isLast ? const Color(0xFFE11D48) : const Color(0xFF007FFF),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: Text(isLast ? 'Finaliser + coupon' : 'Étape suivante'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
         OutlinedButton.icon(
           onPressed: _busy ? null : () => _save(draft: true),
           icon: const Icon(Icons.save_outlined),
-          label: const Text('Sauvegarder temporairement'),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            foregroundColor: const Color(0xFF5D87FF),
-          ),
-        ),
-        const SizedBox(height: 10),
-        FilledButton.icon(
-          style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFFE11D48),
-            padding: const EdgeInsets.symmetric(vertical: 14),
-          ),
-          onPressed: _busy ? null : () => _save(draft: false),
-          icon: _busy
-              ? const SizedBox(
-                  height: 18,
-                  width: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                )
-              : const Icon(Icons.check_circle_outline),
-          label: Text(
-            _localId != null && (widget.existing?['status']?.toString() == 'DRAFT' || _isEdit)
-                ? 'Finaliser et envoyer'
-                : 'Enregistrer toute la fiche',
-          ),
+          label: const Text('Sauvegarder brouillon'),
         ),
         const SizedBox(height: 6),
-        const Text(
-          'Temporaire = brouillon local (pas de sync). Finaliser = file de synchronisation.',
-          style: TextStyle(fontSize: 12, color: Color(0xFF5A6A85)),
+        Text(
+          'Étape $_step / 7 — ${_stepTitles[_step - 1]}',
+          style: const TextStyle(fontSize: 12, color: Color(0xFF5A6A85)),
           textAlign: TextAlign.center,
         ),
       ],
@@ -1068,32 +1103,50 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF1F2),
+                color: const Color(0xFFEAF3FF),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE11D48).withValues(alpha: 0.35)),
+                border: Border.all(color: const Color(0xFF007FFF).withValues(alpha: 0.25)),
               ),
-              child: const Text(
-                'Faites défiler vers le bas : toutes les sections sont sur cette page '
-                '(Identité, Adresse, Origine, Biométrie, Études, Expérience, Admin, Famille).',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, height: 1.35),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Étape $_step / 7 — ${_stepTitles[_step - 1]}',
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: _step / 7,
+                      minHeight: 6,
+                      backgroundColor: const Color(0xFFE6EBF2),
+                      color: const Color(0xFF007FFF),
+                    ),
+                  ),
+                ],
               ),
             ),
-          const SizedBox(height: 12),
-            _buildIdentityBlock(),
-            _buildOriginBlock(),
-            _buildBioBlock(),
-            _section('4. Études faites', [
-              _buildEtudesBlock(),
-            ]),
-            _section('5. Expérience professionnelle', [
-              _buildExperienceBlock(),
-            ]),
-            _section('6. Identité administrative', [
-              _buildAdminBlock(),
-            ]),
-            _section('7. Situation familiale', [
-              _buildFamilyBlock(),
-            ]),
+            const SizedBox(height: 12),
+            if (_step == 1) _buildIdentityBlock(),
+            if (_step == 2) _buildOriginBlock(),
+            if (_step == 3) _buildBioBlock(),
+            if (_step == 4)
+              _section('4. Études faites', [
+                _buildEtudesBlock(),
+              ]),
+            if (_step == 5)
+              _section('5. Expérience professionnelle', [
+                _buildExperienceBlock(),
+              ]),
+            if (_step == 6)
+              _section('6. Identité administrative', [
+                _buildAdminBlock(),
+              ]),
+            if (_step == 7)
+              _section('7. Situation familiale', [
+                _buildFamilyBlock(),
+              ]),
             const SizedBox(height: 8),
             _saveButtons(),
           ],

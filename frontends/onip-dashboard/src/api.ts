@@ -297,6 +297,32 @@ export async function fetchOnipDashboard(): Promise<{
   return request("/onip/dashboard");
 }
 
+export type NationalCard = {
+  card_id: string;
+  citizen_id: string;
+  serial_number: string;
+  issued_at: string | null;
+  expires_at: string | null;
+  status: string;
+  version: number;
+  replaced_by_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  qr_payload?: Record<string, unknown> | null;
+};
+
+export const cardsApi = {
+  getByCitizen: (citizenId: string) =>
+    request<NationalCard | null>(`/cards/citizen/${citizenId}`),
+  issueAndActivate: (citizenId: string) =>
+    request<NationalCard>(`/cards/issue-and-activate`, {
+      method: "POST",
+      body: JSON.stringify({ citizen_id: citizenId }),
+    }),
+  activate: (cardId: string) =>
+    request<NationalCard>(`/cards/${cardId}/activate`, { method: "POST" }),
+};
+
 export type MapPoint = {
   id: string;
   local_id?: string | null;

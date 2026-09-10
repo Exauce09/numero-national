@@ -657,3 +657,223 @@ body {
   margin-bottom: 0;
 }
 
+/* ——— Stats charts ——— */
+.stats-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.chart-panel h2 {
+  margin-top: 0;
+  font-size: 1.05rem;
+}
+
+.bar-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 64px;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.bar-label {
+  font-size: 0.78rem;
+  color: var(--egouv-muted);
+  font-weight: 600;
+}
+
+.bar-track {
+  height: 12px;
+  background: #eef2f7;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  min-width: 4px;
+  transition: width 0.35s ease;
+}
+
+.bar-value {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.donut-wrap {
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.donut {
+  width: 160px;
+  height: 160px;
+}
+
+.donut-center {
+  font-size: 14px;
+  font-weight: 800;
+  fill: var(--egouv-ink);
+}
+
+.donut-sub {
+  font-size: 8px;
+  fill: var(--egouv-muted);
+}
+
+.chart-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.85rem;
+  color: var(--egouv-muted);
+}
+
+.chart-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.4rem;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+/* ——— ID card ——— */
+.id-card-print-wrap {
+  margin: 1rem 0 2rem;
+}
+
+.id-card {
+  max-width: 640px;
+  background: #fff;
+  border: 1px solid var(--egouv-line);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--nn-shadow);
+}
+
+.id-card-stripe {
+  height: 6px;
+  background: linear-gradient(90deg, #007fff 0 33%, #f7d618 33% 66%, #ce1126 66%);
+}
+
+.id-card-head {
+  padding: 0.85rem 1.1rem 0.5rem;
+}
+
+.id-card-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.id-card-head-text strong {
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+}
+
+.id-card-head-text span {
+  font-size: 0.78rem;
+  color: var(--egouv-muted);
+}
+
+.id-card-body {
+  display: grid;
+  grid-template-columns: 72px 1fr auto;
+  gap: 1rem;
+  padding: 0.75rem 1.1rem 1rem;
+  align-items: start;
+}
+
+.id-card-photo {
+  width: 72px;
+  height: 90px;
+  border-radius: 8px;
+  background: linear-gradient(160deg, #eaf3ff, #fff8e6);
+  border: 1px solid var(--egouv-line);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  color: var(--egouv-muted);
+  font-size: 1.4rem;
+}
+
+.id-card-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem 0.85rem;
+}
+
+.id-label {
+  display: block;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--egouv-muted);
+  margin-bottom: 0.1rem;
+}
+
+.id-card-qr {
+  text-align: center;
+}
+
+.id-card-qr img {
+  display: block;
+  border-radius: 8px;
+  border: 1px solid var(--egouv-line);
+}
+
+.id-card-qr small {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--egouv-muted);
+  font-size: 0.7rem;
+}
+
+.id-card-foot {
+  padding: 0.55rem 1.1rem 0.85rem;
+  font-size: 0.75rem;
+  color: var(--egouv-muted);
+  border-top: 1px solid var(--egouv-line);
+}
+
+@media print {
+  .sidebar,
+  .topbar,
+  .sidebar-backdrop,
+  .no-print-actions,
+  .hero-banner,
+  .panel:not(.id-card-print-wrap) {
+    display: none !important;
+  }
+  .page-wrapper,
+  .body-wrap,
+  .shell {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  .id-card {
+    box-shadow: none;
+    border-radius: 0;
+    max-width: none;
+  }
+}
+

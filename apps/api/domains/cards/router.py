@@ -156,6 +156,43 @@ async def verify_online(
     return OnlineVerifyResponse(**result)
 
 
+@router.get("/citizen/{citizen_id}", response_model=CardRead | None)
+async def get_card_for_citizen(
+    citizen_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _: Principal = Depends(require_permissions(PERM_CARD_MANAGE)),
+) -> CardRead | None:
+    card = await services.get_active_card_for_citizen(db, citizen_id)
+    if card is None:
+        return None
+    return _to_read(card)
+
+
+@router.post("/issue-and-activate", response_model=CardRead, status_code=status.HTTP_201_CREATED)
+async def issue_and_activate_card(
+    body: CardIssueRequest,
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(require_permissions(PERM_CARD_ISSUE, PERM_CARD_MANAGE)),
+) -> CardRead:
+    """ONIP : émet puis active immédiatement une carte d'identité nationale."""
+    existing = await services.get_active_card_for_citizen(db, body.citizen_id)
+    if existing is not None:
+        if existing.status == "PENDING":
+            try:
+                existing = await services.activate_card(
+                    db, existing.card_id, actor_id=principal.actor_id
+                )
+            except ValueError:
+                pass
+        return _to_read(existing)
+    card, qr = await services.issue_card(db, body, actor_id=principal.actor_id)
+    try:
+        card = await services.activate_card(db, card.card_id, actor_id=principal.actor_id)
+    except ValueError:
+        pass
+    return _to_read(card, qr)
+
+
 @router.get("/{card_id}", response_model=CardRead)
 async def get_card(
     card_id: UUID,
