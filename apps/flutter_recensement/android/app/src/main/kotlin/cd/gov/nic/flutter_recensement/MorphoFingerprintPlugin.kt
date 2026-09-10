@@ -1,6 +1,9 @@
 package cd.gov.nic.flutter_recensement
 
 import android.app.Activity
+import android.content.Context
+import android.hardware.usb.UsbManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -52,6 +55,39 @@ class MorphoFingerprintPlugin :
   override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
     when (call.method) {
       "isAvailable" -> result.success(true)
+      "detectHardware" -> {
+        val model = Build.MODEL ?: ""
+        val product = Build.PRODUCT ?: ""
+        val device = Build.DEVICE ?: ""
+        val manufacturer = Build.MANUFACTURER ?: ""
+        val blob = listOf(model, product, device, manufacturer).joinToString(" ").lowercase()
+        val isMorphoTablet =
+          blob.contains("morpho") ||
+            blob.contains("mph-mb") ||
+            blob.contains("mph_mb") ||
+            blob.contains("cbm-e3")
+        var hasCbmE3 = false
+        val act = activity
+        if (act != null) {
+          val usb = act.getSystemService(Context.USB_SERVICE) as? UsbManager
+          usb?.deviceList?.values?.forEach { d ->
+            if (d.vendorId == 0x225D && d.productId == 0x0008) {
+              hasCbmE3 = true
+            }
+          }
+        }
+        Log.i(TAG, "detectHardware model=$model product=$product morpho=$isMorphoTablet cbm=$hasCbmE3")
+        result.success(
+          mapOf(
+            "isMorphoTablet" to (isMorphoTablet || hasCbmE3),
+            "hasCbmE3" to hasCbmE3,
+            "model" to model,
+            "product" to product,
+            "device" to device,
+            "manufacturer" to manufacturer,
+          ),
+        )
+      }
       "prepare" -> {
         val act = activity
         if (act == null) {

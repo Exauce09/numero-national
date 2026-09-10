@@ -1,3 +1,4 @@
+import 'morpho_fingerprint.dart';
 import 'secure_storage.dart';
 
 /// Application configuration for census field agents.
@@ -12,7 +13,7 @@ class AppConfig {
   /// Max hours an agent may work offline after last successful auth.
   static const int offlineAuthMaxHours = 72;
 
-  static const String appVersion = '0.3.3';
+  static const String appVersion = '0.3.4';
 
   /// Profil appareil : `standard` | `fingerprint` (MorphoTablet) | `pos`.
   static const String deviceProfile = String.fromEnvironment(
@@ -20,8 +21,28 @@ class AppConfig {
     defaultValue: 'standard',
   );
 
-  static bool get isFingerprintDevice => deviceProfile == 'fingerprint';
+  /// Rempli au démarrage si MorphoTablet / CBM-E3 détecté (indépendant du dart-define).
+  static bool _runtimeMorphoTablet = false;
+
+  static bool get isFingerprintDevice =>
+      deviceProfile == 'fingerprint' || _runtimeMorphoTablet;
+
   static bool get isPosDevice => deviceProfile == 'pos';
+
+  /// Appeler avant runApp pour activer le chemin Morpho sur tablette optique.
+  static Future<void> initDeviceProfile() async {
+    if (deviceProfile == 'fingerprint') {
+      _runtimeMorphoTablet = true;
+      return;
+    }
+    try {
+      final hw = await MorphoFingerprint.detectHardware();
+      _runtimeMorphoTablet =
+          hw['isMorphoTablet'] == true || hw['hasCbmE3'] == true;
+    } catch (_) {
+      _runtimeMorphoTablet = false;
+    }
+  }
 
   /// Runtime override stored on device (login screen) wins over compile-time.
   static Future<String> effectiveApiBaseUrl() async {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'auth/login_screen.dart';
 import 'core/auth_service.dart';
+import 'core/config.dart';
 import 'core/theme.dart';
 import 'features/census/campaigns_screen.dart';
 import 'features/census/conflicts_screen.dart';
@@ -13,6 +14,7 @@ import 'sync/sync_lifecycle.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppConfig.initDeviceProfile();
   await LocalDatabase.instance.init();
   SyncLifecycle.instance.start();
   runApp(const RecensementApp());

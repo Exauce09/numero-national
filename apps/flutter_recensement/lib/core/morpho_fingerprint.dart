@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 
-/// Bridge MorphoSmart (MorphoTablet optique MSO).
+/// Bridge MorphoSmart (MorphoTablet optique MSO / CBM-E3).
 class MorphoFingerprint {
   MorphoFingerprint._();
 
@@ -15,6 +15,17 @@ class MorphoFingerprint {
     } catch (_) {
       return false;
     }
+  }
+
+  /// Détection matérielle (modèle MorphoTablet / USB CBM-E3).
+  static Future<Map<String, dynamic>> detectHardware() async {
+    try {
+      final raw = await _channel.invokeMethod<dynamic>('detectHardware');
+      if (raw is Map) {
+        return raw.map((k, v) => MapEntry(k.toString(), v));
+      }
+    } catch (_) {}
+    return <String, dynamic>{'isMorphoTablet': false, 'hasCbmE3': false};
   }
 
   /// Initialise USB Morpho + ouvre le capteur.
