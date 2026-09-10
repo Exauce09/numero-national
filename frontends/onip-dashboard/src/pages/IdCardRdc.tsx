@@ -43,8 +43,22 @@ export function printNationalIdCard(rootId = "nn-id-card-print"): void {
     return;
   }
 
+  const clone = root.cloneNode(true) as HTMLElement;
+  // Chemins absolus pour que drapeau / armoiries / patrimoine s'impriment
+  clone.querySelectorAll("img").forEach((img) => {
+    const src = img.getAttribute("src");
+    if (src && src.startsWith("/")) {
+      img.setAttribute("src", `${window.location.origin}${src}`);
+    }
+  });
+
   const styleSheets = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
-    .map((n) => n.outerHTML)
+    .map((n) => {
+      if (n instanceof HTMLLinkElement && n.href) {
+        return `<link rel="stylesheet" href="${n.href}" />`;
+      }
+      return n.outerHTML;
+    })
     .join("\n");
 
   const win = window.open("", "_blank", "noopener,noreferrer,width=900,height=700");
@@ -58,6 +72,7 @@ export function printNationalIdCard(rootId = "nn-id-card-print"): void {
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
+  <base href="${window.location.origin}/" />
   <title>Carte d'identité nationale — RDC</title>
   ${styleSheets}
   <style>
@@ -110,7 +125,7 @@ export function printNationalIdCard(rootId = "nn-id-card-print"): void {
   </style>
 </head>
 <body>
-  ${root.outerHTML}
+  ${clone.outerHTML}
 </body>
 </html>`);
   win.document.close();
@@ -120,7 +135,6 @@ export function printNationalIdCard(rootId = "nn-id-card-print"): void {
       win.focus();
       win.print();
     } finally {
-      // laisser l'aperçu ouvert un instant puis fermer
       setTimeout(() => {
         try {
           win.close();
@@ -131,13 +145,27 @@ export function printNationalIdCard(rootId = "nn-id-card-print"): void {
     }
   };
 
-  // Attendre le rendu SVG / polices
-  if (win.document.readyState === "complete") {
-    setTimeout(runPrint, 250);
-  } else {
-    win.addEventListener("load", () => setTimeout(runPrint, 250));
-  }
+  // Attendre CSS + images patrimoine
+  const imgs = Array.from(win.document.images);
+  Promise.all(
+    imgs.map(
+      (img) =>
+        img.complete
+          ? Promise.resolve()
+          : new Promise<void>((resolve) => {
+              img.onload = () => resolve();
+              img.onerror = () => resolve();
+            }),
+    ),
+  ).then(() => setTimeout(runPrint, 200));
 }
+
+const ASSETS = {
+  flag: "/card-assets/drapeau-rdc.png",
+  arms: "/card-assets/armoiries-rdc.png",
+  tour: "/card-assets/tour-echangeur.png",
+  okapi: "/card-assets/okapi.png",
+};
 
 type Props = {
   card: NationalCard;
@@ -197,17 +225,22 @@ export default function IdCardRdc({ card, fallback }: Props) {
     <div id="nn-id-card-print" className="id-card-print-wrap">
       {/* RECTO — HTML réel (pas une image) */}
       <article className="rdc-card rdc-card-front" aria-label="Carte d'identité nationale — recto">
+        <div className="rdc-card-bg" aria-hidden>
+          <img className="rdc-bg-flag" src={ASSETS.flag} alt="" />
+          <img className="rdc-bg-arms" src={ASSETS.arms} alt="" />
+          <img className="rdc-bg-tour" src={ASSETS.tour} alt="" />
+        </div>
         <div className="rdc-card-guilloche" aria-hidden />
         <header className="rdc-card-header">
           <div className="rdc-flag-badge" aria-hidden>
-            <span className="rdc-star">★</span>
+            <img src={ASSETS.flag} alt="" />
           </div>
           <div className="rdc-card-titles">
             <strong>RÉPUBLIQUE DÉMOCRATIQUE DU CONGO</strong>
             <span>CARTE NATIONALE D&apos;IDENTITÉ / IDENTITY CARD</span>
           </div>
           <div className="rdc-country-code" title="Code pays">
-            CD
+            <img src={ASSETS.arms} alt="" />
           </div>
         </header>
 
@@ -218,7 +251,7 @@ export default function IdCardRdc({ card, fallback }: Props) {
             </div>
             <div className="rdc-chip" title="Puce électronique" aria-hidden />
             <div className="rdc-heritage" title="Patrimoine national">
-              Virunga · Congo · Léopard
+              Tour de l&apos;Échangeur · Okapi · Armoiries
             </div>
           </div>
 
@@ -283,8 +316,14 @@ export default function IdCardRdc({ card, fallback }: Props) {
         </div>
       </article>
 
-      {/* VERSO — même structure HTML à l'impression */}
+      {/* VERSO — patrimoine + drapeau + armoiries */}
       <article className="rdc-card rdc-card-back" aria-label="Carte d'identité nationale — verso">
+        <div className="rdc-card-bg rdc-card-bg-back" aria-hidden>
+          <img className="rdc-bg-flag rdc-bg-flag-back" src={ASSETS.flag} alt="" />
+          <img className="rdc-bg-tour rdc-bg-tour-back" src={ASSETS.tour} alt="" />
+          <img className="rdc-bg-okapi" src={ASSETS.okapi} alt="" />
+          <img className="rdc-bg-arms rdc-bg-arms-back" src={ASSETS.arms} alt="" />
+        </div>
         <div className="rdc-card-guilloche rdc-card-guilloche-back" aria-hidden />
         <div className="rdc-back-top">
           <div className="rdc-qr-block">
@@ -323,7 +362,7 @@ export default function IdCardRdc({ card, fallback }: Props) {
               </div>
               <div>
                 <span className="id-label">Patrimoine</span>
-                <strong>RDC — Fleuve · Parcs · Cultures</strong>
+                <strong>Échangeur Limete · Okapi · Armoiries</strong>
               </div>
             </div>
           </div>
