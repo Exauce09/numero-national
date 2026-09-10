@@ -45,11 +45,17 @@ export function getSession(): Session | null {
   if (!raw) return null;
   try {
     const s = JSON.parse(raw) as Session;
-    if (!s.displayName || !s.roleTitle) {
-      const labels = sessionLabel(s.username);
-      return { ...s, ...labels };
+    const labels = sessionLabel(s.username);
+    const withLabels: Session = {
+      ...s,
+      displayName: s.displayName || labels.displayName,
+      roleTitle: s.roleTitle || labels.roleTitle,
+    };
+    // Toujours rattacher la commune du compte (évite topbar vide après ancienne session).
+    if (!withLabels.commune_name || !withLabels.commune_code) {
+      return attachCommune(withLabels, withLabels.username);
     }
-    return s;
+    return withLabels;
   } catch {
     return null;
   }

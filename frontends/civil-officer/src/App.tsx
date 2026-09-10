@@ -36,6 +36,7 @@ import PopulationPage from "./pages/PopulationPage";
 import NewbornsPage from "./pages/NewbornsPage";
 import BirthsPage from "./pages/BirthsPage";
 import CensusPage from "./pages/CensusPage";
+import CouponScanPage from "./pages/CouponScanPage";
 import DeathsPage from "./pages/DeathsPage";
 import MarriagesPage from "./pages/MarriagesPage";
 import AdoptionsPage from "./pages/AdoptionsPage";
@@ -585,6 +586,9 @@ function Shell() {
           <NavLink to="/census">
             <IconClipboard size={18} /> Recensement
           </NavLink>
+          <NavLink to="/census/scan-coupon">
+            <IconClipboard size={18} /> Scan coupon APK
+          </NavLink>
           <NavLink to="/manage/deces">
             <IconCross size={18} /> Décès
           </NavLink>
@@ -710,6 +714,7 @@ function Shell() {
             <Route path="/lists/acts" element={<ActsPage showAnalytics />} />
             <Route path="/births" element={<BirthsPage />} />
             <Route path="/census" element={<CensusPage />} />
+            <Route path="/census/scan-coupon" element={<CouponScanPage />} />
             <Route path="/deaths" element={<DeathsPage />} />
             <Route path="/marriages" element={<MarriagesPage />} />
             <Route path="/adoptions" element={<AdoptionsPage />} />

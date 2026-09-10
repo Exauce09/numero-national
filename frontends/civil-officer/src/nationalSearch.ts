@@ -1,4 +1,5 @@
 import { getSession } from "./auth";
+import { api, type FormDraft } from "./api";
 import {
   addPerson,
   getPerson,
@@ -21,6 +22,10 @@ export type NationalCitizenHit = {
   province_code?: string | null;
   ville?: string | null;
   commune_code?: string | null;
+};
+
+export type DraftSearchHit = FormDraft & {
+  kind: "draft";
 };
 
 function authHeaders(): HeadersInit {
@@ -90,5 +95,22 @@ export async function searchEveryone(query: string): Promise<Person[]> {
     return national.slice(0, 12);
   } catch {
     return local;
+  }
+}
+
+/** Recherche les brouillons partagés (APK + commune) par nom / titre / local_id. */
+export async function searchFormDrafts(query: string): Promise<DraftSearchHit[]> {
+  const q = query.trim();
+  if (!q || !getSession()?.accessToken) return [];
+  try {
+    const params = new URLSearchParams({
+      status: "DRAFT",
+      q,
+      limit: "20",
+    });
+    const rows = await api.listFormDrafts(params);
+    return rows.map((r) => ({ ...r, kind: "draft" as const }));
+  } catch {
+    return [];
   }
 }

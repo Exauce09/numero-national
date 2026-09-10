@@ -1097,8 +1097,11 @@ async def list_form_drafts(
     province_id: uuid.UUID | None = None,
     ville_id: uuid.UUID | None = None,
     campaign_id: uuid.UUID | None = None,
+    q: str | None = None,
     limit: int = 50,
 ) -> list[FormDraft]:
+    from sqlalchemy import or_, cast, String
+
     stmt = select(FormDraft).order_by(FormDraft.updated_at.desc()).limit(limit)
     if system:
         stmt = stmt.where(FormDraft.system == system.strip().lower())
@@ -1112,6 +1115,18 @@ async def list_form_drafts(
         stmt = stmt.where(FormDraft.ville_id == ville_id)
     if campaign_id:
         stmt = stmt.where(FormDraft.campaign_id == campaign_id)
+    needle = (q or "").strip()
+    if needle:
+        like = f"%{needle}%"
+        stmt = stmt.where(
+            or_(
+                FormDraft.title.ilike(like),
+                FormDraft.local_id.ilike(like),
+                FormDraft.system.ilike(like),
+                FormDraft.form_type.ilike(like),
+                cast(FormDraft.payload, String).ilike(like),
+            )
+        )
     return list((await db.execute(stmt)).scalars().all())
 
 
@@ -1267,7 +1282,7 @@ async def resolve_field_coupon(db: AsyncSession, raw: str) -> dict[str, Any]:
             "campaign_id": record.campaign_id,
             "household_local_id": None,
             "family_name": record.family_name,
-            "given_names": (record.payload or {}).get("given_names") if isinstance(record.payload, dict) else None,
+            "given_names": record.given_names,
             "sex": record.sex,
             "date_of_birth": record.date_of_birth,
             "coupon_id": None,

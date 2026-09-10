@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import ActPrintCard from "../components/ActPrintCard";
 import GeoCascade, {
   ADDRESS_FIELD_LABELS,
@@ -110,6 +111,8 @@ type CensusDraft = {
 };
 
 export default function CensusPage() {
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState<StepId>(1);
   const [handicap, setHandicap] = useState<HandicapType>("NORMAL");
   const [nom, setNom] = useState("");
@@ -210,6 +213,57 @@ export default function CensusPage() {
       localStorage.removeItem(CENSUS_DRAFT_KEY);
     }
   }, []);
+
+  useEffect(() => {
+    const state = location.state as {
+      couponPrefill?: {
+        nom?: string;
+        prenom?: string;
+        sexe?: Sexe;
+        dateNaissance?: string;
+        localId?: string;
+      };
+    } | null;
+    const pre = state?.couponPrefill;
+    if (!pre) return;
+    if (pre.nom) setNom(pre.nom);
+    if (pre.prenom) setPrenom(pre.prenom);
+    if (pre.sexe) setSexe(pre.sexe);
+    if (pre.dateNaissance) setDateNaissance(pre.dateNaissance);
+    if (pre.localId) localStorage.setItem(`${CENSUS_DRAFT_KEY}:id`, pre.localId);
+    setStep(1);
+    setDraftNotice("Prérempli depuis le coupon APK — complétez puis enregistrez.");
+  }, [location.state]);
+
+  useEffect(() => {
+    const draftId = searchParams.get("draft");
+    if (!draftId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const rows = await api.listFormDrafts(
+          new URLSearchParams({ status: "DRAFT", limit: "100" }),
+        );
+        const remote = rows.find((r) => r.id === draftId);
+        if (!remote || cancelled) return;
+        const payload = remote.payload as Partial<CensusDraft>;
+        if (payload.nom) setNom(String(payload.nom));
+        if (payload.postnom) setPostnom(String(payload.postnom));
+        if (payload.prenom) setPrenom(String(payload.prenom));
+        if (payload.sexe) setSexe(payload.sexe as Sexe);
+        if (payload.dateNaissance) setDateNaissance(String(payload.dateNaissance));
+        if (remote.local_id) localStorage.setItem(`${CENSUS_DRAFT_KEY}:id`, remote.local_id);
+        setDraftNotice(`Brouillon serveur ouvert — ${remote.title || remote.local_id || remote.id}`);
+        setStep(1);
+        await api.claimFormDraft(remote.id).catch(() => undefined);
+      } catch {
+        if (!cancelled) setError("Impossible de charger le brouillon serveur.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams]);
 
   useEffect(() => {
     if (etatCivil === "MARIE" && !situationFamiliale.a_conjoint) {
@@ -510,7 +564,8 @@ export default function CensusPage() {
       <h2 className="page-title">Recensement</h2>
       <p className="page-lead">
         Formulaire d&apos;identification de la personne — identité selon le modèle officiel ; photos et empreintes à
-        l&apos;étape Biométrie.
+        l&apos;étape Biométrie.{" "}
+        <Link to="/census/scan-coupon">Scanner un coupon APK</Link>
       </p>
 
       <div className="wizard-steps census-wizard-steps">

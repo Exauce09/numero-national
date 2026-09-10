@@ -13,6 +13,7 @@ Revises: 018_card_commune_delivery
 
 from typing import Sequence, Union
 
+import sqlalchemy as sa
 from alembic import op
 
 revision: str = "019_postgis_zd_geospatial"
@@ -22,7 +23,20 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute("CREATE EXTENSION IF NOT EXISTS postgis")
+    conn = op.get_bind()
+    has_postgis = bool(
+        conn.execute(
+            sa.text("SELECT EXISTS(SELECT 1 FROM pg_available_extensions WHERE name = 'postgis')")
+        ).scalar()
+    )
+    if has_postgis:
+        op.execute("CREATE EXTENSION IF NOT EXISTS postgis")
+        poly_type = "geometry(MultiPolygon, 4326)"
+        point_type = "geography(Point, 4326)"
+    else:
+        # Dev/local: plain postgres:16-alpine — keep schema usable without PostGIS.
+        poly_type = "JSONB"
+        point_type = "JSONB"
 
     # --- Territoire (niveau rural manquant ; villes existent déjà) ---
     op.execute(
@@ -60,7 +74,7 @@ def upgrade() -> None:
 
     # --- Zones de dénombrement (ZD) officielles ---
     op.execute(
-        """
+        f"""
         CREATE TABLE IF NOT EXISTS geography.enumeration_zones (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             code VARCHAR(64) NOT NULL,
@@ -70,7 +84,7 @@ def upgrade() -> None:
             localite_id UUID
                 REFERENCES geography.localites(id) ON DELETE SET NULL,
             estimated_population INTEGER,
-            geom geometry(MultiPolygon, 4326),
+            geom {poly_type},
             created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             CONSTRAINT uq_enumeration_zone_code UNIQUE (code),
@@ -88,10 +102,11 @@ def upgrade() -> None:
         "CREATE INDEX IF NOT EXISTS ix_enumeration_zones_localite "
         "ON geography.enumeration_zones (localite_id)"
     )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_enumeration_zones_geom "
-        "ON geography.enumeration_zones USING GIST (geom)"
-    )
+    if has_postgis:
+        op.execute(
+            "CREATE INDEX IF NOT EXISTS ix_enumeration_zones_geom "
+            "ON geography.enumeration_zones USING GIST (geom)"
+        )
 
     # --- Citoyen : ZD d'enregistrement + GPS + statut de vérification ---
     op.execute(
@@ -102,9 +117,9 @@ def upgrade() -> None:
         """
     )
     op.execute(
-        """
+        f"""
         ALTER TABLE core_registry.citizens
-            ADD COLUMN IF NOT EXISTS registration_location geography(Point, 4326)
+            ADD COLUMN IF NOT EXISTS registration_location {point_type}
         """
     )
     op.execute(
@@ -122,14 +137,15 @@ def upgrade() -> None:
         "CREATE INDEX IF NOT EXISTS ix_citizens_verification_status "
         "ON core_registry.citizens (verification_status)"
     )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_citizens_registration_location "
-        "ON core_registry.citizens USING GIST (registration_location)"
-    )
+    if has_postgis:
+        op.execute(
+            "CREATE INDEX IF NOT EXISTS ix_citizens_registration_location "
+            "ON core_registry.citizens USING GIST (registration_location)"
+        )
 
     # Historique ZD (déménagement / migration sans perte)
     op.execute(
-        """
+        f"""
         CREATE TABLE IF NOT EXISTS core_registry.citizen_zd_memberships (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             citizen_id UUID NOT NULL
@@ -140,7 +156,7 @@ def upgrade() -> None:
             valid_to TIMESTAMPTZ,
             reason VARCHAR(64) NOT NULL DEFAULT 'REGISTRATION',
             recorded_by UUID,
-            location geography(Point, 4326),
+            location {point_type},
             notes TEXT,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
@@ -159,10 +175,11 @@ def upgrade() -> None:
         "ON core_registry.citizen_zd_memberships (citizen_id) "
         "WHERE valid_to IS NULL"
     )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_citizen_zd_memberships_location "
-        "ON core_registry.citizen_zd_memberships USING GIST (location)"
-    )
+    if has_postgis:
+        op.execute(
+            "CREATE INDEX IF NOT EXISTS ix_citizen_zd_memberships_location "
+            "ON core_registry.citizen_zd_memberships USING GIST (location)"
+        )
 
     # --- Agent ↔ ZD (multi-ZD, historique) ---
     op.execute(
@@ -210,42 +227,44 @@ def upgrade() -> None:
         """
     )
     op.execute(
-        """
+        f"""
         ALTER TABLE recensement.zones
-            ADD COLUMN IF NOT EXISTS geom geometry(MultiPolygon, 4326)
+            ADD COLUMN IF NOT EXISTS geom {poly_type}
         """
     )
     op.execute(
         "CREATE INDEX IF NOT EXISTS ix_recensement_zones_zd "
         "ON recensement.zones (enumeration_zone_id)"
     )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_recensement_zones_geom "
-        "ON recensement.zones USING GIST (geom)"
-    )
+    if has_postgis:
+        op.execute(
+            "CREATE INDEX IF NOT EXISTS ix_recensement_zones_geom "
+            "ON recensement.zones USING GIST (geom)"
+        )
 
     # Ménages : point PostGIS (en plus de lat/lon float)
     op.execute(
-        """
+        f"""
         ALTER TABLE recensement.households
-            ADD COLUMN IF NOT EXISTS location geography(Point, 4326)
+            ADD COLUMN IF NOT EXISTS location {point_type}
         """
     )
-    op.execute(
-        """
-        UPDATE recensement.households
-        SET location = ST_SetSRID(
-            ST_MakePoint(longitude, latitude), 4326
-        )::geography
-        WHERE latitude IS NOT NULL
-          AND longitude IS NOT NULL
-          AND location IS NULL
-        """
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_households_location "
-        "ON recensement.households USING GIST (location)"
-    )
+    if has_postgis:
+        op.execute(
+            """
+            UPDATE recensement.households
+            SET location = ST_SetSRID(
+                ST_MakePoint(longitude, latitude), 4326
+            )::geography
+            WHERE latitude IS NOT NULL
+              AND longitude IS NOT NULL
+              AND location IS NULL
+            """
+        )
+        op.execute(
+            "CREATE INDEX IF NOT EXISTS ix_households_location "
+            "ON recensement.households USING GIST (location)"
+        )
 
     # Dédup : typologie biométrie / geo+civil (tables biométriques déjà en 007)
     op.execute(

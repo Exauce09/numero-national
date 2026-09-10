@@ -1,8 +1,8 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import DataToolbar from "../components/DataToolbar";
 import { getSession } from "../auth";
-import { searchEveryone } from "../nationalSearch";
+import { searchEveryone, searchFormDrafts, type DraftSearchHit } from "../nationalSearch";
 import {
   displayName,
   getPerson,
@@ -15,6 +15,7 @@ export default function SearchPage() {
   const initial = params.get("q") ?? "";
   const [q, setQ] = useState(initial);
   const [hits, setHits] = useState<Person[]>([]);
+  const [drafts, setDrafts] = useState<DraftSearchHit[]>([]);
   const [selected, setSelected] = useState<Person | null>(null);
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
@@ -25,16 +26,20 @@ export default function SearchPage() {
     setBusy(true);
     setHint(null);
     try {
-      const rows = await searchEveryone(needle);
+      const [rows, draftRows] = await Promise.all([
+        searchEveryone(needle),
+        searchFormDrafts(needle),
+      ]);
       setHits(rows);
+      setDrafts(draftRows);
       if (!needle) {
         setHint(null);
-      } else if (!rows.length && !getSession()?.accessToken) {
+      } else if (!rows.length && !draftRows.length && !getSession()?.accessToken) {
         setHint(
-          "Connectez-vous avec un compte API (ex. officier) pour chercher dans le registre national. Mode local uniquement pour l’instant.",
+          "Connectez-vous avec un compte API (ex. officier) pour chercher dans le registre national et les brouillons.",
         );
-      } else if (!rows.length) {
-        setHint("Aucun résultat national ni local pour cette recherche.");
+      } else if (!rows.length && !draftRows.length) {
+        setHint("Aucun résultat (personnes ni brouillons) pour cette recherche.");
       }
     } finally {
       setBusy(false);
@@ -75,9 +80,8 @@ export default function SearchPage() {
     <div>
       <h2 className="page-title">Recherche</h2>
       <p className="page-lead">
-        Recherche nationale (registre + NIC) et locale : NIC, nom, postnom, prénom, date de naissance,
-        province et ville.
-        {hasApi ? " · Connecté au registre national." : " · Sans jeton API : résultats locaux seulement."}
+        Registre national, fiches locales et brouillons partagés (APK / commune) : NIC, nom, titre, local_id…
+        {hasApi ? " · Connecté à l’API." : " · Sans jeton API : résultats locaux seulement."}
       </p>
       <div className="panel">
         <form className="toolbar" onSubmit={onSubmit}>
@@ -87,7 +91,7 @@ export default function SearchPage() {
               className="form-control"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Ex. Azerty — ou un NIC"
+              placeholder="Ex. Azerty — NIC — ou titre de brouillon"
             />
           </div>
           <button className="btn-primary" style={{ width: "auto", minWidth: 140 }} type="submit" disabled={busy}>
@@ -96,7 +100,7 @@ export default function SearchPage() {
         </form>
         {hint ? <p className="muted" style={{ marginTop: 8 }}>{hint}</p> : null}
         <div className="panel-head" style={{ marginTop: "1rem" }}>
-          <h3 className="panel-title">{hits.length} résultat(s)</h3>
+          <h3 className="panel-title">{hits.length} personne(s)</h3>
           <DataToolbar filename="recherche_personnes" rows={rows} />
         </div>
         <table className="data-table">
@@ -155,6 +159,49 @@ export default function SearchPage() {
         </table>
       </div>
 
+      <div className="panel" style={{ marginTop: "1rem" }}>
+        <div className="panel-head">
+          <h3 className="panel-title">{drafts.length} brouillon(s)</h3>
+        </div>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Titre</th>
+              <th>Système</th>
+              <th>Type</th>
+              <th>Réf. locale</th>
+              <th>Maj</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {drafts.map((d) => (
+              <tr key={d.id}>
+                <td>{d.title || "—"}</td>
+                <td>{d.system}</td>
+                <td>{d.form_type}</td>
+                <td>
+                  <code>{d.local_id || "—"}</code>
+                </td>
+                <td>{d.updated_at ? new Date(d.updated_at).toLocaleString("fr-CD") : "—"}</td>
+                <td>
+                  <Link className="btn-secondary" to={`/census?draft=${encodeURIComponent(d.id)}`}>
+                    Ouvrir
+                  </Link>
+                </td>
+              </tr>
+            ))}
+            {!drafts.length ? (
+              <tr>
+                <td colSpan={6} className="muted">
+                  Aucun brouillon pour cette recherche.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+
       {selected ? (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setSelected(null)}>
           <div className="modal-panel" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
@@ -170,36 +217,6 @@ export default function SearchPage() {
                   {selected.date_naissance || "—"} · {selected.lieu_naissance || "—"}
                 </dd>
               </div>
-              {(() => {
-                const origin = personOrigin(selected);
-                const father = selected.father_id ? getPerson(selected.father_id) : undefined;
-                const mother = selected.mother_id ? getPerson(selected.mother_id) : undefined;
-                return (
-                  <>
-                    <div>
-                      <dt>Père</dt>
-                      <dd>{father ? `${displayName(father)} (${father.nic})` : "—"}</dd>
-                    </div>
-                    <div>
-                      <dt>Mère</dt>
-                      <dd>{mother ? `${displayName(mother)} (${mother.nic})` : "—"}</dd>
-                    </div>
-                    <div>
-                      <dt>Origine (province / ville…)</dt>
-                      <dd>
-                        {origin.label || "—"}
-                        {origin.source === "father"
-                          ? ` — via père ${origin.source_name}`
-                          : origin.source === "mother"
-                            ? ` — via mère ${origin.source_name}`
-                            : origin.source === "self"
-                              ? " — infos propres"
-                              : ""}
-                      </dd>
-                    </div>
-                  </>
-                );
-              })()}
             </dl>
             <div className="modal-actions">
               <button type="button" className="btn-secondary" onClick={() => setSelected(null)}>

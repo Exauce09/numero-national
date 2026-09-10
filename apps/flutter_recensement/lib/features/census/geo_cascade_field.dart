@@ -212,11 +212,16 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
     });
     _emit();
     if (id == null || _showDistrict) return;
-    final rows = await _getList('/geo/communes?ville_id=$id');
+    var rows = await _getList('/geo/communes?ville_id=$id');
+    if (rows.isEmpty && _provinceId != null) {
+      rows = await _getList('/geo/communes?province_id=$_provinceId');
+    }
     if (!mounted) return;
     setState(() {
       _communes = rows;
-      _hint = '${rows.length} commune(s)';
+      _hint = rows.isEmpty
+          ? 'Aucune commune — utilisez + Ajouter'
+          : '${rows.length} commune(s)';
     });
   }
 
@@ -229,11 +234,19 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
     });
     _emit();
     if (id == null) return;
-    final rows = await _getList('/geo/communes?district_id=$id');
+    var rows = await _getList('/geo/communes?district_id=$id');
+    if (rows.isEmpty && _villeId != null) {
+      rows = await _getList('/geo/communes?ville_id=$_villeId');
+    }
+    if (rows.isEmpty && _provinceId != null) {
+      rows = await _getList('/geo/communes?province_id=$_provinceId');
+    }
     if (!mounted) return;
     setState(() {
       _communes = rows;
-      _hint = '${rows.length} secteur(s)/commune(s)';
+      _hint = rows.isEmpty
+          ? 'Aucune commune — utilisez + Ajouter'
+          : '${rows.length} secteur(s)/commune(s)';
     });
   }
 

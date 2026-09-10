@@ -108,6 +108,26 @@ export const api = {
       body: JSON.stringify({ status: "FINALIZED" }),
     }),
 
+  resolveCoupon: (raw: string) =>
+    request<{
+      found: boolean;
+      source: string;
+      local_id?: string | null;
+      campaign_id?: string | null;
+      household_local_id?: string | null;
+      family_name?: string | null;
+      given_names?: string | null;
+      sex?: string | null;
+      date_of_birth?: string | null;
+      coupon_id?: string | null;
+      census_record_id?: string | null;
+      qr_payload?: Record<string, unknown> | null;
+      message?: string | null;
+    }>("/census/coupons/resolve", {
+      method: "POST",
+      body: JSON.stringify({ raw }),
+    }),
+
   listActs: (kind: string, commune?: string) => {
     const q = new URLSearchParams();
     if (commune) q.set("commune_code", commune);

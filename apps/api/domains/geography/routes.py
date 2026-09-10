@@ -109,18 +109,37 @@ async def list_communes(
     province_id: UUID | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[GeoItem]:
+    """List communes. Many urban communes are linked to a ville, not a district —
+    when filtering by district_id with no direct links, fall back to communes of
+    villes in the same province so the cascade never goes blank.
+    """
     await ensure_geography_seeded(db)
     stmt = select(m.Commune)
     if ville_id:
         stmt = stmt.where(m.Commune.ville_id == ville_id)
-    if district_id:
+    elif district_id:
         stmt = stmt.where(m.Commune.district_id == district_id)
-    if province_id:
+    elif province_id:
         stmt = stmt.join(m.Ville, m.Commune.ville_id == m.Ville.id).where(
             m.Ville.province_id == province_id
         )
     stmt = stmt.order_by(m.Commune.name)
-    rows = (await db.execute(stmt)).scalars().all()
+    rows = list((await db.execute(stmt)).scalars().all())
+
+    # Seed often attaches Kinshasa communes to the ville only (district_id NULL).
+    if not rows and district_id and not ville_id:
+        district = await db.get(m.District, district_id)
+        if district is not None:
+            fallback = (
+                await db.execute(
+                    select(m.Commune)
+                    .join(m.Ville, m.Commune.ville_id == m.Ville.id)
+                    .where(m.Ville.province_id == district.province_id)
+                    .order_by(m.Commune.name)
+                )
+            ).scalars().all()
+            rows = list(fallback)
+
     return [GeoItem.model_validate(r) for r in rows]
 
 

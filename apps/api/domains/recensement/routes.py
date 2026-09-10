@@ -425,6 +425,7 @@ async def list_form_drafts(
     province_id: uuid.UUID | None = Query(default=None),
     ville_id: uuid.UUID | None = Query(default=None),
     campaign_id: uuid.UUID | None = Query(default=None),
+    q: str | None = Query(default=None, description="Recherche titre / local_id / contenu"),
     limit: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
@@ -437,6 +438,7 @@ async def list_form_drafts(
         province_id=province_id,
         ville_id=ville_id,
         campaign_id=campaign_id,
+        q=q,
         limit=limit,
     )
     return rows  # type: ignore[return-value]

@@ -214,8 +214,11 @@ export default function GeoCascade({
 
   async function onVille(id: string) {
     const v = villes.find((x) => x.id === id);
+    const base = { ...sel };
     emit({
-      ...sel,
+      ...base,
+      province_id: base.province_id,
+      province_name: base.province_name,
       ville_id: id,
       ville_name: v?.name,
       commune_id: undefined,
@@ -232,7 +235,12 @@ export default function GeoCascade({
     });
     const markLocal = () =>
       setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
-    setCommunes(show("commune") ? await fetchItems(`/geo/communes?ville_id=${id}`, markLocal) : []);
+    // Prefer ville; if empty, also try province-wide so commune never disappears.
+    let rows = show("commune") ? await fetchItems(`/geo/communes?ville_id=${id}`, markLocal) : [];
+    if (show("commune") && rows.length === 0 && base.province_id) {
+      rows = await fetchItems(`/geo/communes?province_id=${base.province_id}`, markLocal);
+    }
+    setCommunes(rows);
     setQuartiers([]);
     setAvenues([]);
     setRues([]);
@@ -241,8 +249,9 @@ export default function GeoCascade({
 
   async function onDistrict(id: string) {
     const d = districts.find((x) => x.id === id);
+    const base = { ...sel };
     emit({
-      ...sel,
+      ...base,
       district_id: id,
       district_name: d?.name,
       commune_id: undefined,
@@ -253,7 +262,13 @@ export default function GeoCascade({
     });
     const markLocal = () =>
       setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
-    const byDist = show("commune") ? await fetchItems(`/geo/communes?district_id=${id}`, markLocal) : [];
+    let byDist = show("commune") ? await fetchItems(`/geo/communes?district_id=${id}`, markLocal) : [];
+    if (show("commune") && byDist.length === 0 && base.ville_id) {
+      byDist = await fetchItems(`/geo/communes?ville_id=${base.ville_id}`, markLocal);
+    }
+    if (show("commune") && byDist.length === 0 && base.province_id) {
+      byDist = await fetchItems(`/geo/communes?province_id=${base.province_id}`, markLocal);
+    }
     if (byDist.length) setCommunes(byDist);
     setLocalites(show("localite") ? await fetchItems(`/geo/localites?district_id=${id}`, markLocal) : []);
   }

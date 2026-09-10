@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { searchEveryone } from "../nationalSearch";
+import { searchEveryone, searchFormDrafts, type DraftSearchHit } from "../nationalSearch";
 import { displayName, personOrigin, type Person } from "../registry";
 
 export default function TopbarSearch() {
@@ -9,6 +9,7 @@ export default function TopbarSearch() {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [hits, setHits] = useState<Person[]>([]);
+  const [drafts, setDrafts] = useState<DraftSearchHit[]>([]);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -22,12 +23,16 @@ export default function TopbarSearch() {
     const needle = q.trim();
     if (needle.length < 1) {
       setHits([]);
+      setDrafts([]);
       return;
     }
     let cancelled = false;
     const t = window.setTimeout(() => {
-      void searchEveryone(needle).then((rows) => {
-        if (!cancelled) setHits(rows.slice(0, 8));
+      void Promise.all([searchEveryone(needle), searchFormDrafts(needle)]).then(([rows, draftRows]) => {
+        if (!cancelled) {
+          setHits(rows.slice(0, 6));
+          setDrafts(draftRows.slice(0, 4));
+        }
       });
     }, 220);
     return () => {
@@ -53,6 +58,11 @@ export default function TopbarSearch() {
     navigate(`/search?q=${encodeURIComponent(p.nic)}`);
   }
 
+  function selectDraft(d: DraftSearchHit) {
+    setOpen(false);
+    navigate(`/census?draft=${encodeURIComponent(d.id)}`);
+  }
+
   return (
     <div className="topbar-search" ref={rootRef}>
       <form className="topbar-search-form" onSubmit={onSubmit} role="search">
@@ -69,36 +79,52 @@ export default function TopbarSearch() {
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder="NIC, nom, date, province, ville…"
+          placeholder="NIC, nom, brouillon…"
           aria-label="Recherche intelligente"
           autoComplete="off"
         />
       </form>
       {open && q.trim() ? (
         <div className="topbar-search-dropdown" role="listbox">
-          {hits.length === 0 ? (
+          {hits.length === 0 && drafts.length === 0 ? (
             <div className="topbar-search-empty">Aucun résultat</div>
           ) : (
-            hits.map((p) => {
-              const loc = personOrigin(p);
-              return (
+            <>
+              {hits.map((p) => {
+                const loc = personOrigin(p);
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className="topbar-search-hit"
+                    role="option"
+                    onClick={() => selectPerson(p)}
+                  >
+                    <strong>{displayName(p)}</strong>
+                    <span>
+                      {p.nic} · {p.date_naissance || "—"}
+                      {loc.ville || loc.province
+                        ? ` · ${[loc.ville, loc.province].filter(Boolean).join(", ")}`
+                        : ""}
+                    </span>
+                  </button>
+                );
+              })}
+              {drafts.map((d) => (
                 <button
-                  key={p.id}
+                  key={d.id}
                   type="button"
                   className="topbar-search-hit"
                   role="option"
-                  onClick={() => selectPerson(p)}
+                  onClick={() => selectDraft(d)}
                 >
-                  <strong>{displayName(p)}</strong>
+                  <strong>Brouillon · {d.title || d.local_id || d.id.slice(0, 8)}</strong>
                   <span>
-                    {p.nic} · {p.date_naissance || "—"}
-                    {loc.ville || loc.province
-                      ? ` · ${[loc.ville, loc.province].filter(Boolean).join(", ")}`
-                      : ""}
+                    {d.system} / {d.form_type}
                   </span>
                 </button>
-              );
-            })
+              ))}
+            </>
           )}
           <button type="button" className="topbar-search-all" onClick={() => goSearch(q)}>
             Voir tous les résultats
