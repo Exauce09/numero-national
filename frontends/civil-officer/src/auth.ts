@@ -102,10 +102,10 @@ export async function login(username: string, password: string): Promise<Session
   for (const attempt of apiAttempts) {
     try {
       const ctrl = new AbortController();
-      const timer = window.setTimeout(() => ctrl.abort(), 2500);
+      const timer = window.setTimeout(() => ctrl.abort(), 8000);
       const res = await fetch(`${base}/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({ email: attempt.email, password: attempt.password }),
         signal: ctrl.signal,
       });
@@ -124,26 +124,41 @@ export async function login(username: string, password: string): Promise<Session
         sessionStorage.setItem(KEY, JSON.stringify(session));
         return session;
       }
-    } catch {
+      if (res.status === 401 || res.status === 403) {
+        // mauvais mot de passe API — ne pas masquer
+        continue;
+      }
+      if (res.status === 405) {
+        throw new Error(
+          "Method Not Allowed — utilisez le portail État civil (POST), pas l’URL API dans le navigateur.",
+        );
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("Method Not Allowed")) throw err;
       /* API indisponible — essai suivant / mode démo */
     }
   }
 
+  // Compte API officier aussi en mode local si API down
+  const apiDemoOk =
+    (user === DEMO_API_EMAIL || user === DEMO_USER) &&
+    (password === DEMO_API_PASSWORD || password === DEMO_PASSWORD || password === passwordOverride);
   const demoOk =
-    user === DEMO_USER && (password === DEMO_PASSWORD || password === passwordOverride);
+    apiDemoOk || (user === DEMO_USER && (password === DEMO_PASSWORD || password === passwordOverride));
   if (!demoOk) {
     throw new Error(
-      `Identifiants incorrects. Utilisez : ${DEMO_USER} / ${DEMO_PASSWORD} (ou ${DEMO_API_EMAIL})`,
+      `Identifiants incorrects. Utilisez : ${DEMO_API_EMAIL} / ${DEMO_API_PASSWORD}`,
     );
   }
 
+  const sessionUser = user.includes("@") ? user : DEMO_USER;
   const session = attachCommune(
     {
-      username: DEMO_USER,
+      username: sessionUser === DEMO_API_EMAIL ? DEMO_USER : sessionUser,
       photoDataUrl,
-      ...sessionLabel(DEMO_USER),
+      ...sessionLabel(sessionUser === DEMO_API_EMAIL ? DEMO_USER : sessionUser),
     },
-    DEMO_USER,
+    sessionUser === DEMO_API_EMAIL ? DEMO_USER : sessionUser,
   );
   sessionStorage.setItem(KEY, JSON.stringify(session));
   return session;

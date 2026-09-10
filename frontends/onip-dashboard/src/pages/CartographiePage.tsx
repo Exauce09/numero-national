@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { fetchOnipMapPoints, type MapPoint } from "../api";
+import { fetchOnipMapByMilieu, fetchOnipMapPoints, type MapMilieu, type MapPoint } from "../api";
 
 declare global {
   interface Window {
@@ -7,6 +7,12 @@ declare global {
       map: (el: HTMLElement, opts?: object) => LeafletMap;
       tileLayer: (url: string, opts?: object) => { addTo: (m: LeafletMap) => void };
       marker: (latlng: [number, number]) => {
+        addTo: (m: LeafletMap) => { bindPopup: (html: string) => void };
+      };
+      circleMarker: (
+        latlng: [number, number],
+        opts?: object,
+      ) => {
         addTo: (m: LeafletMap) => { bindPopup: (html: string) => void };
       };
       latLngBounds: (latlngs: [number, number][]) => unknown;
@@ -19,6 +25,8 @@ type LeafletMap = {
   fitBounds: (bounds: unknown, opts?: object) => void;
   remove: () => void;
 };
+
+type Mode = "persons" | "milieu";
 
 function loadLeaflet(): Promise<NonNullable<typeof window.L>> {
   return new Promise((resolve, reject) => {
@@ -46,8 +54,15 @@ function loadLeaflet(): Promise<NonNullable<typeof window.L>> {
   });
 }
 
+function esc(s: string): string {
+  return s.replace(/</g, "&lt;").replace(/"/g, "&quot;");
+}
+
 export default function CartographiePage() {
+  const [mode, setMode] = useState<Mode>("persons");
   const [points, setPoints] = useState<MapPoint[]>([]);
+  const [milieux, setMilieux] = useState<MapMilieu[]>([]);
+  const [personsTotal, setPersonsTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const mapRef = useRef<HTMLDivElement | null>(null);
@@ -56,10 +71,22 @@ export default function CartographiePage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetchOnipMapPoints()
-      .then((res) => {
-        if (!cancelled) setPoints(res.points ?? []);
-      })
+    setError(null);
+    const load =
+      mode === "persons"
+        ? fetchOnipMapPoints().then((res) => {
+            if (cancelled) return;
+            setPoints(res.points ?? []);
+            setMilieux([]);
+            setPersonsTotal(res.count ?? 0);
+          })
+        : fetchOnipMapByMilieu().then((res) => {
+            if (cancelled) return;
+            setMilieux(res.milieux ?? []);
+            setPoints([]);
+            setPersonsTotal(res.persons ?? 0);
+          });
+    load
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       })
@@ -69,17 +96,42 @@ export default function CartographiePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [mode]);
 
-  const withGps = useMemo(
-    () => points.filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude)),
-    [points],
-  );
+  const markers = useMemo(() => {
+    if (mode === "persons") {
+      return points
+        .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude))
+        .map((p) => ({
+          id: p.id,
+          lat: p.latitude,
+          lng: p.longitude,
+          popup:
+            `<strong>${esc(p.label || p.address_line || "Personne")}</strong><br/>` +
+            `${esc(p.address_line || "—")}<br/>` +
+            `${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}`,
+          radius: 6,
+        }));
+    }
+    return milieux
+      .filter((m) => Number.isFinite(m.latitude) && Number.isFinite(m.longitude))
+      .map((m) => ({
+        id: m.milieu,
+        lat: m.latitude,
+        lng: m.longitude,
+        popup:
+          `<strong>${esc(m.milieu)}</strong><br/>` +
+          `${m.count} personne(s)<br/>` +
+          `H: ${m.male} · F: ${m.female}` +
+          (m.other ? ` · Autre: ${m.other}` : ""),
+        radius: Math.min(28, 8 + Math.sqrt(m.count) * 3),
+      }));
+  }, [mode, points, milieux]);
 
   useEffect(() => {
     let disposed = false;
     async function render() {
-      if (!mapRef.current || withGps.length === 0) return;
+      if (!mapRef.current || markers.length === 0) return;
       try {
         const L = await loadLeaflet();
         if (disposed || !mapRef.current) return;
@@ -87,21 +139,24 @@ export default function CartographiePage() {
           mapInstance.current.remove();
           mapInstance.current = null;
         }
-        const map = L.map(mapRef.current).setView([withGps[0].latitude, withGps[0].longitude], 12);
+        const map = L.map(mapRef.current).setView([markers[0].lat, markers[0].lng], 12);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
           maxZoom: 19,
         }).addTo(map);
         const latlngs: [number, number][] = [];
-        for (const p of withGps) {
-          const ll: [number, number] = [p.latitude, p.longitude];
+        for (const m of markers) {
+          const ll: [number, number] = [m.lat, m.lng];
           latlngs.push(ll);
-          L.marker(ll)
+          L.circleMarker(ll, {
+            radius: m.radius,
+            color: mode === "milieu" ? "#ce1126" : "#007fff",
+            fillColor: mode === "milieu" ? "#f7d618" : "#007fff",
+            fillOpacity: 0.75,
+            weight: 2,
+          })
             .addTo(map)
-            .bindPopup(
-              `<strong>${(p.address_line || "Ménage").replace(/</g, "&lt;")}</strong><br/>` +
-                `${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}`,
-            );
+            .bindPopup(m.popup);
         }
         if (latlngs.length > 1) {
           map.fitBounds(L.latLngBounds(latlngs), { padding: [28, 28] });
@@ -117,62 +172,112 @@ export default function CartographiePage() {
       mapInstance.current?.remove();
       mapInstance.current = null;
     };
-  }, [withGps]);
+  }, [markers, mode]);
 
   return (
     <div>
       <div className="hero-banner">
         <h1>Cartographie</h1>
         <p>
-          Points GPS des ménages enregistrés sur le terrain (APK) — la position est capturée à
-          l&apos;enregistrement, puis synchronisée.
+          Chaque personne recensée apparaît comme un endroit distinct. La vue « Par milieu »
+          regroupe les statistiques par zone / adresse.
         </p>
+      </div>
+
+      <div className="panel" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button
+          type="button"
+          className={mode === "persons" ? "btn-primary" : "btn-secondary"}
+          style={{ width: "auto" }}
+          onClick={() => setMode("persons")}
+        >
+          Personnes (1 point = 1 fiche)
+        </button>
+        <button
+          type="button"
+          className={mode === "milieu" ? "btn-primary" : "btn-secondary"}
+          style={{ width: "auto" }}
+          onClick={() => setMode("milieu")}
+        >
+          Par milieu (stats)
+        </button>
       </div>
 
       <div className="grid" style={{ marginTop: 0 }}>
         <div className="metric">
-          <div className="label">Points sur la carte</div>
-          <div className="value">{withGps.length}</div>
+          <div className="label">{mode === "persons" ? "Personnes sur la carte" : "Milieux"}</div>
+          <div className="value">{markers.length}</div>
+        </div>
+        <div className="metric">
+          <div className="label">Personnes totales</div>
+          <div className="value">{personsTotal}</div>
         </div>
       </div>
 
       {loading ? <p className="muted">Chargement de la carte…</p> : null}
       {error ? <p className="error">{error}</p> : null}
 
-      {!loading && withGps.length === 0 && !error ? (
+      {!loading && markers.length === 0 && !error ? (
         <div className="panel">
           <p className="muted" style={{ margin: 0 }}>
-            Aucun point GPS pour l&apos;instant. Enregistrez un ménage dans l&apos;application terrain
-            (le GPS se capture automatiquement), puis synchronisez.
+            Aucun point GPS. Enregistrez des fiches via l&apos;APK (GPS ménage), puis synchronisez.
           </p>
         </div>
       ) : null}
 
-      {withGps.length > 0 ? (
+      {markers.length > 0 ? (
         <div className="panel" style={{ padding: 0, overflow: "hidden" }}>
           <div ref={mapRef} style={{ height: 480, width: "100%" }} />
         </div>
       ) : null}
 
-      {withGps.length > 0 ? (
+      {mode === "persons" && points.length > 0 ? (
         <div className="panel">
-          <h2>Derniers points</h2>
+          <h2>Personnes ({points.length})</h2>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Adresse</th>
-                <th>Latitude</th>
-                <th>Longitude</th>
-                <th>Mis à jour</th>
+                <th>Nom</th>
+                <th>Adresse / milieu</th>
+                <th>Lat</th>
+                <th>Lng</th>
               </tr>
             </thead>
             <tbody>
-              {withGps.slice(0, 50).map((p) => (
+              {points.slice(0, 100).map((p) => (
                 <tr key={p.id}>
-                  <td>{p.address_line || "—"}</td>
-                  <td>{p.latitude.toFixed(6)}</td>
-                  <td>{p.longitude.toFixed(6)}</td>
-                  <td>{p.updated_at ? new Date(p.updated_at).toLocaleString("fr-FR") : "—"}</td>
+                  <td>{p.label || "—"}</td>
+                  <td>{p.milieu || p.address_line || "—"}</td>
+                  <td>{p.latitude.toFixed(5)}</td>
+                  <td>{p.longitude.toFixed(5)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      {mode === "milieu" && milieux.length > 0 ? (
+        <div className="panel">
+          <h2>Statistiques par milieu</h2>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Milieu</th>
+                <th>Total</th>
+                <th>H</th>
+                <th>F</th>
+                <th>Autre</th>
+              </tr>
+            </thead>
+            <tbody>
+              {milieux.map((m) => (
+                <tr key={m.milieu}>
+                  <td>{m.milieu}</td>
+                  <td>{m.count}</td>
+                  <td>{m.male}</td>
+                  <td>{m.female}</td>
+                  <td>{m.other}</td>
                 </tr>
               ))}
             </tbody>

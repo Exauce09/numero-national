@@ -40,27 +40,35 @@ export default function AnomaliesPage() {
       <div className="panel">
         <h2>Qu’est-ce qu’un doublon ?</h2>
         <p className="muted" style={{ marginTop: 0 }}>
-          Le registre crée un candidat doublon lorsqu’un citoyen a <strong>exactement</strong> les
-          mêmes valeurs (sans tenir compte de la casse pour les noms) :
+          Le registre crée un candidat doublon lorsqu&apos;un citoyen a <strong>exactement</strong>{" "}
+          les mêmes valeurs :
         </p>
         <ul>
           <li>
-            <strong>Nom de famille</strong> (family_name)
+            <strong>Nom de famille</strong>
           </li>
           <li>
-            <strong>Prénom(s)</strong> (given_names)
+            <strong>Prénom(s)</strong>
           </li>
           <li>
-            <strong>Date de naissance</strong>
+            <strong>Province</strong>
+          </li>
+          <li>
+            <strong>Territoire</strong> (commune / ville)
+          </li>
+          <li>
+            <strong>Sexe</strong>
+          </li>
+          <li>
+            <strong>Année de naissance</strong> (pas le jour/mois)
           </li>
         </ul>
         <p className="muted">
-          Score = 1,0 (correspondance démographique exacte). Tant qu’un doublon est{" "}
-          <strong>ouvert</strong>, l’attribution du NIC est bloquée (sauf forçage justifié).
+          Score = 1,0. Tant qu&apos;un doublon est <strong>ouvert</strong>, l&apos;attribution du NIC
+          est bloquée (sauf forçage justifié).
         </p>
         <p className="muted" style={{ marginBottom: 0 }}>
-          Non utilisés aujourd’hui pour le doublon démographique : NIC, adresse, photo, empreinte
-          téléphone, iris photo. La biométrie ABIS (si branchée) est un flux séparé.
+          Non utilisés pour ce doublon démographique : NIC, photo, empreinte téléphone, iris photo.
         </p>
       </div>
 

@@ -1,14 +1,15 @@
-"""NIC génération — format RDC structuré 14 chiffres (v2-rdc-14).
+"""NIC génération — format RDC structuré 14 chiffres (v3-rdc-14).
 
 Format (14 chiffres) ::
-  CC PP TT S YY NNNN L
-  │  │  │  │ │  │    └─ chiffre de contrôle Luhn
-  │  │  │  │ │  └────── séquence anti-collision (0000–9999)
-  │  │  │  │ └───────── année de naissance (2 chiffres)
-  │  │  │  └─────────── sexe (1=H, 2=F, 0=autre/inconnu)
-  │  │  └────────────── territoire / ville (01–99, 00 si inconnu)
-  │  └───────────────── province (01–26)
-  └──────────────────── pays (18 = RDC / COD)
+  PP TTT S YYYY NNNN
+  │  │   │ │    └─ séquence anti-collision (0000–9999)
+  │  │   │ └────── année de naissance (4 chiffres)
+  │  │   └──────── sexe (1=H, 2=F, 0=autre/inconnu)
+  │  └──────────── territoire / ville (001–999, 000 si inconnu)
+  └─────────────── province (01–26)
+
+Pas de code pays dans le NIC : comme dans la plupart des pays, le numéro
+national est déjà scopé à un État (la RDC) — le pays n’est pas répété dedans.
 
 Le NIC n'est jamais accepté en entrée API publique ; seul ce service l'attribue.
 """
@@ -27,14 +28,11 @@ from apps.api.domains.core_registry.enums import CitizenEventType, CitizenStatus
 from apps.api.domains.core_registry.models import Citizen, CitizenHistory, NicIssuanceLog
 from apps.api.domains.geography.seed_data import PROVINCES
 
-ALGORITHM_VERSION = "v2-rdc-14"
+ALGORITHM_VERSION = "v3-rdc-14"
 ACTOR_SYSTEM = "CORE_REGISTRY"
-NIC_PAYLOAD_LENGTH = 13
+NIC_PAYLOAD_LENGTH = 14
 NIC_TOTAL_LENGTH = 14
 MAX_COLLISION_RETRIES = 64
-
-# ISO 3166-1 numeric COD = 180 → compact 2 digits pour le NIC national.
-COUNTRY_CODE_RDC = "18"
 
 # Ordre stable des 26 provinces (index 1..26).
 PROVINCE_NUMERIC: dict[str, str] = {
@@ -44,30 +42,6 @@ PROVINCE_NUMERIC: dict[str, str] = {
 
 class NicGenerationError(RuntimeError):
     """Raised when a unique NIC cannot be attributed."""
-
-
-def luhn_check_digit(payload_digits: str) -> str:
-    """Compute the Luhn check digit for a numeric payload string."""
-    if not payload_digits.isdigit():
-        raise ValueError("payload must be numeric")
-    total = 0
-    reverse = payload_digits[::-1]
-    for i, ch in enumerate(reverse):
-        n = int(ch)
-        if i % 2 == 0:
-            n *= 2
-            if n > 9:
-                n -= 9
-        total += n
-    return str((10 - (total % 10)) % 10)
-
-
-def verify_luhn(number: str) -> bool:
-    """Return True if number passes Luhn (full value including check digit)."""
-    if not number.isdigit() or len(number) < 2:
-        return False
-    payload, check = number[:-1], number[-1]
-    return luhn_check_digit(payload) == check
 
 
 def encode_sex(sex: str | Sex | None) -> str:
@@ -87,31 +61,30 @@ def encode_province(province_code: str | None) -> str:
     code = province_code.strip().upper()
     if code in PROVINCE_NUMERIC:
         return PROVINCE_NUMERIC[code]
-    # Tolère un code déjà numérique 01–26
     if code.isdigit() and 1 <= int(code) <= 26:
         return f"{int(code):02d}"
     return "00"
 
 
 def encode_territory(*parts: str | None) -> str:
-    """Territoire / ville → 01–99 déterministe ; 00 si aucune info."""
+    """Territoire / ville → 001–999 déterministe ; 000 si aucune info."""
     key = "|".join(p.strip().upper() for p in parts if p and str(p).strip())
     if not key:
-        return "00"
+        return "000"
     digest = hashlib.sha256(key.encode("utf-8")).hexdigest()
-    n = (int(digest[:8], 16) % 99) + 1
-    return f"{n:02d}"
+    n = (int(digest[:8], 16) % 999) + 1
+    return f"{n:03d}"
 
 
 def encode_birth_year(dob: date | None) -> str:
     if dob is None:
-        return "00"
-    return f"{dob.year % 100:02d}"
+        return "0000"
+    return f"{dob.year:04d}"
 
 
 def build_semantic_prefix(
     *,
-    nationality: str | None = "COD",
+    nationality: str | None = "COD",  # conservé pour compat API ; non encodé dans le NIC
     province_code: str | None = None,
     territory_key: str | None = None,
     city: str | None = None,
@@ -119,13 +92,13 @@ def build_semantic_prefix(
     sex: str | Sex | None = None,
     date_of_birth: date | None = None,
 ) -> str:
-    """9 chiffres : CC PP TT S YY."""
-    country = COUNTRY_CODE_RDC if (nationality or "COD").upper() in {"COD", "CD", "RDC", "18", "180"} else "00"
+    """10 chiffres : PP TTT S YYYY (sans code pays)."""
+    _ = nationality
     province = encode_province(province_code)
     territory = encode_territory(territory_key, commune_code, city)
     sex_d = encode_sex(sex)
     year = encode_birth_year(date_of_birth)
-    return f"{country}{province}{territory}{sex_d}{year}"
+    return f"{province}{territory}{sex_d}{year}"
 
 
 def generate_candidate_nic(
@@ -149,35 +122,54 @@ def generate_candidate_nic(
         sex=sex,
         date_of_birth=date_of_birth,
     )
-    assert len(prefix) == 9
+    assert len(prefix) == 10
     seq = sequence if sequence is not None else secrets.randbelow(10_000)
     seq_s = f"{seq % 10_000:04d}"
-    payload = prefix + seq_s
-    return payload + luhn_check_digit(payload)
+    return prefix + seq_s
 
 
 def is_valid_nic_format(nic: str) -> bool:
-    """Longueur 14 + Luhn (ne prouve pas l'émission)."""
-    return len(nic) == NIC_TOTAL_LENGTH and nic.isdigit() and verify_luhn(nic)
+    """Longueur 14, numérique uniquement."""
+    return len(nic) == NIC_TOTAL_LENGTH and nic.isdigit()
 
 
 def parse_nic_fields(nic: str) -> dict[str, str]:
-    """Découpe un NIC v2 pour affichage / debug (sans valider l'émission)."""
+    """Découpe un NIC v3 pour affichage / debug."""
     if not is_valid_nic_format(nic):
         raise ValueError("invalid_nic_format")
     return {
-        "country": nic[0:2],
-        "province": nic[2:4],
-        "territory": nic[4:6],
-        "sex": nic[6],
-        "birth_year": nic[7:9],
-        "sequence": nic[9:13],
-        "check": nic[13],
+        "province": nic[0:2],
+        "territory": nic[2:5],
+        "sex": nic[5],
+        "birth_year": nic[6:10],
+        "sequence": nic[10:14],
     }
 
 
+# Compat : anciens tests / imports Luhn (plus utilisés dans le format v3).
+def luhn_check_digit(payload_digits: str) -> str:
+    if not payload_digits.isdigit():
+        raise ValueError("payload must be numeric")
+    total = 0
+    reverse = payload_digits[::-1]
+    for i, ch in enumerate(reverse):
+        n = int(ch)
+        if i % 2 == 0:
+            n *= 2
+            if n > 9:
+                n -= 9
+        total += n
+    return str((10 - (total % 10)) % 10)
+
+
+def verify_luhn(number: str) -> bool:
+    if not number.isdigit() or len(number) < 2:
+        return False
+    payload, check = number[:-1], number[-1]
+    return luhn_check_digit(payload) == check
+
+
 async def nic_exists(session: AsyncSession, nic: str) -> bool:
-    """Anti-collision contre citizens.nic et journal d'émission."""
     citizen_hit = await session.scalar(select(Citizen.id).where(Citizen.nic == nic).limit(1))
     if citizen_hit is not None:
         return True
@@ -196,11 +188,7 @@ def _geo_from_citizen(citizen: Citizen) -> dict[str, str | None]:
     if primary is None and getattr(citizen, "addresses", None):
         primary = citizen.addresses[0] if citizen.addresses else None
     if primary is None:
-        return {
-            "province_code": None,
-            "commune_code": None,
-            "city": None,
-        }
+        return {"province_code": None, "commune_code": None, "city": None}
     return {
         "province_code": primary.province_code,
         "commune_code": primary.commune_code,
@@ -209,7 +197,6 @@ def _geo_from_citizen(citizen: Citizen) -> dict[str, str | None]:
 
 
 async def generate_unique_nic(session: AsyncSession, citizen: Citizen) -> str:
-    """Génère un NIC unique à partir des données du citoyen."""
     geo = _geo_from_citizen(citizen)
     for _ in range(MAX_COLLISION_RETRIES):
         candidate = generate_candidate_nic(
@@ -233,9 +220,6 @@ async def assign_nic(
     citizen: Citizen,
     actor_id: uuid.UUID | None = None,
 ) -> str:
-    """
-    Attribue un NIC système structuré et journalise l'émission.
-    """
     if citizen.nic is not None:
         raise NicGenerationError("Citizen already has a NIC; re-attribution forbidden")
 

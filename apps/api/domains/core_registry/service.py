@@ -223,7 +223,7 @@ async def update_draft_citizen(
         )
     )
     # Re-check duplicates if identity fields changed.
-    if {"family_name", "given_names", "date_of_birth"} & set(changes):
+    if {"family_name", "given_names", "date_of_birth", "sex"} & set(changes):
         await check_and_record_duplicates(session, citizen)
 
     await session.commit()

@@ -327,14 +327,39 @@ export type MapPoint = {
   id: string;
   local_id?: string | null;
   campaign_id?: string | null;
+  household_local_id?: string | null;
+  label?: string | null;
+  sex?: string | null;
+  date_of_birth?: string | null;
+  record_status?: string | null;
   address_line?: string | null;
+  milieu?: string | null;
   latitude: number;
   longitude: number;
   updated_at?: string | null;
 };
 
+export type MapMilieu = {
+  milieu: string;
+  count: number;
+  male: number;
+  female: number;
+  other: number;
+  latitude: number;
+  longitude: number;
+  address_line?: string | null;
+};
+
 export async function fetchOnipMapPoints(): Promise<{ count: number; points: MapPoint[] }> {
   return request("/onip/map-points");
+}
+
+export async function fetchOnipMapByMilieu(): Promise<{
+  count: number;
+  persons: number;
+  milieux: MapMilieu[];
+}> {
+  return request("/onip/map-by-milieu");
 }
 
 export { updateAccessToken, BASE as API_BASE };
