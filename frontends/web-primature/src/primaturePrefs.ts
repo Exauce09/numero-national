@@ -45,6 +45,14 @@ const DEFAULT_NOTIFS: PrimatureNotification[] = [
     read: false,
     href: "/ministeres",
   },
+  {
+    id: "pm4",
+    title: "Tableau synoptique",
+    body: "Synoptique de coordination Primature : domaines, dossiers et alertes en lecture seule.",
+    created_at: new Date(Date.now() - 1500_000).toISOString(),
+    read: false,
+    href: "/synoptique/coordination",
+  },
 ];
 export function getPrimaturePrefs(): PrimaturePrefs {
   try {
