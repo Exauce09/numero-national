@@ -96,35 +96,32 @@ class _CouponPrintScreenState extends State<CouponPrintScreen> {
     if (_printing) return;
     setState(() => _printing = true);
     final name = '${widget.familyName} ${widget.givenNames}'.trim();
-    final sexLabel = widget.sex == 'F' ? 'Féminin' : 'Masculin';
+    final sexLabel = widget.sex == 'F' ? 'Feminin' : 'Masculin';
 
     try {
-      // POS Q2I : toujours tenter l’imprimante thermique — PrintManager PDF plante ici.
+      // Sur Android POS : uniquement imprimante thermique.
+      // Printing.layoutPdf (PrintManager) fait quitter l'app sur Q2I.
       if (Platform.isAndroid) {
-        final thermal = await PosPrinter.isAvailable();
-        if (thermal) {
-          // QR compact scannable (type + local_id) — JSON complet trop long sur 58 mm.
-          final compactQr = jsonEncode(<String, Object?>{
-            'type': 'nn_census_coupon',
-            'v': 1,
-            'local_id': widget.localId,
-          });
-          await PosPrinter.printCoupon(
-            title: 'ONIP - Recensement',
-            subtitle: 'Coupon provisoire',
-            name: name.isEmpty ? '-' : name,
-            sex: sexLabel,
-            dob: widget.dateOfBirth.isEmpty ? '-' : widget.dateOfBirth,
-            localId: widget.localId,
-            qr: compactQr,
+        final compactQr = jsonEncode(<String, Object?>{
+          'type': 'nn_census_coupon',
+          'v': 1,
+          'local_id': widget.localId,
+        });
+        await PosPrinter.printCoupon(
+          title: 'ONIP - Recensement',
+          subtitle: 'Coupon provisoire',
+          name: _ascii(name.isEmpty ? '-' : name),
+          sex: sexLabel,
+          dob: _ascii(widget.dateOfBirth.isEmpty ? '-' : widget.dateOfBirth),
+          localId: widget.localId,
+          qr: compactQr,
+        );
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Coupon imprime sur l imprimante POS')),
           );
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Coupon imprimé sur l’imprimante POS')),
-            );
-          }
-          return;
         }
+        return;
       }
 
       final doc = pw.Document();
@@ -164,8 +161,13 @@ class _CouponPrintScreenState extends State<CouponPrintScreen> {
         ),
       );
 
-      // Sur téléphone / tablette uniquement — jamais forcer PrintManager sur POS.
       await Printing.layoutPdf(onLayout: (_) async => doc.save());
+    } on PlatformException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Impression impossible : ${e.message ?? e.code}')),
+        );
+      }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -175,6 +177,31 @@ class _CouponPrintScreenState extends State<CouponPrintScreen> {
     } finally {
       if (mounted) setState(() => _printing = false);
     }
+  }
+
+  /// Police thermique POS : ASCII simple (évite plantages font firmware).
+  static String _ascii(String input) {
+    const map = <String, String>{
+      'à': 'a', 'â': 'a', 'ä': 'a', 'á': 'a',
+      'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e',
+      'î': 'i', 'ï': 'i', 'í': 'i',
+      'ô': 'o', 'ö': 'o', 'ó': 'o',
+      'ù': 'u', 'û': 'u', 'ü': 'u', 'ú': 'u',
+      'ç': 'c', 'ñ': 'n',
+      'À': 'A', 'Â': 'A', 'Ä': 'A', 'Á': 'A',
+      'É': 'E', 'È': 'E', 'Ê': 'E', 'Ë': 'E',
+      'Î': 'I', 'Ï': 'I', 'Í': 'I',
+      'Ô': 'O', 'Ö': 'O', 'Ó': 'O',
+      'Ù': 'U', 'Û': 'U', 'Ü': 'U', 'Ú': 'U',
+      'Ç': 'C', 'Ñ': 'N',
+      '—': '-', '–': '-', '’': "'", '‘': "'", '“': '"', '”': '"',
+    };
+    final b = StringBuffer();
+    for (final r in input.runes) {
+      final ch = String.fromCharCode(r);
+      b.write(map[ch] ?? (r < 128 ? ch : '?'));
+    }
+    return b.toString();
   }
 
   @override

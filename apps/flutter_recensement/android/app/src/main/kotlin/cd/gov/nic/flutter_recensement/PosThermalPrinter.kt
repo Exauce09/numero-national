@@ -30,6 +30,14 @@ object PosThermalPrinter {
     localId: String,
     qr: String,
   ) {
+    val safeTitle = ascii(title)
+    val safeSubtitle = ascii(subtitle)
+    val safeName = ascii(name)
+    val safeSex = ascii(sex)
+    val safeDob = ascii(dob)
+    val safeLocalId = ascii(localId)
+    val safeQr = qr // JSON ASCII
+
     val holder = ServiceHolder()
     if (!holder.bind(context.applicationContext)) {
       throw IllegalStateException("Service imprimante POS indisponible")
@@ -56,17 +64,18 @@ object PosThermalPrinter {
       }
 
       svc.setPrinterPrintAlignment(1, emptyCb())
-      svc.setPrinterPrintFontSize(28, emptyCb())
+      svc.setPrinterPrintFontSize(24, emptyCb())
       // printText uniquement — printSpecifiedTypeText("ST") plante sur ce firmware.
-      svc.printText("$title\n", emptyCb())
-      svc.printText("$subtitle\n", emptyCb())
+      svc.printText("$safeTitle\n", emptyCb())
+      Thread.sleep(30)
+      svc.printText("$safeSubtitle\n", emptyCb())
       svc.printBlankLines(1, 12, emptyCb())
 
       val qrData =
         when {
-          qr.length <= 180 -> qr
-          localId.isNotBlank() -> localId
-          else -> qr.take(180)
+          safeQr.length <= 180 -> safeQr
+          safeLocalId.isNotBlank() -> safeLocalId
+          else -> safeQr.take(180)
         }
       val module = if (qrData.length > 80) 5 else 7
       Log.i(TAG, "printQR len=${qrData.length} module=$module")
@@ -74,11 +83,11 @@ object PosThermalPrinter {
       svc.printBlankLines(1, 12, emptyCb())
 
       svc.setPrinterPrintAlignment(0, emptyCb())
-      svc.setPrinterPrintFontSize(24, emptyCb())
-      svc.printText("$name\n", emptyCb())
-      if (sex.isNotBlank()) svc.printText("Sexe : $sex\n", emptyCb())
-      if (dob.isNotBlank()) svc.printText("Naissance : $dob\n", emptyCb())
-      svc.printText("Ref : $localId\n", emptyCb())
+      svc.printText("$safeName\n", emptyCb())
+      Thread.sleep(30)
+      if (safeSex.isNotBlank()) svc.printText("Sexe : $safeSex\n", emptyCb())
+      if (safeDob.isNotBlank()) svc.printText("Naissance : $safeDob\n", emptyCb())
+      svc.printText("Ref : $safeLocalId\n", emptyCb())
       svc.printBlankLines(1, 10, emptyCb())
       svc.printText("Pas une carte d'identite.\n", emptyCb())
       svc.printText("Carte officielle = ONIP.\n", emptyCb())
@@ -108,6 +117,36 @@ object PosThermalPrinter {
     } finally {
       holder.unbind(context.applicationContext)
     }
+  }
+
+  /** Évite les glyphes non supportés par la police thermique (crash FontMethod). */
+  private fun ascii(input: String): String {
+    val map =
+      mapOf(
+        'à' to 'a', 'â' to 'a', 'ä' to 'a', 'á' to 'a',
+        'é' to 'e', 'è' to 'e', 'ê' to 'e', 'ë' to 'e',
+        'î' to 'i', 'ï' to 'i', 'í' to 'i',
+        'ô' to 'o', 'ö' to 'o', 'ó' to 'o',
+        'ù' to 'u', 'û' to 'u', 'ü' to 'u', 'ú' to 'u',
+        'ç' to 'c', 'ñ' to 'n',
+        'À' to 'A', 'Â' to 'A', 'Ä' to 'A', 'Á' to 'A',
+        'É' to 'E', 'È' to 'E', 'Ê' to 'E', 'Ë' to 'E',
+        'Î' to 'I', 'Ï' to 'I', 'Í' to 'I',
+        'Ô' to 'O', 'Ö' to 'O', 'Ó' to 'O',
+        'Ù' to 'U', 'Û' to 'U', 'Ü' to 'U', 'Ú' to 'U',
+        'Ç' to 'C', 'Ñ' to 'N',
+        '—' to '-', '–' to '-', '’' to '\'', '‘' to '\'',
+      )
+    val sb = StringBuilder(input.length)
+    for (ch in input) {
+      when {
+        map.containsKey(ch) -> sb.append(map[ch])
+        ch.code in 32..126 -> sb.append(ch)
+        ch == '\n' || ch == '\r' -> sb.append(ch)
+        else -> sb.append('?')
+      }
+    }
+    return sb.toString()
   }
 
   fun printTestCoupon(context: Context) {
