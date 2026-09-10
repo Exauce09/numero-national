@@ -902,9 +902,11 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
           const SizedBox(height: 10),
           TextFormField(
             controller: _dob,
-            readOnly: true,
-            onTap: _pickDob,
-            decoration: _dec('Date de naissance *', hint: 'Toucher pour choisir').copyWith(
+            readOnly: false,
+            onTap: () {
+              // Laisser saisir AAAA-MM-JJ au clavier ; calendrier via icône.
+            },
+            decoration: _dec('Date de naissance *', hint: 'AAAA-MM-JJ ou calendrier').copyWith(
               suffixIcon: IconButton(
                 icon: const Icon(Icons.calendar_today),
                 onPressed: _pickDob,

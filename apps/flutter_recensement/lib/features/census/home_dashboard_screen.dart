@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../../core/pos_printer.dart';
 import '../../core/secure_storage.dart';
 import '../../core/theme.dart';
 import '../../sync/local_database.dart';
@@ -24,6 +26,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   int _queued = 0;
   int _conflicts = 0;
   int _assignments = 0;
+  bool _busyPrint = false;
 
   @override
   void initState() {
@@ -84,6 +87,45 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     if (s.contains('ATTENTE')) return 'En attente réseau';
     if (s.contains('ERROR')) return 'Erreur sync';
     return _syncLabel;
+  }
+
+  Future<void> _testPrinter() async {
+    if (_busyPrint) return;
+    setState(() => _busyPrint = true);
+    final id = 'TEST-${DateTime.now().millisecondsSinceEpoch % 100000}';
+    try {
+      await PosPrinter.printCoupon(
+        title: 'ONIP - Recensement',
+        subtitle: 'Test imprimante',
+        name: _shortName,
+        sex: 'Masculin',
+        dob: '1990-01-15',
+        localId: id,
+        qr: '{"type":"nn_census_coupon","v":1,"local_id":"$id"}',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Test OK — regardez le ticket POS')),
+      );
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Impression refusee : ${e.message ?? e.code}'),
+          backgroundColor: NnColors.danger,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Impression refusee : $e'),
+          backgroundColor: NnColors.danger,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busyPrint = false);
+    }
   }
 
   @override
@@ -213,6 +255,18 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
             onPressed: () => widget.onOpenTab(1),
             icon: const Icon(Icons.home_work_outlined),
             label: const Text('Ménages & zones'),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: _busyPrint ? null : _testPrinter,
+            icon: _busyPrint
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.print_outlined),
+            label: Text(_busyPrint ? 'Impression…' : 'Tester l’imprimante'),
           ),
           const SizedBox(height: 22),
 
