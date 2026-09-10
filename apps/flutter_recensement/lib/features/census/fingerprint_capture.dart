@@ -134,7 +134,7 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
     setState(() {
       _busy = true;
       _error = null;
-      _info = 'Posez fermement le doigt ${widget.hand} sur le capteur optique…';
+      _info = 'Allumage du lecteur… posez le doigt ${widget.hand} sur le capteur (lumière rouge).';
     });
     try {
       if (!_morphoReady) {
@@ -242,7 +242,7 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
                   : (done
                       ? 'Reprendre (${widget.hand})'
                       : (_useMorpho
-                          ? 'Capturer Morpho (${widget.hand})'
+                          ? 'Lire empreinte Morpho (${widget.hand})'
                           : 'Capturer ${widget.hand}')),
             ),
           ),

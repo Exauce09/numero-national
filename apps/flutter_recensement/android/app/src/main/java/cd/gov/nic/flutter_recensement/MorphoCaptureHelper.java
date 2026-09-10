@@ -23,10 +23,13 @@ import java.util.Map;
 import java.util.Observable;
 import java.util.Observer;
 
-/** Capture MorphoSmart (MSO) — logique Java pure pour l’API Integer JNI. */
+/** Capture MorphoSmart (MSO / CBM-E3) — logique Java pure pour l’API Integer JNI. */
 public final class MorphoCaptureHelper {
   private static final String TAG = "MorphoCapture";
   private static final String USB_ACTION = "cd.gov.nic.flutter_recensement.USB_ACTION";
+
+  /** Mode enroll (la LED optique CBM-E3 s’allume pendant capture ; WAKEUP_LED_ON n’est pas supporté → -5). */
+  private static final int DETECT_MODE = DetectionMode.MORPHO_ENROLL_DETECT_MODE;
 
   private static MorphoDevice device;
   private static String sensorName;
@@ -34,6 +37,26 @@ public final class MorphoCaptureHelper {
   private MorphoCaptureHelper() {}
 
   public static synchronized Map<String, Object> prepare(Activity activity) throws Exception {
+    return prepareInternal(activity, false);
+  }
+
+  /**
+   * @param forceReopen si true, ferme toute session et rouvre (nécessaire avant capture pour LED).
+   */
+  private static Map<String, Object> prepareInternal(Activity activity, boolean forceReopen)
+      throws Exception {
+    if (forceReopen) {
+      closeQuietlyUnlocked();
+    } else if (device != null) {
+      Map<String, Object> cached = new HashMap<>();
+      cached.put("ok", true);
+      cached.put("sensor", sensorName == null ? "" : sensorName);
+      cached.put("product", sensorName == null ? "" : sensorName);
+      cached.put("count", 1);
+      cached.put("cached", true);
+      return cached;
+    }
+
     try {
       System.loadLibrary("MSO100");
     } catch (Throwable ignored) {
@@ -41,28 +64,7 @@ public final class MorphoCaptureHelper {
     System.loadLibrary("NativeMorphoSmartSDK");
 
     USBManager.getInstance().initialize(activity, USB_ACTION);
-
-    // Attendre l'accord USB (dialogue système) pour CBM-E3.
-    UsbManager usbManager = (UsbManager) activity.getSystemService(Activity.USB_SERVICE);
-    if (usbManager != null) {
-      for (int attempt = 0; attempt < 15; attempt++) {
-        boolean ready = false;
-        for (UsbDevice d : usbManager.getDeviceList().values()) {
-          if (d.getVendorId() == 0x225D && d.getProductId() == 0x0008) {
-            if (usbManager.hasPermission(d)) {
-              ready = true;
-              break;
-            }
-            USBManager.getInstance().initialize(activity, USB_ACTION);
-          }
-        }
-        if (ready) break;
-        try {
-          Thread.sleep(400);
-        } catch (InterruptedException ignored) {
-        }
-      }
-    }
+    waitUsbPermission(activity);
 
     MorphoDevice morpho = new MorphoDevice();
     Integer nbUsbDevice = new Integer(0);
@@ -73,10 +75,7 @@ public final class MorphoCaptureHelper {
     }
     if (nbUsbDevice.intValue() <= 0) {
       USBManager.getInstance().initialize(activity, USB_ACTION);
-      try {
-        Thread.sleep(900);
-      } catch (InterruptedException ignored) {
-      }
+      sleepMs(900);
       nbUsbDevice = new Integer(0);
       ret = morpho.initUsbDevicesNameEnum(nbUsbDevice);
       if (ret != ErrorCodes.MORPHO_OK || nbUsbDevice.intValue() <= 0) {
@@ -92,7 +91,7 @@ public final class MorphoCaptureHelper {
           "openUsbDevice=" + ret + " " + ErrorCodes.getError(ret, morpho.getInternalError()));
     }
 
-    closeQuietly();
+    closeQuietlyUnlocked();
     device = morpho;
     sensorName = name;
 
@@ -114,12 +113,18 @@ public final class MorphoCaptureHelper {
 
   public static synchronized Map<String, Object> capture(Activity activity, String hand, int timeoutSec)
       throws Exception {
-    if (device == null) {
-      prepare(activity);
-    }
+    // Toujours rouvrir : une session « prepare » au boot n’allume pas la LED ;
+    // la LED optique s’allume au début de capture() sur une session fraîche.
+    prepareInternal(activity, true);
+
     MorphoDevice morpho = device;
     if (morpho == null) {
       throw new IllegalStateException("Device Morpho non ouvert");
+    }
+
+    try {
+      morpho.cancelLiveAcquisition();
+    } catch (Throwable ignored) {
     }
 
     TemplateList templateList = new TemplateList();
@@ -127,11 +132,19 @@ public final class MorphoCaptureHelper {
         new Observer() {
           @Override
           public void update(Observable o, Object arg) {
-            // callbacks live acquisition ignorés (capture bloquante)
+            Log.d(TAG, "Morpho callback: " + (arg == null ? "null" : arg.getClass().getSimpleName()));
           }
         };
 
     int timeout = Math.max(5, Math.min(60, timeoutSec));
+    Log.i(
+        TAG,
+        "Capture START hand="
+            + hand
+            + " timeout="
+            + timeout
+            + "s — la lumière rouge du lecteur doit s’allumer maintenant");
+
     int ret =
         morpho.capture(
             timeout,
@@ -144,10 +157,12 @@ public final class MorphoCaptureHelper {
             EnrollmentType.ONE_ACQUISITIONS,
             LatentDetection.LATENT_DETECT_ENABLE,
             Coder.MORPHO_MSO_V9_CODER,
-            DetectionMode.MORPHO_ENROLL_DETECT_MODE,
+            DETECT_MODE,
             templateList,
             0,
             observer);
+
+    Log.i(TAG, "Capture END ret=" + ret + " templates=" + templateList.getNbTemplate());
 
     if (ret != ErrorCodes.MORPHO_OK) {
       throw new IllegalStateException(
@@ -180,13 +195,47 @@ public final class MorphoCaptureHelper {
   }
 
   public static synchronized void closeQuietly() {
+    closeQuietlyUnlocked();
+  }
+
+  private static void closeQuietlyUnlocked() {
     try {
       if (device != null) {
+        try {
+          device.cancelLiveAcquisition();
+        } catch (Throwable ignored) {
+        }
         device.closeDevice();
       }
     } catch (Throwable ignored) {
     }
     device = null;
     sensorName = null;
+  }
+
+  private static void waitUsbPermission(Activity activity) {
+    UsbManager usbManager = (UsbManager) activity.getSystemService(Activity.USB_SERVICE);
+    if (usbManager == null) return;
+    for (int attempt = 0; attempt < 15; attempt++) {
+      boolean ready = false;
+      for (UsbDevice d : usbManager.getDeviceList().values()) {
+        if (d.getVendorId() == 0x225D && d.getProductId() == 0x0008) {
+          if (usbManager.hasPermission(d)) {
+            ready = true;
+            break;
+          }
+          USBManager.getInstance().initialize(activity, USB_ACTION);
+        }
+      }
+      if (ready) break;
+      sleepMs(400);
+    }
+  }
+
+  private static void sleepMs(int ms) {
+    try {
+      Thread.sleep(ms);
+    } catch (InterruptedException ignored) {
+    }
   }
 }
