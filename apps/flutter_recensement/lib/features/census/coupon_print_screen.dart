@@ -99,23 +99,32 @@ class _CouponPrintScreenState extends State<CouponPrintScreen> {
     final sexLabel = widget.sex == 'F' ? 'Féminin' : 'Masculin';
 
     try {
-      // POS Q2I : imprimante thermique système (iPosPrinter) — pas PrintManager PDF.
-      if (Platform.isAndroid && await PosPrinter.isAvailable()) {
-        await PosPrinter.printCoupon(
-          title: 'ONIP — Recensement',
-          subtitle: 'Coupon provisoire',
-          name: name.isEmpty ? '—' : name,
-          sex: sexLabel,
-          dob: widget.dateOfBirth.isEmpty ? '—' : widget.dateOfBirth,
-          localId: widget.localId,
-          qr: _qrPayload,
-        );
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Coupon imprimé sur l’imprimante POS')),
+      // POS Q2I : toujours tenter l’imprimante thermique — PrintManager PDF plante ici.
+      if (Platform.isAndroid) {
+        final thermal = await PosPrinter.isAvailable();
+        if (thermal) {
+          // QR compact scannable (type + local_id) — JSON complet trop long sur 58 mm.
+          final compactQr = jsonEncode(<String, Object?>{
+            'type': 'nn_census_coupon',
+            'v': 1,
+            'local_id': widget.localId,
+          });
+          await PosPrinter.printCoupon(
+            title: 'ONIP - Recensement',
+            subtitle: 'Coupon provisoire',
+            name: name.isEmpty ? '-' : name,
+            sex: sexLabel,
+            dob: widget.dateOfBirth.isEmpty ? '-' : widget.dateOfBirth,
+            localId: widget.localId,
+            qr: compactQr,
           );
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Coupon imprimé sur l’imprimante POS')),
+            );
+          }
+          return;
         }
-        return;
       }
 
       final doc = pw.Document();
@@ -155,6 +164,7 @@ class _CouponPrintScreenState extends State<CouponPrintScreen> {
         ),
       );
 
+      // Sur téléphone / tablette uniquement — jamais forcer PrintManager sur POS.
       await Printing.layoutPdf(onLayout: (_) async => doc.save());
     } catch (e) {
       if (context.mounted) {

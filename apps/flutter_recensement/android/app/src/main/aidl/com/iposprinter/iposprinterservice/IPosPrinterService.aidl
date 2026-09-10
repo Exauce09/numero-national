@@ -3,11 +3,14 @@ package com.iposprinter.iposprinterservice;
 import com.iposprinter.iposprinterservice.IPosPrinterCallback;
 import android.graphics.Bitmap;
 
+// Ordre STRICT = codes TRANSACTION du firmware ThermalPrinterService v5.1 (Q2I).
+// Ne pas réordonner : un mauvais ordre envoie les appels sur la mauvaise méthode.
 interface IPosPrinterService {
+    int getPrinterStatus();
     void printerInit(in IPosPrinterCallback callback);
     void setPrinterPrintDepth(int depth, in IPosPrinterCallback callback);
-    void setPrinterPrintFontSize(int fontsize, in IPosPrinterCallback callback);
     void setPrinterPrintFontType(String typeface, in IPosPrinterCallback callback);
+    void setPrinterPrintFontSize(int fontsize, in IPosPrinterCallback callback);
     void setPrinterPrintAlignment(int alignment, in IPosPrinterCallback callback);
     void printerFeedLines(int lines, in IPosPrinterCallback callback);
     void printBlankLines(int lines, int height, in IPosPrinterCallback callback);
@@ -21,9 +24,8 @@ interface IPosPrinterService {
     void printRawData(in byte[] rawPrintData, in IPosPrinterCallback callback);
     void sendUserCMDData(in byte[] data, in IPosPrinterCallback callback);
     void printerPerformPrint(int feedlines, in IPosPrinterCallback callback);
-    void printerSetInstructionMode(int mode, in IPosPrinterCallback callback);
     void sendUserTSPLInstruction(String cmd, in IPosPrinterCallback callback);
-    void printerRunToNextLabel();
-    int getPrinterStatus();
+    void printerSetInstructionMode(int mode, in IPosPrinterCallback callback);
     int getPrintInstructionMode();
+    void printerRunToNextLabel();
 }
