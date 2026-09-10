@@ -22,6 +22,7 @@ import {
   IndicatorsPage,
   MinistriesPage,
 } from "./pages/PrimatureLists";
+import SynopticPage from "./pages/SynopticPage";
 function RequireAuth({ children }: { children: ReactNode }) {
   if (!getSession()) return <Navigate to="/login" replace />;
   return <>{children}</>;
@@ -95,6 +96,7 @@ function Shell() {
 
   const badge = primatureUnreadCount();
   const photo = prefs.photoDataUrl;
+  const synActive = location.pathname.startsWith("/synoptique");
 
   return (
     <div className={`page-wrapper${navOpen ? " nav-open" : ""}`}>
@@ -113,6 +115,13 @@ function Shell() {
         <nav className="sidebar-nav">
           <NavLink to="/" end onClick={() => setNavOpen(false)}>
             Tableau de bord
+          </NavLink>
+          <NavLink
+            to="/synoptique/coordination"
+            className={() => (synActive ? "active" : undefined)}
+            onClick={() => setNavOpen(false)}
+          >
+            Tableau synoptique
           </NavLink>
           <NavLink to="/ministeres" onClick={() => setNavOpen(false)}>
             Ministères
@@ -206,6 +215,8 @@ function Shell() {
         <main className="shell">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
+            <Route path="/synoptique" element={<SynopticPage />} />
+            <Route path="/synoptique/:section" element={<SynopticPage />} />
             <Route path="/ministeres" element={<MinistriesPage />} />
             <Route path="/indicateurs" element={<IndicatorsPage />} />
             <Route path="/dossiers" element={<DossiersPage />} />

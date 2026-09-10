@@ -22,6 +22,7 @@ Ouvrir : http://localhost:5179/login
 | Route | Contenu |
 |-------|---------|
 | `/` | Tableau de bord consolidé + graphiques |
+| `/synoptique` | Synoptique Primature (coordination, domaines, dossiers, alertes) |
 | `/ministeres` | État des ministères / modules du système |
 | `/indicateurs` | Indicateurs transversaux (civil, santé, intérieur, ONIP) |
 | `/dossiers` | Dossiers de coordination Primature |

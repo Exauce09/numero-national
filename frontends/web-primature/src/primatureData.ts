@@ -525,3 +525,90 @@ export const SEVERITY_LABELS: Record<AlertSeverity, string> = {
 };
 
 export const TREND_LABELS = { up: "↑", down: "↓", flat: "→" } as const;
+
+/** Synoptique Primature — uniquement les agrégats de coordination. */
+export function synopticCoordination() {
+  const s = getPrimatureSnapshot();
+  const rows = s.ministries.map((m) => ({
+    ministere: m.name,
+    code: m.code,
+    domaine: m.domain,
+    statut: STATUS_LABELS[m.status],
+    couverture_pct: m.coverage_pct,
+    alertes_ouvertes: m.open_alerts,
+    dernier_rapport: new Date(m.last_report_at).toLocaleString("fr-FR"),
+    synthese: m.summary,
+  }));
+  const tot = {
+    ministeres: s.ministries.length,
+    ok: s.ministries.filter((m) => m.status === "OK").length,
+    attention: s.ministries.filter((m) => m.status === "ATTENTION").length,
+    critique: s.ministries.filter((m) => m.status === "CRITIQUE" || m.status === "HORS_LIGNE").length,
+    couverture_moy:
+      s.ministries.length === 0
+        ? 0
+        : Math.round(s.ministries.reduce((a, m) => a + m.coverage_pct, 0) / s.ministries.length),
+    alertes: s.ministries.reduce((a, m) => a + m.open_alerts, 0),
+  };
+  return { rows, tot };
+}
+
+export function synopticDossiers() {
+  const s = getPrimatureSnapshot();
+  const byStatus = {
+    OUVERT: s.dossiers.filter((d) => d.status === "OUVERT").length,
+    EN_COURS: s.dossiers.filter((d) => d.status === "EN_COURS").length,
+    EN_ATTENTE: s.dossiers.filter((d) => d.status === "EN_ATTENTE").length,
+    CLOTURE: s.dossiers.filter((d) => d.status === "CLOTURE").length,
+  };
+  const byPriority = {
+    HAUTE: s.dossiers.filter((d) => d.priority === "HAUTE").length,
+    MOYENNE: s.dossiers.filter((d) => d.priority === "MOYENNE").length,
+    BASSE: s.dossiers.filter((d) => d.priority === "BASSE").length,
+  };
+  const rows = s.dossiers.map((d) => ({
+    ref: d.ref,
+    titre: d.title,
+    ministere: d.ministry,
+    statut: DOSSIER_STATUS_LABELS[d.status],
+    priorite: d.priority,
+    responsable: d.owner,
+    maj: new Date(d.updated_at).toLocaleDateString("fr-FR"),
+  }));
+  return { rows, byStatus, byPriority, total: s.dossiers.length };
+}
+
+export function synopticAlertes() {
+  const s = getPrimatureSnapshot();
+  const open = s.alerts.filter((a) => !a.acknowledged);
+  const bySeverity = {
+    CRITICAL: open.filter((a) => a.severity === "CRITICAL").length,
+    WARNING: open.filter((a) => a.severity === "WARNING").length,
+    INFO: open.filter((a) => a.severity === "INFO").length,
+  };
+  const rows = open.map((a) => ({
+    titre: a.title,
+    severite: SEVERITY_LABELS[a.severity],
+    domaine: a.domain,
+    ministere: a.ministry,
+    date: new Date(a.created_at).toLocaleString("fr-FR"),
+  }));
+  return { rows, bySeverity, total_ouvertes: open.length, total: s.alerts.length };
+}
+
+export function synopticDomaines() {
+  const s = getPrimatureSnapshot();
+  const kpi = dashboardKpis();
+  const rows = [
+    { domaine: "Population nationale", valeur: kpi.population, unite: "personnes", source: "ONIP / registre" },
+    { domaine: "Actes d'état civil (mois)", valeur: kpi.civil_acts, unite: "actes", source: "État civil" },
+    { domaine: "Déclarations santé (mois)", valeur: kpi.health, unite: "déclarations", source: "Santé" },
+    { domaine: "Mouvements intérieur (mois)", valeur: kpi.movements, unite: "mouvements", source: "Intérieur" },
+    { domaine: "Cartes d'identité actives", valeur: kpi.cards, unite: "cartes", source: "ONIP" },
+    { domaine: "Ministères nominaux", valeur: kpi.ministries_ok, unite: "modules", source: "Primature" },
+    { domaine: "Ministères en attention", valeur: kpi.ministries_attention, unite: "modules", source: "Primature" },
+    { domaine: "Dossiers ouverts / en cours", valeur: kpi.dossiers_open, unite: "dossiers", source: "Primature" },
+    { domaine: "Alertes non acquittées", valeur: kpi.alerts_open, unite: "alertes", source: "Modules" },
+  ];
+  return { rows, updated_at: s.updated_at };
+}
