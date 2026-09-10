@@ -13,6 +13,7 @@ SEED_ROLES: list[dict[str, str]] = [
     {"code": "CENTRAL_ADMIN", "name": "Administrateur central", "description": "Administration complète"},
     {"code": "CENSUS_AGENT", "name": "Agent de recensement", "description": "Recensement terrain"},
     {"code": "CENSUS_SUPERVISOR", "name": "Superviseur recensement", "description": "Validation fiches terrain"},
+    {"code": "ZD_ADMIN", "name": "Administrateur ZD", "description": "Administration d'une ou plusieurs zones de dénombrement"},
     {"code": "CIVIL_OFFICER", "name": "Officier d'état civil", "description": "Actes d'état civil"},
     {"code": "HEALTH_AGENT", "name": "Agent de santé", "description": "Déclarations sanitaires"},
     {"code": "MINISTRY_HEALTH", "name": "Ministère de la Santé", "description": "Statistiques santé nationales anonymisées"},
@@ -48,6 +49,14 @@ ROLE_PERMISSION_MAP: dict[str, tuple[str, ...]] = {
         "registry:citizen:read",
         "registry:citizen:create",
         "registry:citizen:validate",
+    ),
+    "ZD_ADMIN": (
+        "census:sync",
+        "census:manage",
+        "registry:citizen:read",
+        "registry:citizen:create",
+        "registry:citizen:validate",
+        "analytics:read",
     ),
     "CIVIL_OFFICER": (
         "civil:act:read",

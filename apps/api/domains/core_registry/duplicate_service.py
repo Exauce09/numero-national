@@ -12,7 +12,7 @@ from sqlalchemy import and_, extract, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from apps.api.domains.core_registry.enums import DuplicateStatus
+from apps.api.domains.core_registry.enums import DuplicateMatchMethod, DuplicateStatus
 from apps.api.domains.core_registry.models import Citizen, DuplicateCandidate
 
 EXACT_DEMOGRAPHIC_SCORE = 1.0
@@ -107,6 +107,7 @@ async def record_duplicate_candidates(
             citizen_b_id=b_id,
             score=score,
             status=DuplicateStatus.OPEN.value,
+            match_method=DuplicateMatchMethod.DEMOGRAPHIC.value,
         )
         session.add(row)
         created.append(row)

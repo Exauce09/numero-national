@@ -26,9 +26,11 @@ from apps.api.db.base import Base
 from apps.api.domains.core_registry.enums import (
     AddressType,
     CitizenStatus,
+    DuplicateMatchMethod,
     DuplicateStatus,
     RelationType,
     Sex,
+    VerificationStatus,
 )
 
 
@@ -79,6 +81,20 @@ class Citizen(Base):
         ForeignKey("core_registry.citizens.id", ondelete="SET NULL"),
         nullable=True,
     )
+    registration_zd_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("geography.enumeration_zones.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    verification_status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default=VerificationStatus.UNVERIFIED.value,
+        server_default=VerificationStatus.UNVERIFIED.value,
+        index=True,
+    )
+    # registration_location geography(Point,4326) — PostGIS only (ST_* in SQL)
 
     addresses: Mapped[list[CitizenAddress]] = relationship(
         back_populates="citizen",
@@ -88,6 +104,11 @@ class Citizen(Base):
         back_populates="citizen",
         cascade="all, delete-orphan",
         order_by="CitizenHistory.created_at",
+    )
+    zd_memberships: Mapped[list[CitizenZdMembership]] = relationship(
+        back_populates="citizen",
+        cascade="all, delete-orphan",
+        order_by="CitizenZdMembership.valid_from",
     )
 
 
@@ -265,8 +286,60 @@ class DuplicateCandidate(Base):
         server_default=DuplicateStatus.OPEN.value,
         index=True,
     )
+    match_method: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default=DuplicateMatchMethod.DEMOGRAPHIC.value,
+        server_default=DuplicateMatchMethod.DEMOGRAPHIC.value,
+        index=True,
+    )
+    distance_meters: Mapped[float | None] = mapped_column(Float, nullable=True)
+    evidence: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
     )
+
+
+class CitizenZdMembership(Base):
+    """Historique d'appartenance à une ZD (enregistrement, déménagement, migration)."""
+
+    __tablename__ = "citizen_zd_memberships"
+    __table_args__ = {"schema": "core_registry"}
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
+    citizen_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("core_registry.citizens.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    zd_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("geography.enumeration_zones.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    valid_from: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    valid_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reason: Mapped[str] = mapped_column(String(64), nullable=False, default="REGISTRATION")
+    recorded_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    # location geography(Point,4326) — PostGIS only
+
+    citizen: Mapped[Citizen] = relationship(back_populates="zd_memberships")

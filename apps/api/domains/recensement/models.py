@@ -90,6 +90,12 @@ class Zone(Base):
     geo_level: Mapped[str | None] = mapped_column(String(32))  # PROVINCE|COMMUNE|QUARTIER|…
     geo_ref_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     geo_bounds: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    enumeration_zone_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("geography.enumeration_zones.id", ondelete="SET NULL"),
+        index=True,
+    )
+    estimated_population: Mapped[int | None] = mapped_column(Integer)
 
     campaign: Mapped[Campaign] = relationship(back_populates="zones")
     teams: Mapped[list["Team"]] = relationship(back_populates="zone")
@@ -130,6 +136,29 @@ class AgentAssignment(Base):
     )
 
     team: Mapped[Team] = relationship(back_populates="assignments")
+
+
+class AgentZdAssignment(Base):
+    """Affectation directe agent ↔ ZD officielle (multi-ZD + historique)."""
+
+    __tablename__ = "agent_zd_assignments"
+    __table_args__ = {"schema": "recensement"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    agent_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    zd_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("geography.enumeration_zones.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    role_label: Mapped[str] = mapped_column(String(64), default="CENSUS_AGENT")
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    assigned_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    unassigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    assigned_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
 
 
 class Device(Base):

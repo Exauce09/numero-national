@@ -43,6 +43,19 @@ class DuplicateStatus(StrEnum):
     MERGED = "MERGED"
 
 
+class DuplicateMatchMethod(StrEnum):
+    DEMOGRAPHIC = "DEMOGRAPHIC"
+    BIOMETRIC = "BIOMETRIC"
+    GEO_CIVIL = "GEO_CIVIL"
+
+
+class VerificationStatus(StrEnum):
+    UNVERIFIED = "UNVERIFIED"
+    PENDING_DEDUP = "PENDING_DEDUP"
+    VERIFIED = "VERIFIED"
+    FLAGGED_DUPLICATE = "FLAGGED_DUPLICATE"
+
+
 class CitizenEventType(StrEnum):
     CREATED = "CREATED"
     UPDATED = "UPDATED"
@@ -50,3 +63,4 @@ class CitizenEventType(StrEnum):
     NIC_ASSIGNED = "NIC_ASSIGNED"
     MERGED = "MERGED"
     STATUS_CHANGED = "STATUS_CHANGED"
+    ZD_CHANGED = "ZD_CHANGED"

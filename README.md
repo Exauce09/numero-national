@@ -39,7 +39,7 @@ copy .githooks\post-commit .git\hooks\post-commit   # Windows
 | 7 | Dashboard ONIP | `domains/onip`, `frontends/onip-dashboard` |
 | 8 | Santé (schéma confidentiel) | `domains/health`, `008` |
 | 9 | Analytics agrégés, gov portals, relying party, notifications | `domains/analytics`, `notifications`, `009`, `frontends/web-institutional` |
-| Geo | Cascade province → ville → commune → quartier → voie (seed RDC) | `domains/geography`, `alembic/012` |
+| Geo | Cascade province → territoire/ville → commune → quartier/village → ZD (PostGIS) | `domains/geography`, `alembic/012`, `019` |
 | UI | Portail officier d’état civil (style E-GOUV / Justicia) | `frontends/civil-officer` |
 
 ---
