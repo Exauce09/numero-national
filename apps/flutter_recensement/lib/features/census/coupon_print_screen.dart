@@ -96,12 +96,11 @@ class _CouponPrintScreenState extends State<CouponPrintScreen> {
     if (_printing) return;
     setState(() => _printing = true);
     final name = '${widget.familyName} ${widget.givenNames}'.trim();
-    final sexLabel = widget.sex == 'F' ? 'Feminin' : 'Masculin';
+    final sexLabel = widget.sex == 'F' ? 'Féminin' : 'Masculin';
 
     try {
-      // Sur Android POS : uniquement imprimante thermique.
-      // Printing.layoutPdf (PrintManager) fait quitter l'app sur Q2I.
-      if (Platform.isAndroid) {
+      // Terminal POS (iPos) : thermique native. Téléphone / tablette : PDF système.
+      if (Platform.isAndroid && await PosPrinter.isAvailable()) {
         final compactQr = jsonEncode(<String, Object?>{
           'type': 'nn_census_coupon',
           'v': 1,
@@ -111,14 +110,14 @@ class _CouponPrintScreenState extends State<CouponPrintScreen> {
           title: 'ONIP - Recensement',
           subtitle: 'Coupon provisoire',
           name: _ascii(name.isEmpty ? '-' : name),
-          sex: sexLabel,
+          sex: sexLabel == 'Féminin' ? 'Feminin' : 'Masculin',
           dob: _ascii(widget.dateOfBirth.isEmpty ? '-' : widget.dateOfBirth),
           localId: widget.localId,
           qr: compactQr,
         );
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Coupon imprime sur l imprimante POS')),
+            const SnackBar(content: Text('Coupon imprimé sur l’imprimante POS')),
           );
         }
         return;

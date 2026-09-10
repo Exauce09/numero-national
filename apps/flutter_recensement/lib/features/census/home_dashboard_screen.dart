@@ -27,6 +27,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   int _conflicts = 0;
   int _assignments = 0;
   bool _busyPrint = false;
+  bool _hasPosPrinter = false;
 
   @override
   void initState() {
@@ -45,6 +46,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       "SELECT COUNT(*) AS c FROM census_records WHERE status = 'CONFLICT'",
     );
     final asg = await _count(db, 'SELECT COUNT(*) AS c FROM assignments_cache');
+    final pos = await PosPrinter.isAvailable();
     if (!mounted) return;
     setState(() {
       _email = email ?? 'Agent terrain';
@@ -52,6 +54,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       _queued = q;
       _conflicts = conf;
       _assignments = asg;
+      _hasPosPrinter = pos;
     });
   }
 
@@ -256,18 +259,20 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
             icon: const Icon(Icons.home_work_outlined),
             label: const Text('Ménages & zones'),
           ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: _busyPrint ? null : _testPrinter,
-            icon: _busyPrint
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.print_outlined),
-            label: Text(_busyPrint ? 'Impression…' : 'Tester l’imprimante'),
-          ),
+          if (_hasPosPrinter) ...[
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: _busyPrint ? null : _testPrinter,
+              icon: _busyPrint
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.print_outlined),
+              label: Text(_busyPrint ? 'Impression…' : 'Tester l’imprimante POS'),
+            ),
+          ],
           const SizedBox(height: 22),
 
           Row(
