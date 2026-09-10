@@ -226,11 +226,9 @@ export default function IdCardRdc({ card, fallback }: Props) {
       {/* RECTO — HTML réel (pas une image) */}
       <article className="rdc-card rdc-card-front" aria-label="Carte d'identité nationale — recto">
         <div className="rdc-card-bg" aria-hidden>
-          <img className="rdc-bg-flag" src={ASSETS.flag} alt="" />
-          <img className="rdc-bg-arms" src={ASSETS.arms} alt="" />
           <img className="rdc-bg-tour" src={ASSETS.tour} alt="" />
+          <img className="rdc-bg-arms" src={ASSETS.arms} alt="" />
         </div>
-        <div className="rdc-card-guilloche" aria-hidden />
         <header className="rdc-card-header">
           <div className="rdc-flag-badge" aria-hidden>
             <img src={ASSETS.flag} alt="" />
@@ -239,7 +237,7 @@ export default function IdCardRdc({ card, fallback }: Props) {
             <strong>RÉPUBLIQUE DÉMOCRATIQUE DU CONGO</strong>
             <span>CARTE NATIONALE D&apos;IDENTITÉ / IDENTITY CARD</span>
           </div>
-          <div className="rdc-country-code" title="Code pays">
+          <div className="rdc-country-code" title="Armoiries">
             <img src={ASSETS.arms} alt="" />
           </div>
         </header>
@@ -319,12 +317,10 @@ export default function IdCardRdc({ card, fallback }: Props) {
       {/* VERSO — patrimoine + drapeau + armoiries */}
       <article className="rdc-card rdc-card-back" aria-label="Carte d'identité nationale — verso">
         <div className="rdc-card-bg rdc-card-bg-back" aria-hidden>
-          <img className="rdc-bg-flag rdc-bg-flag-back" src={ASSETS.flag} alt="" />
           <img className="rdc-bg-tour rdc-bg-tour-back" src={ASSETS.tour} alt="" />
           <img className="rdc-bg-okapi" src={ASSETS.okapi} alt="" />
           <img className="rdc-bg-arms rdc-bg-arms-back" src={ASSETS.arms} alt="" />
         </div>
-        <div className="rdc-card-guilloche rdc-card-guilloche-back" aria-hidden />
         <div className="rdc-back-top">
           <div className="rdc-qr-block">
             {qrSvg ? (
