@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
 import { registryApi, cardsApi, type CitizenHit, type NationalCard } from "../api";
 import { getSession } from "../auth";
-import IdCardRdc from "./IdCardRdc";
+import IdCardRdc, { printNationalIdCard } from "./IdCardRdc";
 
 export default function CardsPage() {
   const hasToken = Boolean(getSession()?.accessToken);
@@ -68,7 +68,7 @@ export default function CardsPage() {
   }
 
   function printCard() {
-    window.print();
+    printNationalIdCard("nn-id-card-print");
   }
 
   return (
@@ -171,7 +171,7 @@ export default function CardsPage() {
               </button>
               {card ? (
                 <button type="button" className="btn-secondary" onClick={printCard}>
-                  Imprimer recto / verso
+                  Imprimer la carte (recto / verso HTML)
                 </button>
               ) : null}
             </div>

@@ -1,15 +1,21 @@
+import { useEffect, useState } from "react";
+import QRCode from "qrcode";
 import type { NationalCard } from "../api";
-
-function qrImgUrl(payload: Record<string, unknown> | null | undefined): string {
-  const data = encodeURIComponent(JSON.stringify(payload ?? {}));
-  return `https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=6&data=${data}`;
-}
 
 function mrzPad(s: string, len: number): string {
   return (s.toUpperCase().replace(/[^A-Z0-9<]/g, "<") + "<".repeat(len)).slice(0, len);
 }
 
-function buildMrz(card: NationalCard, holder: NonNullable<NationalCard["holder"]>): [string, string, string] {
+function buildMrz(
+  card: NationalCard,
+  holder: {
+    nic?: string | null;
+    family_name?: string | null;
+    given_names?: string | null;
+    sex?: string | null;
+    date_of_birth?: string | null;
+  },
+): [string, string, string] {
   const doc = mrzPad((card.serial_number || "CD").replace(/-/g, ""), 9);
   const nic = mrzPad((holder.nic || "").replace(/\D/g, ""), 14);
   const sex = (holder.sex || "X").toUpperCase().startsWith("F") ? "F" : "M";
@@ -29,9 +35,112 @@ function buildMrz(card: NationalCard, holder: NonNullable<NationalCard["holder"]
   ];
 }
 
+/** Imprime le HTML réel de la carte (même DOM / CSS), pas une capture image. */
+export function printNationalIdCard(rootId = "nn-id-card-print"): void {
+  const root = document.getElementById(rootId);
+  if (!root) {
+    window.print();
+    return;
+  }
+
+  const styleSheets = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+    .map((n) => n.outerHTML)
+    .join("\n");
+
+  const win = window.open("", "_blank", "noopener,noreferrer,width=900,height=700");
+  if (!win) {
+    window.print();
+    return;
+  }
+
+  win.document.open();
+  win.document.write(`<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Carte d'identité nationale — RDC</title>
+  ${styleSheets}
+  <style>
+    @page { size: A4 portrait; margin: 12mm; }
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #fff !important;
+    }
+    body {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+    .id-card-print-wrap {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 14mm !important;
+      margin: 0 auto !important;
+      max-width: 180mm !important;
+    }
+    .rdc-card,
+    .rdc-card * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+    .rdc-card {
+      width: 170mm !important;
+      height: 107mm !important;
+      max-height: none !important;
+      max-width: none !important;
+      aspect-ratio: auto !important;
+      box-shadow: none !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+      margin: 0 auto !important;
+    }
+    .rdc-card-front {
+      page-break-after: always;
+    }
+    .rdc-qr-block svg,
+    .rdc-qr-svg svg {
+      width: 28mm !important;
+      height: 28mm !important;
+      display: block;
+      background: #fff;
+      border: 0.3mm solid #9ab4d0;
+    }
+  </style>
+</head>
+<body>
+  ${root.outerHTML}
+</body>
+</html>`);
+  win.document.close();
+
+  const runPrint = () => {
+    try {
+      win.focus();
+      win.print();
+    } finally {
+      // laisser l'aperçu ouvert un instant puis fermer
+      setTimeout(() => {
+        try {
+          win.close();
+        } catch {
+          /* ignore */
+        }
+      }, 500);
+    }
+  };
+
+  // Attendre le rendu SVG / polices
+  if (win.document.readyState === "complete") {
+    setTimeout(runPrint, 250);
+  } else {
+    win.addEventListener("load", () => setTimeout(runPrint, 250));
+  }
+}
+
 type Props = {
   card: NationalCard;
-  /** Fallback si holder API absent */
   fallback?: {
     family_name?: string;
     given_names?: string;
@@ -43,6 +152,8 @@ type Props = {
 };
 
 export default function IdCardRdc({ card, fallback }: Props) {
+  const [qrSvg, setQrSvg] = useState<string>("");
+
   const holder = {
     family_name: card.holder?.family_name ?? fallback?.family_name ?? "—",
     given_names: card.holder?.given_names ?? fallback?.given_names ?? "—",
@@ -65,9 +176,26 @@ export default function IdCardRdc({ card, fallback }: Props) {
   const sexLabel = String(holder.sex).toUpperCase().startsWith("F") ? "F" : "M";
   const mrz = buildMrz(card, holder);
 
+  useEffect(() => {
+    let cancelled = false;
+    const payload = JSON.stringify(card.qr_payload ?? { card_id: card.card_id, v: card.version });
+    void QRCode.toString(payload, {
+      type: "svg",
+      margin: 1,
+      errorCorrectionLevel: "M",
+      color: { dark: "#0b2a4a", light: "#ffffff" },
+      width: 160,
+    }).then((svg) => {
+      if (!cancelled) setQrSvg(svg);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [card.card_id, card.version, card.qr_payload]);
+
   return (
-    <div className="id-card-print-wrap">
-      {/* RECTO */}
+    <div id="nn-id-card-print" className="id-card-print-wrap">
+      {/* RECTO — HTML réel (pas une image) */}
       <article className="rdc-card rdc-card-front" aria-label="Carte d'identité nationale — recto">
         <div className="rdc-card-guilloche" aria-hidden />
         <header className="rdc-card-header">
@@ -155,12 +283,22 @@ export default function IdCardRdc({ card, fallback }: Props) {
         </div>
       </article>
 
-      {/* VERSO */}
+      {/* VERSO — même structure HTML à l'impression */}
       <article className="rdc-card rdc-card-back" aria-label="Carte d'identité nationale — verso">
         <div className="rdc-card-guilloche rdc-card-guilloche-back" aria-hidden />
         <div className="rdc-back-top">
           <div className="rdc-qr-block">
-            <img src={qrImgUrl(card.qr_payload)} alt="QR vérification" width={120} height={120} />
+            {qrSvg ? (
+              <div
+                className="rdc-qr-svg"
+                dangerouslySetInnerHTML={{ __html: qrSvg }}
+                aria-label="QR vérification"
+              />
+            ) : (
+              <div className="rdc-qr-placeholder" aria-hidden>
+                QR…
+              </div>
+            )}
             <small>2D-Doc / vérification</small>
           </div>
           <div className="rdc-back-meta">

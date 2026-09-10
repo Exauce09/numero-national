@@ -787,6 +787,8 @@ body {
     linear-gradient(0deg, #eef5fc, #f7fbff);
   color: #0b2a4a;
   font-family: "Segoe UI", "Candara", "Trebuchet MS", sans-serif;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 .rdc-card-guilloche {
@@ -1014,13 +1016,25 @@ body {
   text-align: center;
 }
 
-.rdc-qr-block img {
+.rdc-qr-block svg,
+.rdc-qr-svg svg {
   display: block;
   width: 110px;
   height: 110px;
   border: 1px solid #9ab4d0;
   background: #fff;
   border-radius: 4px;
+}
+
+.rdc-qr-placeholder {
+  width: 110px;
+  height: 110px;
+  border: 1px dashed #9ab4d0;
+  display: grid;
+  place-items: center;
+  font-size: 0.7rem;
+  color: #5a7390;
+  background: #fff;
 }
 
 .rdc-qr-block small {
@@ -1106,25 +1120,67 @@ body {
   .sidebar-backdrop,
   .no-print-actions,
   .hero-banner,
-  .panel:not(.id-card-print-wrap) {
+  .panel:not(.id-card-print-wrap),
+  .login-error,
+  .success-banner {
     display: none !important;
   }
+
+  html,
+  body {
+    background: #fff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
   .page-wrapper,
   .body-wrap,
-  .shell {
+  .shell,
+  .main,
+  .content {
     display: block !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #fff !important;
+    width: 100% !important;
+    max-width: none !important;
   }
+
   .id-card-print-wrap {
-    max-width: none;
-    gap: 0.75cm;
+    display: flex !important;
+    flex-direction: column !important;
+    max-width: none !important;
+    gap: 12mm !important;
+    margin: 0 auto !important;
   }
+
+  .rdc-card,
+  .rdc-card * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
   .rdc-card {
-    box-shadow: none;
-    max-height: none;
-    page-break-inside: avoid;
+    width: 170mm !important;
+    height: 107mm !important;
+    max-height: none !important;
+    aspect-ratio: auto !important;
+    box-shadow: none !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin: 0 auto !important;
+  }
+
+  .rdc-card-front {
+    page-break-after: always;
+  }
+
+  .rdc-qr-block svg,
+  .rdc-qr-svg svg {
+    width: 28mm !important;
+    height: 28mm !important;
   }
 }
 
