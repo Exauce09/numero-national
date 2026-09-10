@@ -707,13 +707,19 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   Future<void> _save({bool draft = false}) async {
     // Identité obligatoire avant brouillon ou finalisation.
     if (!_validateStep1()) return;
-    if (!draft && (_aConjoint || _etatCivil == 'MARIE') && !_conjointLocked) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Conjoint(e) : recherchez et liez une personne déjà enregistrée'),
-        ),
-      );
-      return;
+    if (!draft && (_aConjoint || _etatCivil == 'MARIE' || _ficheKind == FicheKind.marie)) {
+      final cNom = _conjoint.nom.text.trim();
+      final cPrenom = _conjoint.prenom.text.trim();
+      if (!_conjointLocked && (cNom.isEmpty || cPrenom.isEmpty)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Conjoint(e) : liez une fiche ou saisissez nom et prénom',
+            ),
+          ),
+        );
+        return;
+      }
     }
 
     setState(() => _busy = true);
