@@ -75,11 +75,13 @@ export default function DeclarationsPage() {
     refreshAccounts();
   }, []);
 
-  function applyToRegistry(d: Declaration) {
+  async function applyToRegistry(d: Declaration) {
     const commune = String(d.payload.commune_code ?? "KIN-GOMBE");
     if (d.declaration_type === "BIRTH") {
       const sexe = (String(d.payload.sexe ?? "M").toUpperCase() === "F" ? "F" : "M") as Sexe;
+      const provisionalNic = String(d.payload.child_nic ?? "").trim() || undefined;
       const child = addPerson({
+        nic: provisionalNic,
         nom: String(d.payload.child_nom ?? "INCONNU"),
         postnom: String(d.payload.child_postnom ?? ""),
         prenom: String(d.payload.child_prenom ?? ""),
@@ -93,6 +95,7 @@ export default function DeclarationsPage() {
         {
           ...d.payload,
           child_id: child.id,
+          child_nic: child.nic,
           nom: child.nom,
           postnom: child.postnom,
           prenom: child.prenom,
@@ -142,7 +145,7 @@ export default function DeclarationsPage() {
       const d = rows.find((x) => x.id === id);
       if (!reject && d) {
         try {
-          applyToRegistry(d);
+          await applyToRegistry(d);
         } catch (err) {
           setError(err instanceof Error ? err.message : "Validation locale partielle.");
         }

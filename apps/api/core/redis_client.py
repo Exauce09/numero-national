@@ -94,6 +94,23 @@ async def close_redis() -> None:
     _limiter = None
 
 
+async def reset_rate_limiter_state() -> None:
+    """Clear counters used by tests (in-memory + Redis ``rl:*`` keys)."""
+    global _limiter
+    if isinstance(_limiter, InMemoryRateLimiter):
+        _limiter._buckets.clear()
+    redis = await get_redis()
+    if redis is not None:
+        try:
+            async for key in redis.scan_iter(match="rl:*", count=200):
+                await redis.delete(key)
+        except Exception:  # noqa: BLE001 — best-effort for pytest
+            logger.warning("Could not clear Redis rate-limit keys", exc_info=True)
+    # Force re-resolve so a fresh InMemory limiter is used if Redis was down.
+    if _limiter is None or isinstance(_limiter, InMemoryRateLimiter):
+        _limiter = InMemoryRateLimiter()
+
+
 # --- Login failure counters (lockout) ---------------------------------------
 
 _fail_memory: dict[str, tuple[int, float]] = {}

@@ -1,9 +1,22 @@
 import { FormEvent, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import PersonPicker from "../components/PersonPicker";
-import { displayName, type Person } from "../registry";
+import { displayName, generateNic, type Person } from "../registry";
 import { getHealthSession } from "../healthAuth";
 import { listFacilityDeclarations, notifyEtatCivil } from "../civilDeclarations";
 import { pushHealthNotification } from "../healthPrefs";
+
+type BirthCoupon = {
+  nic: string;
+  nom: string;
+  postnom: string;
+  prenom: string;
+  sexe: "M" | "F";
+  date_naissance: string;
+  mother_name: string;
+  facility_name: string;
+  declaration_id: string;
+};
 
 export default function HealthBirthsPage() {
   const session = getHealthSession()!;
@@ -16,6 +29,7 @@ export default function HealthBirthsPage() {
   const [father, setFather] = useState<Person | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [coupon, setCoupon] = useState<BirthCoupon | null>(null);
   const [, bump] = useState(0);
   const rows = listFacilityDeclarations(session.facilityId).filter((d) => d.declaration_type === "BIRTH");
 
@@ -23,6 +37,7 @@ export default function HealthBirthsPage() {
     e.preventDefault();
     setError(null);
     setMessage(null);
+    setCoupon(null);
     if (!nom.trim() || !prenom.trim() || !dateNaissance) {
       setError("Nom, prénom et date de naissance de l'enfant sont requis.");
       return;
@@ -31,6 +46,10 @@ export default function HealthBirthsPage() {
       setError("La mère est obligatoire (recherche ou ajout).");
       return;
     }
+    const childNic = generateNic();
+    const childNom = nom.trim();
+    const childPostnom = postnom.trim() || mother.postnom || father?.postnom || "";
+    const childPrenom = prenom.trim();
     const decl = notifyEtatCivil({
       type: "BIRTH",
       facilityName: session.facilityName,
@@ -39,9 +58,10 @@ export default function HealthBirthsPage() {
         facility_name: session.facilityName,
         commune_code: session.commune_code,
         commune_name: session.commune_name,
-        child_nom: nom.trim(),
-        child_postnom: postnom.trim() || mother.postnom || father?.postnom || "",
-        child_prenom: prenom.trim(),
+        child_nic: childNic,
+        child_nom: childNom,
+        child_postnom: childPostnom,
+        child_prenom: childPrenom,
         sexe,
         date_naissance: dateNaissance,
         mother_id: mother.id,
@@ -53,13 +73,25 @@ export default function HealthBirthsPage() {
         lieu_naissance: session.facilityName,
       },
     });
+    const birthCoupon: BirthCoupon = {
+      nic: childNic,
+      nom: childNom,
+      postnom: childPostnom,
+      prenom: childPrenom,
+      sexe,
+      date_naissance: dateNaissance,
+      mother_name: displayName(mother),
+      facility_name: session.facilityName,
+      declaration_id: decl.id,
+    };
+    setCoupon(birthCoupon);
     pushHealthNotification({
-      title: "Nouveau-né notifié à l'état civil",
-      body: `${prenom.trim()} ${nom.trim()} — en attente de validation officier (réf. ${decl.id.slice(0, 8)}).`,
+      title: "Nouveau-né — NIC attribué",
+      body: `${childPrenom} ${childNom} — NIC ${childNic} (réf. ${decl.id.slice(0, 8)}).`,
       href: "/sante/births",
     });
     setMessage(
-      `Enregistrement transmis à l'état civil pour validation (réf. ${decl.id.slice(0, 8)}). L'officier a été notifié.`,
+      `NIC ${childNic} attribué. Déclaration transmise à l'état civil (réf. ${decl.id.slice(0, 8)}).`,
     );
     setNom("");
     setPostnom("");
@@ -70,11 +102,27 @@ export default function HealthBirthsPage() {
     bump((n) => n + 1);
   }
 
+  const qrValue = coupon
+    ? JSON.stringify({
+        type: "nn_birth_coupon",
+        v: 1,
+        nic: coupon.nic,
+        national_id: coupon.nic,
+        family_name: coupon.nom,
+        given_names: coupon.prenom,
+        sex: coupon.sexe,
+        dob: coupon.date_naissance,
+        declaration_id: coupon.declaration_id,
+        facility: coupon.facility_name,
+      })
+    : "";
+
   return (
     <div>
       <h2 className="page-title">Nouveau-né</h2>
       <p className="page-lead">
-        Enregistrement à la structure sanitaire — transmission et notification automatiques vers l&apos;état civil.
+        Enregistrement à la structure sanitaire — numéro national immédiat, coupon QR, puis
+        notification automatique vers l&apos;état civil.
       </p>
       <div className="panel">
         <form className="form-grid" onSubmit={onSubmit}>
@@ -117,16 +165,63 @@ export default function HealthBirthsPage() {
           </div>
           <div className="full">
             <button className="btn-primary" type="submit" style={{ width: "auto", minWidth: 280 }}>
-              Enregistrer et notifier l&apos;état civil
+              Enregistrer, attribuer le NIC et notifier
             </button>
           </div>
         </form>
       </div>
+
+      {coupon ? (
+        <div className="panel print-area" style={{ marginTop: "1rem" }}>
+          <div className="success-banner">Coupon naissance — NIC {coupon.nic}</div>
+          <div className="act-print-card" style={{ marginTop: "0.75rem" }}>
+            <div className="act-print-header">
+              <img src="/logo-rdc.jpg" alt="RDC" />
+              <div>
+                <strong>République Démocratique du Congo</strong>
+                <div>E-GOUV · Structure sanitaire</div>
+                <div>Coupon provisoire nouveau-né</div>
+              </div>
+            </div>
+            <div className="act-print-body">
+              <div className="act-print-meta">
+                <div>
+                  <span className="muted">NIC</span>
+                  <strong>{coupon.nic}</strong>
+                </div>
+                <div>
+                  <span className="muted">Enfant</span>
+                  <strong>
+                    {coupon.prenom} {coupon.postnom} {coupon.nom}
+                  </strong>
+                </div>
+                <div>
+                  <span className="muted">Naissance</span>
+                  <strong>{coupon.date_naissance}</strong>
+                </div>
+                <div>
+                  <span className="muted">Mère</span>
+                  <strong>{coupon.mother_name}</strong>
+                </div>
+              </div>
+              <div className="act-print-qr">
+                <QRCodeSVG value={qrValue} size={128} includeMargin />
+                <span className="muted small">Contrôle QR</span>
+              </div>
+            </div>
+          </div>
+          <button className="btn-primary" type="button" style={{ marginTop: "0.75rem", width: "auto" }} onClick={() => window.print()}>
+            Imprimer le coupon
+          </button>
+        </div>
+      ) : null}
+
       <div className="panel" style={{ marginTop: "1rem" }}>
         <h3 className="panel-title">Déclarations envoyées</h3>
         <table className="data-table">
           <thead>
             <tr>
+              <th>NIC</th>
               <th>Enfant</th>
               <th>Mère</th>
               <th>Père</th>
@@ -137,6 +232,9 @@ export default function HealthBirthsPage() {
           <tbody>
             {rows.map((d) => (
               <tr key={d.id}>
+                <td>
+                  <code>{String(d.payload.child_nic ?? "—")}</code>
+                </td>
                 <td>
                   {String(d.payload.child_nom ?? "")} {String(d.payload.child_prenom ?? "")}
                 </td>
