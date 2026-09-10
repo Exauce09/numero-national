@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth_service.dart';
 import '../../core/secure_storage.dart';
+import '../../core/theme.dart';
+import '../../sync/sync_lifecycle.dart';
 
 class DeviceRegistrationScreen extends StatefulWidget {
   const DeviceRegistrationScreen({super.key});
@@ -21,6 +23,7 @@ class _DeviceRegistrationScreenState extends State<DeviceRegistrationScreen> {
   void initState() {
     super.initState();
     _load();
+    SyncLifecycle.instance.nudge();
   }
 
   Future<void> _load() async {
@@ -41,10 +44,10 @@ class _DeviceRegistrationScreenState extends State<DeviceRegistrationScreen> {
       final uid = await _auth.ensureDeviceRegistered();
       setState(() {
         _deviceUid = uid;
-        _status = 'Appareil enregistré auprès du serveur (ou UID local conservé).';
+        _status = 'Appareil enregistré.';
       });
     } catch (e) {
-      setState(() => _status = 'Échec: $e');
+      setState(() => _status = 'Échec enregistrement');
     } finally {
       setState(() => _busy = false);
     }
@@ -52,31 +55,49 @@ class _DeviceRegistrationScreenState extends State<DeviceRegistrationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (_userEmail != null) ...[
-            Text('Agent', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(_userEmail!),
-            const SizedBox(height: 16),
-          ],
-          Text('Identifiant appareil', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          SelectableText(_deviceUid ?? 'Non enregistré'),
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: _busy ? null : _register,
-            child: const Text('Enregistrer / renouveler'),
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: NnColors.card,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: NnColors.line),
           ),
-          if (_status != null) ...[
-            const SizedBox(height: 12),
-            Text(_status!),
-          ],
-        ],
-      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Appareil', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+              const SizedBox(height: 12),
+              if (_userEmail != null) ...[
+                const Text('Agent', style: TextStyle(color: NnColors.muted, fontSize: 12)),
+                Text(_userEmail!, style: const TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 12),
+              ],
+              const Text('Identifiant', style: TextStyle(color: NnColors.muted, fontSize: 12)),
+              SelectableText(
+                _deviceUid ?? 'Non enregistré',
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _busy ? null : _register,
+                child: Text(_busy ? '…' : 'Enregistrer l’appareil'),
+              ),
+              if (_status != null) ...[
+                const SizedBox(height: 10),
+                Text(_status!, style: const TextStyle(fontSize: 13)),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'La synchronisation des fiches se fait automatiquement dès qu’il y a du réseau.',
+          style: TextStyle(color: NnColors.muted, fontSize: 13, height: 1.35),
+        ),
+      ],
     );
   }
 }

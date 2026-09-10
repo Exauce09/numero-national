@@ -89,7 +89,7 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Synchronisation', style: TextStyle(fontWeight: FontWeight.w700)),
+                      const Text('Sync automatique', style: TextStyle(fontWeight: FontWeight.w700)),
                       Text(_syncLabel, style: const TextStyle(color: NnColors.muted, fontSize: 13)),
                     ],
                   ),

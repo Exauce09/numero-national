@@ -24,7 +24,7 @@ class RecensementApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Recensement National',
+      title: 'ONIP Recensement',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       home: const LoginScreen(),
@@ -74,12 +74,17 @@ class _HomeShellState extends State<HomeShell> {
       backgroundColor: NnColors.page,
       appBar: AppBar(
         title: Text(titles[_index]),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(4),
+          child: RdcStripe(height: 4),
+        ),
         actions: [
-          IconButton(
-            tooltip: 'Conflits',
-            onPressed: () => Navigator.of(context).pushNamed('/conflicts'),
-            icon: const Icon(Icons.warning_amber_rounded),
-          ),
+          if (_index == 0)
+            IconButton(
+              tooltip: 'Conflits',
+              onPressed: () => Navigator.of(context).pushNamed('/conflicts'),
+              icon: const Icon(Icons.warning_amber_rounded),
+            ),
           IconButton(
             tooltip: 'Déconnexion',
             onPressed: _logout,
@@ -92,10 +97,10 @@ class _HomeShellState extends State<HomeShell> {
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.grid_view_rounded), label: 'Accueil'),
-          NavigationDestination(icon: Icon(Icons.map_outlined), label: 'Zones'),
-          NavigationDestination(icon: Icon(Icons.insights_outlined), label: 'Stats'),
-          NavigationDestination(icon: Icon(Icons.phone_android_outlined), label: 'Appareil'),
+          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'Accueil'),
+          NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map_rounded), label: 'Zones'),
+          NavigationDestination(icon: Icon(Icons.bar_chart_outlined), selectedIcon: Icon(Icons.bar_chart_rounded), label: 'Stats'),
+          NavigationDestination(icon: Icon(Icons.smartphone_outlined), selectedIcon: Icon(Icons.smartphone), label: 'Appareil'),
         ],
       ),
     );

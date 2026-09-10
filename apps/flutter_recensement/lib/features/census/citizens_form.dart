@@ -1010,19 +1010,12 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _section('3. Biométrie — Photo', [
+        _section('3. Biométrie', [
           PhotoCaptureWidget(
             initialRef: _photoRef,
             onCaptured: (ref) => setState(() => _photoRef = ref),
           ),
-        ]),
-        _section('3. Biométrie — Empreintes & iris (téléphone)', [
-          const Text(
-            'Empreintes : posez le doigt sur le capteur du téléphone. '
-            'Iris : photo de l’œil avec la caméra (référence terrain).',
-            style: TextStyle(fontSize: 12, color: Color(0xFF5A6A85)),
-          ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           FingerprintCaptureWidget(
             label: 'Empreinte main gauche',
             hand: 'gauche',

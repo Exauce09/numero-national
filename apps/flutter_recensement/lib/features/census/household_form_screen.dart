@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/geo_from_gps.dart';
+import '../../core/theme.dart';
 import '../../sync/local_database.dart';
 import '../../sync/sync_lifecycle.dart';
 import '../../sync/sync_queue.dart';
 import 'geo_cascade_field.dart';
 
-/// Nouveau ménage — GPS (online/offline) + cascade manuelle.
+/// Nouveau ménage — GPS (en ligne / hors ligne) + saisie manuelle.
 class HouseholdFormScreen extends StatefulWidget {
   const HouseholdFormScreen({
     super.key,
@@ -42,18 +43,16 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
   }
 
   void _rebuildAddress() {
-    final parts = <String>[
-      if (_gpsLabel != null && _gpsLabel!.trim().isNotEmpty) _gpsLabel!.trim(),
-      if (_geoLabel.trim().isNotEmpty) _geoLabel.trim(),
-      if (_detail.text.trim().isNotEmpty) _detail.text.trim(),
-    ];
-    // Prefer GPS-derived label when present
     if (_gpsLabel != null && _gpsLabel!.isNotEmpty) {
       final manual = <String>[
         if (_detail.text.trim().isNotEmpty) _detail.text.trim(),
       ];
       _address.text = [_gpsLabel!, ...manual].where((e) => e.isNotEmpty).join(' — ');
     } else {
+      final parts = <String>[
+        if (_geoLabel.trim().isNotEmpty) _geoLabel.trim(),
+        if (_detail.text.trim().isNotEmpty) _detail.text.trim(),
+      ];
       _address.text = parts.join(' — ');
     }
   }
@@ -66,7 +65,7 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
     try {
       final addr = await GeoFromGps.resolve();
       if (addr == null) {
-        setState(() => _status = 'GPS indisponible');
+        setState(() => _status = 'GPS indisponible — saisissez l’adresse manuellement');
         return;
       }
       setState(() {
@@ -75,8 +74,8 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
         _gpsLabel = addr.label;
         _gpsSource = addr.source;
         _status = addr.source == 'online'
-            ? 'Adresse GPS précise (en ligne)'
-            : 'GPS OK — approx. hors ligne (complétez la cascade si besoin)';
+            ? 'Adresse précise (GPS + internet)'
+            : 'Position GPS OK hors ligne — complètez si besoin';
       });
       _rebuildAddress();
     } catch (e) {
@@ -172,34 +171,61 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Nouveau ménage')),
+      appBar: AppBar(
+        title: const Text('Nouveau ménage'),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(4),
+          child: RdcStripe(height: 4),
+        ),
+      ),
       body: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            FilledButton.tonalIcon(
-              onPressed: _busy ? null : _locateGps,
-              icon: const Icon(Icons.my_location),
-              label: const Text('Localiser par GPS'),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _status ??
-                  'GPS : en ligne = adresse précise · hors ligne = position + approx. commune Kinshasa. '
-                      'Vous pouvez aussi saisir la cascade manuellement.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: const Color(0xFF5A6A85)),
-            ),
-            if (_lat != null && _lng != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                'GPS ${_lat!.toStringAsFixed(5)}, ${_lng!.toStringAsFixed(5)}'
-                '${_gpsLabel != null ? '\n$_gpsLabel' : ''}',
-                style: const TextStyle(fontWeight: FontWeight.w600),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: NnColors.softBlue,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: NnColors.line),
               ),
-            ],
-            const SizedBox(height: 16),
-            Text('Ou saisie manuelle', style: Theme.of(context).textTheme.titleSmall),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Localisation',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    '1. Bouton GPS (marche avec ou sans internet)\n'
+                    '2. Ou saisie manuelle province → ville → commune…',
+                    style: TextStyle(fontSize: 12, color: NnColors.muted, height: 1.35),
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: _busy ? null : _locateGps,
+                    icon: const Icon(Icons.my_location),
+                    label: Text(_busy && _status == 'Lecture GPS…' ? 'GPS…' : 'Localiser par GPS'),
+                  ),
+                  if (_status != null) ...[
+                    const SizedBox(height: 8),
+                    Text(_status!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  ],
+                  if (_lat != null && _lng != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      '${_lat!.toStringAsFixed(5)}, ${_lng!.toStringAsFixed(5)}'
+                      '${_gpsLabel != null ? '\n$_gpsLabel' : ''}',
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text('Saisie manuelle', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 8),
             GeoCascadeField(
               onLabelChanged: (label) {
@@ -226,10 +252,7 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
             ),
             const SizedBox(height: 24),
             FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFCE1126),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
+              style: FilledButton.styleFrom(backgroundColor: NnColors.rdcRed),
               onPressed: _busy ? null : _save,
               child: _busy
                   ? const SizedBox(

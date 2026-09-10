@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/theme.dart';
+
 /// Empreinte via le **capteur biométrique du téléphone** (Android BiometricPrompt).
-///
-/// L’OS ne livre pas l’image AFIS : on enregistre une attestation
-/// (doigt validé sur le capteur + horodatage + id).
 class FingerprintCaptureWidget extends StatefulWidget {
   const FingerprintCaptureWidget({
     super.key,
@@ -17,7 +16,6 @@ class FingerprintCaptureWidget extends StatefulWidget {
 
   final ValueChanged<String> onCaptured;
   final String label;
-  /// Ex. "gauche" / "droite" — affiché dans le prompt système.
   final String hand;
   final String? initialRef;
 
@@ -52,20 +50,20 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
       setState(() {
         _available = supported && (can || bios.isNotEmpty);
         if (!_available) {
-          _error = 'Activez une empreinte dans Réglages → Sécurité du téléphone';
+          _error = 'Enregistrez une empreinte dans Réglages → Sécurité du téléphone';
           _sensorHint = '';
         } else if (hasFp || bios.isNotEmpty) {
           _error = null;
           _sensorHint = 'Posez le doigt ${widget.hand} sur le capteur du téléphone';
         } else {
-          _sensorHint = 'Biométrie disponible — utilisez le capteur du téléphone';
+          _sensorHint = 'Utilisez le capteur biométrique du téléphone';
         }
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _available = false;
-        _error = 'Biométrie indisponible: $e';
+        _error = 'Biométrie indisponible';
       });
     }
   }
@@ -76,13 +74,11 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
       _error = null;
     });
     try {
-      // Relance la vérif au cas où l’utilisateur vient d’enregistrer une empreinte.
       await _check();
       if (!_available) return;
 
       final ok = await _auth.authenticate(
-        localizedReason:
-            'Empreinte ${widget.hand} — posez le doigt sur le capteur du téléphone',
+        localizedReason: 'Empreinte ${widget.hand} — posez le doigt sur le capteur',
         options: const AuthenticationOptions(
           biometricOnly: true,
           stickyAuth: true,
@@ -98,7 +94,7 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
       setState(() => _ref = ref);
       widget.onCaptured(ref);
     } catch (e) {
-      setState(() => _error = 'Échec capteur: $e');
+      setState(() => _error = 'Échec capteur');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -107,44 +103,46 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
   @override
   Widget build(BuildContext context) {
     final done = _ref != null && _ref!.isNotEmpty;
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(widget.label, style: Theme.of(context).textTheme.titleSmall),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: NnColors.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: done ? NnColors.success.withValues(alpha: 0.35) : NnColors.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(widget.label, style: const TextStyle(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 6),
+          Text(
+            done
+                ? 'Validée via le capteur du téléphone (${widget.hand})'
+                : (_sensorHint.isNotEmpty
+                    ? _sensorHint
+                    : 'Utilise le capteur d’empreinte du téléphone'),
+            style: TextStyle(
+              color: done ? NnColors.success : NnColors.muted,
+              fontWeight: done ? FontWeight.w700 : FontWeight.w500,
+              fontSize: 13,
+            ),
+          ),
+          if (_error != null) ...[
             const SizedBox(height: 6),
-            Text(
-              done
-                  ? 'OK — capturée via le capteur du téléphone (${widget.hand})'
-                  : (_sensorHint.isNotEmpty
-                      ? _sensorHint
-                      : 'Utilise le capteur d’empreinte du téléphone'),
-              style: TextStyle(
-                color: done ? const Color(0xFF0F6B45) : const Color(0xFF5A6A85),
-                fontWeight: done ? FontWeight.w700 : FontWeight.w500,
-                fontSize: 13,
-              ),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 6),
-              Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 13)),
-            ],
-            const SizedBox(height: 10),
-            FilledButton.icon(
-              onPressed: _busy ? null : _capture,
-              icon: Icon(done ? Icons.fingerprint : Icons.fingerprint_outlined),
-              label: Text(
-                _busy
-                    ? 'Capteur…'
-                    : (done ? 'Reprendre (${widget.hand})' : 'Capturer ${widget.hand}'),
-              ),
-              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF007FFF)),
-            ),
+            Text(_error!, style: const TextStyle(color: NnColors.danger, fontSize: 13)),
           ],
-        ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _busy ? null : _capture,
+            icon: Icon(done ? Icons.fingerprint : Icons.fingerprint_outlined),
+            label: Text(
+              _busy
+                  ? 'Capteur…'
+                  : (done ? 'Reprendre (${widget.hand})' : 'Capturer ${widget.hand}'),
+            ),
+          ),
+        ],
       ),
     );
   }

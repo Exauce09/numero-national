@@ -51,7 +51,7 @@ class SyncLifecycle {
     if (_running) return;
     _running = true;
     try {
-      final online = await SyncEngine().isOnline();
+      final online = await SyncEngine().isOnline;
       if (!online) return;
       final pending = await SyncQueue().pending();
       final status = await LocalDatabase.instance.getMeta('sync_status') ?? '';

@@ -8,7 +8,7 @@ import 'assignment_repository.dart';
 import 'conflicts_screen.dart';
 import 'new_person_flow_screen.dart';
 
-/// Accueil agent — design sobre : une action principale + indicateurs utiles.
+/// Accueil agent — design professionnel, actions utiles uniquement.
 class HomeDashboardScreen extends StatefulWidget {
   const HomeDashboardScreen({super.key, required this.onOpenTab});
 
@@ -61,11 +61,10 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     return int.tryParse('$v') ?? 0;
   }
 
-  String get _greeting {
-    final h = DateTime.now().hour;
-    if (h < 12) return 'Bonjour';
-    if (h < 18) return 'Bon après-midi';
-    return 'Bonsoir';
+  String get _shortName {
+    final e = _email;
+    if (e.contains('@')) return e.split('@').first;
+    return e;
   }
 
   Color _syncColor() {
@@ -77,44 +76,125 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     return NnColors.rdcBlue;
   }
 
+  String get _syncHuman {
+    final s = _syncLabel.toUpperCase();
+    if (s.contains('SYNCED') || s.contains('OK')) return 'À jour';
+    if (s.contains('OFFLINE') || s.contains('HORS')) return 'Hors ligne';
+    if (s.contains('SYNCING')) return 'Synchronisation…';
+    if (s.contains('ATTENTE')) return 'En attente réseau';
+    if (s.contains('ERROR')) return 'Erreur sync';
+    return _syncLabel;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final shortName = _email.contains('@') ? _email.split('@').first : _email;
-
     return RefreshIndicator(
       onRefresh: () async {
         SyncLifecycle.instance.nudge();
         await _load();
       },
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         children: [
-          Text(
-            '$_greeting, $shortName',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: NnColors.ink,
+          // En-tête marque
+          Container(
+            decoration: BoxDecoration(
+              color: NnColors.card,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: NnColors.line),
+              boxShadow: [
+                BoxShadow(
+                  color: NnColors.ink.withValues(alpha: 0.04),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
                 ),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(color: _syncColor(), shape: BoxShape.circle),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Sync auto · $_syncLabel'
-                  '${_queued > 0 ? ' · $_queued en file' : ''}',
-                  style: const TextStyle(color: NnColors.muted, fontSize: 13),
+              ],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const RdcStripe(height: 5),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.asset(
+                          'assets/logo-rdc.jpg',
+                          width: 52,
+                          height: 52,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'ONIP · Recensement',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: NnColors.ink,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _shortName,
+                              style: const TextStyle(color: NnColors.muted, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
+
+          // Sync auto (informatif seulement — pas de bouton obligatoire)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: NnColors.softBlue,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: NnColors.line),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(color: _syncColor(), shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Sync automatique · $_syncHuman'
+                    '${_queued > 0 ? ' · $_queued en file' : ''}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: NnColors.ink,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 22),
+
+          const Text(
+            'Collecte terrain',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: NnColors.ink),
+          ),
+          const SizedBox(height: 10),
+
           FilledButton.icon(
             style: FilledButton.styleFrom(
               backgroundColor: NnColors.rdcRed,
@@ -123,16 +203,24 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const NewPersonFlowScreen()),
-              );
+              ).then((_) => _load());
             },
-            icon: const Icon(Icons.person_add_alt_1),
-            label: const Text('Nouvelle fiche'),
+            icon: const Icon(Icons.person_add_alt_1_rounded),
+            label: const Text('Nouvelle fiche citoyen'),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: () => widget.onOpenTab(1),
+            icon: const Icon(Icons.home_work_outlined),
+            label: const Text('Ménages & zones'),
+          ),
+          const SizedBox(height: 22),
+
           Row(
             children: [
               Expanded(
-                child: _MiniStat(
+                child: _StatTile(
+                  icon: Icons.map_outlined,
                   label: 'Zones',
                   value: '$_assignments',
                   onTap: () => widget.onOpenTab(1),
@@ -140,24 +228,23 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _MiniStat(
-                  label: 'À sync',
-                  value: '$_queued',
-                  onTap: () => SyncLifecycle.instance.nudge(),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _MiniStat(
+                child: _StatTile(
+                  icon: Icons.warning_amber_rounded,
                   label: 'Conflits',
                   value: '$_conflicts',
                   alert: _conflicts > 0,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const ConflictsScreen()),
-                  ),
+                  ).then((_) => _load()),
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'v0.3.0 · GPS · empreinte téléphone · iris œil',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11, color: NnColors.muted),
           ),
         ],
       ),
@@ -165,14 +252,16 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   }
 }
 
-class _MiniStat extends StatelessWidget {
-  const _MiniStat({
+class _StatTile extends StatelessWidget {
+  const _StatTile({
+    required this.icon,
     required this.label,
     required this.value,
     required this.onTap,
     this.alert = false,
   });
 
+  final IconData icon;
   final String label;
   final String value;
   final VoidCallback onTap;
@@ -182,27 +271,31 @@ class _MiniStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: NnColors.card,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+          padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: alert ? NnColors.rdcRed.withValues(alpha: 0.4) : NnColors.line),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: alert ? NnColors.rdcRed.withValues(alpha: 0.45) : NnColors.line,
+            ),
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Icon(icon, size: 22, color: alert ? NnColors.rdcRed : NnColors.rdcBlue),
+              const SizedBox(height: 10),
               Text(
                 value,
                 style: TextStyle(
-                  fontSize: 22,
+                  fontSize: 24,
                   fontWeight: FontWeight.w800,
                   color: alert ? NnColors.rdcRed : NnColors.ink,
                 ),
               ),
-              const SizedBox(height: 2),
               Text(label, style: const TextStyle(fontSize: 12, color: NnColors.muted)),
             ],
           ),

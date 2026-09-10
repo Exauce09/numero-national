@@ -113,31 +113,16 @@ class _NewPersonFlowScreenState extends State<NewPersonFlowScreen> {
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: NnColors.line),
                   ),
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Formulaire complet (7 étapes)',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
-                      ),
-                      SizedBox(height: 6),
-                      Text(
-                        '1 Identité · 2 Origine · 3 Biométrie · 4 Études · 5 Expérience · 6 Admin · 7 Famille',
-                        style: TextStyle(color: NnColors.muted, fontSize: 13, height: 1.35),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Choisissez une zone → créez / ouvrez un ménage → « + Personne ».',
-                        style: TextStyle(fontSize: 13),
-                      ),
-                    ],
+                  child: const Text(
+                    'Choisissez une zone, créez un ménage (GPS), puis ajoutez la fiche citoyen.',
+                    style: TextStyle(fontSize: 13, height: 1.35),
                   ),
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 12),
                   Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
                   const SizedBox(height: 8),
-                  OutlinedButton(onPressed: _load, child: const Text('Réessayer / sync')),
+                  OutlinedButton(onPressed: _load, child: const Text('Réessayer')),
                 ],
                 const SizedBox(height: 16),
                 Text(
