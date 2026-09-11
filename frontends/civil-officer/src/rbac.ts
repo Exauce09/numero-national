@@ -86,13 +86,17 @@ export function canAny(keys: string[], permissions: string[] | undefined | null)
 }
 
 /** Sidebar visibility by role family (UI only). */
-export function canSeeNav(key: NavKey, roles: string[]): boolean {
+export function canSeeNav(key: NavKey, roles: string[], permissions?: string[] | null): boolean {
   const r = normalizeRoles(roles);
   const isNational = r.some((x) => NATIONAL.has(x));
   const isProvincial = r.some((x) => PROVINCIAL.has(x));
   const isLead = r.some((x) => BUREAU_LEAD.has(x));
   const isOfficier = r.some((x) => OFFICIER.has(x));
   const isAgent = r.some((x) => AGENT.has(x)) || (!isNational && !isProvincial && !isLead && !isOfficier);
+  const perms = permissions ?? [];
+  const hasUserManage = can("users:manage", perms);
+  const hasPersonnel = can("personnel:read", perms) || can("personnel:manage", perms);
+  const hasAccountReq = can("account_request:manage", perms) || can("account_request:create", perms);
 
   switch (key) {
     case "dashboard":
@@ -113,9 +117,11 @@ export function canSeeNav(key: NavKey, roles: string[]): boolean {
     case "census":
       return isLead || isProvincial || isNational || isOfficier;
     case "admin_personnel":
+      return (isLead || isProvincial || isNational) && (hasPersonnel || hasUserManage || perms.length === 0);
     case "admin_bureaux":
-    case "admin_accounts":
       return isLead || isProvincial || isNational;
+    case "admin_accounts":
+      return (isLead || isProvincial || isNational) && (hasAccountReq || hasUserManage || perms.length === 0);
     case "cartes":
       return isOfficier || isLead || isProvincial || isNational;
     default:

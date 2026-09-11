@@ -721,10 +721,34 @@
 
 .topbar-commune {
   display: block;
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: 0.72rem;
+  font-weight: 600;
   color: var(--egouv-primary);
-  margin-bottom: 0.1rem;
+  margin-bottom: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.topbar-search {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 420px;
+  min-width: 0;
+  margin: 0 auto;
+}
+
+.topbar-search-form {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 36px;
+  padding: 0 0.65rem;
+  border: 1px solid var(--egouv-line);
+  border-radius: 8px;
+  background: #fff;
 }
 
 .geo-embedded {
@@ -736,24 +760,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-}
-
-.topbar-search {
-  position: relative;
-  flex: 1 1 220px;
-  max-width: 340px;
-  min-width: 160px;
-}
-
-.topbar-search-form {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  height: 40px;
-  padding: 0 0.7rem;
-  border: 1px solid var(--egouv-line);
-  border-radius: 10px;
-  background: #fff;
 }
 
 .topbar-search-icon {

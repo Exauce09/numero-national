@@ -27,7 +27,14 @@ export default function AccountRequestsPage() {
       setPersonnel(pers);
       setBureaux(burs);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Chargement impossible");
+      const msg = e instanceof Error ? e.message : "Chargement impossible";
+      if (msg.toLowerCase().includes("users:manage") || msg.toLowerCase().includes("permission")) {
+        setError(
+          "Accès refusé : votre compte n’a pas la permission de gérer les utilisateurs (users:manage). Connectez-vous avec un administrateur (ex. admin.recensement@example.gov).",
+        );
+      } else {
+        setError(msg);
+      }
     }
   }
 

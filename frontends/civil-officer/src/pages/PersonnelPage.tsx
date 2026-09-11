@@ -18,7 +18,14 @@ export default function PersonnelPage() {
     try {
       setRows(await api.listPersonnel());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Chargement impossible");
+      const msg = e instanceof Error ? e.message : "Chargement impossible";
+      if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("personnel")) {
+        setError(
+          "Accès refusé : permission personnel insuffisante. Un officier ne gère pas le personnel — utilisez un compte admin / responsable de bureau.",
+        );
+      } else {
+        setError(msg);
+      }
     }
   }
 

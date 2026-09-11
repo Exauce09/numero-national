@@ -558,6 +558,7 @@ function Shell() {
     .filter(Boolean)
     .join(" · ");
   const roles = session?.roles ?? ["OFFICIER_ETAT_CIVIL"];
+  const permissions = session?.permissions ?? [];
   const badge = unreadCount();
   const photo = prefs.photoDataUrl || session?.photoDataUrl;
 
@@ -586,12 +587,12 @@ function Shell() {
           </button>
         </div>
         <nav className="sidebar-nav">
-          {canSeeNav("dashboard", roles) ? (
+          {canSeeNav("dashboard", roles, permissions) ? (
             <NavLink to="/" end>
               <IconDashboard size={18} /> Tableau de bord
             </NavLink>
           ) : null}
-          {canSeeNav("synoptique", roles) ? (
+          {canSeeNav("synoptique", roles, permissions) ? (
             <NavLink
               to="/synoptique/naissances"
               className={({ isActive }) =>
@@ -601,7 +602,7 @@ function Shell() {
               <IconTable size={18} /> Tableau synoptique
             </NavLink>
           ) : null}
-          {canSeeNav("population", roles) ? (
+          {canSeeNav("population", roles, permissions) ? (
             <NavLink
               to="/population"
               className={({ isActive }) =>
@@ -616,82 +617,82 @@ function Shell() {
               <IconUsers size={18} /> Population
             </NavLink>
           ) : null}
-          {canSeeNav("naissances", roles) ? (
+          {canSeeNav("naissances", roles, permissions) ? (
             <NavLink to="/manage/naissance">
               <IconBaby size={18} /> Naissances
             </NavLink>
           ) : null}
-          {canSeeNav("census", roles) ? (
+          {canSeeNav("census", roles, permissions) ? (
             <NavLink to="/census">
               <IconClipboard size={18} /> Recensement
             </NavLink>
           ) : null}
-          {canSeeNav("census", roles) ? (
+          {canSeeNav("census", roles, permissions) ? (
             <NavLink to="/census/scan-coupon">
               <IconClipboard size={18} /> Scan coupon APK
             </NavLink>
           ) : null}
-          {canSeeNav("deces", roles) ? (
+          {canSeeNav("deces", roles, permissions) ? (
             <NavLink to="/manage/deces">
               <IconCross size={18} /> Décès
             </NavLink>
           ) : null}
-          {canSeeNav("mariages", roles) ? (
+          {canSeeNav("mariages", roles, permissions) ? (
             <NavLink to="/manage/mariage">
               <IconRing size={18} /> Mariages
             </NavLink>
           ) : null}
-          {canSeeNav("naissances", roles) ? (
+          {canSeeNav("naissances", roles, permissions) ? (
             <NavLink to="/manage/adoption">
               <IconHome size={18} /> Adoption
             </NavLink>
           ) : null}
-          {canSeeNav("census", roles) ? (
+          {canSeeNav("census", roles, permissions) ? (
             <NavLink to="/manage/deplacement">
               <IconCar size={18} /> Déplacement
             </NavLink>
           ) : null}
-          {canSeeNav("divorces", roles) ? (
+          {canSeeNav("divorces", roles, permissions) ? (
             <NavLink to="/manage/divorce">
               <IconSplit size={18} /> Divorce
             </NavLink>
           ) : null}
-          {canSeeNav("documents", roles) ? (
+          {canSeeNav("documents", roles, permissions) ? (
             <NavLink to="/acts">
               <IconFile size={18} /> Actes & documents
             </NavLink>
           ) : null}
-          {canSeeNav("cartes", roles) ? (
+          {canSeeNav("cartes", roles, permissions) ? (
             <NavLink to="/cartes-livraison">
               <IconFile size={18} /> Livraison cartes ID
             </NavLink>
           ) : null}
-          {canSeeNav("declarations", roles) ? (
+          {canSeeNav("declarations", roles, permissions) ? (
             <NavLink to="/declarations">
               <IconClipboard size={18} /> Déclarations santé
             </NavLink>
           ) : null}
-          {canSeeNav("validation", roles) ? (
+          {canSeeNav("validation", roles, permissions) ? (
             <NavLink to="/transcriptions">
               <IconFile size={18} /> Transcriptions
             </NavLink>
           ) : null}
-          {canSeeNav("admin_bureaux", roles) ? (
+          {canSeeNav("admin_bureaux", roles, permissions) ? (
             <NavLink to="/admin/bureaux">
               <IconHome size={18} /> Bureaux EC
             </NavLink>
           ) : null}
-          {canSeeNav("admin_personnel", roles) ? (
+          {canSeeNav("admin_personnel", roles, permissions) ? (
             <NavLink to="/admin/personnel">
               <IconUsers size={18} /> Personnel
             </NavLink>
           ) : null}
-          {canSeeNav("admin_accounts", roles) ? (
+          {canSeeNav("admin_accounts", roles, permissions) ? (
             <NavLink to="/admin/account-requests">
               <IconClipboard size={18} /> Demandes de compte
             </NavLink>
           ) : null}
-          {canSeeNav("documents", roles) ? (
+          {canSeeNav("documents", roles, permissions) ? (
             <NavLink to="/verify-document">
               <IconFile size={18} /> Vérifier document
             </NavLink>
@@ -717,9 +718,8 @@ function Shell() {
             >
               <span />
             </button>
-            <div>
-              <h1 className="topbar-title">Gestion de la population</h1>
-              <span className="topbar-subtitle">République démocratique du Congo</span>
+            <div title="République démocratique du Congo">
+              <h1 className="topbar-title">Population</h1>
             </div>
           </div>
 
@@ -728,14 +728,12 @@ function Shell() {
           </div>
 
           <div className="topbar-right">
-            <div className="topbar-identity" title={roleTitle}>
-              <span className="topbar-role">{roleTitle}</span>
-              {territoryLine ? (
-                <span className="topbar-commune">{territoryLine}</span>
-              ) : communeLabel ? (
-                <span className="topbar-commune">{communeLabel}</span>
-              ) : null}
+            <div
+              className="topbar-identity"
+              title={[roleTitle, territoryLine || communeLabel].filter(Boolean).join(" · ")}
+            >
               <strong className="topbar-responsable">{responsableLabel}</strong>
+              <span className="topbar-role">{roleTitle}</span>
             </div>
             <button
               type="button"
