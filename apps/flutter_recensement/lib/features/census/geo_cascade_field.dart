@@ -73,6 +73,14 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
   String? _error;
   String? _hint;
   bool _loading = true;
+  bool _manualMode = false;
+  final _manualProvince = TextEditingController();
+  final _manualVille = TextEditingController();
+  final _manualDistrict = TextEditingController();
+  final _manualCommune = TextEditingController();
+  final _manualVillage = TextEditingController();
+  final _manualQuartier = TextEditingController();
+  final _manualAvenue = TextEditingController();
 
   bool get _showDistrict => widget.preset == GeoCascadePreset.origin;
   /// Village uniquement pour l’origine (rural). Adresse urbaine Kinshasa = commune → quartier → avenue.
@@ -94,6 +102,18 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
   void initState() {
     super.initState();
     _bootstrap();
+  }
+
+  @override
+  void dispose() {
+    _manualProvince.dispose();
+    _manualVille.dispose();
+    _manualDistrict.dispose();
+    _manualCommune.dispose();
+    _manualVillage.dispose();
+    _manualQuartier.dispose();
+    _manualAvenue.dispose();
+    super.dispose();
   }
 
   Future<List<GeoItem>> _getList(String path) async {
@@ -119,7 +139,8 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
         _provinces = rows;
         _loading = false;
         if (rows.isEmpty) {
-          _error = 'Géo indisponible — saisissez l’adresse manuellement.';
+          _manualMode = true;
+          _error = 'Géo indisponible — saisie manuelle de l’adresse activée.';
         } else {
           _hint = '${rows.length} provinces';
         }
@@ -128,9 +149,55 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Géo hors ligne — adresse manuelle.';
+        _manualMode = true;
+        _error = 'Géo hors ligne — saisie manuelle de l’adresse activée.';
       });
     }
+  }
+
+  void _emitManual() {
+    String? t(TextEditingController c) {
+      final v = c.text.trim();
+      return v.isEmpty ? null : v;
+    }
+
+    final parts = <String>[
+      if (t(_manualProvince) != null) t(_manualProvince)!,
+      if (t(_manualVille) != null) t(_manualVille)!,
+      if (_showDistrict && t(_manualDistrict) != null) t(_manualDistrict)!,
+      if (t(_manualCommune) != null) t(_manualCommune)!,
+      if (_showVillage && t(_manualVillage) != null) t(_manualVillage)!,
+      if (_showQuartierAvenue && t(_manualQuartier) != null) t(_manualQuartier)!,
+      if (_showQuartierAvenue && t(_manualAvenue) != null) t(_manualAvenue)!,
+    ];
+    final label = parts.join(' · ');
+    widget.onLabelChanged(label);
+    widget.onSelectionChanged?.call({
+      'province_name': t(_manualProvince),
+      'ville_name': t(_manualVille),
+      'district_name': _showDistrict ? t(_manualDistrict) : null,
+      'commune_name': t(_manualCommune),
+      'localite_name': _showVillage ? t(_manualVillage) : null,
+      'quartier_name': _showQuartierAvenue ? t(_manualQuartier) : null,
+      'avenue_name': _showQuartierAvenue ? t(_manualAvenue) : null,
+      'label': label,
+      'source': 'manual_offline',
+    });
+  }
+
+  Widget _manualField(String label, TextEditingController ctrl) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextField(
+        controller: ctrl,
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+        ),
+        textCapitalization: TextCapitalization.words,
+        onChanged: (_) => _emitManual(),
+      ),
+    );
   }
 
   String? _nameOf(String? id, List<GeoItem> list, {bool voie = false}) {
@@ -519,6 +586,35 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
           Text(_hint!, style: const TextStyle(color: Color(0xFF5D87FF), fontSize: 13)),
         ],
         const SizedBox(height: 8),
+        if (_manualMode) ...[
+          _manualField('Province *', _manualProvince),
+          _manualField('Ville', _manualVille),
+          if (_showDistrict) _manualField('Territoire', _manualDistrict),
+          _manualField(
+            _showDistrict ? 'Secteur / Chefferie / Commune' : 'Commune',
+            _manualCommune,
+          ),
+          if (_showVillage) _manualField('Village', _manualVillage),
+          if (_showQuartierAvenue) ...[
+            _manualField('Quartier', _manualQuartier),
+            _manualField('Avenue / rue', _manualAvenue),
+          ],
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _manualMode = false;
+                  _error = null;
+                  _hint = 'Rechargement géo…';
+                });
+                _bootstrap();
+              },
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Réessayer la géo en ligne'),
+            ),
+          ),
+        ] else ...[
         _dd(label: 'Province', value: _provinceId, items: _provinces, onChanged: _onProvince),
         _dd(label: 'Ville', value: _villeId, items: _villes, onChanged: _onVille),
         if (_showDistrict)
@@ -563,6 +659,18 @@ class _GeoCascadeFieldState extends State<GeoCascadeField> {
             alignment: Alignment.centerLeft,
             child: _addBtn('Ajouter avenue', _quartierId == null ? null : _addAvenue),
           ),
+        ],
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            onPressed: () => setState(() {
+              _manualMode = true;
+              _error = 'Saisie manuelle (sans liste géo).';
+              _emitManual();
+            }),
+            child: const Text('Saisir l’adresse manuellement'),
+          ),
+        ),
         ],
       ],
     );
