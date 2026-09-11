@@ -449,29 +449,56 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   bool _validateStep1({bool showMessage = true}) {
     String? err;
     final nom = _nom.text.trim();
+    final postnom = _postnom.text.trim();
     final prenom = _prenom.text.trim();
     final dob = _dob.text.trim();
     final mere = _mere.text.trim();
     final pere = _pere.text.trim();
     final dod = _dateDeces.text.trim();
+    final lieu = (_geoNaissance['label'] ?? _lieuNaissance.text).toString().trim();
+    final nationalite = _nationalite.text.trim();
+    final pays = _paysResidence.text.trim();
+    final tel = _telephone.text.trim();
+    final adresseOk = (_geoActuelle['province_name'] ?? '').toString().trim().isNotEmpty ||
+        (_geoActuelle['label'] ?? '').toString().trim().isNotEmpty;
 
     switch (_ficheKind) {
       case FicheKind.personne:
-        if (nom.isEmpty || prenom.isEmpty || !_validDate(dob)) {
-          err = 'Identité personne : nom, prénom et date de naissance (AAAA-MM-JJ) requis';
+        if (nom.isEmpty ||
+            postnom.isEmpty ||
+            prenom.isEmpty ||
+            !_validDate(dob) ||
+            lieu.isEmpty ||
+            pere.isEmpty ||
+            mere.isEmpty ||
+            nationalite.isEmpty ||
+            pays.isEmpty ||
+            !adresseOk ||
+            tel.isEmpty) {
+          err =
+              'Identité incomplète : nom, post-nom, prénom, sexe, naissance, lieu de naissance, '
+              'père, mère, nationalité, pays, adresse actuelle et téléphone sont obligatoires '
+              '(e-mail facultatif).';
         }
       case FicheKind.bebe:
-        if (nom.isEmpty || !_validDate(dob) || (mere.isEmpty && pere.isEmpty)) {
+        if (nom.isEmpty || !_validDate(dob) || (mere.isEmpty && pere.isEmpty) || lieu.isEmpty) {
           err =
-              'Identité bébé : nom (ou « Enfant de … »), date de naissance, et nom de la mère ou du père requis';
+              'Identité bébé incomplète : nom, date et lieu de naissance, et mère ou père requis';
         }
       case FicheKind.decede:
         if (nom.isEmpty ||
+            postnom.isEmpty ||
             prenom.isEmpty ||
             !_validDate(dob) ||
-            !_validDate(dod)) {
+            !_validDate(dod) ||
+            lieu.isEmpty ||
+            pere.isEmpty ||
+            mere.isEmpty ||
+            nationalite.isEmpty ||
+            !adresseOk) {
           err =
-              'Identité décédé : nom, prénom, date de naissance et date de décès (AAAA-MM-JJ) requis';
+              'Identité décédé incomplète : nom, post-nom, prénom, naissance, décès, lieu, '
+              'père, mère, nationalité et adresse requis (e-mail facultatif).';
         } else if (_validDate(dob) && _validDate(dod)) {
           final b = DateTime.parse(dob);
           final d = DateTime.parse(dod);
@@ -480,8 +507,20 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
           }
         }
       case FicheKind.marie:
-        if (nom.isEmpty || prenom.isEmpty || !_validDate(dob)) {
-          err = 'Identité marié(e) : nom, prénom et date de naissance (AAAA-MM-JJ) requis';
+        if (nom.isEmpty ||
+            postnom.isEmpty ||
+            prenom.isEmpty ||
+            !_validDate(dob) ||
+            lieu.isEmpty ||
+            pere.isEmpty ||
+            mere.isEmpty ||
+            nationalite.isEmpty ||
+            pays.isEmpty ||
+            !adresseOk ||
+            tel.isEmpty) {
+          err =
+              'Identité marié(e) incomplète : nom, post-nom, prénom, naissance, lieu, père, mère, '
+              'nationalité, pays, adresse et téléphone requis (e-mail facultatif).';
         } else {
           final cNom = _conjoint.nom.text.trim();
           final cPrenom = _conjoint.prenom.text.trim();
@@ -494,11 +533,54 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
 
     if (err != null) {
       if (showMessage && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(err),
+            backgroundColor: const Color(0xFFB91C1C),
+            duration: const Duration(seconds: 5),
+          ),
+        );
       }
       return false;
     }
     return true;
+  }
+
+  bool _validateStep3Fingerprints({bool showMessage = true}) {
+    final d1 = _empreintePouceDroit.text.trim().isNotEmpty;
+    final d2 = _empreinteIndexDroit.text.trim().isNotEmpty;
+    final d3 = _empreinteIndexGauche.text.trim().isNotEmpty;
+    if (d1 && d2 && d3) return true;
+    if (!showMessage || !mounted) return false;
+    final missing = <String>[
+      if (!d1) 'doigt 1 (pouce droit)',
+      if (!d2) 'doigt 2 (index droit)',
+      if (!d3) 'doigt 3 (index gauche)',
+    ];
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Empreintes incomplètes : ${missing.join(', ')}.'),
+        backgroundColor: const Color(0xFFB91C1C),
+      ),
+    );
+    return false;
+  }
+
+  void _onFingerRegistered(int n, String label, String ref) {
+    if (!mounted) return;
+    final d1 = (n == 1 ? ref : _empreintePouceDroit.text).trim().isNotEmpty;
+    final d2 = (n == 2 ? ref : _empreinteIndexDroit.text).trim().isNotEmpty;
+    final d3 = (n == 3 ? ref : _empreinteIndexGauche.text).trim().isNotEmpty;
+    final msg = d1 && d2 && d3
+        ? 'Les trois doigts sont bien enregistrés.'
+        : 'Doigt $n ($label) enregistré.';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: d1 && d2 && d3 ? const Color(0xFF15803D) : const Color(0xFF1D4ED8),
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   Future<void> _pickDeathDate() async {
@@ -969,7 +1051,9 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
                 onPressed: _busy
                     ? null
                     : () {
-                        if (_step == 1 && !_validateStep1()) return;
+                        // Identité toujours complète avant toute étape suivante.
+                        if (!_validateStep1()) return;
+                        if (_step == 3 && !_validateStep3Fingerprints()) return;
                         if (!isLast) {
                           setState(() => _step += 1);
                           return;
@@ -1038,12 +1122,12 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
           const SizedBox(height: 8),
           Text(
             isBebe
-                ? 'Identité bébé obligatoire (nom, sexe, naissance, mère ou père).'
+                ? 'Identité bébé : tous les champs marqués * sont obligatoires.'
                 : isDecede
-                    ? 'Identité décédé obligatoire (nom, prénom, naissance, décès).'
+                    ? 'Identité décédé : tous les champs * sont obligatoires (e-mail facultatif).'
                     : isMarie
-                        ? 'Identité marié(e) obligatoire + conjoint(e) (nom et prénom).'
-                        : 'Identité personne obligatoire (nom, prénom, sexe, naissance).',
+                        ? 'Identité marié(e) + conjoint(e) obligatoires (e-mail facultatif).'
+                        : 'Identité complète obligatoire avant l’étape 2 (e-mail facultatif).',
             style: const TextStyle(fontSize: 12, color: Color(0xFF5A6A85), height: 1.3),
           ),
         ]),
@@ -1058,7 +1142,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
           const SizedBox(height: 10),
           TextFormField(
             controller: _postnom,
-            decoration: _dec('Post-nom'),
+            decoration: _dec(isBebe ? 'Post-nom' : 'Post-nom *'),
             textCapitalization: TextCapitalization.characters,
           ),
           const SizedBox(height: 10),
@@ -1109,7 +1193,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
           const SizedBox(height: 10),
           GeoCascadeField(
             preset: GeoCascadePreset.place,
-            title: 'Lieu de naissance',
+            title: 'Lieu de naissance *',
             onLabelChanged: (label) {
               _lieuNaissance.text = label;
             },
@@ -1154,12 +1238,12 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
           const SizedBox(height: 10),
           TextFormField(
             controller: _pere,
-            decoration: _dec(isBebe ? 'Nom du père * (si pas de mère)' : 'Nom du père'),
+            decoration: _dec(isBebe ? 'Nom du père * (si pas de mère)' : 'Nom du père *'),
           ),
           const SizedBox(height: 10),
           TextFormField(
             controller: _mere,
-            decoration: _dec(isBebe ? 'Nom de la mère * (si pas de père)' : 'Nom de la mère'),
+            decoration: _dec(isBebe ? 'Nom de la mère * (si pas de père)' : 'Nom de la mère *'),
           ),
           if (!isBebe) ...[
             const SizedBox(height: 10),
@@ -1168,14 +1252,14 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
                 Expanded(
                   child: TextFormField(
                     controller: _nationalite,
-                    decoration: _dec('Nationalité'),
+                    decoration: _dec('Nationalité *'),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: TextFormField(
                     controller: _paysResidence,
-                    decoration: _dec('Pays de résidence'),
+                    decoration: _dec(isDecede ? 'Pays de résidence' : 'Pays de résidence *'),
                   ),
                 ),
               ],
@@ -1216,10 +1300,10 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             const SizedBox(height: 8),
             _memberFields(_conjoint, showTelephone: true, locked: _conjointLocked),
           ]),
-        if (!isBebe) _section('1b. Adresse actuelle', [
+        if (!isBebe) _section('1b. Adresse actuelle *', [
           GeoCascadeField(
             preset: GeoCascadePreset.address,
-            title: 'Adresse actuelle',
+            title: 'Adresse actuelle *',
             onLabelChanged: (_) {},
             onSelectionChanged: (sel) => _geoActuelle = sel,
           ),
@@ -1228,13 +1312,13 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
           const SizedBox(height: 10),
           TextFormField(
             controller: _telephone,
-            decoration: _dec('Numéro de téléphone'),
+            decoration: _dec(isDecede ? 'Numéro de téléphone' : 'Numéro de téléphone *'),
             keyboardType: TextInputType.phone,
           ),
           const SizedBox(height: 10),
           TextFormField(
             controller: _email,
-            decoration: _dec('Adresse e-mail'),
+            decoration: _dec('Adresse e-mail (facultatif)'),
             keyboardType: TextInputType.emailAddress,
           ),
           const SizedBox(height: 10),
@@ -1305,19 +1389,21 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
 
   Widget _buildBioBlock() {
     Widget finger({
-      required String n,
+      required int num,
       required String label,
       required String hand,
       required TextEditingController ctrl,
       required Color color,
       void Function(String ref)? also,
     }) {
+      final done = ctrl.text.trim().isNotEmpty;
       return Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: color, width: 2),
+          color: done ? color.withValues(alpha: 0.08) : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1330,7 +1416,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
                     radius: 16,
                     backgroundColor: color,
                     child: Text(
-                      n,
+                      '$num',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w900,
@@ -1348,6 +1434,14 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
                       ),
                     ),
                   ),
+                  Text(
+                    done ? 'Doigt $num enregistré' : 'En attente',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: done ? const Color(0xFF15803D) : const Color(0xFF64748B),
+                      fontSize: 12,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1360,12 +1454,18 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
                 ctrl.text = ref;
                 also?.call(ref);
                 _fingerprintRef ??= ref;
+                _onFingerRegistered(num, label, ref);
               }),
             ),
           ],
         ),
       );
     }
+
+    final d1 = _empreintePouceDroit.text.trim().isNotEmpty;
+    final d2 = _empreinteIndexDroit.text.trim().isNotEmpty;
+    final d3 = _empreinteIndexGauche.text.trim().isNotEmpty;
+    final allFp = d1 && d2 && d3;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1374,14 +1474,19 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFF0B3D91),
+            color: allFp ? const Color(0xFF15803D) : const Color(0xFF0B3D91),
             borderRadius: BorderRadius.circular(14),
           ),
-          child: const Text(
-            'EMPREINTES — 3 DOIGTS DIFFÉRENTS\n'
-            '① Pouce DROIT   ② Index DROIT   ③ Index GAUCHE\n'
-            'Posez un doigt différent à chaque lecture (LED rouge).',
-            style: TextStyle(
+          child: Text(
+            allFp
+                ? 'Les trois doigts sont bien enregistrés.\n'
+                    '① ${d1 ? 'OK' : '—'}  ② ${d2 ? 'OK' : '—'}  ③ ${d3 ? 'OK' : '—'}'
+                : 'EMPREINTES — 3 DOIGTS DIFFÉRENTS\n'
+                    '① Pouce DROIT ${d1 ? '✓ enregistré' : '(à lire)'}   '
+                    '② Index DROIT ${d2 ? '✓ enregistré' : '(à lire)'}   '
+                    '③ Index GAUCHE ${d3 ? '✓ enregistré' : '(à lire)'}\n'
+                    'Posez un doigt différent à chaque lecture (LED rouge).',
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 14,
               fontWeight: FontWeight.w800,
@@ -1391,7 +1496,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
         ),
         _section('3. Empreintes digitales', [
           finger(
-            n: '1',
+            num: 1,
             label: 'Pouce droit',
             hand: 'pouce_droit',
             ctrl: _empreintePouceDroit,
@@ -1399,14 +1504,14 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             also: (ref) => _empreinteDroite.text = ref,
           ),
           finger(
-            n: '2',
+            num: 2,
             label: 'Index droit',
             hand: 'index_droit',
             ctrl: _empreinteIndexDroit,
             color: const Color(0xFF2563EB),
           ),
           finger(
-            n: '3',
+            num: 3,
             label: 'Index gauche',
             hand: 'index_gauche',
             ctrl: _empreinteIndexGauche,
@@ -1465,7 +1570,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Identité obligatoire — le reste peut être complété plus tard.',
+                    'Identité complète obligatoire avant l’étape 2 (e-mail facultatif).',
                     style: TextStyle(fontSize: 12, color: Color(0xFF5A6A85), height: 1.3),
                   ),
                   const SizedBox(height: 8),

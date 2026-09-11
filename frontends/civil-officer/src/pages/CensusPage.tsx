@@ -108,6 +108,9 @@ type CensusDraft = {
   photo?: string;
   empreinteGauche: string;
   empreinteDroite: string;
+  empreintePouceDroit?: string;
+  empreinteIndexDroit?: string;
+  empreinteIndexGauche?: string;
   iris: string;
   etudes: EtudesData;
   experience: ExperienceData;
@@ -152,6 +155,10 @@ export default function CensusPage() {
   const [photo, setPhoto] = useState<string | undefined>();
   const [empreinteGauche, setEmpreinteGauche] = useState("");
   const [empreinteDroite, setEmpreinteDroite] = useState("");
+  const [empreintePouceDroit, setEmpreintePouceDroit] = useState("");
+  const [empreinteIndexDroit, setEmpreinteIndexDroit] = useState("");
+  const [empreinteIndexGauche, setEmpreinteIndexGauche] = useState("");
+  const [fpNotice, setFpNotice] = useState<string | null>(null);
   const [iris, setIris] = useState("");
   const [etudes, setEtudes] = useState<EtudesData>(emptyEtudes);
   const [experience, setExperience] = useState<ExperienceData>(emptyExperience);
@@ -202,6 +209,9 @@ export default function CensusPage() {
       setPhoto(d.photo);
       setEmpreinteGauche(d.empreinteGauche ?? "");
       setEmpreinteDroite(d.empreinteDroite ?? "");
+      setEmpreintePouceDroit(d.empreintePouceDroit ?? d.empreinteDroite ?? "");
+      setEmpreinteIndexDroit(d.empreinteIndexDroit ?? "");
+      setEmpreinteIndexGauche(d.empreinteIndexGauche ?? d.empreinteGauche ?? "");
       setIris(d.iris ?? "");
       setEtudes(
         d.etudes
@@ -318,6 +328,9 @@ export default function CensusPage() {
 
   function validateIdentity(): boolean {
     setError(null);
+    const lieuOk = Boolean(geoNaissance.province_name || geoNaissance.label);
+    const adresseOk = Boolean(geoActuelle.province_name || geoActuelle.label);
+
     if (!nom.trim()) {
       setError("Identité : le nom est requis.");
       return false;
@@ -326,17 +339,55 @@ export default function CensusPage() {
       setError("Identité : la date de naissance est requise.");
       return false;
     }
-    if (ficheKind === "personne" || ficheKind === "decede" || ficheKind === "marie") {
-      if (!prenom.trim()) {
-        setError("Identité : le prénom est requis.");
-        return false;
-      }
-    }
+
     if (ficheKind === "bebe") {
       if (!mere && !pere) {
         setError("Identité bébé : nommez la mère ou le père (recherche personne).");
         return false;
       }
+      if (!lieuOk) {
+        setError("Identité bébé : le lieu de naissance est requis.");
+        return false;
+      }
+      return true;
+    }
+
+    // Personne / décédé / marié — identité complète (e-mail facultatif).
+    if (!postnom.trim()) {
+      setError("Identité : le post-nom est requis.");
+      return false;
+    }
+    if (!prenom.trim()) {
+      setError("Identité : le prénom est requis.");
+      return false;
+    }
+    if (!lieuOk) {
+      setError("Identité : le lieu de naissance est requis.");
+      return false;
+    }
+    if (!pere) {
+      setError("Identité : le père est requis (recherche personne).");
+      return false;
+    }
+    if (!mere) {
+      setError("Identité : la mère est requise (recherche personne).");
+      return false;
+    }
+    if (!nationalite.trim()) {
+      setError("Identité : la nationalité est requise.");
+      return false;
+    }
+    if (ficheKind !== "decede" && !paysResidence.trim()) {
+      setError("Identité : le pays de résidence est requis.");
+      return false;
+    }
+    if (!adresseOk) {
+      setError("Identité : l'adresse actuelle (au moins la province) est requise.");
+      return false;
+    }
+    if (ficheKind !== "decede" && !telephone.trim()) {
+      setError("Identité : le numéro de téléphone est requis (e-mail facultatif).");
+      return false;
     }
     if (ficheKind === "decede") {
       if (!dateDeces) {
@@ -381,8 +432,38 @@ export default function CensusPage() {
     return true;
   }
 
+  function captureFinger(
+    n: 1 | 2 | 3,
+    setter: (v: string) => void,
+    also?: (v: string) => void,
+  ) {
+    const code = `CAP-D${n}-${Date.now().toString(36).toUpperCase()}`;
+    setter(code);
+    also?.(code);
+    const next1 = n === 1 ? code : empreintePouceDroit;
+    const next2 = n === 2 ? code : empreinteIndexDroit;
+    const next3 = n === 3 ? code : empreinteIndexGauche;
+    if (next1 && next2 && next3) {
+      setFpNotice("Les trois doigts sont bien enregistrés.");
+    } else {
+      setFpNotice(`Doigt ${n} enregistré.`);
+    }
+  }
+
+  function validateFingerprints(): boolean {
+    if (empreintePouceDroit && empreinteIndexDroit && empreinteIndexGauche) return true;
+    const missing = [
+      !empreintePouceDroit && "doigt 1 (pouce droit)",
+      !empreinteIndexDroit && "doigt 2 (index droit)",
+      !empreinteIndexGauche && "doigt 3 (index gauche)",
+    ].filter(Boolean);
+    setError(`Empreintes incomplètes : ${missing.join(", ")}.`);
+    return false;
+  }
+
   function goTo(next: StepId) {
     if (!validateStep(next)) return;
+    if (step === 3 && next > 3 && !validateFingerprints()) return;
     setStep(next);
   }
 
@@ -452,8 +533,11 @@ export default function CensusPage() {
       geoOrigine,
       tribu,
       photo,
-      empreinteGauche,
-      empreinteDroite,
+      empreinteGauche: empreinteIndexGauche || empreinteGauche,
+      empreinteDroite: empreintePouceDroit || empreinteDroite,
+      empreintePouceDroit,
+      empreinteIndexDroit,
+      empreinteIndexGauche,
       iris,
       etudes,
       experience,
@@ -544,7 +628,13 @@ export default function CensusPage() {
         mother_id: mere?.id,
         father_id: pere?.id,
         photo_data_url: photo,
-        fingerprint_note: [empreinteGauche && `Gauche: ${empreinteGauche}`, empreinteDroite && `Droite: ${empreinteDroite}`]
+        fingerprint_note: [
+          empreintePouceDroit && `1.Pouce droit: ${empreintePouceDroit}`,
+          empreinteIndexDroit && `2.Index droit: ${empreinteIndexDroit}`,
+          empreinteIndexGauche && `3.Index gauche: ${empreinteIndexGauche}`,
+          !empreintePouceDroit && empreinteDroite && `Droite: ${empreinteDroite}`,
+          !empreinteIndexGauche && empreinteGauche && `Gauche: ${empreinteGauche}`,
+        ]
           .filter(Boolean)
           .join(" | ") || undefined,
         iris_note: iris.trim() || undefined,
@@ -703,7 +793,7 @@ export default function CensusPage() {
                   <input className="form-control" value={nom} onChange={(e) => setNom(e.target.value)} />
                 </div>
                 <div className="full">
-                  <label className="form-label">Post-nom de la personne</label>
+                  <label className="form-label">Post-nom de la personne *</label>
                   <input className="form-control" value={postnom} onChange={(e) => setPostnom(e.target.value)} />
                 </div>
                 <div className="full">
@@ -741,7 +831,7 @@ export default function CensusPage() {
                   </div>
                 ) : null}
                 <div className="full">
-                  <label className="form-label">Lieu de naissance</label>
+                  <label className="form-label">Lieu de naissance *</label>
                   <GeoCascade
                     embedded
                     label="Lieu de naissance"
@@ -1013,41 +1103,91 @@ export default function CensusPage() {
                 </div>
               </div>
               <div className="bio-card">
-                <div className="bio-card-head">Empreintes sélectionnées / empreinte digitale</div>
+                <div className="bio-card-head">Empreintes — 3 doigts distincts</div>
+                {fpNotice ? (
+                  <p
+                    style={{
+                      margin: "0.5rem 0",
+                      padding: "0.55rem 0.7rem",
+                      borderRadius: 8,
+                      background:
+                        fpNotice.includes("trois") ? "rgba(21,128,61,0.12)" : "rgba(37,99,235,0.12)",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {fpNotice}
+                  </p>
+                ) : null}
                 <div className="form-grid">
                   <div>
-                    <label className="form-label">Gauche</label>
+                    <label className="form-label">1. Pouce droit *</label>
                     <input
                       className="form-control"
-                      value={empreinteGauche}
-                      onChange={(e) => setEmpreinteGauche(e.target.value)}
-                      placeholder="Réf. capture gauche"
+                      value={empreintePouceDroit}
+                      onChange={(e) => setEmpreintePouceDroit(e.target.value)}
+                      placeholder="Réf. pouce droit"
                     />
                     <button
                       type="button"
                       className="btn-add btn-sm"
                       style={{ marginTop: "0.45rem" }}
-                      onClick={() => setEmpreinteGauche(`CAP-G-${Date.now().toString(36).toUpperCase()}`)}
+                      onClick={() =>
+                        captureFinger(1, setEmpreintePouceDroit, setEmpreinteDroite)
+                      }
                     >
-                      Capturer
+                      Capturer doigt 1
                     </button>
+                    {empreintePouceDroit ? (
+                      <p className="muted" style={{ marginTop: 4 }}>
+                        Doigt 1 enregistré
+                      </p>
+                    ) : null}
                   </div>
                   <div>
-                    <label className="form-label">Droite</label>
+                    <label className="form-label">2. Index droit *</label>
                     <input
                       className="form-control"
-                      value={empreinteDroite}
-                      onChange={(e) => setEmpreinteDroite(e.target.value)}
-                      placeholder="Réf. capture droite"
+                      value={empreinteIndexDroit}
+                      onChange={(e) => setEmpreinteIndexDroit(e.target.value)}
+                      placeholder="Réf. index droit"
                     />
                     <button
                       type="button"
                       className="btn-add btn-sm"
                       style={{ marginTop: "0.45rem" }}
-                      onClick={() => setEmpreinteDroite(`CAP-D-${Date.now().toString(36).toUpperCase()}`)}
+                      onClick={() => captureFinger(2, setEmpreinteIndexDroit)}
                     >
-                      Capturer
+                      Capturer doigt 2
                     </button>
+                    {empreinteIndexDroit ? (
+                      <p className="muted" style={{ marginTop: 4 }}>
+                        Doigt 2 enregistré
+                      </p>
+                    ) : null}
+                  </div>
+                  <div>
+                    <label className="form-label">3. Index gauche *</label>
+                    <input
+                      className="form-control"
+                      value={empreinteIndexGauche}
+                      onChange={(e) => setEmpreinteIndexGauche(e.target.value)}
+                      placeholder="Réf. index gauche"
+                    />
+                    <button
+                      type="button"
+                      className="btn-add btn-sm"
+                      style={{ marginTop: "0.45rem" }}
+                      onClick={() =>
+                        captureFinger(3, setEmpreinteIndexGauche, setEmpreinteGauche)
+                      }
+                    >
+                      Capturer doigt 3
+                    </button>
+                    {empreinteIndexGauche ? (
+                      <p className="muted" style={{ marginTop: 4 }}>
+                        Doigt 3 enregistré
+                      </p>
+                    ) : null}
                   </div>
                   <div className="full">
                     <label className="form-label">Iris</label>

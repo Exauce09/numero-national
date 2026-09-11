@@ -13,7 +13,7 @@ class AppConfig {
   /// Max hours an agent may work offline after last successful auth.
   static const int offlineAuthMaxHours = 72;
 
-  static const String appVersion = '0.3.7';
+  static const String appVersion = '0.3.8';
 
   /// Profil appareil : `standard` | `fingerprint` (MorphoTablet) | `pos`.
   static const String deviceProfile = String.fromEnvironment(
