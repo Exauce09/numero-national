@@ -517,6 +517,9 @@ async def set_user_account_status(
     elif account_status in {AccountStatus.SUSPENDED.value, AccountStatus.DISABLED.value}:
         user.is_active = False
         user.disabled_at = datetime.now(timezone.utc)
+        from apps.api.domains.identity.services import _revoke_user_refresh_sessions
+
+        await _revoke_user_refresh_sessions(db, user_id)
     await write_audit(
         db,
         action=f"user.{account_status.lower()}",
@@ -554,6 +557,27 @@ async def user_has_bureau_access(db: AsyncSession, user: User, bureau_id: UUID) 
             return True
         if s.bureau_id == bureau_id:
             return True
+        # Resolve PROVINCE / VILLE / COMMUNE scopes against bureau geography.
+        if s.scope_type in {"PROVINCE", "VILLE", "COMMUNE"} and s.territory_id:
+            bureau = await db.get(BureauEtatCivil, bureau_id)
+            if bureau is None:
+                continue
+            if s.scope_type == "PROVINCE" and bureau.province_id == s.territory_id:
+                return True
+            if s.scope_type == "VILLE" and bureau.ville_id == s.territory_id:
+                return True
+            if s.scope_type == "COMMUNE" and bureau.commune_id == s.territory_id:
+                return True
+    # User geo fallback (élections-style assignment on the account).
+    if user.province_id or user.ville_id or user.commune_id:
+        bureau = await db.get(BureauEtatCivil, bureau_id)
+        if bureau is not None:
+            if user.commune_id and bureau.commune_id == user.commune_id:
+                return True
+            if user.ville_id and bureau.ville_id == user.ville_id:
+                return True
+            if user.province_id and bureau.province_id == user.province_id:
+                return True
     assignment = await get_active_assignment_for_user(db, user)
     return bool(assignment and assignment.bureau_id == bureau_id)
 

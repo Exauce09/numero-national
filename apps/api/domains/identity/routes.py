@@ -84,7 +84,7 @@ async def register(
     """
     await seed_roles_and_permissions(db)
     actor = await _require_register_actor(request, db, settings)
-    from apps.api.domains.identity.iam_services import PRIVILEGED_ROLES
+    from apps.api.domains.identity.iam_services import PRIVILEGED_ROLES, assert_can_request_role
 
     requested_priv = set(payload.role_codes or []) & PRIVILEGED_ROLES
     if actor is None and requested_priv:
@@ -95,6 +95,9 @@ async def register(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Cannot self-assign privileged administrative roles",
             )
+    if actor is not None:
+        for code in payload.role_codes or []:
+            assert_can_request_role(actor, code)
     user = await identity_services.register_user(db, payload)
     ip, device = _client_meta(request)
     await write_audit(
@@ -352,9 +355,12 @@ async def list_users(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[UserMe]:
     await seed_roles_and_permissions(db)
-    users = await identity_services.list_users(db, limit=limit, offset=offset)
+    users = await identity_services.list_users(
+        db, limit=limit, offset=offset, actor=current_user
+    )
     return [identity_services.user_to_me(u) for u in users]
 
 
@@ -371,6 +377,16 @@ async def update_user(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> UserMe:
+    from apps.api.domains.identity.iam_services import (
+        assert_can_request_role,
+        assert_not_self_privilege,
+    )
+
+    data = payload.model_dump(exclude_unset=True)
+    if "role_codes" in data and data["role_codes"] is not None:
+        assert_not_self_privilege(current_user, user_id, data["role_codes"])
+        for code in data["role_codes"]:
+            assert_can_request_role(current_user, code)
     user = await identity_services.update_user(db, user_id, payload)
     ip, device = _client_meta(request)
     await write_audit(

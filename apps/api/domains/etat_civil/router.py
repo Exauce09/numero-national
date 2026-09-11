@@ -62,13 +62,20 @@ def _act_create(act_type: ActType):
 def _act_list(act_type: ActType):
     async def _endpoint(
         commune_code: str | None = None,
+        bureau_id: UUID | None = None,
         limit: int = Query(50, ge=1, le=200),
         offset: int = Query(0, ge=0),
         db: AsyncSession = Depends(get_db),
-        _: Principal = Depends(require_permissions(PERM_CIVIL_READ)),
+        principal: Principal = Depends(require_permissions(PERM_CIVIL_READ)),
     ) -> list[CivilActRead]:
         rows = await services.list_acts(
-            db, act_type=act_type, commune_code=commune_code, limit=limit, offset=offset
+            db,
+            act_type=act_type,
+            commune_code=commune_code,
+            bureau_id=bureau_id,
+            actor_id=principal.actor_id,
+            limit=limit,
+            offset=offset,
         )
         return [CivilActRead.model_validate(r) for r in rows]
 
@@ -120,9 +127,9 @@ async def population_search(
 async def get_act(
     act_id: UUID,
     db: AsyncSession = Depends(get_db),
-    _: Principal = Depends(require_permissions(PERM_CIVIL_READ)),
+    principal: Principal = Depends(require_permissions(PERM_CIVIL_READ)),
 ) -> CivilActRead:
-    act = await services.get_act(db, act_id)
+    act = await services.get_act_for_actor(db, act_id, actor_id=principal.actor_id)
     if act is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Act not found")
     return CivilActRead.model_validate(act)
@@ -176,9 +183,9 @@ _mount_act_collection("/documents-acts", ActType.DOCUMENT)
 async def create_residence(
     body: ResidenceCreate,
     db: AsyncSession = Depends(get_db),
-    _: Principal = Depends(require_permissions(PERM_CIVIL_WRITE)),
+    principal: Principal = Depends(require_permissions(PERM_CIVIL_WRITE)),
 ) -> ResidenceRead:
-    record = await services.create_residence(db, body)
+    record = await services.create_residence(db, body, actor_id=principal.actor_id)
     return ResidenceRead.model_validate(record)
 
 

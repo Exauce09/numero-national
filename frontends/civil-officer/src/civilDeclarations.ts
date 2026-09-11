@@ -1,4 +1,6 @@
-/** File partagée hôpital → état civil (localStorage démo). */
+/** Déclarations hôpital → état civil (API prioritaire, localStorage secours). */
+
+import { api } from "./api";
 
 export type CivilDeclaration = {
   id: string;
@@ -66,33 +68,61 @@ function pushOfficerNotif(title: string, body: string, href = "/declarations") {
   }
 }
 
-export function notifyEtatCivil(input: {
+function saveLocal(decl: CivilDeclaration) {
+  const store = loadDemo();
+  store.declarations.unshift(decl);
+  saveDemo(store);
+}
+
+export async function notifyEtatCivil(input: {
   type: "BIRTH" | "DEATH";
   payload: Record<string, unknown>;
   facilityName: string;
-}): CivilDeclaration {
-  const store = loadDemo();
-  const decl: CivilDeclaration = {
-    id: crypto.randomUUID(),
-    source: "HOSPITAL",
-    declaration_type: input.type,
-    payload: {
-      ...input.payload,
-      facility_name: input.facilityName,
-      notified_at: new Date().toISOString(),
-    },
-    status: "PENDING_OFFICER",
-    created_at: new Date().toISOString(),
+}): Promise<CivilDeclaration> {
+  const payload = {
+    ...input.payload,
+    facility_name: input.facilityName,
+    notified_at: new Date().toISOString(),
   };
-  store.declarations.unshift(decl);
-  saveDemo(store);
   const kind = input.type === "BIRTH" ? "naissance" : "décès";
-  pushOfficerNotif(
-    `Notification structure sanitaire — ${kind}`,
-    `${input.facilityName} a déclaré un(e) ${kind}. Validation officier requise.`,
-    "/declarations",
-  );
-  return decl;
+  try {
+    const remote = await api.createDeclaration({
+      source: "HOSPITAL",
+      declaration_type: input.type,
+      payload,
+    });
+    const decl: CivilDeclaration = {
+      id: remote.id,
+      source: (remote.source as CivilDeclaration["source"]) || "HOSPITAL",
+      declaration_type: remote.declaration_type as "BIRTH" | "DEATH",
+      payload: (remote.payload as Record<string, unknown>) || payload,
+      status: (remote.status as CivilDeclaration["status"]) || "PENDING_OFFICER",
+      created_at: remote.created_at,
+    };
+    saveLocal(decl);
+    pushOfficerNotif(
+      `Notification structure sanitaire — ${kind}`,
+      `${input.facilityName} a déclaré un(e) ${kind}. Validation officier requise.`,
+      "/declarations",
+    );
+    return decl;
+  } catch {
+    const decl: CivilDeclaration = {
+      id: crypto.randomUUID(),
+      source: "HOSPITAL",
+      declaration_type: input.type,
+      payload,
+      status: "PENDING_OFFICER",
+      created_at: new Date().toISOString(),
+    };
+    saveLocal(decl);
+    pushOfficerNotif(
+      `Notification structure sanitaire — ${kind}`,
+      `${input.facilityName} a déclaré un(e) ${kind}. Validation officier requise.`,
+      "/declarations",
+    );
+    return decl;
+  }
 }
 
 export function listFacilityDeclarations(facilityId?: string): CivilDeclaration[] {

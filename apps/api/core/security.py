@@ -269,6 +269,13 @@ async def get_current_user(
             detail="User inactive or not found",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    account_status = getattr(user, "account_status", "ACTIVE") or "ACTIVE"
+    if account_status in {"SUSPENDED", "DISABLED", "EXPIRED"}:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User inactive or not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return user
 
 

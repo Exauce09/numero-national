@@ -124,6 +124,12 @@ async def get_current_principal(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="User inactive or not found",
             )
+        account_status = getattr(user, "account_status", "ACTIVE") or "ACTIVE"
+        if account_status in {"SUSPENDED", "DISABLED", "EXPIRED"}:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User inactive or not found",
+            )
         me = user_to_me(user)
         return Principal(
             actor_id=me.id,

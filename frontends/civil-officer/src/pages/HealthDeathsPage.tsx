@@ -16,7 +16,7 @@ export default function HealthDeathsPage() {
   const [, bump] = useState(0);
   const rows = listFacilityDeclarations(session.facilityId).filter((d) => d.declaration_type === "DEATH");
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setMessage(null);
@@ -28,7 +28,7 @@ export default function HealthDeathsPage() {
       setError("Date et cause du décès sont requis.");
       return;
     }
-    const decl = notifyEtatCivil({
+    const decl = await notifyEtatCivil({
       type: "DEATH",
       facilityName: session.facilityName,
       payload: {

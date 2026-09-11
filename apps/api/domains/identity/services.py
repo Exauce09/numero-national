@@ -392,14 +392,32 @@ async def delete_institution(db: AsyncSession, institution_id: UUID) -> None:
 # --- RBAC -------------------------------------------------------------------
 
 
-async def list_users(db: AsyncSession, *, limit: int = 100, offset: int = 0) -> list[User]:
-    result = await db.execute(
+async def list_users(
+    db: AsyncSession,
+    *,
+    limit: int = 100,
+    offset: int = 0,
+    actor: User | None = None,
+) -> list[User]:
+    stmt = (
         select(User)
         .options(selectinload(User.roles).selectinload(Role.permissions))
         .order_by(User.created_at.desc())
-        .limit(limit)
-        .offset(offset)
     )
+    # Scope IAM listings: national admins see all; others only their territory.
+    if actor is not None:
+        from apps.api.domains.identity.iam_services import user_role_codes
+
+        roles = user_role_codes(actor)
+        if not (roles & {"SUPER_ADMIN_NATIONAL", "CENTRAL_ADMIN", "ADMIN_NATIONAL"}):
+            if actor.commune_id is not None:
+                stmt = stmt.where(User.commune_id == actor.commune_id)
+            elif actor.ville_id is not None:
+                stmt = stmt.where(User.ville_id == actor.ville_id)
+            elif actor.province_id is not None:
+                stmt = stmt.where(User.province_id == actor.province_id)
+    stmt = stmt.limit(limit).offset(offset)
+    result = await db.execute(stmt)
     return list(result.scalars().all())
 
 
@@ -408,9 +426,35 @@ async def set_user_active(db: AsyncSession, user_id: UUID, is_active: bool) -> U
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     user.is_active = is_active
+    # Keep account_status in sync with legacy is_active toggle (SEC-03).
+    if is_active:
+        user.account_status = "ACTIVE"
+        user.disabled_at = None
+    else:
+        user.account_status = "DISABLED"
+        from datetime import UTC, datetime
+
+        user.disabled_at = datetime.now(UTC)
+        await _revoke_user_refresh_sessions(db, user_id)
     await db.commit()
     await db.refresh(user)
     return await get_user_by_id(db, user_id)  # type: ignore[return-value]
+
+
+async def _revoke_user_refresh_sessions(db: AsyncSession, user_id: UUID) -> None:
+    from datetime import UTC, datetime
+
+    from apps.api.domains.identity.models import RefreshSession
+
+    now = datetime.now(UTC)
+    result = await db.execute(
+        select(RefreshSession).where(
+            RefreshSession.user_id == user_id,
+            RefreshSession.revoked_at.is_(None),
+        )
+    )
+    for row in result.scalars().all():
+        row.revoked_at = now
 
 
 async def list_roles(db: AsyncSession) -> list[Role]:

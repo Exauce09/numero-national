@@ -310,24 +310,32 @@ async def test_divorce_does_not_delete_marriage(client: AsyncClient) -> None:
         json={
             "commune_code": "KIN-GOMBE",
             "payload": {"epoux": "A", "epouse": "B"},
-            "status": "VALIDATED",
+            "status": "DRAFT",
         },
     )
     assert marriage.status_code in {200, 201}, marriage.text
     mid = marriage.json()["id"]
+    for status_name in ("SUBMITTED", "VALIDATED"):
+        tr = await client.post(
+            f"/api/v1/civil/acts/{mid}/transition",
+            headers=officer_h,
+            json={"status": status_name},
+        )
+        assert tr.status_code == 200, tr.text
     divorce = await client.post(
         "/api/v1/civil/divorces",
         headers=officer_h,
         json={
             "commune_code": "KIN-GOMBE",
             "payload": {"marriage_act_id": mid},
-            "status": "VALIDATED",
+            "status": "DRAFT",
         },
     )
     assert divorce.status_code in {200, 201}, divorce.text
     still = await client.get(f"/api/v1/civil/acts/{mid}", headers=officer_h)
     assert still.status_code == 200
     assert still.json()["id"] == mid
+    assert still.json()["status"] == "VALIDATED"
 
 
 @pytest.mark.asyncio

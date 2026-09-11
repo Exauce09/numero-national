@@ -178,6 +178,15 @@ async def create_act(
         db, actor_id=actor_id, bureau_id=getattr(data, "bureau_id", None)
     )
 
+    # SEC-01: never create already-VALIDATED acts — use /transition with civil:act:validate.
+    if data.status != ActStatus.DRAFT:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=400,
+            detail="Acts must be created as DRAFT; use POST /civil/acts/{id}/transition to validate",
+        )
+
     prefix = data.act_type.value[:3]
     number = data.act_number or _act_number(prefix, data.commune_code)
     payload = dict(data.payload or {})
@@ -190,7 +199,7 @@ async def create_act(
         act_type=data.act_type.value,
         act_number=number,
         commune_code=data.commune_code,
-        status=data.status.value,
+        status=ActStatus.DRAFT.value,
         citizen_id=data.citizen_id,
         related_citizen_ids=[str(x) for x in data.related_citizen_ids]
         if data.related_citizen_ids
@@ -200,11 +209,6 @@ async def create_act(
         verification_code=uuid.uuid4().hex[:16].upper(),
         bureau_id=bureau_id,
     )
-    if data.status == ActStatus.VALIDATED:
-        act.issued_at = datetime.now(UTC)
-        act.validated_by = actor_id
-        act.registered_at = act.issued_at
-        _attach_authentication(act, actor_id=actor_id, at=act.issued_at)
     db.add(act)
     await db.flush()
     # QR = référence signée vers l'acte (pas de PII)
@@ -301,13 +305,14 @@ async def soft_delete_act(
     from apps.api.domains.audit.services import write_audit
 
     act = await get_act(db, act_id)
-    if act is None:
+    if act is None or act.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Act not found")
     if act.status == ActStatus.VALIDATED.value:
         raise HTTPException(
             status_code=403,
             detail="Validated acts cannot be deleted; archive or rectify instead",
         )
+    await resolve_and_enforce_bureau(db, actor_id=actor_id, bureau_id=act.bureau_id)
     act.deleted_at = datetime.now(UTC)
     await write_audit(
         db,
@@ -581,7 +586,31 @@ async def verify_document_code(db: AsyncSession, code: str) -> dict[str, Any]:
 
 
 async def get_act(db: AsyncSession, act_id: uuid.UUID) -> CivilAct | None:
-    return await db.get(CivilAct, act_id)
+    act = await db.get(CivilAct, act_id)
+    if act is None or act.deleted_at is not None:
+        return None
+    return act
+
+
+async def get_act_for_actor(
+    db: AsyncSession,
+    act_id: uuid.UUID,
+    *,
+    actor_id: uuid.UUID | None = None,
+) -> CivilAct | None:
+    """Fetch act with bureau scope enforcement for non-national actors."""
+    from fastapi import HTTPException
+
+    act = await get_act(db, act_id)
+    if act is None:
+        return None
+    if actor_id is None:
+        return act
+    try:
+        await resolve_and_enforce_bureau(db, actor_id=actor_id, bureau_id=act.bureau_id)
+    except HTTPException:
+        return None
+    return act
 
 
 async def list_acts(
@@ -589,16 +618,85 @@ async def list_acts(
     *,
     act_type: ActType | None = None,
     commune_code: str | None = None,
+    bureau_id: uuid.UUID | None = None,
+    actor_id: uuid.UUID | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> list[CivilAct]:
-    stmt = select(CivilAct).order_by(CivilAct.created_at.desc())
+    stmt = (
+        select(CivilAct)
+        .where(CivilAct.deleted_at.is_(None))
+        .order_by(CivilAct.created_at.desc())
+    )
     if act_type:
         stmt = stmt.where(CivilAct.act_type == act_type.value)
     if commune_code:
         stmt = stmt.where(CivilAct.commune_code == commune_code)
+    if bureau_id is not None:
+        stmt = stmt.where(CivilAct.bureau_id == bureau_id)
+    elif actor_id is not None:
+        # Scope list to bureaux the actor can access (national roles see all).
+        from apps.api.domains.identity.iam_services import load_user_with_rbac, user_role_codes
+
+        user = await load_user_with_rbac(db, actor_id)
+        if user is not None:
+            roles = user_role_codes(user)
+            if not (roles & {"SUPER_ADMIN_NATIONAL", "CENTRAL_ADMIN", "ADMIN_NATIONAL"}):
+                allowed = await _actor_bureau_ids(db, user)
+                if allowed is not None:
+                    stmt = stmt.where(CivilAct.bureau_id.in_(allowed))
     stmt = stmt.limit(limit).offset(offset)
     return list((await db.execute(stmt)).scalars().all())
+
+
+async def _actor_bureau_ids(db: AsyncSession, user) -> list[uuid.UUID] | None:
+    """Return explicit bureau IDs for scoped users, or None if unrestricted."""
+    from apps.api.domains.identity.iam_services import (
+        get_active_assignment_for_user,
+        list_scopes,
+        user_role_codes,
+    )
+    from apps.api.domains.identity.models import BureauEtatCivil
+
+    roles = user_role_codes(user)
+    if roles & {"SUPER_ADMIN_NATIONAL", "CENTRAL_ADMIN", "ADMIN_NATIONAL"}:
+        return None
+    ids: set[uuid.UUID] = set()
+    scopes = await list_scopes(db, user.id)
+    for s in scopes:
+        if s.scope_type == "NATIONAL":
+            return None
+        if s.bureau_id:
+            ids.add(s.bureau_id)
+        if s.scope_type == "PROVINCE" and s.territory_id:
+            rows = await db.execute(
+                select(BureauEtatCivil.id).where(BureauEtatCivil.province_id == s.territory_id)
+            )
+            ids.update(rows.scalars().all())
+        if s.scope_type == "VILLE" and s.territory_id:
+            rows = await db.execute(
+                select(BureauEtatCivil.id).where(BureauEtatCivil.ville_id == s.territory_id)
+            )
+            ids.update(rows.scalars().all())
+        if s.scope_type == "COMMUNE" and s.territory_id:
+            rows = await db.execute(
+                select(BureauEtatCivil.id).where(BureauEtatCivil.commune_id == s.territory_id)
+            )
+            ids.update(rows.scalars().all())
+    assignment = await get_active_assignment_for_user(db, user)
+    if assignment and assignment.bureau_id:
+        ids.add(assignment.bureau_id)
+    if user.province_id or user.ville_id or user.commune_id:
+        q = select(BureauEtatCivil.id)
+        if user.commune_id:
+            q = q.where(BureauEtatCivil.commune_id == user.commune_id)
+        elif user.ville_id:
+            q = q.where(BureauEtatCivil.ville_id == user.ville_id)
+        elif user.province_id:
+            q = q.where(BureauEtatCivil.province_id == user.province_id)
+        rows = await db.execute(q)
+        ids.update(rows.scalars().all())
+    return list(ids) if ids else []
 
 
 async def list_declarations(
@@ -690,15 +788,37 @@ async def validate_declaration(
     *,
     actor_id: uuid.UUID | None = None,
 ) -> tuple[CivilDeclaration, CivilAct | None, dict[str, Any]]:
+    """Accept/reject a declaration.
+
+    SEC-02: never jump an act to VALIDATED here — create/link a DRAFT act and
+    require POST /civil/acts/{id}/transition (cachet / workflow / audit).
+    """
+    from fastapi import HTTPException
+
+    from apps.api.domains.audit.services import write_audit
+
     decl = await db.get(CivilDeclaration, declaration_id)
     if decl is None:
         raise ValueError("Declaration not found")
 
     if body.reject:
         decl.status = DeclarationStatus.REJECTED.value
+        await write_audit(
+            db,
+            action="civil.declaration.reject",
+            actor_id=actor_id,
+            resource_type="civil_declaration",
+            resource_id=str(decl.id),
+            new_value={"reason": body.rejection_reason},
+            commit=False,
+        )
         await db.commit()
         await db.refresh(decl)
         return decl, None, {"rejected": True, "reason": body.rejection_reason}
+
+    bureau_id = await resolve_and_enforce_bureau(
+        db, actor_id=actor_id, bureau_id=getattr(body, "bureau_id", None)
+    )
 
     act_type = (
         ActType.BIRTH
@@ -717,46 +837,80 @@ async def validate_declaration(
         act = await db.get(CivilAct, decl.linked_act_id)
         if act is None:
             raise ValueError("Linked act missing")
+        if act.status == ActStatus.VALIDATED.value:
+            raise HTTPException(
+                status_code=409,
+                detail="Linked act already validated; use rectification workflow",
+            )
         act.payload = payload
-        act.status = ActStatus.VALIDATED.value
-        act.issued_at = datetime.now(UTC)
-        act.validated_by = actor_id
         if citizen_id:
             act.citizen_id = citizen_id
         if body.related_citizen_ids:
             act.related_citizen_ids = [str(x) for x in body.related_citizen_ids]
+        if bureau_id:
+            act.bureau_id = bureau_id
+        if act.status == ActStatus.DRAFT.value:
+            act.status = ActStatus.SUBMITTED.value
     else:
         act = CivilAct(
             act_type=act_type.value,
             act_number=body.act_number or _act_number(act_type.value[:3], body.commune_code),
             commune_code=body.commune_code,
-            status=ActStatus.VALIDATED.value,
+            status=ActStatus.DRAFT.value,
             citizen_id=citizen_id,
             related_citizen_ids=[str(x) for x in body.related_citizen_ids]
             if body.related_citizen_ids
             else None,
             payload=payload,
-            issued_at=datetime.now(UTC),
-            validated_by=actor_id,
+            created_by=actor_id,
+            bureau_id=bureau_id,
+            verification_code=uuid.uuid4().hex[:16].upper(),
         )
         db.add(act)
         await db.flush()
         decl.linked_act_id = act.id
 
     decl.status = DeclarationStatus.VALIDATED.value
+    await write_audit(
+        db,
+        action="civil.declaration.accept",
+        actor_id=actor_id,
+        resource_type="civil_declaration",
+        resource_id=str(decl.id),
+        new_value={
+            "linked_act_id": str(act.id),
+            "act_status": act.status,
+            "bureau_id": str(bureau_id) if bureau_id else None,
+        },
+        commit=False,
+    )
     await db.commit()
     await db.refresh(decl)
     await db.refresh(act)
 
     registry_signal = await signal_registry_status_change(
         citizen_id=act.citizen_id,
-        event="CIVIL_ACT_VALIDATED",
-        payload={"act_id": str(act.id), "act_type": act.act_type},
+        event="CIVIL_DECLARATION_ACCEPTED",
+        payload={"act_id": str(act.id), "act_type": act.act_type, "act_status": act.status},
     )
     return decl, act, registry_signal
 
 
-async def create_residence(db: AsyncSession, data: ResidenceCreate) -> ResidenceRecord:
+async def create_residence(
+    db: AsyncSession,
+    data: ResidenceCreate,
+    *,
+    actor_id: uuid.UUID | None = None,
+) -> ResidenceRecord:
+    bureau_id = await resolve_and_enforce_bureau(
+        db, actor_id=actor_id, bureau_id=getattr(data, "bureau_id", None)
+    )
+    # Residence attestation starts DRAFT; activate record only after act validation.
+    record_status = (
+        ResidenceStatus.DRAFT.value
+        if data.status == ResidenceStatus.ACTIVE
+        else data.status.value
+    )
     number = data.attestation_number or _act_number("RES", data.commune_code)
     record = ResidenceRecord(
         citizen_id=data.citizen_id,
@@ -767,27 +921,34 @@ async def create_residence(db: AsyncSession, data: ResidenceCreate) -> Residence
         province_code=data.province_code,
         country_code=data.country_code,
         attestation_number=number,
-        status=data.status.value,
+        status=record_status,
         notes=data.notes,
     )
     db.add(record)
-    # Also create a civil act of type RESIDENCE_ATTESTATION for audit trail
+    # Audit trail act — DRAFT only (SEC-01); validate via /transition.
     act = CivilAct(
         act_type=ActType.RESIDENCE_ATTESTATION.value,
         act_number=number,
         commune_code=data.commune_code,
-        status=ActStatus.VALIDATED.value,
+        status=ActStatus.DRAFT.value,
         citizen_id=data.citizen_id,
+        created_by=actor_id,
+        bureau_id=bureau_id,
+        verification_code=uuid.uuid4().hex[:16].upper(),
         payload={
             "line1": data.line1,
             "line2": data.line2,
             "city": data.city,
             "province_code": data.province_code,
             "country_code": data.country_code,
+            "residence_record_id": None,
         },
-        issued_at=datetime.now(UTC),
     )
     db.add(act)
+    await db.flush()
+    payload = dict(act.payload or {})
+    payload["residence_record_id"] = str(record.id)
+    act.payload = payload
     await db.commit()
     await db.refresh(record)
     return record

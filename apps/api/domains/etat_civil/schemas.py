@@ -192,6 +192,7 @@ class DeclarationValidateRequest(BaseModel):
     citizen_id: UUID | None = None
     related_citizen_ids: list[UUID] | None = None
     payload_overrides: dict[str, Any] | None = None
+    bureau_id: UUID | None = None
     reject: bool = False
     rejection_reason: str | None = None
 
@@ -207,6 +208,7 @@ class ResidenceCreate(BaseModel):
     attestation_number: str | None = None
     status: ResidenceStatus = ResidenceStatus.ACTIVE
     notes: str | None = None
+    bureau_id: UUID | None = None
 
 
 class ResidenceRead(BaseModel):

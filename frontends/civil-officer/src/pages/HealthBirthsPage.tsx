@@ -33,7 +33,7 @@ export default function HealthBirthsPage() {
   const [, bump] = useState(0);
   const rows = listFacilityDeclarations(session.facilityId).filter((d) => d.declaration_type === "BIRTH");
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setMessage(null);
@@ -50,7 +50,7 @@ export default function HealthBirthsPage() {
     const childNom = nom.trim();
     const childPostnom = postnom.trim() || mother.postnom || father?.postnom || "";
     const childPrenom = prenom.trim();
-    const decl = notifyEtatCivil({
+    const decl = await notifyEtatCivil({
       type: "BIRTH",
       facilityName: session.facilityName,
       payload: {
