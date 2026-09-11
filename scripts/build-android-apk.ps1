@@ -8,6 +8,7 @@
 
 param(
   [string]$ApiHost = "",
+  [string]$DeviceProfile = "fingerprint",
   [switch]$Install,
   [switch]$DebugBuild,
   [switch]$AutoLogin
@@ -36,7 +37,11 @@ $ApiBase = "http://${ApiHost}:8000/api/v1"
 Write-Host "API_BASE_URL=$ApiBase"
 if ($AutoLogin) { Write-Host "AUTO_LOGIN=true" }
 
-$defines = @("--dart-define=API_BASE_URL=$ApiBase")
+$defines = @(
+  "--dart-define=API_BASE_URL=$ApiBase",
+  "--dart-define=DEVICE_PROFILE=$DeviceProfile"
+)
+Write-Host "DEVICE_PROFILE=$DeviceProfile"
 if ($AutoLogin) { $defines += "--dart-define=AUTO_LOGIN=true" }
 
 $appDir = Join-Path $PSScriptRoot "..\apps\flutter_recensement"
