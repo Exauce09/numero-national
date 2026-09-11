@@ -102,7 +102,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   static const _stepTitles = <String>[
     '1. Identité',
     '2. Origine',
-    '3. Biométrie',
+    '3. Empreintes (3 doigts)',
     '4. Études',
     '5. Expérience',
     '6. Admin',
@@ -1304,117 +1304,120 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   }
 
   Widget _buildBioBlock() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (AppConfig.isFingerprintDevice)
-          Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF4E5),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE6A23C).withValues(alpha: 0.45)),
-            ),
-            child: const Text(
-              'MorphoTablet — 3 doigts distincts sur le capteur optique (LED rouge), puis la photo.',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, height: 1.35),
-            ),
-          ),
-        _section('3. Biométrie', [
-          Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0F6FF),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.25)),
-            ),
-            child: const Text(
-              '3 doigts distincts : 1) Pouce droit — 2) Index droit — 3) Index gauche. '
-              'Chaque lecture doit être un doigt différent.',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, height: 1.35),
-            ),
-          ),
-          if (AppConfig.isFingerprintDevice) ...[
-            FingerprintCaptureWidget(
-              label: '1. Pouce droit',
-              hand: 'pouce_droit',
-              initialRef:
-                  _empreintePouceDroit.text.trim().isEmpty ? null : _empreintePouceDroit.text.trim(),
-              onCaptured: (ref) => setState(() {
-                _empreintePouceDroit.text = ref;
-                _empreinteDroite.text = ref;
-                _fingerprintRef = ref;
-              }),
-            ),
-            FingerprintCaptureWidget(
-              label: '2. Index droit',
-              hand: 'index_droit',
-              initialRef:
-                  _empreinteIndexDroit.text.trim().isEmpty ? null : _empreinteIndexDroit.text.trim(),
-              onCaptured: (ref) => setState(() {
-                _empreinteIndexDroit.text = ref;
-                _fingerprintRef ??= ref;
-              }),
+    Widget finger({
+      required String n,
+      required String label,
+      required String hand,
+      required TextEditingController ctrl,
+      required Color color,
+      void Function(String ref)? also,
+    }) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: color, width: 2),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: color,
+                    child: Text(
+                      n,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      label.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: color,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             FingerprintCaptureWidget(
-              label: '3. Index gauche',
-              hand: 'index_gauche',
-              initialRef: _empreinteIndexGauche.text.trim().isEmpty
-                  ? null
-                  : _empreinteIndexGauche.text.trim(),
+              key: ValueKey('fp_$hand'),
+              label: label,
+              hand: hand,
+              initialRef: ctrl.text.trim().isEmpty ? null : ctrl.text.trim(),
               onCaptured: (ref) => setState(() {
-                _empreinteIndexGauche.text = ref;
-                _empreinteGauche.text = ref;
-                _fingerprintRef ??= ref;
-              }),
-            ),
-            const SizedBox(height: 8),
-            PhotoCaptureWidget(
-              initialRef: _photoRef,
-              onCaptured: (ref) => setState(() => _photoRef = ref),
-            ),
-          ] else ...[
-            PhotoCaptureWidget(
-              initialRef: _photoRef,
-              onCaptured: (ref) => setState(() => _photoRef = ref),
-            ),
-            const SizedBox(height: 8),
-            FingerprintCaptureWidget(
-              label: '1. Pouce droit',
-              hand: 'pouce_droit',
-              initialRef:
-                  _empreintePouceDroit.text.trim().isEmpty ? null : _empreintePouceDroit.text.trim(),
-              onCaptured: (ref) => setState(() {
-                _empreintePouceDroit.text = ref;
-                _empreinteDroite.text = ref;
-                _fingerprintRef = ref;
-              }),
-            ),
-            FingerprintCaptureWidget(
-              label: '2. Index droit',
-              hand: 'index_droit',
-              initialRef:
-                  _empreinteIndexDroit.text.trim().isEmpty ? null : _empreinteIndexDroit.text.trim(),
-              onCaptured: (ref) => setState(() {
-                _empreinteIndexDroit.text = ref;
-                _fingerprintRef ??= ref;
-              }),
-            ),
-            FingerprintCaptureWidget(
-              label: '3. Index gauche',
-              hand: 'index_gauche',
-              initialRef: _empreinteIndexGauche.text.trim().isEmpty
-                  ? null
-                  : _empreinteIndexGauche.text.trim(),
-              onCaptured: (ref) => setState(() {
-                _empreinteIndexGauche.text = ref;
-                _empreinteGauche.text = ref;
+                ctrl.text = ref;
+                also?.call(ref);
                 _fingerprintRef ??= ref;
               }),
             ),
           ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0B3D91),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Text(
+            'EMPREINTES — 3 DOIGTS DIFFÉRENTS\n'
+            '① Pouce DROIT   ② Index DROIT   ③ Index GAUCHE\n'
+            'Posez un doigt différent à chaque lecture (LED rouge).',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              height: 1.4,
+            ),
+          ),
+        ),
+        _section('3. Empreintes digitales', [
+          finger(
+            n: '1',
+            label: 'Pouce droit',
+            hand: 'pouce_droit',
+            ctrl: _empreintePouceDroit,
+            color: const Color(0xFFDC2626),
+            also: (ref) => _empreinteDroite.text = ref,
+          ),
+          finger(
+            n: '2',
+            label: 'Index droit',
+            hand: 'index_droit',
+            ctrl: _empreinteIndexDroit,
+            color: const Color(0xFF2563EB),
+          ),
+          finger(
+            n: '3',
+            label: 'Index gauche',
+            hand: 'index_gauche',
+            ctrl: _empreinteIndexGauche,
+            color: const Color(0xFF16A34A),
+            also: (ref) => _empreinteGauche.text = ref,
+          ),
+          const SizedBox(height: 8),
+          PhotoCaptureWidget(
+            initialRef: _photoRef,
+            onCaptured: (ref) => setState(() => _photoRef = ref),
+          ),
           IrisCaptureWidget(
             initialRef: _iris.text.trim().isEmpty ? null : _iris.text.trim(),
             onCaptured: (ref) => setState(() => _iris.text = ref),
