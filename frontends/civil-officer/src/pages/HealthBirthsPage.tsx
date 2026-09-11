@@ -179,7 +179,7 @@ export default function HealthBirthsPage() {
               <img src="/logo-rdc.jpg" alt="RDC" />
               <div>
                 <strong>République Démocratique du Congo</strong>
-                <div>E-GOUV · Structure sanitaire</div>
+                <div>SIGPOP-RDC · Structure sanitaire</div>
                 <div>Coupon provisoire nouveau-né</div>
               </div>
             </div>

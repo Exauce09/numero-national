@@ -39,7 +39,7 @@ export default function HealthLoginPage() {
     <div className="login-page">
       <div className="login-card" style={{ maxWidth: 520 }}>
         <img className="login-logo" src="/logo-rdc.jpg" alt="République Démocratique du Congo" />
-        <h1 className="login-title">E-GOUV — Structure sanitaire</h1>
+        <h1 className="login-title">SIGPOP-RDC — Structure sanitaire</h1>
         <p className="login-subtitle">Hôpital · Clinique · Centre de santé · Maternité</p>
 
         <form onSubmit={onLogin} autoComplete="off">

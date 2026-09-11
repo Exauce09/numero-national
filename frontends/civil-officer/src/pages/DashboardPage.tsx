@@ -202,21 +202,17 @@ export default function DashboardPage() {
   const quickActions =
     variant === "officier"
       ? [
-          { label: "À vérifier", href: "/declarations" },
-          { label: "Actes", href: "/acts" },
-          { label: "Population", href: "/population" },
+          { label: "Nouvelle naissance", href: "/manage/naissance" },
+          { label: "Biométrie", href: "/biometrie/identification" },
         ]
       : variant === "agent"
         ? [
             { label: "Nouvelle naissance", href: "/manage/naissance" },
-            { label: "Population", href: "/population" },
             { label: "Déclarations", href: "/declarations" },
           ]
         : [
-            { label: "Population", href: "/population" },
-            { label: "Naissances", href: "/lists/naissance" },
+            { label: "Naissances", href: "/manage/naissance" },
             { label: "Recensement", href: "/census" },
-            { label: "Déclarations", href: "/declarations" },
           ];
 
   return (

@@ -41,8 +41,10 @@ export default function LoginPage() {
     <div className="login-page">
       <div className="login-card">
         <img className="login-logo" src="/logo-rdc.jpg" alt="République Démocratique du Congo" />
-        <h1 className="login-title">Système national de gestion de la population</h1>
-        <p className="login-subtitle">E-GOUV — Portail état civil · Accès sécurisé</p>
+        <h1 className="login-title">SIGPOP-RDC</h1>
+        <p className="login-subtitle">
+          Système intégré de gouvernance de la population — Portail état civil
+        </p>
         <form onSubmit={(e) => void onSubmit(e)} method="post" action="#" autoComplete="off">
           {error ? <div className="login-error" role="alert">{error}</div> : null}
           <label className="form-label" htmlFor="username">

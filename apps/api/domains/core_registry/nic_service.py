@@ -34,10 +34,38 @@ NIC_PAYLOAD_LENGTH = 14
 NIC_TOTAL_LENGTH = 14
 MAX_COLLISION_RETRIES = 64
 
-# Ordre stable des 26 provinces (index 1..26).
+# Ordre / codes province pour NIC 14 chiffres (PP…).
+# Kinshasa = 15 (code métier SIGPOP) — jamais 00.
 PROVINCE_NUMERIC: dict[str, str] = {
-    code: f"{i:02d}" for i, (code, _name, _chef) in enumerate(PROVINCES, start=1)
+    "KIN": "15",
+    "BC": "01",
+    "KWG": "02",
+    "KWL": "03",
+    "MND": "04",
+    "EQT": "05",
+    "MNG": "06",
+    "NUB": "07",
+    "SUB": "08",
+    "TSH": "09",
+    "TSHO": "10",
+    "BUE": "11",
+    "HUE": "12",
+    "ITU": "13",
+    "NKV": "14",
+    "SKV": "16",
+    "MNM": "17",
+    "HKT": "18",
+    "LLB": "19",
+    "HLM": "20",
+    "TGY": "21",
+    "KAS": "22",
+    "KAC": "23",
+    "KAO": "24",
+    "LOM": "25",
+    "SNK": "26",
 }
+
+DEFAULT_PROVINCE_CODE = "15"  # Kinshasa — défaut national SIGPOP (pas 00)
 
 
 class NicGenerationError(RuntimeError):
@@ -57,13 +85,20 @@ def encode_sex(sex: str | Sex | None) -> str:
 
 def encode_province(province_code: str | None) -> str:
     if not province_code:
-        return "00"
+        return DEFAULT_PROVINCE_CODE
     code = province_code.strip().upper()
     if code in PROVINCE_NUMERIC:
         return PROVINCE_NUMERIC[code]
     if code.isdigit() and 1 <= int(code) <= 26:
-        return f"{int(code):02d}"
-    return "00"
+        # Never emit 00; map bare "0" / invalid to Kinshasa 15
+        n = int(code)
+        if n == 0:
+            return DEFAULT_PROVINCE_CODE
+        return f"{n:02d}"
+    # Alias textuels fréquents
+    if "KINSHASA" in code or code in {"KIN", "15"}:
+        return "15"
+    return DEFAULT_PROVINCE_CODE
 
 
 def encode_territory(*parts: str | None) -> str:
@@ -188,9 +223,10 @@ def _geo_from_citizen(citizen: Citizen) -> dict[str, str | None]:
     if primary is None and getattr(citizen, "addresses", None):
         primary = citizen.addresses[0] if citizen.addresses else None
     if primary is None:
-        return {"province_code": None, "commune_code": None, "city": None}
+        # Défaut Kinshasa (15) — jamais province 00
+        return {"province_code": "KIN", "commune_code": None, "city": "Kinshasa"}
     return {
-        "province_code": primary.province_code,
+        "province_code": primary.province_code or "KIN",
         "commune_code": primary.commune_code,
         "city": primary.city,
     }

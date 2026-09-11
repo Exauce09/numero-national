@@ -79,7 +79,7 @@ export default function TopbarSearch() {
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder="Rechercher une personne, un acte, un dossier…"
+          placeholder="Recherche (nom, NIC, acte…) ou empreinte →"
           aria-label="Recherche globale"
           autoComplete="off"
         />

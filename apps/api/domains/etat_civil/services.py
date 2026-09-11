@@ -241,8 +241,12 @@ async def create_act(
     # NIC national unique porté dans l'acte (jamais dans le QR brut comme PII étendu)
     national_id = payload.get("national_id") or payload.get("nic")
     if not national_id:
-        national_id = f"NIC-{uuid.uuid4().hex[:12].upper()}"
+        # Provisoire 14 chiffres (province Kinshasa=15) — remplacé à la validation par assign_nic
+        from apps.api.domains.core_registry.nic_service import generate_candidate_nic
+
+        national_id = generate_candidate_nic(province_code="KIN")
         payload["national_id"] = national_id
+        payload["nic"] = national_id
     act = CivilAct(
         act_type=data.act_type.value,
         act_number=number,

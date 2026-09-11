@@ -109,9 +109,31 @@ function save(registry: Registry): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(registry));
 }
 
-export function generateNic(): string {
-  const hex = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
-  return `NIC-${hex}`;
+export function generateNic(opts?: {
+  provinceCode?: string;
+  sex?: string;
+  dateOfBirth?: string;
+}): string {
+  /** NIC 14 chiffres — province Kinshasa = 15 (jamais 00). */
+  const province = (opts?.provinceCode || "15").replace(/\D/g, "").padStart(2, "0").slice(-2);
+  const pp = province === "00" ? "15" : province;
+  const territory = String((Math.abs(hashSeed()) % 999) + 1).padStart(3, "0");
+  const sexRaw = (opts?.sex || "").toUpperCase();
+  const sex = sexRaw.startsWith("F") ? "2" : sexRaw.startsWith("M") ? "1" : "0";
+  let year = "0000";
+  if (opts?.dateOfBirth) {
+    const y = Number(String(opts.dateOfBirth).slice(0, 4));
+    if (y >= 1900 && y <= 2100) year = String(y);
+  } else {
+    year = String(new Date().getFullYear());
+  }
+  const seq = String(Math.abs(hashSeed()) % 10000).padStart(4, "0");
+  return `${pp}${territory}${sex}${year}${seq}`;
+}
+
+function hashSeed(): number {
+  const hex = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+  return Number.parseInt(hex, 16);
 }
 
 export function ageYears(dob: string): number {

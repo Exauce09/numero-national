@@ -41,7 +41,12 @@ function saveDemo(store: DemoStore) {
   localStorage.setItem(DEMO_KEY, JSON.stringify(store));
 }
 
-function pushOfficerNotif(title: string, body: string, href = "/declarations") {
+function pushOfficerNotif(
+  declarationId: string,
+  title: string,
+  body: string,
+  href = "/declarations",
+) {
   try {
     const raw = localStorage.getItem(NOTIF_KEY);
     const rows = raw
@@ -54,15 +59,17 @@ function pushOfficerNotif(title: string, body: string, href = "/declarations") {
           href?: string;
         }[])
       : [];
-    rows.unshift({
-      id: crypto.randomUUID(),
+    const id = `decl-${declarationId}`;
+    const without = rows.filter((r) => r.id !== id);
+    without.unshift({
+      id,
       title,
       body,
       created_at: new Date().toISOString(),
       read: false,
       href,
     });
-    localStorage.setItem(NOTIF_KEY, JSON.stringify(rows.slice(0, 50)));
+    localStorage.setItem(NOTIF_KEY, JSON.stringify(without.slice(0, 50)));
   } catch {
     /* ignore */
   }
@@ -84,7 +91,6 @@ export async function notifyEtatCivil(input: {
     facility_name: input.facilityName,
     notified_at: new Date().toISOString(),
   };
-  const kind = input.type === "BIRTH" ? "naissance" : "décès";
   try {
     const remote = await api.createDeclaration({
       source: "HOSPITAL",
@@ -101,8 +107,13 @@ export async function notifyEtatCivil(input: {
     };
     saveLocal(decl);
     pushOfficerNotif(
-      `Notification structure sanitaire — ${kind}`,
-      `${input.facilityName} a déclaré un(e) ${kind}. Validation officier requise.`,
+      decl.id,
+      input.type === "BIRTH"
+        ? "Déclaration de naissance en attente de validation"
+        : "Déclaration de décès en attente de validation",
+      input.type === "BIRTH"
+        ? `${input.facilityName} a déclaré un nouveau-né. Validation officier requise.`
+        : `${input.facilityName} a déclaré un décès. Validation officier requise.`,
       "/declarations",
     );
     return decl;
@@ -117,8 +128,13 @@ export async function notifyEtatCivil(input: {
     };
     saveLocal(decl);
     pushOfficerNotif(
-      `Notification structure sanitaire — ${kind}`,
-      `${input.facilityName} a déclaré un(e) ${kind}. Validation officier requise.`,
+      decl.id,
+      input.type === "BIRTH"
+        ? "Déclaration de naissance en attente de validation"
+        : "Déclaration de décès en attente de validation",
+      input.type === "BIRTH"
+        ? `${input.facilityName} a déclaré un nouveau-né. Validation officier requise.`
+        : `${input.facilityName} a déclaré un décès. Validation officier requise.`,
       "/declarations",
     );
     return decl;
@@ -129,6 +145,11 @@ export function listFacilityDeclarations(facilityId?: string): CivilDeclaration[
   const rows = loadDemo().declarations.filter((d) => d.source === "HOSPITAL");
   if (!facilityId) return rows;
   return rows.filter((d) => String(d.payload.facility_id ?? "") === facilityId);
+}
+
+/** Déclarations naissance/décès en attente (stockage local / démo). */
+export function listPendingOfficerDeclarations(): CivilDeclaration[] {
+  return loadDemo().declarations.filter((d) => d.status === "PENDING_OFFICER");
 }
 
 export function setDeclarationStatus(

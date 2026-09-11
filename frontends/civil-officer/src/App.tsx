@@ -27,10 +27,13 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   savePrefs,
+  syncDeclarationNotifications,
   unreadCount,
   type AppNotification,
   type UserPrefs,
 } from "./prefs";
+import { api } from "./api";
+import { listPendingOfficerDeclarations } from "./civilDeclarations";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import PopulationPage from "./pages/PopulationPage";
@@ -195,7 +198,7 @@ function HealthShell() {
         <div className="sidebar-brand">
           <img src="/logo-rdc.jpg" alt="RDC" />
           <strong>Structure sanitaire</strong>
-          <span>E-GOUV · Santé</span>
+          <span>SIGPOP-RDC · Santé</span>
           <button
             type="button"
             className="sidebar-close"
@@ -245,7 +248,7 @@ function HealthShell() {
             >
               <span />
             </button>
-            <h1 className="topbar-title">Structure sanitaire</h1>
+            <h1 className="topbar-title">SIGPOP-RDC · Santé</h1>
           </div>
 
           <div className="topbar-center" title={session.roleTitle}>
@@ -493,6 +496,45 @@ function Shell() {
   }, [prefs.theme]);
 
   useEffect(() => {
+    let cancelled = false;
+    async function refreshNotifs() {
+      const local = listPendingOfficerDeclarations().filter(
+        (d) => d.declaration_type === "BIRTH" || d.declaration_type === "DEATH",
+      );
+      try {
+        const remote = await api.listDeclarations("PENDING_OFFICER");
+        if (cancelled) return;
+        const byId = new Map<string, (typeof local)[number]>();
+        for (const d of local) byId.set(d.id, d);
+        for (const d of remote) {
+          const type = String(d.declaration_type || "").toUpperCase();
+          if (type !== "BIRTH" && type !== "DEATH") continue;
+          byId.set(d.id, {
+            id: d.id,
+            source: (d.source as "HOSPITAL" | "COMMUNE" | "CITIZEN") || "HOSPITAL",
+            declaration_type: type as "BIRTH" | "DEATH",
+            payload: (d.payload as Record<string, unknown>) || {},
+            status: "PENDING_OFFICER",
+            created_at: d.created_at,
+          });
+        }
+        syncDeclarationNotifications([...byId.values()]);
+        setNotifs(listNotifications());
+      } catch {
+        if (cancelled) return;
+        syncDeclarationNotifications(local);
+        setNotifs(listNotifications());
+      }
+    }
+    void refreshNotifs();
+    const timer = window.setInterval(() => void refreshNotifs(), 45_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [location.pathname]);
+
+  useEffect(() => {
     setNavOpen(false);
   }, [location.pathname]);
 
@@ -579,8 +621,8 @@ function Shell() {
       <aside className="sidebar" id="app-sidebar">
         <div className="sidebar-brand">
           <img src="/logo-rdc.jpg" alt="République démocratique du Congo" />
-          <strong>Système national de gestion de la population</strong>
-          <span>RDC · E-GOUV</span>
+          <strong>SIGPOP-RDC</strong>
+          <span>Système intégré de gouvernance de la population</span>
           <button
             type="button"
             className="sidebar-close"
@@ -621,6 +663,36 @@ function Shell() {
               <IconUsers size={18} /> Population
             </NavLink>
           ) : null}
+          {canSeeNav("naissances", roles, permissions) ? (
+            <NavLink to="/manage/naissance">
+              <IconBaby size={18} /> Naissances
+            </NavLink>
+          ) : null}
+          {canSeeNav("mariages", roles, permissions) ? (
+            <NavLink to="/manage/mariage">
+              <IconRing size={18} /> Mariages
+            </NavLink>
+          ) : null}
+          {canSeeNav("divorces", roles, permissions) ? (
+            <NavLink to="/manage/divorce">
+              <IconSplit size={18} /> Divorce
+            </NavLink>
+          ) : null}
+          {canSeeNav("naissances", roles, permissions) ? (
+            <NavLink to="/manage/adoption">
+              <IconHome size={18} /> Adoption
+            </NavLink>
+          ) : null}
+          {canSeeNav("deces", roles, permissions) ? (
+            <NavLink to="/manage/deces">
+              <IconCross size={18} /> Décès
+            </NavLink>
+          ) : null}
+          {canSeeNav("census", roles, permissions) ? (
+            <NavLink to="/manage/deplacement">
+              <IconCar size={18} /> Déplacement
+            </NavLink>
+          ) : null}
           {canSeeNav("biometrie", roles, permissions) ? (
             <NavLink
               to="/biometrie"
@@ -631,11 +703,6 @@ function Shell() {
               <IconClipboard size={18} /> Biométrie
             </NavLink>
           ) : null}
-          {canSeeNav("naissances", roles, permissions) ? (
-            <NavLink to="/manage/naissance">
-              <IconBaby size={18} /> Naissances
-            </NavLink>
-          ) : null}
           {canSeeNav("census", roles, permissions) ? (
             <NavLink to="/census">
               <IconClipboard size={18} /> Recensement
@@ -644,31 +711,6 @@ function Shell() {
           {canSeeNav("census", roles, permissions) ? (
             <NavLink to="/census/scan-coupon">
               <IconClipboard size={18} /> Scan coupon APK
-            </NavLink>
-          ) : null}
-          {canSeeNav("deces", roles, permissions) ? (
-            <NavLink to="/manage/deces">
-              <IconCross size={18} /> Décès
-            </NavLink>
-          ) : null}
-          {canSeeNav("mariages", roles, permissions) ? (
-            <NavLink to="/manage/mariage">
-              <IconRing size={18} /> Mariages
-            </NavLink>
-          ) : null}
-          {canSeeNav("naissances", roles, permissions) ? (
-            <NavLink to="/manage/adoption">
-              <IconHome size={18} /> Adoption
-            </NavLink>
-          ) : null}
-          {canSeeNav("census", roles, permissions) ? (
-            <NavLink to="/manage/deplacement">
-              <IconCar size={18} /> Déplacement
-            </NavLink>
-          ) : null}
-          {canSeeNav("divorces", roles, permissions) ? (
-            <NavLink to="/manage/divorce">
-              <IconSplit size={18} /> Divorce
             </NavLink>
           ) : null}
           {canSeeNav("documents", roles, permissions) ? (
@@ -738,12 +780,52 @@ function Shell() {
               <span />
             </button>
             <div title="République démocratique du Congo">
-              <h1 className="topbar-title">Population</h1>
+              <h1 className="topbar-title">SIGPOP-RDC</h1>
             </div>
           </div>
 
           <div className="topbar-center">
             <TopbarSearch />
+            <button
+              type="button"
+              className="topbar-icon-btn topbar-fingerprint-btn"
+              aria-label="Recherche par empreinte digitale"
+              title="Recherche par empreinte digitale"
+              onClick={() => navigate("/biometrie/identification")}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path
+                  d="M12 3.5c-2.8 0-5 2.4-5 5.4v1.2"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M7.2 14.2c.3 2.8 2.4 4.8 4.8 4.8s4.5-2 4.8-4.8"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M12 7.2v5.5"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M9.2 8.1c-.5.7-.8 1.6-.8 2.5v1.4M14.8 8.1c.5.7.8 1.6.8 2.5v.8"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M17 8.9c.6.9 1 2 1 3.2v.6M6.2 12.2V11c0-1.1.3-2.1.8-3"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
           </div>
 
           <div className="topbar-right">

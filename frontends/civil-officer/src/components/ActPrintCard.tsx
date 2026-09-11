@@ -1,5 +1,6 @@
 import { QRCodeSVG } from "qrcode.react";
 import { actTypeLabel, type Act } from "../registry";
+import BirthCertificatePrint from "./BirthCertificatePrint";
 
 type Props = {
   act: Act;
@@ -16,6 +17,14 @@ export default function ActPrintCard({
   verificationCode,
   mentions,
 }: Props) {
+  if (act.type === "BIRTH") {
+    return (
+      <BirthCertificatePrint
+        act={act}
+        verificationCode={verificationCode}
+      />
+    );
+  }
   const auth =
     act.payload?.authentication && typeof act.payload.authentication === "object"
       ? (act.payload.authentication as Record<string, unknown>)
@@ -56,7 +65,7 @@ export default function ActPrintCard({
         <img src="/logo-rdc.jpg" alt="RDC" />
         <div>
           <strong>République Démocratique du Congo</strong>
-          <div>E-GOUV · État civil communal</div>
+          <div>SIGPOP-RDC · État civil</div>
           <div>{title ?? `Extrait — ${actTypeLabel(act.type)}`}</div>
         </div>
       </div>
