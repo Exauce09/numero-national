@@ -4,8 +4,6 @@ import DataToolbar from "../components/DataToolbar";
 import { getSession } from "../auth";
 import { searchEveryone, searchFormDrafts, type DraftSearchHit } from "../nationalSearch";
 import {
-  displayName,
-  getPerson,
   personOrigin,
   type Person,
 } from "../registry";
@@ -16,7 +14,6 @@ export default function SearchPage() {
   const [q, setQ] = useState(initial);
   const [hits, setHits] = useState<Person[]>([]);
   const [drafts, setDrafts] = useState<DraftSearchHit[]>([]);
-  const [selected, setSelected] = useState<Person | null>(null);
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   const hasApi = Boolean(getSession()?.accessToken);
@@ -141,9 +138,9 @@ export default function SearchPage() {
                           : "—"}
                   </td>
                   <td>
-                    <button type="button" className="btn-secondary" onClick={() => setSelected(getPerson(p.id) ?? p)}>
-                      Détail
-                    </button>
+                    <Link className="btn-secondary" to={`/personnes/${p.id}`}>
+                      Voir
+                    </Link>
                   </td>
                 </tr>
               );
@@ -201,31 +198,6 @@ export default function SearchPage() {
           </tbody>
         </table>
       </div>
-
-      {selected ? (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setSelected(null)}>
-          <div className="modal-panel" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
-            <h3>{displayName(selected)}</h3>
-            <dl className="act-print-fields">
-              <div>
-                <dt>NIC</dt>
-                <dd>{selected.nic}</dd>
-              </div>
-              <div>
-                <dt>Naissance</dt>
-                <dd>
-                  {selected.date_naissance || "—"} · {selected.lieu_naissance || "—"}
-                </dd>
-              </div>
-            </dl>
-            <div className="modal-actions">
-              <button type="button" className="btn-secondary" onClick={() => setSelected(null)}>
-                Fermer
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

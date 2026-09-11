@@ -31,6 +31,58 @@ export type PopulationHit = {
   status: string | null;
 };
 
+export type CitizenListItem = {
+  id: string;
+  nic: string | null;
+  status: string;
+  family_name: string;
+  given_names: string;
+  date_of_birth: string;
+  sex?: string;
+  place_of_birth?: string | null;
+  province_code?: string | null;
+  ville?: string | null;
+  commune_code?: string | null;
+};
+
+export type CitizenAddress = {
+  id: string;
+  address_type: string;
+  line1: string;
+  line2?: string | null;
+  city: string;
+  commune_code?: string | null;
+  province_code?: string | null;
+  country_code?: string;
+  is_primary?: boolean;
+};
+
+export type CitizenDetail = {
+  id: string;
+  nic: string | null;
+  status: string;
+  sex: string;
+  date_of_birth: string;
+  place_of_birth: string | null;
+  nationality: string;
+  given_names: string;
+  family_name: string;
+  created_at: string;
+  updated_at: string;
+  validated_at: string | null;
+  deceased_at: string | null;
+  merged_into_id: string | null;
+  addresses: CitizenAddress[];
+};
+
+export type PersonCivilEvent = {
+  at: string | null;
+  act_type: string;
+  act_number: string;
+  status: string;
+  act_id: string;
+};
+
 export type FormDraft = {
   id: string;
   system: string;
@@ -83,8 +135,18 @@ export const api = {
     request<PopulationHit[]>(`/civil/population/search?${params}`),
 
   searchCitizens: (params: URLSearchParams) =>
-    request<{ items: Array<Record<string, unknown>>; total: number }>(
+    request<{ items: CitizenListItem[]; total: number; page: number; page_size: number }>(
       `/registry/citizens?${params}`,
+    ),
+
+  getCitizen: (id: string) => request<CitizenDetail>(`/registry/citizens/${id}`),
+
+  getCitizenByNic: (nic: string) =>
+    request<CitizenDetail>(`/registry/citizens/by-nic/${encodeURIComponent(nic)}`),
+
+  personCivilHistory: (citizenId: string) =>
+    request<{ citizen_id: string; events: PersonCivilEvent[] }>(
+      `/civil/persons/${citizenId}/history`,
     ),
 
   listFormDrafts: (params?: URLSearchParams) =>

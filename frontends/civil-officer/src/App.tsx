@@ -34,6 +34,7 @@ import {
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import PopulationPage from "./pages/PopulationPage";
+import PersonDetailPage from "./pages/PersonDetailPage";
 import NewbornsPage from "./pages/NewbornsPage";
 import BirthsPage from "./pages/BirthsPage";
 import CensusPage from "./pages/CensusPage";
@@ -596,8 +597,18 @@ function Shell() {
             </NavLink>
           ) : null}
           {canSeeNav("population", roles) ? (
-            <NavLink to="/population">
-              <IconUsers size={18} /> Population
+            <NavLink
+              to="/personnes"
+              className={({ isActive }) =>
+                isActive ||
+                location.pathname.startsWith("/personnes") ||
+                location.pathname.startsWith("/population") ||
+                location.pathname.startsWith("/lists/population")
+                  ? "active"
+                  : undefined
+              }
+            >
+              <IconUsers size={18} /> Personnes
             </NavLink>
           ) : null}
           {canSeeNav("naissances", roles) ? (
@@ -764,6 +775,8 @@ function Shell() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/synoptique" element={<SynopticPage />} />
             <Route path="/synoptique/:section" element={<SynopticPage />} />
+            <Route path="/personnes" element={<PopulationPage />} />
+            <Route path="/personnes/:id" element={<PersonDetailPage />} />
             <Route path="/population" element={<PopulationPage />} />
             <Route path="/lists/population" element={<PopulationPage showAnalytics />} />
             <Route path="/newborns" element={<NewbornsPage />} />
