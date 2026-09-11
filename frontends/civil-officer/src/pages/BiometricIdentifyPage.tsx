@@ -69,21 +69,38 @@ export default function BiometricIdentifyPage() {
           "Pont ZK9500 indisponible. Sur ce PC : py -3 scripts/zkteco_bridge.py (USB branché).",
         );
       }
+      if (health.demo || !health.sdk_loaded) {
+        throw new Error(
+          "Pont en mode DEMO ou SDK non chargé. Relancez : py -3 scripts/zkteco_bridge.py (ZKTECO_DEMO=0).",
+        );
+      }
+      setBridgeNote(
+        `ZK9500 réel — posez le doigt maintenant (${health.device_count || 1} lecteur)…`,
+      );
       const cap = await fetch(`${ZK_BRIDGE}/capture`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ finger_position: finger }),
+        body: JSON.stringify({ finger_position: finger, timeout_ms: 20000 }),
       }).then(async (r) => {
-        if (!r.ok) throw new Error(`Capture ZK ${r.status}`);
-        return r.json() as Promise<{
+        const body = (await r.json().catch(() => ({}))) as {
+          template_b64?: string;
+          note?: string;
+          demo?: boolean;
+          device?: string;
+          detail?: string;
+        };
+        if (!r.ok) {
+          throw new Error(body.detail || `Capture ZK ${r.status}`);
+        }
+        return body as {
           template_b64: string;
           note?: string;
           demo?: boolean;
           device?: string;
-        }>;
+        };
       });
       setBridgeNote(
-        `${cap.device || "ZK9500"}${cap.demo ? " (DEMO)" : ""} — ${cap.note || "Capture OK"}`,
+        `${cap.device || "ZK9500"}${cap.demo ? " (DEMO)" : " (RÉEL)"} — ${cap.note || "Capture OK"}`,
       );
       await identifyWithTemplate(cap.template_b64);
     } catch (e) {

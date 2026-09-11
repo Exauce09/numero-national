@@ -18,7 +18,7 @@
 ## Ce qui reste pour un système national certifié
 
 - Moteur ABIS multi-constructeurs (Morpho + ZKTeco) homologué
-- SDK ZKFinger réel dans `scripts/zkteco_bridge.py` (au lieu du mode DEMO)
+- ABIS multi-vendeur (Morpho tablette ↔ ZK9500 PC) — le pont ZK utilise déjà `libzkfp.dll` en capture réelle
 - Certification biométrique / seuils officiels RDC
 - Cartographie nationale temps réel + qualité adresse
 - Workflow juridique complet (contentieux, mentions légales sourcées)
