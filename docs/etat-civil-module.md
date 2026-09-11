@@ -27,14 +27,14 @@ Ne pas présenter ces valeurs comme obligations du Code de la famille sans sourc
 
 - Numérotation séquentielle par commune + année + type (`act_number_counters` + verrou advisory).
 - Workflow `DRAFT → SUBMITTED → UNDER_REVIEW → VALIDATED` (+ cachet à la validation).
-- Couplage Core Registry à la validation : naissance → création/lien citoyen ; décès → statut `DECEASED`.
+- Couplage Core Registry à la validation : naissance → création/lien citoyen + attribution NIC (si possible) ; décès → statut `DECEASED`.
 - Recherche d’actes `GET /civil/acts/search` (périmètre bureau).
 - Extrait officiel `GET /acts/{id}/extract` (QR, `verification_code`, mentions).
 - Mentions marginales sur actes validés.
-- Inbox corrections `GET /civil/corrections` + `POST …/review` (approuver / rejeter).
+- Inbox corrections `GET /civil/corrections` + `POST …/review` : approbation applique le champ sur le citoyen (nom, prénom, sexe, date/lieu de naissance, nationalité).
 - UI civil-officer : listes API-first si JWT, workflow / impression bloquée avant `VALIDATED`, mentions, corrections.
 
-Hors périmètre MVP (non certifié national) : archivage légal long terme, NIC automatique à la naissance, géolocalisation juridique complète, certification métier.
+Hors périmètre MVP (non certifié national) : archivage légal long terme, géolocalisation juridique complète, certification métier / PKI / HSM.
 
 ## API principales
 

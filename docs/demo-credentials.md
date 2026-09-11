@@ -18,11 +18,9 @@
 ## Ce qui reste pour un système national certifié
 
 - Moteur ABIS multi-constructeurs (Morpho + ZKTeco) homologué
-- ABIS multi-vendeur (Morpho tablette ↔ ZK9500 PC) — le pont ZK utilise déjà `libzkfp.dll` en capture réelle
 - Certification biométrique / seuils officiels RDC
-- Cartographie nationale temps réel + qualité adresse
-- Workflow juridique complet (contentieux, mentions légales sourcées)
 - Haute disponibilité, MFA obligatoire, HSM / chiffrement production
+- Archivage légal long terme et PKI / cachet électronique certifié
 - Audit indépendant et procédures d’exception biométrique formalisées
 
-Le MVP actuel couvre actes, IAM, population, enrôlement 3 doigts, dédup 1:N démo, cartographie filtrable, coupon PDF/partage.
+Le MVP opérationnel couvre : actes + workflow + numérotation, registre API, extrait/QR, déclarations, corrections appliquées, NIC à la naissance, IAM bureau, population, biométrie enrôlement/recherche.

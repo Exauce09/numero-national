@@ -997,14 +997,27 @@ async def apply_registry_on_validation(
                 logger.info("birth duplicate check skipped: %s", exc)
 
             act.citizen_id = citizen.id
-            # Keep NIC placeholder in payload aligned with citizen when assigned later.
-            if payload.get("national_id") or payload.get("nic"):
-                pass
-            else:
-                payload["citizen_id"] = str(citizen.id)
-                act.payload = payload
+            nic_assigned: str | None = None
+            try:
+                from apps.api.domains.core_registry.nic_service import (
+                    NicGenerationError,
+                    assign_nic,
+                )
+
+                nic_assigned = await assign_nic(db, citizen=citizen, actor_id=actor_id)
+            except Exception as nic_exc:  # noqa: BLE001 — duplicates / generation
+                logger.info("NIC assign deferred for birth citizen %s: %s", citizen.id, nic_exc)
+                result["nic_note"] = str(nic_exc)
+
+            payload["citizen_id"] = str(citizen.id)
+            if nic_assigned:
+                payload["nic"] = nic_assigned
+                payload["national_id"] = nic_assigned
+            act.payload = payload
             result["action"] = "created_citizen"
             result["citizen_id"] = str(citizen.id)
+            if nic_assigned:
+                result["nic"] = nic_assigned
         except Exception as exc:  # noqa: BLE001
             result["action"] = "error"
             result["note"] = str(exc)
@@ -1104,6 +1117,8 @@ async def review_correction_request(
     review_note: str | None = None,
     actor_id: uuid.UUID | None = None,
 ) -> CorrectionRequest:
+    from datetime import date as date_cls
+
     from fastapi import HTTPException
 
     from apps.api.domains.audit.services import write_audit
@@ -1116,6 +1131,72 @@ async def review_correction_request(
             status_code=409,
             detail=f"Cannot review request in status {row.status}",
         )
+
+    applied: dict[str, Any] = {}
+    if approve:
+        allowed = {
+            "given_names",
+            "family_name",
+            "place_of_birth",
+            "nationality",
+            "sex",
+            "date_of_birth",
+        }
+        field = (row.field_name or "").strip().lower()
+        # Accept French aliases from citizen portal
+        aliases = {
+            "prenom": "given_names",
+            "prénom": "given_names",
+            "nom": "family_name",
+            "lieu_naissance": "place_of_birth",
+            "lieu_de_naissance": "place_of_birth",
+            "sexe": "sex",
+            "date_naissance": "date_of_birth",
+            "nationalite": "nationality",
+            "nationalité": "nationality",
+        }
+        field = aliases.get(field, field)
+        if field not in allowed:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Field '{row.field_name}' cannot be corrected via this workflow",
+            )
+        try:
+            from apps.api.domains.core_registry.enums import CitizenEventType
+            from apps.api.domains.core_registry.models import Citizen, CitizenHistory
+
+            citizen = await db.get(Citizen, row.citizen_id)
+            if citizen is None:
+                raise HTTPException(status_code=404, detail="Citizen not found for correction")
+            old_val = getattr(citizen, field, None)
+            new_val: Any = row.requested_value
+            if field == "date_of_birth":
+                new_val = date_cls.fromisoformat(str(row.requested_value).strip()[:10])
+            elif field == "sex":
+                new_val = _map_sex(str(row.requested_value))
+            setattr(citizen, field, new_val)
+            citizen.updated_at = datetime.now(UTC)
+            db.add(
+                CitizenHistory(
+                    citizen_id=citizen.id,
+                    event_type=CitizenEventType.STATUS_CHANGED.value,
+                    payload={
+                        "source": "etat_civil.correction",
+                        "field": field,
+                        "old_value": str(old_val) if old_val is not None else None,
+                        "new_value": str(new_val),
+                        "correction_request_id": str(row.id),
+                    },
+                    actor_id=actor_id,
+                    created_at=datetime.now(UTC),
+                )
+            )
+            applied = {"field": field, "old": str(old_val) if old_val is not None else None, "new": str(new_val)}
+        except HTTPException:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=400, detail=f"Cannot apply correction: {exc}") from exc
+
     row.status = "APPROVED" if approve else "REJECTED"
     row.reviewed_by = actor_id
     row.reviewed_at = datetime.now(UTC)
@@ -1126,7 +1207,7 @@ async def review_correction_request(
         actor_id=actor_id,
         resource_type="correction_request",
         resource_id=str(row.id),
-        new_value={"status": row.status, "review_note": review_note},
+        new_value={"status": row.status, "review_note": review_note, "applied": applied},
         commit=False,
     )
     await db.commit()
