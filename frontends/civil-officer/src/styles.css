@@ -362,14 +362,228 @@
 .eg-chart-card {
   background: var(--egouv-card, #fff);
   border: 1px solid var(--egouv-line);
-  border-radius: 12px;
+  border-radius: var(--egouv-radius, 10px);
   padding: 0.9rem 1rem 1rem;
+  box-shadow: var(--egouv-shadow, none);
 }
 
 .eg-chart-title {
   margin: 0 0 0.65rem;
   font-size: 0.9rem;
   font-weight: 700;
+  color: var(--egouv-primary, #0b3d91);
+}
+
+.eg-chart-empty {
+  margin: 0.5rem 0 0;
+}
+
+.eg-chart-legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  margin-top: 0.35rem;
+}
+
+.eg-axis-label {
+  font-size: 10px;
+  fill: var(--egouv-muted);
+}
+
+.eg-line-svg {
+  display: block;
+  max-width: 100%;
+}
+
+.dash-page {
+  animation: dash-fade 0.35s ease;
+}
+
+@keyframes dash-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-page {
+    animation: none;
+  }
+}
+
+.dash-welcome {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.dash-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.dash-demo-banner {
+  background: #fff8e6;
+  border: 1px solid #f0d78c;
+  color: #6b5300;
+  border-radius: 8px;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.88rem;
+  margin-bottom: 1rem;
+}
+
+.dash-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1.1rem;
+}
+
+.dash-kpi {
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--egouv-line);
+  border-radius: 10px;
+  padding: 0.95rem 1rem;
+  cursor: pointer;
+  font: inherit;
+  box-shadow: var(--egouv-shadow, 0 1px 2px rgba(15, 35, 70, 0.04));
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dash-kpi:hover {
+  border-color: var(--egouv-primary);
+  box-shadow: 0 4px 16px rgba(11, 61, 145, 0.08);
+}
+
+.dash-kpi-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.55rem;
+}
+
+.dash-kpi-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dash-demo-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: #fff3cd;
+  color: #856404;
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+}
+
+.dash-kpi-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--egouv-muted);
+}
+
+.dash-kpi-value {
+  font-family: var(--egouv-font-display, inherit);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--egouv-ink);
+  line-height: 1.15;
+  margin: 0.2rem 0 0.45rem;
+}
+
+.dash-kpi-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.dash-kpi-sub {
+  font-size: 0.75rem;
+  color: var(--egouv-muted);
+}
+
+.dash-section-title {
+  margin: 0.5rem 0 0.75rem;
+  font-size: 1rem;
+  color: var(--egouv-primary);
+}
+
+.dash-charts-main {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.dash-action-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.dash-action-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--egouv-line);
+  border-radius: 10px;
+  padding: 1rem;
+  cursor: pointer;
+  font: inherit;
+}
+
+.dash-action-card:hover {
+  border-color: var(--egouv-primary);
+}
+
+.dash-action-label {
+  font-size: 0.8rem;
+  color: var(--egouv-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 600;
+}
+
+.dash-action-value {
+  font-size: 1.6rem;
+  color: var(--egouv-primary);
+}
+
+.dash-activity {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.dash-activity li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.88rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--egouv-line);
 }
 
 .eg-chart-body {

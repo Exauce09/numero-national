@@ -1,4 +1,4 @@
-/** Camembert et histogramme SVG (sans dépendance chart). */
+/** Camembert, barres et lignes SVG (sans dépendance chart). */
 
 export type ChartSlice = { label: string; value: number; color: string };
 
@@ -68,6 +68,7 @@ export function PieChart({
           ))}
         </ul>
       </div>
+      {total <= 0 ? <p className="muted small eg-chart-empty">Pas encore de données disponibles</p> : null}
     </div>
   );
 }
@@ -82,6 +83,7 @@ export function BarChart({
   height?: number;
 }) {
   const max = Math.max(1, ...data.map((d) => d.value));
+  const hasData = data.some((d) => d.value > 0);
   return (
     <div className="eg-chart-card">
       {title ? <h4 className="eg-chart-title">{title}</h4> : null}
@@ -101,6 +103,122 @@ export function BarChart({
           </div>
         ))}
       </div>
+      {!hasData ? <p className="muted small eg-chart-empty">Pas encore de données disponibles</p> : null}
     </div>
+  );
+}
+
+export type LineSeries = { name: string; color: string; values: number[] };
+
+/** Courbe(s) temporelles — labels = mois / périodes. */
+export function LineChart({
+  title,
+  labels,
+  series,
+  height = 220,
+}: {
+  title?: string;
+  labels: string[];
+  series: LineSeries[];
+  height?: number;
+}) {
+  const padL = 36;
+  const padR = 12;
+  const padT = 16;
+  const padB = 36;
+  const width = Math.max(320, labels.length * 48 + padL + padR);
+  const plotW = width - padL - padR;
+  const plotH = height - padT - padB;
+  const all = series.flatMap((s) => s.values);
+  const max = Math.max(1, ...all);
+  const hasData = all.some((v) => v > 0);
+
+  function xAt(i: number) {
+    if (labels.length <= 1) return padL + plotW / 2;
+    return padL + (i / (labels.length - 1)) * plotW;
+  }
+  function yAt(v: number) {
+    return padT + plotH - (v / max) * plotH;
+  }
+
+  return (
+    <div className="eg-chart-card">
+      {title ? <h4 className="eg-chart-title">{title}</h4> : null}
+      <svg
+        className="eg-line-svg"
+        width="100%"
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label={title}
+        preserveAspectRatio="xMidYMid meet"
+      >
+        {[0, 0.25, 0.5, 0.75, 1].map((t) => {
+          const y = padT + plotH * (1 - t);
+          return (
+            <g key={t}>
+              <line x1={padL} y1={y} x2={width - padR} y2={y} stroke="var(--egouv-line)" strokeWidth="1" />
+              <text x={padL - 6} y={y + 4} textAnchor="end" className="eg-axis-label">
+                {Math.round(max * t)}
+              </text>
+            </g>
+          );
+        })}
+        {series.map((s) => {
+          const pts = s.values
+            .map((v, i) => `${i === 0 ? "M" : "L"} ${xAt(i)} ${yAt(v)}`)
+            .join(" ");
+          return (
+            <g key={s.name}>
+              <path d={pts} fill="none" stroke={s.color} strokeWidth="2.5" strokeLinejoin="round" />
+              {s.values.map((v, i) => (
+                <circle key={`${s.name}-${i}`} cx={xAt(i)} cy={yAt(v)} r="3.5" fill={s.color} />
+              ))}
+            </g>
+          );
+        })}
+        {labels.map((lab, i) => (
+          <text key={lab} x={xAt(i)} y={height - 10} textAnchor="middle" className="eg-axis-label">
+            {lab}
+          </text>
+        ))}
+      </svg>
+      <ul className="eg-chart-legend eg-chart-legend-row">
+        {series.map((s) => (
+          <li key={s.name}>
+            <span className="eg-swatch" style={{ background: s.color }} />
+            {s.name}
+          </li>
+        ))}
+      </ul>
+      {!hasData ? <p className="muted small eg-chart-empty">Pas encore de données disponibles</p> : null}
+    </div>
+  );
+}
+
+/** Mini sparkline pour KPI. */
+export function Sparkline({
+  values,
+  color = "#0b3d91",
+  width = 88,
+  height = 28,
+}: {
+  values: number[];
+  color?: string;
+  width?: number;
+  height?: number;
+}) {
+  const max = Math.max(1, ...values);
+  const pts = values
+    .map((v, i) => {
+      const x = values.length <= 1 ? width / 2 : (i / (values.length - 1)) * width;
+      const y = height - (v / max) * (height - 4) - 2;
+      return `${x},${y}`;
+    })
+    .join(" ");
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden>
+      <polyline fill="none" stroke={color} strokeWidth="2" points={pts} />
+    </svg>
   );
 }
