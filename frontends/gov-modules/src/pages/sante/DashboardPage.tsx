@@ -128,7 +128,7 @@ export default function DashboardPage() {
         <GroupedBarChart
           title="Structures par type"
           series={[{ name: "Structures", color: "#3b6ea5", values: facilityBars.map((f) => f.value) }]}
-          labels={facilityBars.map((f) => f.label)}
+          categories={facilityBars.map((f) => f.label)}
         />
       </div>
     </div>

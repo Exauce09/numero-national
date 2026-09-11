@@ -16,7 +16,9 @@ export type ActType =
   | "ADOPTION"
   | "DISPLACEMENT"
   | "DIVORCE"
-  | "DOCUMENT";
+  | "DOCUMENT"
+  | "RECOGNITION"
+  | "RECTIFICATION";
 
 export type Person = {
   id: string;
@@ -78,6 +80,8 @@ const ACT_ENDPOINT: Record<ActType, string> = {
   DISPLACEMENT: "displacements",
   DIVORCE: "divorces",
   DOCUMENT: "documents",
+  RECOGNITION: "recognitions",
+  RECTIFICATION: "rectifications",
 };
 
 function emptyRegistry(): Registry {
@@ -720,6 +724,8 @@ export function actTypeLabel(type: ActType): string {
     DISPLACEMENT: "Déplacement",
     DIVORCE: "Divorce",
     DOCUMENT: "Document",
+    RECOGNITION: "Reconnaissance",
+    RECTIFICATION: "Rectification",
   };
   return labels[type];
 }

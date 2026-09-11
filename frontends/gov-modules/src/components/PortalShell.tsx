@@ -76,7 +76,7 @@ export default function PortalShell({ portal, brand, tagline, nav, title, childr
       </aside>
 
       <div className="body-wrap">
-        <header className="topbar">
+        <header className="topbar topbar-3">
           <div className="topbar-left">
             <button
               type="button"
@@ -90,7 +90,18 @@ export default function PortalShell({ portal, brand, tagline, nav, title, childr
             </button>
             <h1 className="topbar-title">{title}</h1>
           </div>
-          <span className="topbar-user">{session?.username}</span>
+          <div className="topbar-center">
+            <span className="topbar-role">{session?.roleTitle || brand}</span>
+            {session?.territoryLabel ? (
+              <span className="topbar-commune">{session.territoryLabel}</span>
+            ) : null}
+            <strong className="topbar-responsable">
+              {session?.displayName || session?.username}
+            </strong>
+          </div>
+          <div className="topbar-right">
+            <span className="topbar-user">{session?.username}</span>
+          </div>
         </header>
         <main className="shell">{children}</main>
       </div>

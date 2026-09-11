@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   api,
   type AccountProvisionResult,
@@ -29,7 +29,6 @@ function today() {
 }
 
 export default function AccountWizardPage() {
-  const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

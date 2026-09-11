@@ -79,6 +79,8 @@ def user_to_me(user: User) -> UserMe:
         province_id=user.province_id,
         ville_id=user.ville_id,
         commune_id=user.commune_id,
+        account_status=getattr(user, "account_status", None) or "ACTIVE",
+        last_login_at=getattr(user, "last_login_at", None),
         roles=roles,
         permissions=sorted(permissions),
         created_at=user.created_at,

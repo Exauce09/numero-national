@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getSession } from "../auth";
 import {
   IconBaby,
   IconCar,
@@ -11,6 +12,7 @@ import {
   IconSplit,
   IconUsers,
 } from "../components/Icons";
+import { dashboardVariant } from "../rbac";
 import { ageDays, listActs, listPopulationPersons } from "../registry";
 
 type Tone = "primary" | "success" | "danger" | "warning" | "info" | "secondary" | "pink" | "indigo";
@@ -27,6 +29,8 @@ type DashItem = {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const session = getSession();
+  const variant = dashboardVariant(session?.roles ?? ["OFFICIER_ETAT_CIVIL"]);
   const population = listPopulationPersons();
   const acts = listActs();
   const [query, setQuery] = useState("");
@@ -53,140 +57,218 @@ export default function DashboardPage() {
     };
   }, [acts.length]);
 
-  const items: DashItem[] = [
-    {
-      id: "pop",
-      title: "Population",
-      value: population.length,
-      subtitle: "Vivants hors nouveaux-nés (≤ 90 j)",
-      tone: "primary",
-      href: "/lists/population",
-      icon: <IconUsers size={26} />,
-    },
-    {
-      id: "birth",
-      title: "Naissances",
-      value: births.total,
-      subtitle: `Nouveaux-nés 90 j : ${births.newborns} (G ${births.garcons} · F ${births.filles})`,
-      tone: "success",
-      href: "/lists/naissance",
-      icon: <IconBaby size={26} />,
-    },
-    {
-      id: "death",
-      title: "Décès",
-      value: acts.filter((a) => a.type === "DEATH").length,
-      subtitle: "Actes de décès",
-      tone: "danger",
-      href: "/lists/deces",
-      icon: <IconCross size={26} />,
-    },
-    {
-      id: "marriage",
-      title: "Mariages",
-      value: acts.filter((a) => a.type === "MARRIAGE").length,
-      subtitle: "Unions",
-      tone: "warning",
-      href: "/lists/mariage",
-      icon: <IconRing size={26} />,
-    },
-    {
-      id: "divorce",
-      title: "Divorces",
-      value: acts.filter((a) => a.type === "DIVORCE").length,
-      subtitle: "Dissolutions",
-      tone: "secondary",
-      href: "/lists/divorce",
-      icon: <IconSplit size={26} />,
-    },
-    {
-      id: "adoption",
-      title: "Adoptions",
-      value: acts.filter((a) => a.type === "ADOPTION").length,
-      subtitle: "Actes d'adoption",
-      tone: "indigo",
-      href: "/lists/adoption",
-      icon: <IconUsers size={26} />,
-    },
-    {
-      id: "move",
-      title: "Déplacements",
-      value: acts.filter((a) => a.type === "DISPLACEMENT").length,
-      subtitle: "Mouvements",
-      tone: "info",
-      href: "/lists/deplacement",
-      icon: <IconCar size={26} />,
-    },
-    {
-      id: "census",
-      title: "Recensement",
-      value: acts.filter((a) => a.type === "CENSUS").length,
-      subtitle: "Fiches",
-      tone: "primary",
-      href: "/lists/acts?type=CENSUS",
-      icon: <IconClipboard size={26} />,
-    },
-    {
-      id: "docs",
-      title: "Actes & documents",
-      value: acts.length,
-      subtitle: `${acts.filter((a) => a.type === "DOCUMENT").length} documents émis`,
-      tone: "secondary",
-      href: "/lists/acts",
-      icon: <IconFile size={26} />,
-    },
-  ];
+  const actStatus = (a: (typeof acts)[number]) => String(a.payload?.status ?? "").toUpperCase();
+  const drafts = acts.filter((a) => actStatus(a) === "DRAFT").length;
+  const submitted = acts.filter((a) =>
+    ["SUBMITTED", "UNDER_REVIEW", "VERIFIED"].includes(actStatus(a)),
+  ).length;
+  const validated = acts.filter((a) =>
+    ["VALIDATED", "AUTHENTICATED"].includes(actStatus(a)),
+  ).length;
 
-  const filtered = items.filter(
-    (i) =>
-      !query.trim() ||
-      i.title.toLowerCase().includes(query.trim().toLowerCase()) ||
-      i.subtitle.toLowerCase().includes(query.trim().toLowerCase()),
-  );
+  const lead = useMemo(() => {
+    switch (variant) {
+      case "national":
+        return "Vue nationale — synthèse population, actes et bureaux.";
+      case "provincial":
+        return `Province : ${session?.commune_province ?? "—"}. Données limitées à votre périmètre.`;
+      case "bureau":
+        return `Bureau / commune : ${session?.commune_name ?? "—"}. Pilotage opérationnel du bureau.`;
+      case "officier":
+        return "File de validation et authentification — dossiers à traiter.";
+      default:
+        return "Déclarations et dossiers en cours — préparation des actes.";
+    }
+  }, [variant, session?.commune_province, session?.commune_name]);
+
+  const items: DashItem[] = useMemo(() => {
+    const baseOps: DashItem[] = [
+      {
+        id: "pop",
+        title: "Population",
+        value: population.length,
+        subtitle: "Personnes enregistrées (registre local)",
+        tone: "primary",
+        href: "/lists/population",
+        icon: <IconUsers size={26} />,
+      },
+      {
+        id: "birth",
+        title: "Naissances",
+        value: births.total,
+        subtitle: `Nouveaux-nés 90 j : ${births.newborns} (G ${births.garcons} · F ${births.filles})`,
+        tone: "success",
+        href: "/lists/naissance",
+        icon: <IconBaby size={26} />,
+      },
+      {
+        id: "death",
+        title: "Décès",
+        value: acts.filter((a) => a.type === "DEATH").length,
+        subtitle: "Actes de décès",
+        tone: "danger",
+        href: "/lists/deces",
+        icon: <IconCross size={26} />,
+      },
+      {
+        id: "marriage",
+        title: "Mariages",
+        value: acts.filter((a) => a.type === "MARRIAGE").length,
+        subtitle: "Unions",
+        tone: "warning",
+        href: "/lists/mariage",
+        icon: <IconRing size={26} />,
+      },
+      {
+        id: "divorce",
+        title: "Divorces",
+        value: acts.filter((a) => a.type === "DIVORCE").length,
+        subtitle: "Dissolutions",
+        tone: "secondary",
+        href: "/lists/divorce",
+        icon: <IconSplit size={26} />,
+      },
+      {
+        id: "docs",
+        title: "Documents / actes",
+        value: acts.length,
+        subtitle: "Tous types",
+        tone: "info",
+        href: "/acts",
+        icon: <IconFile size={26} />,
+      },
+    ];
+
+    if (variant === "agent") {
+      return [
+        {
+          id: "drafts",
+          title: "Brouillons",
+          value: drafts,
+          subtitle: "À compléter",
+          tone: "warning",
+          href: "/manage/naissance",
+          icon: <IconClipboard size={26} />,
+        },
+        {
+          id: "submitted",
+          title: "Soumis",
+          value: submitted,
+          subtitle: "En attente de vérification",
+          tone: "info",
+          href: "/declarations",
+          icon: <IconClipboard size={26} />,
+        },
+        baseOps[1],
+        baseOps[2],
+        {
+          id: "decl",
+          title: "Déclarations santé",
+          value: 0,
+          subtitle: "File hôpital → état civil",
+          tone: "pink",
+          href: "/declarations",
+          icon: <IconBaby size={26} />,
+        },
+        {
+          id: "search",
+          title: "Population",
+          value: population.length,
+          subtitle: "Recherche personne",
+          tone: "primary",
+          href: "/population",
+          icon: <IconUsers size={26} />,
+        },
+      ];
+    }
+
+    if (variant === "officier") {
+      return [
+        {
+          id: "to-verify",
+          title: "À vérifier / valider",
+          value: submitted,
+          subtitle: "Dossiers soumis",
+          tone: "warning",
+          href: "/declarations",
+          icon: <IconClipboard size={26} />,
+        },
+        {
+          id: "authenticated",
+          title: "Validés",
+          value: validated,
+          subtitle: "Actes authentifiés / validés",
+          tone: "success",
+          href: "/acts",
+          icon: <IconFile size={26} />,
+        },
+        baseOps[1],
+        baseOps[2],
+        baseOps[3],
+        baseOps[4],
+      ];
+    }
+
+    if (variant === "bureau") {
+      return [
+        ...baseOps.slice(0, 4),
+        {
+          id: "queue",
+          title: "File du bureau",
+          value: drafts + submitted,
+          subtitle: "Brouillons + soumis",
+          tone: "indigo",
+          href: "/declarations",
+          icon: <IconClipboard size={26} />,
+        },
+        {
+          id: "census",
+          title: "Recensement",
+          value: 0,
+          subtitle: "Campagnes / coupons",
+          tone: "info",
+          href: "/census",
+          icon: <IconCar size={26} />,
+        },
+      ];
+    }
+
+    // provincial / national — full set
+    return baseOps;
+  }, [variant, population.length, births, acts, drafts, submitted, validated]);
+
+  const filtered = items.filter((it) => {
+    if (!query.trim()) return true;
+    const q = query.toLowerCase();
+    return it.title.toLowerCase().includes(q) || it.subtitle.toLowerCase().includes(q);
+  });
 
   return (
     <div>
-      <div className="eg-page-head">
-        <div>
-          <h2 className="page-title">Tableau de bord</h2>
-          <p className="page-lead">
-            Accueil communal style{" "}
-            <a href="https://www.justicia.website/egouv/COMMUNE/accueil.php" target="_blank" rel="noreferrer">
-              e-gov Justicia
-            </a>{" "}
-            — cliquez une carte pour ouvrir le détail.
-          </p>
-        </div>
-        <div className="eg-page-tools">
-          <input
-            className="form-control"
-            style={{ marginBottom: 0, minWidth: 220 }}
-            placeholder="Filtrer les indicateurs…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
+      <h2 className="page-title">Tableau de bord</h2>
+      <p className="page-lead">{lead}</p>
+      <div className="toolbar">
+        <input
+          className="form-control"
+          placeholder="Filtrer les indicateurs…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
       </div>
-
       <div className="eg-widget-grid">
-        {filtered.map((item) => (
+        {filtered.map((it) => (
           <button
-            key={item.id}
+            key={it.id}
             type="button"
-            className="eg-widget"
-            onClick={() => navigate(item.href)}
+            className={`eg-widget eg-widget-${it.tone}`}
+            onClick={() => navigate(it.href)}
           >
+            <div className="eg-widget-icon">{it.icon}</div>
             <div className="eg-widget-body">
-              <div className="eg-widget-text">
-                <span className="eg-widget-value">{item.value}</span>
-                <span className="eg-widget-title">{item.title}</span>
-                <span className="eg-widget-sub">{item.subtitle}</span>
-              </div>
-              <span className={`eg-widget-icon tone-${item.tone}`}>{item.icon}</span>
+              <div className="eg-widget-title">{it.title}</div>
+              <div className="eg-widget-value">{it.value}</div>
+              <div className="eg-widget-sub">{it.subtitle}</div>
             </div>
-            <span className="eg-widget-foot">
-              Voir le détail <span aria-hidden="true">→</span>
-            </span>
           </button>
         ))}
       </div>

@@ -41,12 +41,12 @@ export default function LoginPage() {
     <div className="login-page">
       <div className="login-card">
         <img className="login-logo" src="/logo-rdc.jpg" alt="République Démocratique du Congo" />
-        <h1 className="login-title">E-GOUV — État civil</h1>
-        <p className="login-subtitle">Portail Officier d&apos;état civil · Commune</p>
+        <h1 className="login-title">Système national de gestion de la population</h1>
+        <p className="login-subtitle">E-GOUV — Portail état civil · Accès sécurisé</p>
         <form onSubmit={(e) => void onSubmit(e)} method="post" action="#" autoComplete="off">
-          {error ? <div className="login-error">{error}</div> : null}
+          {error ? <div className="login-error" role="alert">{error}</div> : null}
           <label className="form-label" htmlFor="username">
-            Identifiant (email)
+            Identifiant / email
           </label>
           <input
             id="username"
@@ -56,6 +56,7 @@ export default function LoginPage() {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoComplete="username"
+            disabled={busy}
           />
           <label className="form-label" htmlFor="password">
             Mot de passe
@@ -67,6 +68,7 @@ export default function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
+            disabled={busy}
           />
           <button
             type="button"
@@ -77,20 +79,18 @@ export default function LoginPage() {
               setError(null);
             }}
           >
-            Remplir le compte officier API
+            Remplir le compte officier de démonstration
           </button>
           <button className="btn-primary" type="submit" disabled={busy}>
             {busy ? "Connexion…" : "Se connecter"}
           </button>
         </form>
         <p className="login-subtitle" style={{ marginTop: "1.25rem", marginBottom: 0 }}>
-          Compte : <strong>{DEMO_API_EMAIL}</strong>
+          Aide : compte démo <strong>{DEMO_API_EMAIL}</strong>
           <br />
-          Mot de passe : <strong>{DEMO_API_PASSWORD}</strong>
+          <span className="muted">Alias local : {DEMO_USER} / {DEMO_PASSWORD}</span>
           <br />
-          <span className="muted">
-            Alias local : {DEMO_USER} / {DEMO_PASSWORD}
-          </span>
+          <span className="muted">Mot de passe oublié — contactez votre administrateur territorial.</span>
         </p>
       </div>
     </div>

@@ -122,6 +122,8 @@ class UserMe(BaseModel):
     province_id: UUID | None = None
     ville_id: UUID | None = None
     commune_id: UUID | None = None
+    account_status: str | None = None
+    last_login_at: datetime | None = None
     roles: list[str] = Field(default_factory=list)
     permissions: list[str] = Field(default_factory=list)
     created_at: datetime

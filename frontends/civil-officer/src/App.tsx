@@ -2,6 +2,7 @@ import type { FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { clearSession, DEMO_PASSWORD, getSession, updateSession } from "./auth";
+import { canSeeNav } from "./rbac";
 import {
   clearHealthSession,
   getHealthSession,
@@ -543,6 +544,14 @@ function Shell() {
   const communeLabel = session?.commune_name
     ? `Commune de ${session.commune_name}`
     : null;
+  const territoryLine = [
+    session?.commune_province,
+    session?.commune_ville,
+    session?.commune_name ? `Commune de ${session.commune_name}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const roles = session?.roles ?? ["OFFICIER_ETAT_CIVIL"];
   const badge = unreadCount();
   const photo = prefs.photoDataUrl || session?.photoDataUrl;
 
@@ -560,7 +569,7 @@ function Shell() {
         <div className="sidebar-brand">
           <img src="/logo-rdc.jpg" alt="RDC" />
           <strong>État civil</strong>
-          <span>E-GOUV · Commune</span>
+          <span>E-GOUV · {roleTitle}</span>
           <button
             type="button"
             className="sidebar-close"
@@ -571,68 +580,106 @@ function Shell() {
           </button>
         </div>
         <nav className="sidebar-nav">
-          <NavLink to="/" end>
-            <IconDashboard size={18} /> Tableau de bord
-          </NavLink>
-          <NavLink
-            to="/synoptique/naissances"
-            className={({ isActive }) =>
-              isActive || location.pathname.startsWith("/synoptique") ? "active" : undefined
-            }
-          >
-            <IconTable size={18} /> Tableau synoptique
-          </NavLink>
-          <NavLink to="/population">
-            <IconUsers size={18} /> Population
-          </NavLink>
-          <NavLink to="/manage/naissance">
-            <IconBaby size={18} /> Naissances
-          </NavLink>
-          <NavLink to="/census">
-            <IconClipboard size={18} /> Recensement
-          </NavLink>
-          <NavLink to="/census/scan-coupon">
-            <IconClipboard size={18} /> Scan coupon APK
-          </NavLink>
-          <NavLink to="/manage/deces">
-            <IconCross size={18} /> Décès
-          </NavLink>
-          <NavLink to="/manage/mariage">
-            <IconRing size={18} /> Mariages
-          </NavLink>
-          <NavLink to="/manage/adoption">
-            <IconHome size={18} /> Adoption
-          </NavLink>
-          <NavLink to="/manage/deplacement">
-            <IconCar size={18} /> Déplacement
-          </NavLink>
-          <NavLink to="/manage/divorce">
-            <IconSplit size={18} /> Divorce
-          </NavLink>
-          <NavLink to="/acts">
-            <IconFile size={18} /> Actes & documents
-          </NavLink>
-          <NavLink to="/cartes-livraison">
-            <IconFile size={18} /> Livraison cartes ID
-          </NavLink>
-          <NavLink to="/declarations">
-            <IconClipboard size={18} /> Déclarations santé
-          </NavLink>
-          <NavLink to="/transcriptions">
-            <IconFile size={18} /> Transcriptions
-          </NavLink>
-          <NavLink to="/admin/bureaux">
-            <IconHome size={18} /> Bureaux EC
-          </NavLink>
-          <NavLink to="/admin/personnel">
-            <IconUsers size={18} /> Personnel
-          </NavLink>
-          <NavLink to="/admin/account-requests">
-            <IconClipboard size={18} /> Demandes de compte
-          </NavLink>
-          <NavLink to="/verify-document">
-            <IconFile size={18} /> Vérifier document
-          </NavLink>
+          {canSeeNav("dashboard", roles) ? (
+            <NavLink to="/" end>
+              <IconDashboard size={18} /> Tableau de bord
+            </NavLink>
+          ) : null}
+          {canSeeNav("synoptique", roles) ? (
+            <NavLink
+              to="/synoptique/naissances"
+              className={({ isActive }) =>
+                isActive || location.pathname.startsWith("/synoptique") ? "active" : undefined
+              }
+            >
+              <IconTable size={18} /> Tableau synoptique
+            </NavLink>
+          ) : null}
+          {canSeeNav("population", roles) ? (
+            <NavLink to="/population">
+              <IconUsers size={18} /> Population
+            </NavLink>
+          ) : null}
+          {canSeeNav("naissances", roles) ? (
+            <NavLink to="/manage/naissance">
+              <IconBaby size={18} /> Naissances
+            </NavLink>
+          ) : null}
+          {canSeeNav("census", roles) ? (
+            <NavLink to="/census">
+              <IconClipboard size={18} /> Recensement
+            </NavLink>
+          ) : null}
+          {canSeeNav("census", roles) ? (
+            <NavLink to="/census/scan-coupon">
+              <IconClipboard size={18} /> Scan coupon APK
+            </NavLink>
+          ) : null}
+          {canSeeNav("deces", roles) ? (
+            <NavLink to="/manage/deces">
+              <IconCross size={18} /> Décès
+            </NavLink>
+          ) : null}
+          {canSeeNav("mariages", roles) ? (
+            <NavLink to="/manage/mariage">
+              <IconRing size={18} /> Mariages
+            </NavLink>
+          ) : null}
+          {canSeeNav("naissances", roles) ? (
+            <NavLink to="/manage/adoption">
+              <IconHome size={18} /> Adoption
+            </NavLink>
+          ) : null}
+          {canSeeNav("census", roles) ? (
+            <NavLink to="/manage/deplacement">
+              <IconCar size={18} /> Déplacement
+            </NavLink>
+          ) : null}
+          {canSeeNav("divorces", roles) ? (
+            <NavLink to="/manage/divorce">
+              <IconSplit size={18} /> Divorce
+            </NavLink>
+          ) : null}
+          {canSeeNav("documents", roles) ? (
+            <NavLink to="/acts">
+              <IconFile size={18} /> Actes & documents
+            </NavLink>
+          ) : null}
+          {canSeeNav("cartes", roles) ? (
+            <NavLink to="/cartes-livraison">
+              <IconFile size={18} /> Livraison cartes ID
+            </NavLink>
+          ) : null}
+          {canSeeNav("declarations", roles) ? (
+            <NavLink to="/declarations">
+              <IconClipboard size={18} /> Déclarations santé
+            </NavLink>
+          ) : null}
+          {canSeeNav("validation", roles) ? (
+            <NavLink to="/transcriptions">
+              <IconFile size={18} /> Transcriptions
+            </NavLink>
+          ) : null}
+          {canSeeNav("admin_bureaux", roles) ? (
+            <NavLink to="/admin/bureaux">
+              <IconHome size={18} /> Bureaux EC
+            </NavLink>
+          ) : null}
+          {canSeeNav("admin_personnel", roles) ? (
+            <NavLink to="/admin/personnel">
+              <IconUsers size={18} /> Personnel
+            </NavLink>
+          ) : null}
+          {canSeeNav("admin_accounts", roles) ? (
+            <NavLink to="/admin/account-requests">
+              <IconClipboard size={18} /> Demandes de compte
+            </NavLink>
+          ) : null}
+          {canSeeNav("documents", roles) ? (
+            <NavLink to="/verify-document">
+              <IconFile size={18} /> Vérifier document
+            </NavLink>
+          ) : null}
         </nav>
         <div className="sidebar-foot">
           <button type="button" className="btn-logout" style={{ width: "100%" }} onClick={logout}>
@@ -659,7 +706,9 @@ function Shell() {
 
           <div className="topbar-center" title={roleTitle}>
             <span className="topbar-role">{roleTitle}</span>
-            {communeLabel ? <span className="topbar-commune">{communeLabel}</span> : null}
+            {territoryLine ? <span className="topbar-commune">{territoryLine}</span> : communeLabel ? (
+              <span className="topbar-commune">{communeLabel}</span>
+            ) : null}
             <strong className="topbar-responsable">{responsableLabel}</strong>
           </div>
 
