@@ -37,6 +37,23 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
   bool _useMorpho = false;
   String _morphoSensor = '';
 
+  String get _fingerLabel {
+    switch (widget.hand) {
+      case 'pouce_droit':
+        return 'pouce droit';
+      case 'index_droit':
+        return 'index droit';
+      case 'index_gauche':
+        return 'index gauche';
+      case 'gauche':
+        return 'main gauche';
+      case 'droite':
+        return 'main droite';
+      default:
+        return widget.hand;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -74,7 +91,7 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
           _morphoReady = prep['ok'] == true;
           _morphoSensor = prep['sensor']?.toString() ?? '';
           _info = _morphoReady
-              ? 'Capteur Morpho prêt (${_morphoSensor.isEmpty ? 'CBM-E3' : _morphoSensor}). Posez le doigt ${widget.hand} puis Capturer.'
+              ? 'Capteur Morpho prêt (${_morphoSensor.isEmpty ? 'CBM-E3' : _morphoSensor}). Posez le $_fingerLabel puis Lire.'
               : 'Capteur Morpho non prêt';
           _error = null;
           _systemBio = false;
@@ -117,7 +134,7 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
         if (!_systemBio) {
           _error = 'Enregistrez une empreinte dans Réglages → Sécurité';
         } else {
-          _info = 'Posez le doigt ${widget.hand} sur le capteur du téléphone';
+          _info = 'Posez le $_fingerLabel sur le capteur du téléphone';
         }
       });
     } catch (_) {
@@ -134,7 +151,7 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
     setState(() {
       _busy = true;
       _error = null;
-      _info = 'Allumage du lecteur… posez le doigt ${widget.hand} sur le capteur (lumière rouge).';
+      _info = 'Allumage du lecteur… posez le $_fingerLabel sur le capteur (lumière rouge).';
     });
     try {
       if (!_morphoReady) {
@@ -151,14 +168,14 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
       setState(() {
         _ref = stored;
         _info =
-            'Empreinte ${widget.hand} OK — qualité ${out['quality'] ?? '—'} (${out['template_len'] ?? 0} o)';
+            '$_fingerLabel OK — qualité ${out['quality'] ?? '—'} (${out['template_len'] ?? 0} o)';
         _error = null;
       });
       widget.onCaptured(stored);
     } on PlatformException catch (e) {
       setState(() {
         _error = e.message ?? 'Échec capture Morpho';
-        _info = 'Reposez le doigt sur le capteur optique et réessayez.';
+        _info = 'Reposez le $_fingerLabel sur le capteur optique et réessayez.';
       });
     } catch (e) {
       setState(() => _error = e.toString());
@@ -178,7 +195,7 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
         return;
       }
       final ok = await _auth.authenticate(
-        localizedReason: 'Empreinte ${widget.hand}',
+        localizedReason: 'Empreinte $_fingerLabel',
         options: const AuthenticationOptions(
           biometricOnly: true,
           stickyAuth: true,
@@ -218,7 +235,7 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
           const SizedBox(height: 6),
           Text(
             done
-                ? 'Empreinte ${widget.hand} enregistrée'
+                ? 'Empreinte $_fingerLabel enregistrée'
                 : (_info ?? 'Capteur d’empreinte'),
             style: TextStyle(
               color: done ? NnColors.success : NnColors.muted,
@@ -240,10 +257,10 @@ class _FingerprintCaptureWidgetState extends State<FingerprintCaptureWidget> {
               _busy
                   ? (_useMorpho ? 'Lecture Morpho…' : 'Capteur…')
                   : (done
-                      ? 'Reprendre (${widget.hand})'
+                      ? 'Reprendre ($_fingerLabel)'
                       : (_useMorpho
-                          ? 'Lire empreinte Morpho (${widget.hand})'
-                          : 'Capturer ${widget.hand}')),
+                          ? 'Lire $_fingerLabel'
+                          : 'Capturer $_fingerLabel')),
             ),
           ),
           if (_useMorpho && !done) ...[

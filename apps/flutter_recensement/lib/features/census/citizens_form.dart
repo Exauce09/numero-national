@@ -61,6 +61,9 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
   late final TextEditingController _tribu;
   late final TextEditingController _empreinteGauche;
   late final TextEditingController _empreinteDroite;
+  late final TextEditingController _empreintePouceDroit;
+  late final TextEditingController _empreinteIndexDroit;
+  late final TextEditingController _empreinteIndexGauche;
   late final TextEditingController _iris;
   late final TextEditingController _etudesRemarques;
   late final TextEditingController _anneeFinEtudes;
@@ -183,6 +186,26 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
         TextEditingController(text: payload['empreinte_gauche']?.toString() ?? '');
     _empreinteDroite =
         TextEditingController(text: payload['empreinte_droite']?.toString() ?? '');
+    // 3 doigts distincts (AFIS) — rétrocompat avec gauche/droite.
+    final fpMap = payload['empreintes'];
+    String fpOf(String key, String fallback) {
+      if (fpMap is Map && fpMap[key] != null && fpMap[key].toString().trim().isNotEmpty) {
+        return fpMap[key].toString();
+      }
+      final direct = payload[key]?.toString() ?? '';
+      if (direct.trim().isNotEmpty) return direct;
+      return fallback;
+    }
+
+    _empreintePouceDroit = TextEditingController(
+      text: fpOf('empreinte_pouce_droit', _empreinteDroite.text),
+    );
+    _empreinteIndexDroit = TextEditingController(
+      text: fpOf('empreinte_index_droit', ''),
+    );
+    _empreinteIndexGauche = TextEditingController(
+      text: fpOf('empreinte_index_gauche', _empreinteGauche.text),
+    );
     _iris = TextEditingController(text: payload['iris']?.toString() ?? '');
 
     final etudes = EtudesData.parse(
@@ -341,6 +364,9 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     _tribu.dispose();
     _empreinteGauche.dispose();
     _empreinteDroite.dispose();
+    _empreintePouceDroit.dispose();
+    _empreinteIndexDroit.dispose();
+    _empreinteIndexGauche.dispose();
     _iris.dispose();
     _etudesRemarques.dispose();
     _anneeFinEtudes.dispose();
@@ -540,8 +566,17 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
       'secteur_chefferie_commune': _geoOrigine['commune_name'],
       'village_origine': _geoOrigine['localite_name'],
       'tribu': _tribu.text.trim(),
-      'empreinte_gauche': _empreinteGauche.text.trim(),
-      'empreinte_droite': _empreinteDroite.text.trim(),
+      'empreinte_pouce_droit': _empreintePouceDroit.text.trim(),
+      'empreinte_index_droit': _empreinteIndexDroit.text.trim(),
+      'empreinte_index_gauche': _empreinteIndexGauche.text.trim(),
+      // Rétrocompat sync / API existante
+      'empreinte_gauche': _empreinteIndexGauche.text.trim(),
+      'empreinte_droite': _empreintePouceDroit.text.trim(),
+      'empreintes': {
+        'pouce_droit': _empreintePouceDroit.text.trim(),
+        'index_droit': _empreinteIndexDroit.text.trim(),
+        'index_gauche': _empreinteIndexGauche.text.trim(),
+      },
       'iris': _iris.text.trim(),
       'fingerprint_ref': _fingerprintRef,
       'parcours_scolaire': _buildEtudes().formatScolaire(),
@@ -1282,27 +1317,56 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               border: Border.all(color: const Color(0xFFE6A23C).withValues(alpha: 0.45)),
             ),
             child: const Text(
-              'MorphoTablet — commencez par les empreintes (capteur optique en haut à gauche), puis la photo.',
+              'MorphoTablet — 3 doigts distincts sur le capteur optique (LED rouge), puis la photo.',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, height: 1.35),
             ),
           ),
         _section('3. Biométrie', [
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F6FF),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.25)),
+            ),
+            child: const Text(
+              '3 doigts distincts : 1) Pouce droit — 2) Index droit — 3) Index gauche. '
+              'Chaque lecture doit être un doigt différent.',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, height: 1.35),
+            ),
+          ),
           if (AppConfig.isFingerprintDevice) ...[
             FingerprintCaptureWidget(
-              label: 'Empreinte main gauche',
-              hand: 'gauche',
-              initialRef: _empreinteGauche.text.trim().isEmpty ? null : _empreinteGauche.text.trim(),
+              label: '1. Pouce droit',
+              hand: 'pouce_droit',
+              initialRef:
+                  _empreintePouceDroit.text.trim().isEmpty ? null : _empreintePouceDroit.text.trim(),
               onCaptured: (ref) => setState(() {
-                _empreinteGauche.text = ref;
+                _empreintePouceDroit.text = ref;
+                _empreinteDroite.text = ref;
                 _fingerprintRef = ref;
               }),
             ),
             FingerprintCaptureWidget(
-              label: 'Empreinte main droite',
-              hand: 'droite',
-              initialRef: _empreinteDroite.text.trim().isEmpty ? null : _empreinteDroite.text.trim(),
+              label: '2. Index droit',
+              hand: 'index_droit',
+              initialRef:
+                  _empreinteIndexDroit.text.trim().isEmpty ? null : _empreinteIndexDroit.text.trim(),
               onCaptured: (ref) => setState(() {
-                _empreinteDroite.text = ref;
+                _empreinteIndexDroit.text = ref;
+                _fingerprintRef ??= ref;
+              }),
+            ),
+            FingerprintCaptureWidget(
+              label: '3. Index gauche',
+              hand: 'index_gauche',
+              initialRef: _empreinteIndexGauche.text.trim().isEmpty
+                  ? null
+                  : _empreinteIndexGauche.text.trim(),
+              onCaptured: (ref) => setState(() {
+                _empreinteIndexGauche.text = ref;
+                _empreinteGauche.text = ref;
                 _fingerprintRef ??= ref;
               }),
             ),
@@ -1312,29 +1376,44 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               onCaptured: (ref) => setState(() => _photoRef = ref),
             ),
           ] else ...[
-          PhotoCaptureWidget(
-            initialRef: _photoRef,
-            onCaptured: (ref) => setState(() => _photoRef = ref),
-          ),
-          const SizedBox(height: 8),
-          FingerprintCaptureWidget(
-            label: 'Empreinte main gauche',
-            hand: 'gauche',
-            initialRef: _empreinteGauche.text.trim().isEmpty ? null : _empreinteGauche.text.trim(),
-            onCaptured: (ref) => setState(() {
-              _empreinteGauche.text = ref;
-              _fingerprintRef = ref;
-            }),
-          ),
-          FingerprintCaptureWidget(
-            label: 'Empreinte main droite',
-            hand: 'droite',
-            initialRef: _empreinteDroite.text.trim().isEmpty ? null : _empreinteDroite.text.trim(),
-            onCaptured: (ref) => setState(() {
-              _empreinteDroite.text = ref;
-              _fingerprintRef ??= ref;
-            }),
-          ),
+            PhotoCaptureWidget(
+              initialRef: _photoRef,
+              onCaptured: (ref) => setState(() => _photoRef = ref),
+            ),
+            const SizedBox(height: 8),
+            FingerprintCaptureWidget(
+              label: '1. Pouce droit',
+              hand: 'pouce_droit',
+              initialRef:
+                  _empreintePouceDroit.text.trim().isEmpty ? null : _empreintePouceDroit.text.trim(),
+              onCaptured: (ref) => setState(() {
+                _empreintePouceDroit.text = ref;
+                _empreinteDroite.text = ref;
+                _fingerprintRef = ref;
+              }),
+            ),
+            FingerprintCaptureWidget(
+              label: '2. Index droit',
+              hand: 'index_droit',
+              initialRef:
+                  _empreinteIndexDroit.text.trim().isEmpty ? null : _empreinteIndexDroit.text.trim(),
+              onCaptured: (ref) => setState(() {
+                _empreinteIndexDroit.text = ref;
+                _fingerprintRef ??= ref;
+              }),
+            ),
+            FingerprintCaptureWidget(
+              label: '3. Index gauche',
+              hand: 'index_gauche',
+              initialRef: _empreinteIndexGauche.text.trim().isEmpty
+                  ? null
+                  : _empreinteIndexGauche.text.trim(),
+              onCaptured: (ref) => setState(() {
+                _empreinteIndexGauche.text = ref;
+                _empreinteGauche.text = ref;
+                _fingerprintRef ??= ref;
+              }),
+            ),
           ],
           IrisCaptureWidget(
             initialRef: _iris.text.trim().isEmpty ? null : _iris.text.trim(),
