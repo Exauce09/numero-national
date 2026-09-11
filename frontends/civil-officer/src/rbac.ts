@@ -29,7 +29,8 @@ export type NavKey =
   | "admin_accounts"
   | "documents"
   | "cartes"
-  | "search";
+  | "search"
+  | "biometrie";
 
 const NATIONAL = new Set(["SUPER_ADMIN_NATIONAL", "ADMIN_NATIONAL", "CENTRAL_ADMIN"]);
 const PROVINCIAL = new Set(["ADMIN_PROVINCIAL"]);
@@ -124,6 +125,16 @@ export function canSeeNav(key: NavKey, roles: string[], permissions?: string[] |
       return (isLead || isProvincial || isNational) && (hasAccountReq || hasUserManage || perms.length === 0);
     case "cartes":
       return isOfficier || isLead || isProvincial || isNational;
+    case "biometrie":
+      return (
+        can("biometric:enroll", perms) ||
+        can("biometric:match", perms) ||
+        isOfficier ||
+        isLead ||
+        isProvincial ||
+        isNational ||
+        isAgent
+      );
     default:
       return false;
   }

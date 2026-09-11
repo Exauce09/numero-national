@@ -69,6 +69,9 @@ import ManageNaissancePage from "./pages/ManageNaissancePage";
 import SynopticPage from "./pages/SynopticPage";
 import ManageActsPage, { MANAGE_CONFIGS } from "./components/ManageActsPage";
 import TerritoryPage from "./pages/TerritoryPage";
+import BiometricDashboardPage from "./pages/BiometricDashboardPage";
+import BiometricEnrollPage from "./pages/BiometricEnrollPage";
+import BiometricIdentifyPage from "./pages/BiometricIdentifyPage";
 import TopbarSearch from "./components/TopbarSearch";
 import {
   IconBaby,
@@ -617,6 +620,16 @@ function Shell() {
               <IconUsers size={18} /> Population
             </NavLink>
           ) : null}
+          {canSeeNav("biometrie", roles, permissions) ? (
+            <NavLink
+              to="/biometrie"
+              className={({ isActive }) =>
+                isActive || location.pathname.startsWith("/biometrie") ? "active" : undefined
+              }
+            >
+              <IconClipboard size={18} /> Biométrie
+            </NavLink>
+          ) : null}
           {canSeeNav("naissances", roles, permissions) ? (
             <NavLink to="/manage/naissance">
               <IconBaby size={18} /> Naissances
@@ -787,6 +800,9 @@ function Shell() {
             <Route path="/synoptique/:section" element={<SynopticPage />} />
             <Route path="/population" element={<PopulationPage />} />
             <Route path="/population/:id" element={<PersonDetailPage />} />
+            <Route path="/biometrie" element={<BiometricDashboardPage />} />
+            <Route path="/biometrie/enrolement" element={<BiometricEnrollPage />} />
+            <Route path="/biometrie/identification" element={<BiometricIdentifyPage />} />
             <Route path="/lists/population" element={<PopulationPage showAnalytics />} />
             <Route path="/personnes" element={<Navigate to="/population" replace />} />
             <Route path="/personnes/:id" element={<PersonDetailRedirect />} />

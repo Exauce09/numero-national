@@ -41,6 +41,7 @@ PERM_CENSUS_SYNC = "census:sync"
 PERM_CENSUS_MANAGE = "census:manage"
 PERM_BIOMETRIC_ENROLL = "biometric:enroll"
 PERM_BIOMETRIC_MATCH = "biometric:match"
+PERM_BIOMETRIC_REVIEW = "biometric:review"
 PERM_HEALTH_DECLARE = "health:declare"
 PERM_HEALTH_READ = "health:read"
 PERM_ONIP_DASHBOARD = "onip:dashboard"
@@ -80,6 +81,7 @@ ALL_DOMAIN_PERMISSIONS: tuple[str, ...] = (
     PERM_CENSUS_MANAGE,
     PERM_BIOMETRIC_ENROLL,
     PERM_BIOMETRIC_MATCH,
+    PERM_BIOMETRIC_REVIEW,
     PERM_HEALTH_DECLARE,
     PERM_HEALTH_READ,
     PERM_ONIP_DASHBOARD,

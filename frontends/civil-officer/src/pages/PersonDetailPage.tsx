@@ -15,6 +15,7 @@ type TabId =
   | "deces"
   | "mentions"
   | "documents"
+  | "biometrie"
   | "historique";
 
 const TABS: { id: TabId; label: string }[] = [
@@ -27,6 +28,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "deces", label: "Décès" },
   { id: "mentions", label: "Mentions" },
   { id: "documents", label: "Documents" },
+  { id: "biometrie", label: "Biométrie" },
   { id: "historique", label: "Historique" },
 ];
 
@@ -48,6 +50,15 @@ export default function PersonDetailPage() {
   const [tab, setTab] = useState<TabId>("identite");
   const [citizen, setCitizen] = useState<CitizenDetail | null>(null);
   const [events, setEvents] = useState<PersonCivilEvent[]>([]);
+  const [prints, setPrints] = useState<
+    Array<{
+      id: string;
+      finger_label: string;
+      quality_score: number | null;
+      status: string;
+      created_at: string;
+    }>
+  >([]);
   const [local, setLocal] = useState<Person | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
@@ -86,6 +97,12 @@ export default function PersonDetailPage() {
           if (!cancelled) setEvents(hist.events ?? []);
         } catch {
           if (!cancelled) setEvents([]);
+        }
+        try {
+          const fp = await api.biometricCitizenPrints(detail.id);
+          if (!cancelled) setPrints(fp);
+        } catch {
+          if (!cancelled) setPrints([]);
         }
       } catch (e) {
         if (!cancelled) {
@@ -324,6 +341,48 @@ export default function PersonDetailPage() {
                       </li>
                     ))}
                   </ul>
+                )}
+              </div>
+            ) : null}
+
+            {tab === "biometrie" ? (
+              <div>
+                <p>
+                  Empreintes enregistrées : <strong>{prints.length} / 3</strong>
+                </p>
+                <div className="action-row" style={{ marginBottom: "0.75rem" }}>
+                  <Link className="btn-primary btn-sm" to={`/biometrie/enrolement?citizen=${id}`}>
+                    Enrôler / compléter
+                  </Link>
+                  <Link className="btn-secondary btn-sm" to="/biometrie/identification">
+                    Identification 1:N
+                  </Link>
+                </div>
+                {prints.length === 0 ? (
+                  <p className="muted">Aucune empreinte active (gabarits jamais affichés ici).</p>
+                ) : (
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Doigt</th>
+                        <th>Qualité</th>
+                        <th>Statut</th>
+                        <th>Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {prints.map((p) => (
+                        <tr key={p.id}>
+                          <td>{p.finger_label}</td>
+                          <td>{p.quality_score != null ? `${p.quality_score} %` : "—"}</td>
+                          <td>
+                            <span className="status-badge">{p.status}</span>
+                          </td>
+                          <td>{new Date(p.created_at).toLocaleDateString("fr-CD")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
               </div>
             ) : null}

@@ -280,6 +280,106 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ rejection_reason: reason }),
     }),
+
+  biometricFingers: () =>
+    request<{ positions: Array<{ code: string; label: string }> }>("/biometric/fingers"),
+
+  biometricStartEnrollment: (body: { citizen_id: string; device_id?: string }) =>
+    request<{
+      id: string;
+      citizen_id: string;
+      status: string;
+      required_fingers: number;
+      fingerprints_count: number;
+    }>("/biometric/enrollments", { method: "POST", body: JSON.stringify(body) }),
+
+  biometricCapture: (
+    enrollmentId: string,
+    body: {
+      finger_position: string;
+      template_b64: string;
+      quality_score?: number;
+      capture_device?: string;
+    },
+  ) =>
+    request<{
+      accepted: boolean;
+      blocked: boolean;
+      decision: string;
+      finger_position: string;
+      fingerprint_id?: string;
+      quality_score?: number;
+      message: string;
+      fingerprints_count: number;
+      required_fingers: number;
+      match?: {
+        id: string;
+        matched_citizen_id: string;
+        match_score: number;
+        threshold_used: number;
+        decision: string;
+        finger_position?: string;
+        matched_finger_label?: string;
+        review_status: string;
+      };
+      candidates: Array<{
+        citizen_id: string;
+        score: number;
+        finger_position?: string;
+        finger_label?: string;
+      }>;
+    }>(`/biometric/enrollments/${enrollmentId}/capture`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  biometricFinalize: (enrollmentId: string) =>
+    request<{ id: string; status: string }>(`/biometric/enrollments/${enrollmentId}/finalize`, {
+      method: "POST",
+      body: "{}",
+    }),
+
+  biometricCitizenPrints: (citizenId: string) =>
+    request<
+      Array<{
+        id: string;
+        finger_position: string;
+        finger_label: string;
+        quality_score: number | null;
+        status: string;
+        created_at: string;
+      }>
+    >(`/biometric/citizens/${citizenId}/fingerprints`),
+
+  biometricIdentify: (body: {
+    modality?: string;
+    template_b64: string;
+    max_candidates?: number;
+  }) =>
+    request<{
+      decision: string;
+      session_id: string;
+      candidates: Array<{
+        citizen_id: string;
+        template_id: string;
+        score: number;
+        finger_position?: string | null;
+        finger_label?: string | null;
+      }>;
+    }>("/biometric/identify", { method: "POST", body: JSON.stringify(body) }),
+
+  biometricStats: () =>
+    request<{
+      enrollments: number;
+      fingerprints_active: number;
+      matches_total: number;
+      strong_matches: number;
+      pending_reviews: number;
+      blocked_enrollments: number;
+      average_quality: number | null;
+      note: string;
+    }>("/biometric/stats"),
+
   createAssignment: (body: Record<string, unknown>) =>
     request<Record<string, unknown>>("/iam/assignments", {
       method: "POST",

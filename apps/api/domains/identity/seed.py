@@ -98,6 +98,8 @@ ROLE_PERMISSION_MAP: dict[str, tuple[str, ...]] = {
         "cards:issue",
         "cards:manage",
         "bureau:read",
+        "biometric:enroll",
+        "biometric:match",
     ),
     "AGENT_ETAT_CIVIL": (
         "civil:act:read",
@@ -108,6 +110,7 @@ ROLE_PERMISSION_MAP: dict[str, tuple[str, ...]] = {
         "documents:read",
         "documents:write",
         "bureau:read",
+        "biometric:enroll",
     ),
     "AUDITEUR": (
         "audit:read",
@@ -151,6 +154,9 @@ ROLE_PERMISSION_MAP: dict[str, tuple[str, ...]] = {
         "cards:issue",
         "cards:manage",
         "bureau:read",
+        "biometric:enroll",
+        "biometric:match",
+        "biometric:review",
     ),
     "HEALTH_AGENT": (
         "health:declare",
@@ -174,6 +180,7 @@ ROLE_PERMISSION_MAP: dict[str, tuple[str, ...]] = {
         "cards:verify",
         "biometric:enroll",
         "biometric:match",
+        "biometric:review",
         "audit:read",
         "census:manage",
     ),
