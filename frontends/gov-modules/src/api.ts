@@ -223,4 +223,183 @@ export const api = {
     request<UserMe>(`/rbac/users/${userId}/active?is_active=${active}`, {
       method: "PATCH",
     }),
+
+  // --- IAM account administration ---
+  accountsList: (status?: string) => {
+    const q = new URLSearchParams();
+    if (status) q.set("status", status);
+    return request<AccountListResponse>(`/iam/accounts?${q}`);
+  },
+  accountDetail: (id: string) => request<AccountDetail>(`/iam/accounts/${id}`),
+  accountHistory: (id: string) => request<HistoryEvent[]>(`/iam/accounts/${id}/history`),
+  assignableRoles: () => request<AssignableRolesResponse>("/iam/accounts/assignable-roles"),
+  provisionAccount: (body: Record<string, unknown>) =>
+    request<AccountProvisionResult>("/iam/accounts/provision", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  changeRole: (id: string, body: { role_code: string; reason: string }) =>
+    request<AccountDetail>(`/iam/accounts/${id}/change-role`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  changeAssignment: (id: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/iam/accounts/${id}/change-assignment`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  resetAccess: (id: string) =>
+    request<AccountProvisionResult>(`/iam/accounts/${id}/reset-access`, { method: "POST" }),
+  suspendUser: (id: string, reason: string, until?: string) =>
+    request<Record<string, unknown>>(`/iam/users/${id}/suspend`, {
+      method: "POST",
+      body: JSON.stringify({ reason, until: until || null }),
+    }),
+  disableUser: (id: string, reason: string) =>
+    request<Record<string, unknown>>(`/iam/users/${id}/disable`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }),
+  activateUser: (id: string, reason: string) =>
+    request<Record<string, unknown>>(`/iam/users/${id}/activate`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }),
+  searchPersonnel: (q: string) =>
+    request<Personnel[]>(`/iam/personnel?q=${encodeURIComponent(q)}`),
+  personnelAccountCheck: (id: string) =>
+    request<{ has_active_account: boolean; user_id?: string; account_status?: string }>(
+      `/iam/personnel/${id}/account-check`,
+    ),
+  createPersonnel: (body: Record<string, unknown>) =>
+    request<Personnel>("/iam/personnel", { method: "POST", body: JSON.stringify(body) }),
+  listBureaux: (params: Record<string, string | undefined>) => {
+    const q = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v) q.set(k, v);
+    });
+    return request<Bureau[]>(`/iam/bureaux?${q}`);
+  },
+  geoProvinces: () => softRequest<GeoItem[]>("/geo/provinces", []),
+  geoVilles: (provinceId: string) =>
+    softRequest<GeoItem[]>(`/geo/villes?province_id=${encodeURIComponent(provinceId)}`, []),
+  geoCommunes: (villeId: string) =>
+    softRequest<GeoItem[]>(`/geo/communes?ville_id=${encodeURIComponent(villeId)}`, []),
+  activateInvite: (token: string, password: string) =>
+    request<UserMe>("/auth/activate-invite", {
+      method: "POST",
+      body: JSON.stringify({ token, password }),
+    }),
 };
+export type AccountStats = {
+  total: number;
+  active: number;
+  pending: number;
+  suspended: number;
+  disabled: number;
+};
+
+export type AccountListItem = {
+  id: string;
+  email: string;
+  full_name: string;
+  account_status: string;
+  is_active: boolean;
+  role_codes: string[];
+  personnel_id?: string | null;
+  personnel_matricule?: string | null;
+  personnel_name?: string | null;
+  function_code?: string | null;
+  bureau_id?: string | null;
+  bureau_name?: string | null;
+  last_login_at?: string | null;
+  created_at: string;
+};
+
+export type AccountListResponse = { stats: AccountStats; items: AccountListItem[] };
+
+export type AccountDetail = {
+  user: AccountListItem;
+  personnel: Personnel | null;
+  assignment: Assignment | null;
+  scopes: Scope[];
+  permissions: string[];
+};
+
+export type AccountProvisionResult = {
+  user_id: string;
+  email: string;
+  username: string;
+  account_status: string;
+  role_codes: string[];
+  personnel_id: string;
+  assignment_id: string;
+  invite_token?: string | null;
+  invite_url?: string | null;
+  message: string;
+};
+
+export type AssignableRolesResponse = {
+  roles: Array<{
+    code: string;
+    name: string;
+    description?: string | null;
+    permissions: string[];
+  }>;
+};
+
+export type HistoryEvent = {
+  id: string;
+  action: string;
+  created_at: string;
+  actor_id?: string | null;
+  result?: string | null;
+  justification?: string | null;
+  old_value?: Record<string, unknown> | null;
+  new_value?: Record<string, unknown> | null;
+};
+
+export type Personnel = {
+  id: string;
+  matricule: string;
+  family_name: string;
+  postnom?: string | null;
+  given_names: string;
+  function_title?: string | null;
+  phone_pro?: string | null;
+  email_pro?: string | null;
+  status: string;
+};
+
+export type Bureau = {
+  id: string;
+  code: string;
+  name: string;
+  province_id?: string | null;
+  ville_id?: string | null;
+  commune_id?: string | null;
+  commune_code?: string | null;
+  status: string;
+};
+
+export type Assignment = {
+  id: string;
+  personnel_id: string;
+  bureau_id?: string | null;
+  province_id?: string | null;
+  function_code: string;
+  start_date: string;
+  end_date?: string | null;
+  status: string;
+  justification?: string | null;
+};
+
+export type Scope = {
+  id: string;
+  user_id: string;
+  scope_type: string;
+  territory_id?: string | null;
+  bureau_id?: string | null;
+};
+
+export type GeoItem = { id: string; code?: string; name: string };

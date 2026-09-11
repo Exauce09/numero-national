@@ -24,7 +24,10 @@ import AlertsPage from "./pages/presidence/AlertsPage";
 import BriefingPage from "./pages/presidence/BriefingPage";
 
 import AdminDashboard from "./pages/admin/DashboardPage";
-import UsersPage from "./pages/admin/UsersPage";
+import UsersAdminPage from "./pages/admin/UsersAdminPage";
+import AccountWizardPage from "./pages/admin/AccountWizardPage";
+import AccountDetailPage from "./pages/admin/AccountDetailPage";
+import ActivateInvitePage from "./pages/admin/ActivateInvitePage";
 import RolesPage from "./pages/admin/RolesPage";
 import InstitutionsPage from "./pages/admin/InstitutionsPage";
 import AuditPage from "./pages/admin/AuditPage";
@@ -61,7 +64,7 @@ const PRESIDENCE_NAV: NavItem[] = [
 
 const ADMIN_NAV: NavItem[] = [
   { to: "/admin", label: "Tableau de bord" },
-  { to: "/admin/utilisateurs", label: "Utilisateurs" },
+  { to: "/administration/utilisateurs", label: "Utilisateurs" },
   { to: "/admin/roles", label: "Rôles" },
   { to: "/admin/institutions", label: "Institutions" },
   { to: "/admin/audit", label: "Audit" },
@@ -179,6 +182,8 @@ export default function App() {
           />
         }
       />
+      <Route path="/admin/activation" element={<ActivateInvitePage />} />
+
       <Route
         path="/admin/*"
         element={
@@ -192,12 +197,36 @@ export default function App() {
             >
               <Routes>
                 <Route index element={<AdminDashboard />} />
-                <Route path="utilisateurs" element={<UsersPage />} />
+                <Route path="utilisateurs" element={<UsersAdminPage />} />
+                <Route path="utilisateurs/nouveau" element={<AccountWizardPage />} />
+                <Route path="utilisateurs/:id" element={<AccountDetailPage />} />
                 <Route path="roles" element={<RolesPage />} />
                 <Route path="institutions" element={<InstitutionsPage />} />
                 <Route path="audit" element={<AuditPage />} />
                 <Route path="config" element={<ConfigPage />} />
                 <Route path="*" element={<Navigate to="/admin" replace />} />
+              </Routes>
+            </PortalShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/administration/*"
+        element={
+          <RequireAuth portal="admin">
+            <PortalShell
+              portal="admin"
+              brand="Admin"
+              tagline="E-GOUV · IAM & config"
+              nav={ADMIN_NAV}
+              title="Administration système"
+            >
+              <Routes>
+                <Route path="utilisateurs" element={<UsersAdminPage />} />
+                <Route path="utilisateurs/nouveau" element={<AccountWizardPage />} />
+                <Route path="utilisateurs/:id" element={<AccountDetailPage />} />
+                <Route path="*" element={<Navigate to="/administration/utilisateurs" replace />} />
               </Routes>
             </PortalShell>
           </RequireAuth>

@@ -18,6 +18,7 @@ import CardPage from "./pages/Card";
 import DashboardPage from "./pages/Dashboard";
 import DocumentsPage from "./pages/Documents";
 import LoginPage from "./pages/LoginPage";
+import CitizenRegisterPage from "./pages/CitizenRegisterPage";
 
 function RequireAuth({ children }: { children: ReactNode }) {
   if (!getSession()) return <Navigate to="/login" replace />;
@@ -357,6 +358,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/espace-citoyen/inscription" element={<CitizenRegisterPage />} />
+      <Route path="/inscription" element={<Navigate to="/espace-citoyen/inscription" replace />} />
       <Route
         path="/*"
         element={

@@ -34,6 +34,7 @@ from apps.api.domains.identity.schemas import (
     UserRegister,
     UserUpdate,
 )
+from apps.api.domains.identity.iam_schemas import CitizenRegisterRequest, InviteActivateRequest
 from apps.api.domains.identity.seed import seed_roles_and_permissions
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
@@ -151,6 +152,38 @@ async def login(
         result="success",
     )
     return tokens
+
+
+@auth_router.post("/activate-invite", response_model=UserMe, summary="Activate PENDING account via invitation")
+async def activate_invite(
+    payload: InviteActivateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> UserMe:
+    from apps.api.domains.identity import account_admin_services as admin
+    from apps.api.domains.identity.seed import seed_roles_and_permissions
+
+    await seed_roles_and_permissions(db)
+    user = await admin.activate_invite(db, payload)
+    return identity_services.user_to_me(user)
+
+
+@auth_router.post(
+    "/citizen/register",
+    response_model=UserMe,
+    status_code=status.HTTP_201_CREATED,
+    summary="Citizen self-registration (no administrative roles)",
+)
+async def citizen_register(
+    payload: CitizenRegisterRequest,
+    db: AsyncSession = Depends(get_db),
+) -> UserMe:
+    from apps.api.domains.identity import account_admin_services as admin
+    from apps.api.domains.identity.seed import seed_roles_and_permissions
+
+    await seed_roles_and_permissions(db)
+    # Refuse if body somehow tries to sneak privileged data — schema has none.
+    user = await admin.register_citizen(db, payload)
+    return identity_services.user_to_me(user)
 
 
 @auth_router.post("/refresh", response_model=TokenPair, summary="Refresh access token (rotating)")

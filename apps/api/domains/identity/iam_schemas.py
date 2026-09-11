@@ -96,6 +96,8 @@ class AssignmentCreate(BaseModel):
     province_id: UUID | None = None
     function_code: str = Field(min_length=2, max_length=64)
     start_date: date
+    end_date: date | None = None
+    open_ended: bool = False
     justification: str | None = None
     document_reference: str | None = None
 
@@ -178,3 +180,144 @@ class AccountRequestRead(BaseModel):
 class UserStatusAction(BaseModel):
     reason: str = Field(min_length=3)
     until: datetime | None = None
+
+
+# --- Account administration (wizard + lifecycle) ---------------------------------
+
+
+class AccountProvisionPersonnel(BaseModel):
+    mode: str = Field(description="select | create")
+    personnel_id: UUID | None = None
+    new_personnel: PersonnelCreate | None = None
+
+
+class AccountProvisionAssignment(BaseModel):
+    province_id: UUID
+    ville_id: UUID | None = None
+    commune_id: UUID | None = None
+    bureau_id: UUID
+    function_code: str = Field(min_length=2, max_length=64)
+    start_date: date
+    end_date: date | None = None
+    open_ended: bool = True
+    justification: str | None = None
+    document_reference: str | None = None
+
+
+class AccountProvisionCredentials(BaseModel):
+    username: str = Field(min_length=3, max_length=64)
+    email: EmailStr | None = None
+    phone: str | None = None
+    access_mode: str = Field(default="invite", description="invite | temporary_password")
+    temporary_password: str | None = Field(default=None, min_length=8)
+
+
+class AccountProvisionCreate(BaseModel):
+    """Orchestrated PERSONNEL → AFFECTATION → COMPTE → RÔLE → SCOPE."""
+
+    personnel: AccountProvisionPersonnel
+    assignment: AccountProvisionAssignment
+    credentials: AccountProvisionCredentials
+    role_code: str = Field(min_length=2, max_length=64)
+    scope_type: str | None = None  # auto if omitted
+
+
+class AccountProvisionResult(BaseModel):
+    user_id: UUID
+    email: str
+    username: str
+    account_status: str
+    role_codes: list[str]
+    personnel_id: UUID
+    assignment_id: UUID
+    invite_token: str | None = None
+    invite_url: str | None = None
+    message: str
+
+
+class AccountListItem(BaseModel):
+    id: UUID
+    email: str
+    full_name: str
+    account_status: str
+    is_active: bool
+    role_codes: list[str]
+    personnel_id: UUID | None = None
+    personnel_matricule: str | None = None
+    personnel_name: str | None = None
+    function_code: str | None = None
+    bureau_id: UUID | None = None
+    bureau_name: str | None = None
+    last_login_at: datetime | None = None
+    created_at: datetime
+
+
+class AccountStats(BaseModel):
+    total: int
+    active: int
+    pending: int
+    suspended: int
+    disabled: int
+
+
+class AccountListResponse(BaseModel):
+    stats: AccountStats
+    items: list[AccountListItem]
+
+
+class AccountDetail(BaseModel):
+    user: AccountListItem
+    personnel: PersonnelRead | None = None
+    assignment: AssignmentRead | None = None
+    scopes: list[ScopeRead] = Field(default_factory=list)
+    permissions: list[str] = Field(default_factory=list)
+
+
+class RoleChangeRequest(BaseModel):
+    role_code: str = Field(min_length=2, max_length=64)
+    reason: str = Field(min_length=3)
+
+
+class AssignmentChangeRequest(BaseModel):
+    bureau_id: UUID
+    province_id: UUID | None = None
+    ville_id: UUID | None = None
+    commune_id: UUID | None = None
+    function_code: str = Field(min_length=2, max_length=64)
+    start_date: date
+    end_date: date | None = None
+    open_ended: bool = True
+    justification: str | None = None
+    document_reference: str | None = None
+
+
+class InviteActivateRequest(BaseModel):
+    token: str = Field(min_length=16)
+    password: str = Field(min_length=8, max_length=128)
+
+
+class CitizenRegisterRequest(BaseModel):
+    family_name: str = Field(min_length=1, max_length=128)
+    postnom: str | None = None
+    given_names: str = Field(min_length=1, max_length=128)
+    date_of_birth: date
+    email: EmailStr | None = None
+    phone: str | None = None
+    username: str = Field(min_length=3, max_length=64)
+    password: str = Field(min_length=8, max_length=128)
+    password_confirm: str = Field(min_length=8, max_length=128)
+
+
+class HistoryEvent(BaseModel):
+    id: UUID
+    action: str
+    created_at: datetime
+    actor_id: UUID | None = None
+    result: str | None = None
+    justification: str | None = None
+    old_value: dict[str, Any] | None = None
+    new_value: dict[str, Any] | None = None
+
+
+class AssignableRolesResponse(BaseModel):
+    roles: list[dict[str, Any]]

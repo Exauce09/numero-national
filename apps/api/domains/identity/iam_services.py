@@ -241,10 +241,14 @@ async def create_assignment(
         if bureau is None or bureau.status != "ACTIVE":
             raise HTTPException(status_code=400, detail="Bureau must exist and be ACTIVE")
     row = Assignment(
-        **payload.model_dump(),
+        **payload.model_dump(exclude={"open_ended"}),
         assigned_by=actor_id,
         status=AssignmentStatus.ACTIVE.value,
     )
+    if getattr(payload, "open_ended", False):
+        row.end_date = None
+    if row.end_date is not None and row.end_date < row.start_date:
+        raise HTTPException(status_code=400, detail="date_fin must be >= date_debut")
     db.add(row)
     await db.flush()
     await write_audit(
@@ -522,7 +526,11 @@ async def set_user_account_status(
         await _revoke_user_refresh_sessions(db, user_id)
     await write_audit(
         db,
-        action=f"user.{account_status.lower()}",
+        action={
+            AccountStatus.ACTIVE.value: "ACCOUNT_REACTIVATED",
+            AccountStatus.SUSPENDED.value: "ACCOUNT_SUSPENDED",
+            AccountStatus.DISABLED.value: "ACCOUNT_DISABLED",
+        }.get(account_status, f"user.{account_status.lower()}"),
         actor_id=actor.id,
         resource_type="user",
         resource_id=str(user.id),
@@ -555,6 +563,14 @@ async def user_has_bureau_access(db: AsyncSession, user: User, bureau_id: UUID) 
     for s in scopes:
         if s.scope_type == "NATIONAL":
             return True
+    # Explicit BUREAU scopes restrict to listed bureaux (mutation-safe).
+    bureau_scopes = [s for s in scopes if s.scope_type == "BUREAU" and s.bureau_id]
+    if bureau_scopes:
+        if any(s.bureau_id == bureau_id for s in bureau_scopes):
+            return True
+        assignment = await get_active_assignment_for_user(db, user)
+        return bool(assignment and assignment.bureau_id == bureau_id)
+    for s in scopes:
         if s.bureau_id == bureau_id:
             return True
         # Resolve PROVINCE / VILLE / COMMUNE scopes against bureau geography.

@@ -12,18 +12,26 @@ from apps.api.core.security import get_current_user, require_permissions, user_p
 from apps.api.db.session import get_db
 from apps.api.domains.identity import iam_services
 from apps.api.domains.identity.iam_schemas import (
+    AccountDetail,
+    AccountListResponse,
+    AccountProvisionCreate,
+    AccountProvisionResult,
     AccountRequestApprove,
     AccountRequestCreate,
     AccountRequestRead,
     AccountRequestReject,
+    AssignableRolesResponse,
+    AssignmentChangeRequest,
     AssignmentCreate,
     AssignmentRead,
     BureauCreate,
     BureauRead,
     BureauUpdate,
+    HistoryEvent,
     PersonnelCreate,
     PersonnelRead,
     PersonnelUpdate,
+    RoleChangeRequest,
     ScopeCreate,
     ScopeRead,
     UserStatusAction,
@@ -52,13 +60,36 @@ async def create_personnel(
 
 @iam_router.get("/personnel", response_model=list[PersonnelRead])
 async def list_personnel(
+    q: str | None = None,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_permissions("personnel:read")),
 ) -> list[PersonnelRead]:
-    rows = await iam_services.list_personnel(db, limit=limit, offset=offset)
+    from apps.api.domains.identity import account_admin_services as admin
+
+    if q:
+        rows = await admin.searchable_personnel(db, q=q, limit=limit)
+    else:
+        rows = await iam_services.list_personnel(db, limit=limit, offset=offset)
     return [PersonnelRead.model_validate(r) for r in rows]
+
+
+@iam_router.get("/personnel/{personnel_id}/account-check")
+async def personnel_account_check(
+    personnel_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions("personnel:read")),
+) -> dict:
+    from apps.api.domains.identity import account_admin_services as admin
+
+    existing = await admin.personnel_has_active_account(db, personnel_id)
+    return {
+        "personnel_id": str(personnel_id),
+        "has_active_account": existing is not None,
+        "user_id": str(existing.id) if existing else None,
+        "account_status": existing.account_status if existing else None,
+    }
 
 
 @iam_router.patch("/personnel/{personnel_id}", response_model=PersonnelRead)
@@ -85,10 +116,33 @@ async def create_bureau(
 @iam_router.get("/bureaux", response_model=list[BureauRead])
 async def list_bureaux(
     commune_code: str | None = None,
+    province_id: UUID | None = None,
+    ville_id: UUID | None = None,
+    commune_id: UUID | None = None,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_permissions("bureau:read")),
+    actor: User = Depends(require_permissions("bureau:read")),
 ) -> list[BureauRead]:
-    rows = await iam_services.list_bureaux(db, commune_code=commune_code)
+    from apps.api.domains.identity import account_admin_services as admin
+
+    if province_id or ville_id or commune_id:
+        rows = await admin.list_bureaux_scoped(
+            db,
+            actor,
+            province_id=province_id,
+            ville_id=ville_id,
+            commune_id=commune_id,
+            commune_code=commune_code,
+        )
+    else:
+        rows = await iam_services.list_bureaux(db, commune_code=commune_code)
+        # Still filter by actor scope when listing broadly
+        roles = iam_services.user_role_codes(actor)
+        if not (roles & {"SUPER_ADMIN_NATIONAL", "CENTRAL_ADMIN", "ADMIN_NATIONAL"}):
+            filtered = []
+            for b in rows:
+                if await iam_services.user_has_bureau_access(db, actor, b.id):
+                    filtered.append(b)
+            rows = filtered
     return [BureauRead.model_validate(r) for r in rows]
 
 
@@ -216,9 +270,9 @@ async def activate_user(
     db: AsyncSession = Depends(get_db),
     actor: User = Depends(require_permissions("users:manage")),
 ) -> dict:
-    user = await iam_services.set_user_account_status(
-        db, user_id, account_status="ACTIVE", reason=payload.reason, actor=actor
-    )
+    from apps.api.domains.identity import account_admin_services as admin
+
+    user = await admin.reactivate_account(db, user_id, actor=actor, reason=payload.reason)
     return {"id": str(user.id), "account_status": user.account_status, "is_active": user.is_active}
 
 
@@ -258,3 +312,103 @@ async def bureau_access_check(
     if not ok:
         raise HTTPException(status_code=403, detail="Outside territorial scope")
     return {"bureau_id": str(bureau_id), "allowed": True}
+
+
+# --- Account administration (wizard lifecycle) ---------------------------------
+
+
+@iam_router.get("/accounts", response_model=AccountListResponse)
+async def list_accounts(
+    status_filter: str | None = Query(None, alias="status"),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    actor: User = Depends(require_permissions("users:manage")),
+) -> AccountListResponse:
+    from apps.api.domains.identity import account_admin_services as admin
+
+    return await admin.list_accounts(
+        db, actor, status_filter=status_filter, limit=limit, offset=offset
+    )
+
+
+@iam_router.get("/accounts/assignable-roles", response_model=AssignableRolesResponse)
+async def assignable_roles(
+    db: AsyncSession = Depends(get_db),
+    actor: User = Depends(require_permissions("users:manage")),
+) -> AssignableRolesResponse:
+    from apps.api.domains.identity import account_admin_services as admin
+
+    return await admin.assignable_roles_for_actor(db, actor)
+
+
+@iam_router.post("/accounts/provision", response_model=AccountProvisionResult, status_code=201)
+async def provision_account(
+    payload: AccountProvisionCreate,
+    db: AsyncSession = Depends(get_db),
+    actor: User = Depends(require_permissions("users:manage")),
+) -> AccountProvisionResult:
+    from apps.api.domains.identity import account_admin_services as admin
+
+    return await admin.provision_account(db, payload, actor=actor)
+
+
+@iam_router.get("/accounts/{user_id}", response_model=AccountDetail)
+async def get_account(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    actor: User = Depends(require_permissions("users:manage")),
+) -> AccountDetail:
+    from apps.api.domains.identity import account_admin_services as admin
+
+    return await admin.get_account_detail(db, actor, user_id)
+
+
+@iam_router.get("/accounts/{user_id}/history", response_model=list[HistoryEvent])
+async def account_history(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    actor: User = Depends(require_permissions("users:manage")),
+) -> list[HistoryEvent]:
+    from apps.api.domains.identity import account_admin_services as admin
+
+    await admin.get_account_detail(db, actor, user_id)
+    return await admin.account_history(db, user_id)
+
+
+@iam_router.post("/accounts/{user_id}/change-role", response_model=AccountDetail)
+async def change_role(
+    user_id: UUID,
+    payload: RoleChangeRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: User = Depends(require_permissions("users:manage")),
+) -> AccountDetail:
+    from apps.api.domains.identity import account_admin_services as admin
+
+    await admin.change_role(db, user_id, payload, actor=actor)
+    return await admin.get_account_detail(db, actor, user_id)
+
+
+@iam_router.post("/accounts/{user_id}/change-assignment", response_model=AssignmentRead)
+async def change_assignment(
+    user_id: UUID,
+    payload: AssignmentChangeRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: User = Depends(require_permissions("assignment:manage")),
+) -> AssignmentRead:
+    from apps.api.domains.identity import account_admin_services as admin
+
+    row = await admin.change_assignment(db, user_id, payload, actor=actor)
+    return AssignmentRead.model_validate(row)
+
+
+@iam_router.post("/accounts/{user_id}/reset-access", response_model=AccountProvisionResult)
+async def reset_access(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    actor: User = Depends(require_permissions("users:manage")),
+) -> AccountProvisionResult:
+    from apps.api.domains.identity import account_admin_services as admin
+
+    return await admin.reset_access_invite(db, user_id, actor=actor)
+
