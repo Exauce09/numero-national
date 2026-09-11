@@ -48,6 +48,35 @@ from apps.api.domains.recensement.schemas import (
 )
 
 
+def _kinshasa_fallback_coords() -> tuple[float, float]:
+    """Approximate Kinshasa centre — keeps manual addresses visible on the map."""
+    return (-4.3276, 15.3136)
+
+
+def _ensure_geo_fields(data: dict[str, Any]) -> tuple[float | None, float | None, str | None]:
+    """Resolve lat/lng + address_source; never leave manual households without coords."""
+    src = _resolve_address_source(data)
+    lat = data.get("latitude")
+    lng = data.get("longitude")
+    try:
+        lat_f = float(lat) if lat is not None and lat != "" else None
+    except (TypeError, ValueError):
+        lat_f = None
+    try:
+        lng_f = float(lng) if lng is not None and lng != "" else None
+    except (TypeError, ValueError):
+        lng_f = None
+    if (lat_f is None or lng_f is None) and (
+        src == "manual" or data.get("address_line") or data.get("geo_label")
+    ):
+        lat_f, lng_f = _kinshasa_fallback_coords()
+        if src is None:
+            src = "manual"
+    if src is None and lat_f is not None and lng_f is not None:
+        src = "gps"
+    return lat_f, lng_f, src
+
+
 def _resolve_address_source(data: dict[str, Any]) -> str | None:
     """Normalize address origin for cartography filters."""
     raw = (
@@ -57,17 +86,21 @@ def _resolve_address_source(data: dict[str, Any]) -> str | None:
     )
     if raw is None:
         if data.get("latitude") is not None and data.get("longitude") is not None:
+            # gps_source absent → treat as gps only if coords look precise; else manual
             return "gps"
-        if data.get("address_line"):
+        if data.get("address_line") or data.get("geo_label"):
             return "manual"
         return None
     s = str(raw).strip().lower()
-    if s in {"manual", "manual_offline", "cascade", "offline_manual"}:
+    if s in {"manual", "manual_offline", "cascade", "offline_manual", "offline"}:
+        # "offline" without real GPS device fix → manual cartography bucket
+        if s == "offline" and data.get("latitude") is not None:
+            return "gps"
         return "manual"
     if s in {"online", "nominatim"}:
         return "online"
-    if s in {"gps", "offline", "offline_kinshasa"}:
-        return "gps" if s == "gps" else ("online" if s == "online" else "gps")
+    if s in {"gps", "offline_kinshasa"}:
+        return "gps"
     return s[:32] or None
 
 
@@ -163,14 +196,15 @@ async def sync_push(db: AsyncSession, req: SyncPushRequest) -> SyncPushResult:
                 )
             ).scalar_one_or_none()
             # Idempotent upsert by (campaign, local_id). Last push wins for household fields.
+            lat, lng, src = _ensure_geo_fields(item.data)
             if existing is None:
                 hh = Household(
                     campaign_id=req.campaign_id,
                     local_id=item.local_id,
                     address_line=item.data.get("address_line"),
-                    latitude=item.data.get("latitude"),
-                    longitude=item.data.get("longitude"),
-                    address_source=_resolve_address_source(item.data),
+                    latitude=lat,
+                    longitude=lng,
+                    address_source=src,
                     member_count=int(item.data.get("member_count") or 0),
                     collected_by=req.agent_user_id,
                     device_id=device.id,
@@ -180,13 +214,16 @@ async def sync_push(db: AsyncSession, req: SyncPushRequest) -> SyncPushResult:
                 await db.flush()
             else:
                 existing.address_line = item.data.get("address_line", existing.address_line)
-                if "latitude" in item.data:
-                    existing.latitude = item.data.get("latitude")
-                if "longitude" in item.data:
-                    existing.longitude = item.data.get("longitude")
-                src = _resolve_address_source(item.data)
+                if lat is not None:
+                    existing.latitude = lat
+                elif existing.latitude is None and (src == "manual" or existing.address_line):
+                    existing.latitude, existing.longitude = _kinshasa_fallback_coords()
+                if lng is not None:
+                    existing.longitude = lng
                 if src:
                     existing.address_source = src
+                elif existing.address_source is None and existing.latitude is None:
+                    existing.address_source = "manual"
                 existing.member_count = int(
                     item.data.get("member_count") or existing.member_count or 0
                 )

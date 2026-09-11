@@ -77,6 +77,11 @@ class Settings(BaseSettings):
     # Biométrie — local (démo) | abis (proxy HTTP vers moteur externe)
     biometric_provider: str = Field(default="local", alias="BIOMETRIC_PROVIDER")
     biometric_abis_url: str | None = Field(default=None, alias="BIOMETRIC_ABIS_URL")
+    # Pont ZK9500 EngX sur le PC hôte (Docker → host.docker.internal)
+    zkteco_bridge_url: str = Field(
+        default="http://host.docker.internal:18765",
+        alias="ZKTECO_BRIDGE_URL",
+    )
 
     @field_validator("secret_key")
     @classmethod

@@ -1,4 +1,4 @@
-/** Identification biométrique 1:N — DEMO local ou capture ZK9500 (pont local). */
+/** Identification biométrique 1:N — capture ZK9500 réelle uniquement. */
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -7,18 +7,8 @@ import { getSession } from "../auth";
 
 const ZK_BRIDGE = "http://127.0.0.1:18765";
 
-function b64FromText(text: string): string {
-  const bytes = new TextEncoder().encode(text);
-  let binary = "";
-  bytes.forEach((b) => {
-    binary += String.fromCharCode(b);
-  });
-  return btoa(binary);
-}
-
 export default function BiometricIdentifyPage() {
   const hasApi = Boolean(getSession()?.accessToken);
-  const [sampleKey, setSampleKey] = useState("demo-print-A");
   const [finger, setFinger] = useState("INDEX_DROIT");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,30 +23,6 @@ export default function BiometricIdentifyPage() {
     }>;
   } | null>(null);
 
-  async function identifyWithTemplate(template_b64: string) {
-    const res = await api.biometricIdentify({
-      modality: "FINGERPRINT",
-      template_b64,
-      max_candidates: 5,
-    });
-    setResult({ decision: res.decision, candidates: res.candidates });
-  }
-
-  async function runDemo() {
-    setBusy(true);
-    setError(null);
-    setResult(null);
-    setBridgeNote(null);
-    try {
-      const template_b64 = b64FromText(`FINGERPRINT|${sampleKey}|${finger}|v1`);
-      await identifyWithTemplate(template_b64);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Recherche impossible");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function runZkteco() {
     setBusy(true);
     setError(null);
@@ -66,21 +32,19 @@ export default function BiometricIdentifyPage() {
       const health = await fetch(`${ZK_BRIDGE}/health`).then((r) => r.json()).catch(() => null);
       if (!health) {
         throw new Error(
-          "Pont ZK9500 indisponible. Sur ce PC : py -3 scripts/zkteco_bridge.py (USB branché).",
+          "Pont ZK9500 indisponible. Lancez scripts\\start-zkteco-bridge.ps1 (USB branché).",
         );
       }
       if (health.demo || !health.sdk_loaded) {
-        throw new Error(
-          "Pont en mode DEMO ou SDK non chargé. Relancez : py -3 scripts/zkteco_bridge.py (ZKTECO_DEMO=0).",
-        );
+        throw new Error("Pont ZK non prêt (sdk_loaded=false). Relancez le bridge EngX.");
       }
       setBridgeNote(
-        `ZK9500 réel — posez le doigt maintenant (${health.device_count || 1} lecteur)…`,
+        `ZK9500 SN ${health.sensor_sn || "?"} — posez le doigt maintenant…`,
       );
       const cap = await fetch(`${ZK_BRIDGE}/capture`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ finger_position: finger, timeout_ms: 20000 }),
+        body: JSON.stringify({ finger_position: finger, timeout_ms: 30000 }),
       }).then(async (r) => {
         const body = (await r.json().catch(() => ({}))) as {
           template_b64?: string;
@@ -89,22 +53,20 @@ export default function BiometricIdentifyPage() {
           device?: string;
           detail?: string;
         };
-        if (!r.ok) {
-          throw new Error(body.detail || `Capture ZK ${r.status}`);
-        }
-        return body as {
-          template_b64: string;
-          note?: string;
-          demo?: boolean;
-          device?: string;
-        };
+        if (!r.ok) throw new Error(body.detail || `Capture ZK ${r.status}`);
+        if (body.demo) throw new Error("Mode DEMO refusé");
+        if (!body.template_b64) throw new Error("Template vide");
+        return body as { template_b64: string; note?: string; device?: string };
       });
-      setBridgeNote(
-        `${cap.device || "ZK9500"}${cap.demo ? " (DEMO)" : " (RÉEL)"} — ${cap.note || "Capture OK"}`,
-      );
-      await identifyWithTemplate(cap.template_b64);
+      setBridgeNote(`${cap.device || "ZK9500"} (RÉEL) — ${cap.note || "Capture OK"} — recherche 1:N…`);
+      const res = await api.biometricIdentify({
+        modality: "FINGERPRINT",
+        template_b64: cap.template_b64,
+        max_candidates: 5,
+      });
+      setResult({ decision: res.decision, candidates: res.candidates });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Capture ZK impossible");
+      setError(e instanceof Error ? e.message : "Capture / recherche impossible");
     } finally {
       setBusy(false);
     }
@@ -117,18 +79,18 @@ export default function BiometricIdentifyPage() {
       </p>
       <h2 className="page-title">Identification biométrique 1:N</h2>
       <p className="page-lead">
-        Recherche population. Morpho (tablette) et ZKTeco (USB) exigent un ABIS pour le
-        cross-matching constructeur. Une correspondance n&apos;est pas une preuve juridique.
+        Recherche dans la population à partir d&apos;une empreinte capturée sur le ZK9500
+        (même lecteur que pour l&apos;enrôlement).
       </p>
       <div className="dash-demo-banner">
-        ZK9500 détecté côté PC → lancez le pont local, puis « Capturer ZK9500 ».
+        Lancez le pont EngX, posez le doigt, puis « Capturer ZK9500 + rechercher ».
       </div>
 
       {!hasApi ? (
         <p className="muted">Connexion API requise (permission biometric:match).</p>
       ) : (
         <div className="panel">
-          <label className="form-label">Doigt</label>
+          <label className="form-label">Doigt (libellé)</label>
           <select className="form-control" value={finger} onChange={(e) => setFinger(e.target.value)}>
             <option value="INDEX_DROIT">Index droit</option>
             <option value="POUCE_DROIT">Pouce droit</option>
@@ -136,70 +98,38 @@ export default function BiometricIdentifyPage() {
           </select>
           <div className="action-row" style={{ marginTop: "1rem" }}>
             <button type="button" className="btn-primary" disabled={busy} onClick={() => void runZkteco()}>
-              {busy ? "…" : "Capturer ZK9500 + rechercher"}
+              {busy ? "Capture / recherche…" : "Capturer ZK9500 + rechercher"}
             </button>
           </div>
-          <hr style={{ margin: "1.25rem 0", borderColor: "#e6ebf2" }} />
-          <label className="form-label">Fallback échantillon DEMO (sans lecteur)</label>
-          <select className="form-control" value={sampleKey} onChange={(e) => setSampleKey(e.target.value)}>
-            <option value="demo-print-A">Échantillon A</option>
-            <option value="demo-print-B">Échantillon B</option>
-            <option value="demo-print-C">Échantillon C</option>
-          </select>
-          <button
-            type="button"
-            className="btn-secondary"
-            style={{ marginTop: "0.75rem" }}
-            disabled={busy}
-            onClick={() => void runDemo()}
-          >
-            Recherche DEMO
-          </button>
+          {bridgeNote ? <p className="muted">{bridgeNote}</p> : null}
+          {error ? (
+            <div className="login-error" role="alert">
+              {error}
+            </div>
+          ) : null}
+          {result ? (
+            <div style={{ marginTop: "1rem" }}>
+              <p>
+                Décision : <strong>{result.decision}</strong>
+              </p>
+              {result.candidates.length === 0 ? (
+                <p className="muted">Aucun candidat.</p>
+              ) : (
+                <ul>
+                  {result.candidates.map((c, idx) => (
+                    <li key={`${c.citizen_id}-${idx}`}>
+                      <Link to={`/population/${c.citizen_id}`}>{c.citizen_id}</Link>
+                      {" — "}
+                      {c.finger_label || c.finger_position || "doigt"} — score{" "}
+                      {(c.score * 100).toFixed(1)} %
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : null}
         </div>
       )}
-
-      {bridgeNote ? <p className="muted">{bridgeNote}</p> : null}
-      {error ? (
-        <div className="login-error" role="alert">
-          {error}
-        </div>
-      ) : null}
-
-      {result ? (
-        <div className="panel" style={{ marginTop: "1rem" }}>
-          <h3 className="panel-title">Décision : {result.decision}</h3>
-          {result.candidates.length === 0 ? (
-            <p className="muted">Aucune correspondance exploitable.</p>
-          ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Population</th>
-                  <th>Doigt</th>
-                  <th>Score</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.candidates.map((c) => (
-                  <tr key={c.citizen_id + String(c.score)}>
-                    <td>
-                      <code>{c.citizen_id}</code>
-                    </td>
-                    <td>{c.finger_label || c.finger_position || "—"}</td>
-                    <td>{(c.score * 100).toFixed(1)} %</td>
-                    <td>
-                      <Link className="btn-secondary btn-sm" to={`/population/${c.citizen_id}`}>
-                        Ouvrir
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      ) : null}
     </div>
   );
 }

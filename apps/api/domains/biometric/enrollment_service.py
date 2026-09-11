@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import uuid
 from datetime import UTC, datetime
 
@@ -10,6 +11,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from apps.api.core.config import get_settings
 from apps.api.domains.audit.services import write_audit
 from apps.api.domains.biometric.models import (
     FINGER_POSITIONS,
@@ -147,12 +149,55 @@ async def list_citizen_fingerprints(
     ]
 
 
+async def _engx_verify_score(probe: bytes, gallery: bytes) -> float:
+    """1:1 via pont ZKFPEngX (VerFingerFromStr). 1.0 = match, 0.0 sinon."""
+    settings = get_settings()
+    base = (settings.zkteco_bridge_url or "").rstrip("/")
+    if not base:
+        return 0.0
+    try:
+        import urllib.request
+
+        payload = json.dumps(
+            {
+                "probe_b64": base64.b64encode(probe).decode(),
+                "gallery_b64": [base64.b64encode(gallery).decode()],
+            }
+        ).encode()
+        req = urllib.request.Request(
+            f"{base}/verify",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode())
+        if data.get("matched"):
+            return 1.0
+        scores = data.get("scores") or []
+        return float(scores[0]) if scores else 0.0
+    except Exception:
+        return 0.0
+
+
+def _looks_engx_template(raw: bytes) -> bool:
+    if not raw or len(raw) < 16:
+        return False
+    try:
+        s = raw.decode("utf-8")
+    except Exception:
+        return False
+    # EngX EncodeTemplate1 → chaîne ASCII/base64-like
+    return all(32 <= ord(c) < 127 for c in s[:40]) and len(s) >= 32
+
+
 async def _search_gallery(
     db: AsyncSession,
     *,
     probe_hash: str,
     exclude_citizen_id: uuid.UUID | None,
     max_candidates: int,
+    probe_raw: bytes | None = None,
 ) -> list[IdentifyCandidate]:
     provider = get_biometric_provider()
     stmt = select(BiometricTemplate).where(
@@ -165,13 +210,26 @@ async def _search_gallery(
     scored: list[IdentifyCandidate] = []
     for t in gallery:
         gallery_hash = t.template_hash
-        if not gallery_hash:
-            try:
-                plain = provider.decrypt_template(bytes(t.template_encrypted))
+        plain: bytes | None = None
+        try:
+            plain = provider.decrypt_template(bytes(t.template_encrypted))
+            if not gallery_hash:
                 gallery_hash = provider.template_hash(plain)
-            except Exception:
+        except Exception:
+            if not gallery_hash:
                 continue
-        score = provider.compare(probe_hash, gallery_hash)
+        score = provider.compare(probe_hash, gallery_hash) if gallery_hash else 0.0
+        # Empreintes ZK EngX : hash exact insuffisant → VerFinger 1:1
+        if (
+            score < 0.99
+            and probe_raw is not None
+            and plain is not None
+            and (
+                (t.algorithm_version or "").startswith("zkfinger")
+                or (_looks_engx_template(probe_raw) and _looks_engx_template(plain))
+            )
+        ):
+            score = max(score, await _engx_verify_score(probe_raw, plain))
         if score >= 0.5:
             scored.append(
                 IdentifyCandidate(
@@ -277,6 +335,7 @@ async def capture_finger(
         probe_hash=probe_hash,
         exclude_citizen_id=enrollment.citizen_id,
         max_candidates=5,
+        probe_raw=raw,
     )
 
     strong = thresholds["strong"]
@@ -385,12 +444,17 @@ async def capture_finger(
         )
 
     # No conflict — store fingerprint (never return template bytes)
+    algo = provider.ALGORITHM if hasattr(provider, "ALGORITHM") else "mvp-hash-v1"
+    if data.capture_device and "ZK" in str(data.capture_device).upper():
+        algo = "zkfinger-engx-v9"
+    elif _looks_engx_template(raw):
+        algo = "zkfinger-engx-v9"
     row = BiometricTemplate(
         citizen_id=enrollment.citizen_id,
         modality=BiometricModality.FINGERPRINT,
         template_encrypted=encrypted,
         quality_score=data.quality_score,
-        algorithm_version=provider.ALGORITHM if hasattr(provider, "ALGORITHM") else "mvp-hash-v1",
+        algorithm_version=algo,
         enrollment_id=enrollment.id,
         finger_position=finger,
         hand=HAND_BY_FINGER.get(finger),
@@ -478,6 +542,7 @@ async def identify(
         probe_hash=probe_hash,
         exclude_citizen_id=None,
         max_candidates=req.max_candidates,
+        probe_raw=raw,
     )
     if candidates and candidates[0].score >= thresholds["strong"]:
         decision = DedupDecision.MATCH_CONFIRMED

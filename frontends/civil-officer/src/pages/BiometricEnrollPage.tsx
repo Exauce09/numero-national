@@ -1,20 +1,48 @@
-/** Enrôlement biométrique — 3 doigts distincts + dédup 1:N. */
+/** Enrôlement biométrique — capture ZK9500 réelle (pont local EngX). */
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { getSession } from "../auth";
 
-const DEMO_NOTE =
-  "Capture DEMO (LocalHashProvider) — pas un moteur ABIS certifié. Les seuils sont techniques (environment=demo).";
+const ZK_BRIDGE = "http://127.0.0.1:18765";
 
-function b64FromText(text: string): string {
-  const bytes = new TextEncoder().encode(text);
-  let binary = "";
-  bytes.forEach((b) => {
-    binary += String.fromCharCode(b);
+async function captureZk(finger: string): Promise<{
+  template_b64: string;
+  quality_score: number;
+  device: string;
+  note?: string;
+}> {
+  const health = await fetch(`${ZK_BRIDGE}/health`).then((r) => r.json()).catch(() => null);
+  if (!health?.sdk_loaded) {
+    throw new Error(
+      "Pont ZK9500 indisponible. Lancez scripts/start-zkteco-bridge.ps1 (lecteur USB branché).",
+    );
+  }
+  const cap = await fetch(`${ZK_BRIDGE}/capture`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ finger_position: finger, timeout_ms: 30000 }),
+  }).then(async (r) => {
+    const body = (await r.json().catch(() => ({}))) as {
+      template_b64?: string;
+      quality_score?: number;
+      device?: string;
+      note?: string;
+      detail?: string;
+      demo?: boolean;
+    };
+    if (!r.ok) throw new Error(body.detail || `Capture ZK ${r.status}`);
+    if (body.demo) throw new Error("Mode DEMO refusé — utilisez le pont EngX réel.");
+    if (!body.template_b64) throw new Error("Template vide");
+    return {
+      template_b64: body.template_b64,
+      quality_score: body.quality_score ?? 80,
+      device: body.device || "ZK9500",
+      note: body.note,
+    };
   });
-  return btoa(binary);
+  return cap;
 }
 
 export default function BiometricEnrollPage() {
@@ -28,10 +56,9 @@ export default function BiometricEnrollPage() {
   const [step, setStep] = useState(0);
   const [finger, setFinger] = useState("");
   const [usedFingers, setUsedFingers] = useState<string[]>([]);
-  const [quality, setQuality] = useState(92);
-  const [sampleKey, setSampleKey] = useState("demo-print-A");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [bridgeNote, setBridgeNote] = useState<string | null>(null);
   const [block, setBlock] = useState<{
     message: string;
     matchedCitizenId?: string;
@@ -64,7 +91,7 @@ export default function BiometricEnrollPage() {
       const enr = await api.biometricStartEnrollment({ citizen_id: citizenId });
       setEnrollmentId(enr.id);
       setStep(1);
-      setOkMsg("Enrôlement ouvert — capturez 3 doigts distincts.");
+      setOkMsg("Enrôlement ouvert — capturez 3 doigts sur le ZK9500.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Impossible de démarrer l'enrôlement");
     } finally {
@@ -81,14 +108,15 @@ export default function BiometricEnrollPage() {
     setError(null);
     setBlock(null);
     setOkMsg(null);
+    setBridgeNote("Posez le doigt sur le ZK9500 maintenant…");
     try {
-      // Same sampleKey → same template → dédup démontrable
-      const template_b64 = b64FromText(`FINGERPRINT|${sampleKey}|${finger}|v1`);
+      const zk = await captureZk(finger);
+      setBridgeNote(`${zk.device} — ${zk.note || "Capture OK"}`);
       const res = await api.biometricCapture(enrollmentId, {
         finger_position: finger,
-        template_b64,
-        quality_score: quality,
-        capture_device: "DEMO-LOCAL",
+        template_b64: zk.template_b64,
+        quality_score: zk.quality_score,
+        capture_device: zk.device,
       });
       setCount(res.fingerprints_count);
       if (res.blocked && res.match) {
@@ -106,7 +134,7 @@ export default function BiometricEnrollPage() {
       setOkMsg(res.message);
       if (res.fingerprints_count >= required) {
         await api.biometricFinalize(enrollmentId);
-        setOkMsg("Enrôlement finalisé — 3 empreintes enregistrées.");
+        setOkMsg("Enrôlement finalisé — 3 empreintes ZK9500 enregistrées.");
         setStep(4);
       } else {
         setStep(res.fingerprints_count + 1);
@@ -143,7 +171,7 @@ export default function BiometricEnrollPage() {
         ) : null}
       </p>
       <div className="dash-demo-banner" role="note">
-        {DEMO_NOTE}
+        Capture réelle ZK9500 (pont EngX). Posez le doigt quand demandé — pas de mode démo.
       </div>
 
       <div className="panel" style={{ marginBottom: "1rem" }}>
@@ -151,7 +179,7 @@ export default function BiometricEnrollPage() {
           {[1, 2, 3].map((n) => (
             <span
               key={n}
-              className={`status-badge${step >= n || count >= n ? "" : ""}`}
+              className="status-badge"
               style={{
                 background: count >= n || step > n ? "#0aad8a" : step === n ? "#0b3d91" : "#e6ebf2",
                 color: count >= n || step >= n ? "#fff" : "#5b6b7c",
@@ -169,10 +197,11 @@ export default function BiometricEnrollPage() {
         </div>
       ) : null}
       {okMsg ? <p className="muted">{okMsg}</p> : null}
+      {bridgeNote ? <p className="muted">{bridgeNote}</p> : null}
 
       {block ? (
         <div className="panel" style={{ borderColor: "#ce1126" }} role="alert">
-          <h3 className="panel-title">⚠ Correspondance biométrique détectée</h3>
+          <h3 className="panel-title">Correspondance biométrique détectée</h3>
           <p>{block.message}</p>
           <dl className="act-print-fields">
             <div>
@@ -189,10 +218,6 @@ export default function BiometricEnrollPage() {
               <dt>Score</dt>
               <dd>{block.score != null ? `${(block.score * 100).toFixed(1)} %` : "—"}</dd>
             </div>
-            <div>
-              <dt>Statut</dt>
-              <dd>Correspondance forte — enrôlement bloqué</dd>
-            </div>
           </dl>
           <div className="action-row">
             {block.matchedCitizenId ? (
@@ -204,16 +229,12 @@ export default function BiometricEnrollPage() {
               Annuler
             </button>
           </div>
-          <p className="muted small" style={{ marginTop: "0.75rem" }}>
-            Aucun nouveau dossier n&apos;a été créé. Une exception nécessite une revue autorisée
-            (audit obligatoire).
-          </p>
         </div>
       ) : null}
 
       {!enrollmentId && !block ? (
         <div className="panel">
-          <p>Démarrez l&apos;enrôlement pour capturer 3 doigts différents.</p>
+          <p>Démarrez l&apos;enrôlement pour capturer 3 doigts différents sur le ZK9500.</p>
           <button type="button" className="btn-primary" disabled={busy || !citizenId} onClick={() => void start()}>
             {busy ? "…" : "Démarrer l'enrôlement"}
           </button>
@@ -238,52 +259,19 @@ export default function BiometricEnrollPage() {
               </option>
             ))}
           </select>
-          <label className="form-label">Échantillon DEMO (même clé = même empreinte)</label>
-          <select
-            className="form-control"
-            value={sampleKey}
-            onChange={(e) => setSampleKey(e.target.value)}
-          >
-            <option value="demo-print-A">Échantillon A</option>
-            <option value="demo-print-B">Échantillon B</option>
-            <option value="demo-print-C">Échantillon C</option>
-          </select>
-          <label className="form-label">Qualité estimée : {quality} %</label>
-          <input
-            type="range"
-            min={40}
-            max={100}
-            value={quality}
-            onChange={(e) => setQuality(Number(e.target.value))}
-          />
-          <div
-            className="panel"
-            style={{
-              marginTop: "1rem",
-              textAlign: "center",
-              padding: "2rem",
-              background: "#f7f9fc",
-            }}
-          >
-            PLACEZ LE DOIGT (simulation)
-            <div style={{ marginTop: "0.5rem" }}>
-              Qualité :{" "}
-              <strong style={{ color: quality >= 60 ? "#0aad8a" : "#ce1126" }}>{quality} %</strong>
-            </div>
-          </div>
           <div className="action-row" style={{ marginTop: "1rem" }}>
             <button type="button" className="btn-primary" disabled={busy || !finger} onClick={() => void capture()}>
-              {busy ? "Vérification 1:N…" : "Capturer"}
+              {busy ? "Capture en cours — posez le doigt…" : "Capturer ZK9500"}
             </button>
           </div>
         </div>
       ) : null}
 
-      {step >= 4 && !block ? (
+      {step >= 4 ? (
         <div className="panel">
-          <p>✓ Enrôlement terminé ({required} empreintes).</p>
-          <Link className="btn-secondary" to={`/population/${citizenId}`}>
-            Retour à la fiche population
+          <p>Enrôlement terminé.</p>
+          <Link className="btn-primary" to={`/population/${citizenId}`}>
+            Retour fiche
           </Link>
         </div>
       ) : null}

@@ -127,14 +127,28 @@ async def list_map_points(
     Si plusieurs personnes partagent le même ménage / GPS, un léger décalage
     déterministe sépare les marqueurs pour que N personnes = N endroits visibles.
     Filtre optionnel address_source: gps | online | manual.
+
+    Ménages sans coordonnées : fallback Kinshasa + source manuelle (visibles sur la carte).
     """
     points: list[dict[str, Any]] = []
     try:
         where_src = ""
         params: dict[str, Any] = {"lim": limit}
         if address_source and address_source.lower() not in {"all", "*"}:
-            where_src = " AND COALESCE(h.address_source, 'gps') = :address_source"
-            params["address_source"] = address_source.lower()
+            src = address_source.lower()
+            params["address_source"] = src
+            if (src == "manual"):
+                where_src = """
+                  AND LOWER(COALESCE(h.address_source, '')) IN
+                    ('manual', 'manual_offline', 'cascade', 'offline_manual')
+                """
+            elif src == "online":
+                where_src = " AND LOWER(COALESCE(h.address_source, '')) = 'online'"
+            else:  # gps
+                where_src = """
+                  AND h.latitude IS NOT NULL AND h.longitude IS NOT NULL
+                  AND LOWER(COALESCE(NULLIF(h.address_source, ''), 'gps')) IN ('gps', 'offline', 'offline_kinshasa')
+                """
         result = await db.execute(
             text(
                 f"""
@@ -147,9 +161,16 @@ async def list_map_points(
                        r.date_of_birth,
                        r.status AS record_status,
                        h.address_line,
-                       h.latitude,
-                       h.longitude,
-                       h.address_source,
+                       COALESCE(h.latitude, -4.3276) AS latitude,
+                       COALESCE(h.longitude, 15.3136) AS longitude,
+                       CASE
+                         WHEN LOWER(COALESCE(h.address_source, '')) IN
+                              ('manual', 'manual_offline', 'cascade') THEN 'manual'
+                         WHEN h.latitude IS NULL OR h.longitude IS NULL THEN 'manual'
+                         WHEN LOWER(COALESCE(h.address_source, '')) = 'online' THEN 'online'
+                         WHEN h.address_source IS NULL THEN 'gps'
+                         ELSE LOWER(h.address_source)
+                       END AS address_source,
                        h.local_id AS household_local_id,
                        COALESCE(
                          NULLIF(trim(h.address_line), ''),
@@ -158,8 +179,7 @@ async def list_map_points(
                        r.updated_at
                 FROM recensement.census_records r
                 INNER JOIN recensement.households h ON h.id = r.household_id
-                WHERE h.latitude IS NOT NULL
-                  AND h.longitude IS NOT NULL
+                WHERE 1=1
                   {where_src}
                 ORDER BY r.updated_at DESC NULLS LAST
                 LIMIT :lim
