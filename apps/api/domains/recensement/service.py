@@ -48,6 +48,29 @@ from apps.api.domains.recensement.schemas import (
 )
 
 
+def _resolve_address_source(data: dict[str, Any]) -> str | None:
+    """Normalize address origin for cartography filters."""
+    raw = (
+        data.get("address_source")
+        or data.get("gps_source")
+        or data.get("geo_source")
+    )
+    if raw is None:
+        if data.get("latitude") is not None and data.get("longitude") is not None:
+            return "gps"
+        if data.get("address_line"):
+            return "manual"
+        return None
+    s = str(raw).strip().lower()
+    if s in {"manual", "manual_offline", "cascade", "offline_manual"}:
+        return "manual"
+    if s in {"online", "nominatim"}:
+        return "online"
+    if s in {"gps", "offline", "offline_kinshasa"}:
+        return "gps" if s == "gps" else ("online" if s == "online" else "gps")
+    return s[:32] or None
+
+
 async def create_campaign(db: AsyncSession, data: CampaignCreate) -> Campaign:
     campaign = Campaign(**data.model_dump())
     db.add(campaign)
@@ -147,6 +170,7 @@ async def sync_push(db: AsyncSession, req: SyncPushRequest) -> SyncPushResult:
                     address_line=item.data.get("address_line"),
                     latitude=item.data.get("latitude"),
                     longitude=item.data.get("longitude"),
+                    address_source=_resolve_address_source(item.data),
                     member_count=int(item.data.get("member_count") or 0),
                     collected_by=req.agent_user_id,
                     device_id=device.id,
@@ -160,6 +184,9 @@ async def sync_push(db: AsyncSession, req: SyncPushRequest) -> SyncPushResult:
                     existing.latitude = item.data.get("latitude")
                 if "longitude" in item.data:
                     existing.longitude = item.data.get("longitude")
+                src = _resolve_address_source(item.data)
+                if src:
+                    existing.address_source = src
                 existing.member_count = int(
                     item.data.get("member_count") or existing.member_count or 0
                 )

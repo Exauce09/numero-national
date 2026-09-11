@@ -192,6 +192,7 @@ class Household(Base):
     address_line: Mapped[str | None] = mapped_column(String(512))
     latitude: Mapped[float | None] = mapped_column(Float)
     longitude: Mapped[float | None] = mapped_column(Float)
+    address_source: Mapped[str | None] = mapped_column(String(32))  # gps | online | manual
     member_count: Mapped[int] = mapped_column(Integer, default=0)
     collected_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     device_id: Mapped[uuid.UUID | None] = mapped_column(

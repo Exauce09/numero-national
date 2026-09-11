@@ -196,6 +196,59 @@ class _CouponPrintScreenState extends State<CouponPrintScreen> {
     }
   }
 
+  Future<void> _sharePdf(BuildContext context) async {
+    if (_printing) return;
+    setState(() => _printing = true);
+    final name = '${widget.familyName} ${widget.givenNames}'.trim();
+    final sexLabel = widget.sex == 'F' ? 'Féminin' : 'Masculin';
+    try {
+      final doc = pw.Document();
+      final qrImage = await QrPainter(
+        data: _qrPayload,
+        version: QrVersions.auto,
+        gapless: true,
+      ).toImageData(420);
+      final qrBytes = qrImage!.buffer.asUint8List();
+      doc.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a6,
+          margin: const pw.EdgeInsets.all(18),
+          build: (ctx) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.Text('ONIP — Recensement national', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 4),
+              pw.Text('Coupon provisoire', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+              pw.SizedBox(height: 10),
+              pw.Image(pw.MemoryImage(qrBytes), width: 120, height: 120),
+              pw.SizedBox(height: 10),
+              if (widget.nationalId != null && widget.nationalId!.isNotEmpty)
+                pw.Text('N° ${widget.nationalId}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 6),
+              pw.Text(name.isEmpty ? '—' : name, style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Sexe : $sexLabel', style: const pw.TextStyle(fontSize: 10)),
+              pw.Text('Naissance : ${widget.dateOfBirth.isEmpty ? '—' : widget.dateOfBirth}', style: const pw.TextStyle(fontSize: 10)),
+            ],
+          ),
+        ),
+      );
+      final bytes = await doc.save();
+      // Ouvre le partage Android (Gmail, Drive, Bluetooth…).
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: 'coupon-${widget.nationalId ?? widget.localId}.pdf',
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Partage impossible : $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
   /// Police thermique POS : ASCII simple (évite plantages font firmware).
   static String _ascii(String input) {
     const map = <String, String>{
@@ -334,6 +387,12 @@ class _CouponPrintScreenState extends State<CouponPrintScreen> {
                   )
                 : const Icon(Icons.print),
             label: Text(_printing ? 'Impression…' : 'Imprimer le coupon'),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: _printing ? null : () => _sharePdf(context),
+            icon: const Icon(Icons.share_outlined),
+            label: const Text('Partager PDF (Gmail, Drive…)'),
           ),
         ],
       ),

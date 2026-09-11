@@ -74,6 +74,10 @@ class Settings(BaseSettings):
 
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
+    # Biométrie — local (démo) | abis (proxy HTTP vers moteur externe)
+    biometric_provider: str = Field(default="local", alias="BIOMETRIC_PROVIDER")
+    biometric_abis_url: str | None = Field(default=None, alias="BIOMETRIC_ABIS_URL")
+
     @field_validator("secret_key")
     @classmethod
     def secret_not_empty(cls, v: str) -> str:

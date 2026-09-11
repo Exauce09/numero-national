@@ -13,13 +13,14 @@ class LocalDatabase {
     final dbPath = await getDatabasesPath();
     _db = await openDatabase(
       p.join(dbPath, 'recensement.db'),
-      version: 5,
+      version: 6,
       onCreate: (db, version) async {
         await _createV1(db);
         await _createV2(db);
         await _createV3(db);
         await _createV4(db);
         await _createV5(db);
+        await _createV6(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -33,6 +34,9 @@ class LocalDatabase {
         }
         if (oldVersion < 5) {
           await _createV5(db);
+        }
+        if (oldVersion < 6) {
+          await _createV6(db);
         }
       },
     );
@@ -135,6 +139,12 @@ class LocalDatabase {
   Future<void> _createV5(Database db) async {
     await db.execute(
       'ALTER TABLE census_records ADD COLUMN payload TEXT',
+    );
+  }
+
+  Future<void> _createV6(Database db) async {
+    await db.execute(
+      'ALTER TABLE households ADD COLUMN address_source TEXT',
     );
   }
 

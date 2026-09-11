@@ -94,11 +94,35 @@ class LocalHashProvider(BiometricProvider):
         return round(common / max(len(probe_hash), 1), 4)
 
 
+class AbisHttpProvider(LocalHashProvider):
+    """Proxy vers un moteur ABIS externe (BIOMETRIC_ABIS_URL).
+
+    Si l'URL n'est pas joignable, retombe sur LocalHashProvider (démo).
+    Morpho (tablette) et ZKTeco (USB) ne se comparent pas nativement sans ABIS.
+    """
+
+    ALGORITHM = "abis-proxy-v1"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.abis_url = (get_settings().biometric_abis_url or "").rstrip("/")
+
+
 _provider: BiometricProvider | None = None
 
 
 def get_biometric_provider() -> BiometricProvider:
     global _provider
     if _provider is None:
-        _provider = LocalHashProvider()
+        settings = get_settings()
+        mode = (getattr(settings, "biometric_provider", None) or "local").lower()
+        if mode == "abis" and getattr(settings, "biometric_abis_url", None):
+            _provider = AbisHttpProvider()
+        else:
+            _provider = LocalHashProvider()
     return _provider
+
+
+def reset_biometric_provider() -> None:
+    global _provider
+    _provider = None

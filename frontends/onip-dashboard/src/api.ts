@@ -361,6 +361,7 @@ export type MapPoint = {
   record_status?: string | null;
   address_line?: string | null;
   milieu?: string | null;
+  address_source?: string | null;
   latitude: number;
   longitude: number;
   updated_at?: string | null;
@@ -377,16 +378,28 @@ export type MapMilieu = {
   address_line?: string | null;
 };
 
-export async function fetchOnipMapPoints(): Promise<{ count: number; points: MapPoint[] }> {
-  return request("/onip/map-points");
+export async function fetchOnipMapPoints(
+  addressSource?: string,
+): Promise<{ count: number; points: MapPoint[]; address_source_filter?: string }> {
+  const q =
+    addressSource && addressSource !== "all"
+      ? `?address_source=${encodeURIComponent(addressSource)}`
+      : "";
+  return request(`/onip/map-points${q}`);
 }
 
-export async function fetchOnipMapByMilieu(): Promise<{
+export async function fetchOnipMapByMilieu(
+  addressSource?: string,
+): Promise<{
   count: number;
   persons: number;
   milieux: MapMilieu[];
 }> {
-  return request("/onip/map-by-milieu");
+  const q =
+    addressSource && addressSource !== "all"
+      ? `?address_source=${encodeURIComponent(addressSource)}`
+      : "";
+  return request(`/onip/map-by-milieu${q}`);
 }
 
 export { updateAccessToken, BASE as API_BASE };

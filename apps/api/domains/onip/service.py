@@ -119,17 +119,25 @@ async def build_dashboard(db: AsyncSession) -> dict[str, Any]:
     }
 
 
-async def list_map_points(db: AsyncSession, limit: int = 5000) -> dict[str, Any]:
+async def list_map_points(
+    db: AsyncSession, limit: int = 5000, address_source: str | None = None
+) -> dict[str, Any]:
     """Un point GPS par personne recensée (pas seulement par ménage).
 
     Si plusieurs personnes partagent le même ménage / GPS, un léger décalage
     déterministe sépare les marqueurs pour que N personnes = N endroits visibles.
+    Filtre optionnel address_source: gps | online | manual.
     """
     points: list[dict[str, Any]] = []
     try:
+        where_src = ""
+        params: dict[str, Any] = {"lim": limit}
+        if address_source and address_source.lower() not in {"all", "*"}:
+            where_src = " AND COALESCE(h.address_source, 'gps') = :address_source"
+            params["address_source"] = address_source.lower()
         result = await db.execute(
             text(
-                """
+                f"""
                 SELECT r.id::text AS id,
                        r.local_id,
                        r.campaign_id::text AS campaign_id,
@@ -141,6 +149,7 @@ async def list_map_points(db: AsyncSession, limit: int = 5000) -> dict[str, Any]
                        h.address_line,
                        h.latitude,
                        h.longitude,
+                       h.address_source,
                        h.local_id AS household_local_id,
                        COALESCE(
                          NULLIF(trim(h.address_line), ''),
@@ -151,11 +160,12 @@ async def list_map_points(db: AsyncSession, limit: int = 5000) -> dict[str, Any]
                 INNER JOIN recensement.households h ON h.id = r.household_id
                 WHERE h.latitude IS NOT NULL
                   AND h.longitude IS NOT NULL
+                  {where_src}
                 ORDER BY r.updated_at DESC NULLS LAST
                 LIMIT :lim
                 """
             ),
-            {"lim": limit},
+            params,
         )
         for idx, row in enumerate(result.mappings()):
             # Décalage ~8–25 m pour distinguer les personnes d'un même ménage
@@ -166,6 +176,7 @@ async def list_map_points(db: AsyncSession, limit: int = 5000) -> dict[str, Any]
             name = " ".join(
                 p for p in [row["family_name"], row["given_names"]] if p
             ).strip() or "Personne"
+            src = row.get("address_source") or "gps"
             points.append(
                 {
                     "id": row["id"],
@@ -178,6 +189,7 @@ async def list_map_points(db: AsyncSession, limit: int = 5000) -> dict[str, Any]
                     "record_status": row["record_status"],
                     "address_line": row["address_line"],
                     "milieu": row["milieu"],
+                    "address_source": src,
                     "latitude": lat,
                     "longitude": lng,
                     "updated_at": row["updated_at"].isoformat()
@@ -193,13 +205,16 @@ async def list_map_points(db: AsyncSession, limit: int = 5000) -> dict[str, Any]
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "count": len(points),
         "mode": "persons",
+        "address_source_filter": address_source or "all",
         "points": points,
     }
 
 
-async def list_map_by_milieu(db: AsyncSession, limit: int = 5000) -> dict[str, Any]:
+async def list_map_by_milieu(
+    db: AsyncSession, limit: int = 5000, address_source: str | None = None
+) -> dict[str, Any]:
     """Agrège les points par milieu (adresse / zone) avec statistiques."""
-    raw = await list_map_points(db, limit=limit)
+    raw = await list_map_points(db, limit=limit, address_source=address_source)
     buckets: dict[str, dict[str, Any]] = {}
     for p in raw["points"]:
         key = (p.get("milieu") or "Sans adresse").strip() or "Sans adresse"

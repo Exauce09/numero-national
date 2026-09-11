@@ -129,6 +129,21 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
     try {
       final localId = const Uuid().v4();
       final now = DateTime.now().toUtc().toIso8601String();
+      final addressSource = () {
+        if (_gpsSource == 'online') return 'online';
+        if (_gpsSource == 'offline' || (_lat != null && _lng != null && _gpsSource != null)) {
+          return 'gps';
+        }
+        if (_geoLabel.trim().isNotEmpty || _address.text.trim().isNotEmpty) {
+          return 'manual';
+        }
+        return _lat != null ? 'gps' : 'manual';
+      }();
+      // Saisie manuelle sans GPS : point approximatif Kinshasa centre pour rester visible sur la carte.
+      if ((_lat == null || _lng == null) && addressSource == 'manual') {
+        _lat = -4.3276;
+        _lng = 15.3136;
+      }
       final data = <String, Object?>{
         'id': localId,
         'local_id': localId,
@@ -136,6 +151,7 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
         'address_line': _address.text.trim(),
         'latitude': _lat,
         'longitude': _lng,
+        'address_source': addressSource,
         'member_count': 0,
         'updated_at': now,
       };
@@ -152,6 +168,7 @@ class _HouseholdFormScreenState extends State<HouseholdFormScreen> {
             if (widget.zoneId != null) 'zone_id': widget.zoneId,
             if (_geoLabel.isNotEmpty) 'geo_label': _geoLabel,
             if (_gpsSource != null) 'gps_source': _gpsSource,
+            'address_source': addressSource,
           },
         ),
       );

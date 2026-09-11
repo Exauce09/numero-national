@@ -20,12 +20,18 @@ async def onip_dashboard(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
 
 
 @router.get("/map-points")
-async def onip_map_points(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
-    """Un marqueur GPS par personne recensée."""
-    return await service.list_map_points(db)
+async def onip_map_points(
+    address_source: str | None = None,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Un marqueur GPS par personne recensée. Filtre: gps | online | manual."""
+    return await service.list_map_points(db, address_source=address_source)
 
 
 @router.get("/map-by-milieu")
-async def onip_map_by_milieu(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+async def onip_map_by_milieu(
+    address_source: str | None = None,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
     """Carte regroupée par milieu avec statistiques."""
-    return await service.list_map_by_milieu(db)
+    return await service.list_map_by_milieu(db, address_source=address_source)

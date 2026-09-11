@@ -27,6 +27,18 @@ type LeafletMap = {
 };
 
 type Mode = "persons" | "milieu";
+type AddressFilter = "all" | "gps" | "online" | "manual";
+
+function sourceColor(src: string | null | undefined): { color: string; fill: string } {
+  switch ((src || "gps").toLowerCase()) {
+    case "manual":
+      return { color: "#ce1126", fill: "#f7d618" };
+    case "online":
+      return { color: "#0aad8a", fill: "#0aad8a" };
+    default:
+      return { color: "#007fff", fill: "#007fff" };
+  }
+}
 
 function loadLeaflet(): Promise<NonNullable<typeof window.L>> {
   return new Promise((resolve, reject) => {
@@ -60,6 +72,7 @@ function esc(s: string): string {
 
 export default function CartographiePage() {
   const [mode, setMode] = useState<Mode>("persons");
+  const [addressFilter, setAddressFilter] = useState<AddressFilter>("all");
   const [points, setPoints] = useState<MapPoint[]>([]);
   const [milieux, setMilieux] = useState<MapMilieu[]>([]);
   const [personsTotal, setPersonsTotal] = useState(0);
@@ -74,13 +87,13 @@ export default function CartographiePage() {
     setError(null);
     const load =
       mode === "persons"
-        ? fetchOnipMapPoints().then((res) => {
+        ? fetchOnipMapPoints(addressFilter).then((res) => {
             if (cancelled) return;
             setPoints(res.points ?? []);
             setMilieux([]);
             setPersonsTotal(res.count ?? 0);
           })
-        : fetchOnipMapByMilieu().then((res) => {
+        : fetchOnipMapByMilieu(addressFilter).then((res) => {
             if (cancelled) return;
             setMilieux(res.milieux ?? []);
             setPoints([]);
@@ -96,22 +109,34 @@ export default function CartographiePage() {
     return () => {
       cancelled = true;
     };
-  }, [mode]);
+  }, [mode, addressFilter]);
 
   const markers = useMemo(() => {
     if (mode === "persons") {
       return points
         .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude))
-        .map((p) => ({
-          id: p.id,
-          lat: p.latitude,
-          lng: p.longitude,
-          popup:
-            `<strong>${esc(p.label || p.address_line || "Personne")}</strong><br/>` +
-            `${esc(p.address_line || "—")}<br/>` +
-            `${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}`,
-          radius: 6,
-        }));
+        .map((p) => {
+          const c = sourceColor(p.address_source);
+          const srcLabel =
+            p.address_source === "manual"
+              ? "Saisie manuelle"
+              : p.address_source === "online"
+                ? "GPS + internet"
+                : "GPS";
+          return {
+            id: p.id,
+            lat: p.latitude,
+            lng: p.longitude,
+            popup:
+              `<strong>${esc(p.label || p.address_line || "Personne")}</strong><br/>` +
+              `${esc(p.address_line || "—")}<br/>` +
+              `<em>${srcLabel}</em><br/>` +
+              `${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}`,
+            radius: 6,
+            color: c.color,
+            fill: c.fill,
+          };
+        });
     }
     return milieux
       .filter((m) => Number.isFinite(m.latitude) && Number.isFinite(m.longitude))
@@ -125,6 +150,8 @@ export default function CartographiePage() {
           `H: ${m.male} · F: ${m.female}` +
           (m.other ? ` · Autre: ${m.other}` : ""),
         radius: Math.min(28, 8 + Math.sqrt(m.count) * 3),
+        color: "#ce1126",
+        fill: "#f7d618",
       }));
   }, [mode, points, milieux]);
 
@@ -150,8 +177,8 @@ export default function CartographiePage() {
           latlngs.push(ll);
           L.circleMarker(ll, {
             radius: m.radius,
-            color: mode === "milieu" ? "#ce1126" : "#007fff",
-            fillColor: mode === "milieu" ? "#f7d618" : "#007fff",
+            color: m.color,
+            fillColor: m.fill,
             fillOpacity: 0.75,
             weight: 2,
           })
@@ -201,7 +228,31 @@ export default function CartographiePage() {
         >
           Par milieu (stats)
         </button>
+        <span className="muted" style={{ alignSelf: "center", marginLeft: 8 }}>
+          Adresse :
+        </span>
+        {(
+          [
+            ["all", "Toutes"],
+            ["gps", "GPS"],
+            ["online", "GPS + internet"],
+            ["manual", "Saisie manuelle"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className={addressFilter === id ? "btn-primary" : "btn-secondary"}
+            style={{ width: "auto" }}
+            onClick={() => setAddressFilter(id)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
+      <p className="muted small">
+        Légende personnes : bleu = GPS · vert = GPS+internet · jaune/rouge = saisie manuelle.
+      </p>
 
       <div className="grid" style={{ marginTop: 0 }}>
         <div className="metric">
@@ -239,6 +290,7 @@ export default function CartographiePage() {
               <tr>
                 <th>Nom</th>
                 <th>Adresse / milieu</th>
+                <th>Source</th>
                 <th>Lat</th>
                 <th>Lng</th>
               </tr>
@@ -248,6 +300,13 @@ export default function CartographiePage() {
                 <tr key={p.id}>
                   <td>{p.label || "—"}</td>
                   <td>{p.milieu || p.address_line || "—"}</td>
+                  <td>
+                    {p.address_source === "manual"
+                      ? "Manuelle"
+                      : p.address_source === "online"
+                        ? "GPS+net"
+                        : "GPS"}
+                  </td>
                   <td>{p.latitude.toFixed(5)}</td>
                   <td>{p.longitude.toFixed(5)}</td>
                 </tr>

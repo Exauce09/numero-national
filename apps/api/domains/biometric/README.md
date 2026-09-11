@@ -33,6 +33,22 @@ Table `biometric.biometric_thresholds` (`environment=demo`). Valeurs techniques 
 2. Brancher via `get_biometric_provider()` (factory / settings).
 3. Conserver le même contrat API et les mêmes tables (`template_hash` peut devenir un index externe ABIS).
 
+Variables :
+
+```text
+BIOMETRIC_PROVIDER=local|abis
+BIOMETRIC_ABIS_URL=https://abis.example/v1
+```
+
+### ZK9500 USB (site PC)
+
+1. Brancher le lecteur ZK9500 (détecté comme `ZK9500` USB).
+2. Lancer le pont local : `py -3 scripts/zkteco_bridge.py`
+3. Sur civil-officer → Biométrie → Identification → **Capturer ZK9500 + rechercher**
+
+Sans SDK ZKFinger, le pont fournit une capture DEMO pour valider le flux.
+**Morpho (tablette) ↔ ZKTeco (USB)** : matching croisé uniquement via un vrai ABIS multi-constructeurs.
+
 ## Permissions RBAC
 
 | Permission | Usage |
