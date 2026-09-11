@@ -32,6 +32,8 @@ numero_national.egg-info/
 
 # Docker / local data
 postgres_data/
+backups/
+*.dump
 *.log
 
 # Secrets — never commit
