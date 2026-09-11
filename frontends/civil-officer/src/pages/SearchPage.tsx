@@ -138,7 +138,7 @@ export default function SearchPage() {
                           : "—"}
                   </td>
                   <td>
-                    <Link className="btn-secondary" to={`/personnes/${p.id}`}>
+                    <Link className="btn-secondary" to={`/population/${p.id}`}>
                       Voir
                     </Link>
                   </td>

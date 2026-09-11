@@ -87,9 +87,9 @@ export default function DashboardPage() {
         id: "pop",
         title: "Population",
         value: population.length,
-        subtitle: "Personnes enregistrées (registre local)",
+        subtitle: "Population enregistrée (registre)",
         tone: "primary",
-        href: "/personnes",
+        href: "/population",
         icon: <IconUsers size={26} />,
       },
       {
@@ -172,11 +172,11 @@ export default function DashboardPage() {
         },
         {
           id: "search",
-          title: "Personnes",
+          title: "Population",
           value: population.length,
-          subtitle: "Recherche personne",
+          subtitle: "Recherche population",
           tone: "primary",
-          href: "/personnes",
+          href: "/population",
           icon: <IconUsers size={26} />,
         },
       ];

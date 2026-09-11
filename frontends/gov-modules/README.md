@@ -15,7 +15,7 @@ URL d’accueil : http://localhost:5177/
 | Santé | http://localhost:5177/sante/login | `sante` | `DemoSante2026!` |
 | Intérieur | http://localhost:5177/interieur/login | `interieur` | `DemoInterieur2026!` |
 | Présidence | http://localhost:5177/presidence/login | `presidence` | `DemoPresidence2026!` |
-| Administration | http://localhost:5177/admin/login | `admin` | `DemoAdmin2026!` |
+| Administration | http://localhost:5177/admin/login | `admin` | `Admin2026!` |
 
 Proxy Vite : `/api` → `http://localhost:8000`.
 

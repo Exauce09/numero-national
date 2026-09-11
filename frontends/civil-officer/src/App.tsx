@@ -1,6 +1,6 @@
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { clearSession, DEMO_PASSWORD, getSession, updateSession } from "./auth";
 import { canSeeNav } from "./rbac";
 import {
@@ -88,6 +88,11 @@ function RequireCivil({ children }: { children: ReactNode }) {
   if (getHealthSession()) return <Navigate to="/sante" replace />;
   if (!getSession()) return <Navigate to="/login" replace />;
   return <>{children}</>;
+}
+
+function PersonDetailRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/population/${id ?? ""}`} replace />;
 }
 
 function RequireHealth({ children }: { children: ReactNode }) {
@@ -568,9 +573,9 @@ function Shell() {
       ) : null}
       <aside className="sidebar" id="app-sidebar">
         <div className="sidebar-brand">
-          <img src="/logo-rdc.jpg" alt="RDC" />
-          <strong>État civil</strong>
-          <span>E-GOUV · {roleTitle}</span>
+          <img src="/logo-rdc.jpg" alt="République démocratique du Congo" />
+          <strong>Système national de gestion de la population</strong>
+          <span>RDC · E-GOUV</span>
           <button
             type="button"
             className="sidebar-close"
@@ -598,17 +603,17 @@ function Shell() {
           ) : null}
           {canSeeNav("population", roles) ? (
             <NavLink
-              to="/personnes"
+              to="/population"
               className={({ isActive }) =>
                 isActive ||
-                location.pathname.startsWith("/personnes") ||
                 location.pathname.startsWith("/population") ||
+                location.pathname.startsWith("/personnes") ||
                 location.pathname.startsWith("/lists/population")
                   ? "active"
                   : undefined
               }
             >
-              <IconUsers size={18} /> Personnes
+              <IconUsers size={18} /> Population
             </NavLink>
           ) : null}
           {canSeeNav("naissances", roles) ? (
@@ -712,19 +717,26 @@ function Shell() {
             >
               <span />
             </button>
-            <h1 className="topbar-title">État civil</h1>
+            <div>
+              <h1 className="topbar-title">Gestion de la population</h1>
+              <span className="topbar-subtitle">République démocratique du Congo</span>
+            </div>
           </div>
 
-          <div className="topbar-center" title={roleTitle}>
-            <span className="topbar-role">{roleTitle}</span>
-            {territoryLine ? <span className="topbar-commune">{territoryLine}</span> : communeLabel ? (
-              <span className="topbar-commune">{communeLabel}</span>
-            ) : null}
-            <strong className="topbar-responsable">{responsableLabel}</strong>
+          <div className="topbar-center">
+            <TopbarSearch />
           </div>
 
           <div className="topbar-right">
-            <TopbarSearch />
+            <div className="topbar-identity" title={roleTitle}>
+              <span className="topbar-role">{roleTitle}</span>
+              {territoryLine ? (
+                <span className="topbar-commune">{territoryLine}</span>
+              ) : communeLabel ? (
+                <span className="topbar-commune">{communeLabel}</span>
+              ) : null}
+              <strong className="topbar-responsable">{responsableLabel}</strong>
+            </div>
             <button
               type="button"
               className="topbar-icon-btn"
@@ -775,10 +787,11 @@ function Shell() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/synoptique" element={<SynopticPage />} />
             <Route path="/synoptique/:section" element={<SynopticPage />} />
-            <Route path="/personnes" element={<PopulationPage />} />
-            <Route path="/personnes/:id" element={<PersonDetailPage />} />
             <Route path="/population" element={<PopulationPage />} />
+            <Route path="/population/:id" element={<PersonDetailPage />} />
             <Route path="/lists/population" element={<PopulationPage showAnalytics />} />
+            <Route path="/personnes" element={<Navigate to="/population" replace />} />
+            <Route path="/personnes/:id" element={<PersonDetailRedirect />} />
             <Route path="/newborns" element={<NewbornsPage />} />
             <Route path="/manage/deces" element={<ManageDecesPage />} />
             <Route path="/manage/divorce" element={<ManageDivorcePage />} />

@@ -55,7 +55,7 @@ export default function TopbarSearch() {
   function selectPerson(p: Person) {
     setQ(p.nic);
     setOpen(false);
-    navigate(`/search?q=${encodeURIComponent(p.nic)}`);
+    navigate(`/population/${p.id}`);
   }
 
   function selectDraft(d: DraftSearchHit) {
@@ -79,8 +79,8 @@ export default function TopbarSearch() {
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder="NIC, nom, brouillon…"
-          aria-label="Recherche intelligente"
+          placeholder="Rechercher une personne, un acte, un dossier…"
+          aria-label="Recherche globale"
           autoComplete="off"
         />
       </form>

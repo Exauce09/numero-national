@@ -122,7 +122,7 @@ export default function PersonDetailPage() {
   return (
     <div>
       <p className="eg-breadcrumb">
-        <Link to="/personnes">Personnes</Link> / Fiche
+        <Link to="/population">Population</Link> / Fiche
       </p>
       <div className="eg-page-head">
         <div>
@@ -136,8 +136,8 @@ export default function PersonDetailPage() {
             </span>
           </p>
         </div>
-        <Link className="btn-secondary" to="/personnes">
-          ← Retour à la liste
+        <Link className="btn-secondary" to="/population">
+          ← Retour à la population
         </Link>
       </div>
 

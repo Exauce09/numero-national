@@ -1,22 +1,40 @@
-/* Charte unifiée type e-gov (Justicia / Modernize) + couleurs RDC */
+/* Charte institutionnelle RDC — plateforme nationale (blanc dominant) */
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600;700&display=swap");
+
 :root {
-  --egouv-primary: #5d87ff;
-  --egouv-primary-hover: #4a74e8;
+  --egouv-primary: #0b3d91;
+  --egouv-primary-hover: #092f70;
+  --egouv-primary-soft: #e8f0fb;
   --egouv-save: #ce1126;
-  --egouv-ink: #2a3547;
-  --egouv-muted: #5a6a85;
-  --egouv-line: #e5eaf2;
+  --egouv-ink: #1f2a37;
+  --egouv-muted: #5b6b7c;
+  --egouv-line: #e6ebf2;
   --egouv-card: #ffffff;
-  --egouv-page: #f5f7fb;
-  --egouv-bg1: rgb(210, 241, 223);
-  --egouv-bg2: rgb(211, 229, 250);
-  --egouv-danger: #fa896b;
+  --egouv-page: #f7f9fc;
+  --egouv-bg1: #eef5ff;
+  --egouv-bg2: #f5f7fb;
+  --egouv-danger: #ce1126;
   --egouv-rdc-red: #ce1126;
   --egouv-rdc-yellow: #f7d618;
   --egouv-rdc-blue: #007fff;
-  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --egouv-shadow: 0 1px 2px rgba(15, 35, 70, 0.04), 0 8px 24px rgba(15, 35, 70, 0.06);
+  --egouv-radius: 10px;
+  --egouv-font: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --egouv-font-display: "IBM Plex Sans Condensed", "IBM Plex Sans", sans-serif;
+  font-family: var(--egouv-font);
   color: var(--egouv-ink);
   background: var(--egouv-page);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 html[data-theme="dark"] {
@@ -91,36 +109,35 @@ a:hover {
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  background: radial-gradient(
-    circle at 50% 20%,
-    var(--egouv-bg1) 0%,
-    var(--egouv-bg2) 45%,
-    #eef2f8 100%
-  );
+  background:
+    linear-gradient(180deg, #ffffff 0%, var(--egouv-page) 55%, #eef3f9 100%);
 }
 
 .login-card {
   width: 100%;
-  max-width: 420px;
+  max-width: 440px;
   background: var(--egouv-card);
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(42, 53, 71, 0.12);
-  padding: 1.75rem 1.75rem 2rem;
+  border: 1px solid var(--egouv-line);
+  border-radius: var(--egouv-radius);
+  box-shadow: var(--egouv-shadow);
+  padding: 1.85rem 1.85rem 2rem;
 }
 
 .login-logo {
   display: block;
   margin: 0 auto 0.75rem;
-  width: 160px;
+  width: 140px;
   height: auto;
 }
 
 .login-title {
   text-align: center;
   margin: 0 0 0.25rem;
-  font-size: 1.15rem;
+  font-family: var(--egouv-font-display);
+  font-size: 1.35rem;
   font-weight: 700;
-  color: var(--egouv-ink);
+  color: var(--egouv-primary);
+  letter-spacing: 0.01em;
 }
 
 .login-subtitle {
@@ -263,9 +280,9 @@ a:hover {
 }
 
 .sidebar {
-  width: 260px;
+  width: 268px;
   flex-shrink: 0;
-  background: #fff;
+  background: #ffffff;
   border-right: 1px solid var(--egouv-line);
   display: flex;
   flex-direction: column;
@@ -273,59 +290,66 @@ a:hover {
   top: 0;
   height: 100vh;
   z-index: 20;
-  box-shadow: 0 0 24px rgba(42, 53, 71, 0.06);
+  box-shadow: none;
 }
 
 .sidebar-brand {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.55rem;
-  padding: 1.25rem 1rem 1rem;
+  gap: 0.45rem;
+  padding: 1.15rem 1rem 1rem;
   border-bottom: 1px solid var(--egouv-line);
   text-align: center;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 
 .sidebar-brand img {
-  width: 88px;
+  width: 72px;
   height: auto;
   object-fit: contain;
 }
 
 .sidebar-brand strong {
-  font-size: 0.95rem;
-  color: var(--egouv-ink);
+  font-size: 0.88rem;
+  font-family: var(--egouv-font-display);
+  color: var(--egouv-primary);
+  line-height: 1.25;
+  max-width: 14rem;
 }
 
 .sidebar-brand span {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: var(--egouv-muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
 }
 
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  padding: 1rem 0.85rem;
+  gap: 0.2rem;
+  padding: 0.85rem 0.75rem;
   flex: 1;
   overflow-y: auto;
 }
 
 .sidebar-nav a {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
   color: var(--egouv-ink);
-  font-weight: 560;
-  font-size: 0.92rem;
+  font-weight: 500;
+  font-size: 0.9rem;
   text-decoration: none;
-  padding: 0.7rem 0.9rem;
+  padding: 0.62rem 0.8rem;
   border-radius: 8px;
   margin-right: 0;
+  border: 1px solid transparent;
 }
 
 .sidebar-nav a:hover {
-  background: #eef3ff;
+  background: var(--egouv-primary-soft);
   color: var(--egouv-primary);
   text-decoration: none;
 }
@@ -333,6 +357,7 @@ a:hover {
 .sidebar-nav a.active {
   background: var(--egouv-primary);
   color: #fff;
+  border-color: var(--egouv-primary);
 }
 
 .sidebar-foot {
@@ -352,26 +377,39 @@ a:hover {
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  padding: 0.9rem 1.35rem;
-  background: #fff;
+  padding: 0.75rem 1.25rem;
+  background: #ffffff;
   border-bottom: 1px solid var(--egouv-line);
   position: sticky;
   top: 0;
   z-index: 10;
+  box-shadow: 0 1px 0 rgba(15, 35, 70, 0.03);
 }
 
 .topbar-3 {
   display: grid;
-  grid-template-columns: 1fr minmax(0, 1.4fr) 1fr;
+  grid-template-columns: minmax(180px, 1.1fr) minmax(220px, 1.6fr) minmax(200px, 1.1fr);
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.85rem;
 }
 
 .topbar-title {
-  font-size: 1.05rem;
+  font-size: 0.98rem;
   font-weight: 700;
-  color: var(--egouv-ink);
+  font-family: var(--egouv-font-display);
+  color: var(--egouv-primary);
   margin: 0;
+  line-height: 1.2;
+}
+
+.topbar-subtitle {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--egouv-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 0.12rem;
 }
 
 .topbar-user {
@@ -383,22 +421,38 @@ a:hover {
 .topbar-center {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  text-align: center;
   min-width: 0;
-  padding: 0 0.5rem;
+  padding: 0 0.25rem;
 }
 
 .topbar-role {
-  font-size: 0.72rem;
-  color: var(--egouv-muted);
+  font-size: 0.68rem;
+  color: var(--egouv-primary);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 100%;
+  font-weight: 700;
+}
+
+.topbar-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  min-width: 0;
+  margin-right: 0.35rem;
+}
+
+.topbar-identity .topbar-role {
+  max-width: 220px;
+}
+
+.topbar-identity .topbar-commune {
+  max-width: 240px;
 }
 
 .topbar-responsable {
@@ -720,9 +774,9 @@ a:hover {
   margin-top: 1rem;
   background: var(--egouv-card);
   border: 1px solid var(--egouv-line);
-  border-radius: 12px;
+  border-radius: var(--egouv-radius);
   padding: 1.1rem 1.25rem;
-  box-shadow: 0 4px 18px rgba(42, 53, 71, 0.04);
+  box-shadow: var(--egouv-shadow);
 }
 
 .muted {

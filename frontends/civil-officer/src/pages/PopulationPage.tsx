@@ -149,9 +149,9 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
       <div className="eg-page-head">
         <div>
           <p className="eg-breadcrumb">
-            <Link to="/">Accueil</Link> / Personnes
+            <Link to="/">Accueil</Link> / Population
           </p>
-          <h2 className="page-title">{showAnalytics ? "Liste de la population" : "Personnes / Population"}</h2>
+          <h2 className="page-title">{showAnalytics ? "Liste de la population" : "Population"}</h2>
           <p className="page-lead">
             {source === "api" ? (
               <>
@@ -286,7 +286,7 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                       <span className="status-badge">{p.registryStatus || "—"}</span>
                     </td>
                     <td className="table-actions">
-                      <Link className="btn-add btn-sm" to={`/personnes/${p.id}`}>
+                      <Link className="btn-add btn-sm" to={`/population/${p.id}`}>
                         Voir
                       </Link>
                     </td>
