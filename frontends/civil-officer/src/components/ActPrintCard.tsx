@@ -6,9 +6,16 @@ type Props = {
   title?: string;
   extraFields?: { label: string; value: string }[];
   verificationCode?: string | null;
+  mentions?: { label: string; value: string }[];
 };
 
-export default function ActPrintCard({ act, title, extraFields, verificationCode }: Props) {
+export default function ActPrintCard({
+  act,
+  title,
+  extraFields,
+  verificationCode,
+  mentions,
+}: Props) {
   const auth =
     act.payload?.authentication && typeof act.payload.authentication === "object"
       ? (act.payload.authentication as Record<string, unknown>)
@@ -104,6 +111,18 @@ export default function ActPrintCard({ act, title, extraFields, verificationCode
           <p className="muted small" style={{ marginTop: "0.5rem" }}>
             Code de vérification : <code>{code}</code>
           </p>
+        ) : null}
+        {mentions && mentions.length > 0 ? (
+          <div style={{ marginTop: "0.75rem" }}>
+            <strong className="muted small">Mentions marginales</strong>
+            <ul className="muted small" style={{ margin: "0.25rem 0 0", paddingLeft: "1.1rem" }}>
+              {mentions.map((m) => (
+                <li key={`${m.label}-${m.value}`}>
+                  {m.label} : {m.value}
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : null}
         <div className="act-print-qr">
           <QRCodeSVG value={qrValue} size={128} includeMargin />

@@ -54,6 +54,7 @@ import ActsPage from "./pages/ActsPage";
 import SearchPage from "./pages/SearchPage";
 import DeclarationsPage from "./pages/DeclarationsPage";
 import TranscriptionsPage from "./pages/TranscriptionsPage";
+import CorrectionsInboxPage from "./pages/CorrectionsInboxPage";
 import HealthDashboardPage from "./pages/HealthDashboardPage";
 import HealthBirthsPage from "./pages/HealthBirthsPage";
 import HealthDeathsPage from "./pages/HealthDeathsPage";
@@ -690,6 +691,11 @@ function Shell() {
               <IconFile size={18} /> Transcriptions
             </NavLink>
           ) : null}
+          {canSeeNav("corrections", roles, permissions) ? (
+            <NavLink to="/corrections">
+              <IconClipboard size={18} /> Corrections
+            </NavLink>
+          ) : null}
           {canSeeNav("admin_bureaux", roles, permissions) ? (
             <NavLink to="/admin/bureaux">
               <IconHome size={18} /> Bureaux EC
@@ -834,6 +840,7 @@ function Shell() {
             <Route path="/acts" element={<ActsPage />} />
             <Route path="/declarations" element={<DeclarationsPage />} />
             <Route path="/transcriptions" element={<TranscriptionsPage />} />
+            <Route path="/corrections" element={<CorrectionsInboxPage />} />
             <Route path="/admin/bureaux" element={<BureauxPage />} />
             <Route path="/admin/personnel" element={<PersonnelPage />} />
             <Route path="/admin/account-requests" element={<AccountRequestsPage />} />

@@ -1,16 +1,19 @@
 /** Pages manage-* style Justicia : stats, graphiques, liste paginée, détail. */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import ActPrintCard from "./ActPrintCard";
+import ActWorkflowPanel from "./ActWorkflowPanel";
 import { BarChart, PieChart } from "./Charts";
 import DataToolbar from "./DataToolbar";
 import { SimpleStatBlocks } from "./StatBlocks";
+import { api } from "../api";
+import { getSession } from "../auth";
 import {
   actTypeLabel,
   getAct,
   getPersonByNic,
   listActs,
+  upsertActsFromApi,
   type Act,
   type ActType,
 } from "../registry";
@@ -160,6 +163,17 @@ export const MANAGE_CONFIGS: Record<string, ManageConfig> = {
 const PAGE_SIZE = 10;
 const COLORS = ["#5d87ff", "#13deb9", "#fa896b", "#ffae1f", "#539bff", "#763ebd"];
 
+const ACT_KIND: Partial<Record<ActType, string>> = {
+  BIRTH: "births",
+  DEATH: "deaths",
+  MARRIAGE: "marriages",
+  DIVORCE: "divorces",
+  ADOPTION: "adoptions",
+  RECOGNITION: "recognitions",
+  RECTIFICATION: "rectifications",
+  DOCUMENT: "documents",
+};
+
 function cell(act: Act, key: string): string {
   const v = act.payload[key];
   if (v == null || v === "") return "—";
@@ -188,11 +202,35 @@ export default function ManageActsPage({
   showAnalytics?: boolean;
 }) {
   const navigate = useNavigate();
+  const session = getSession();
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [viewAct, setViewAct] = useState<Act | null>(null);
+  const [tick, setTick] = useState(0);
+  const [source, setSource] = useState<"api" | "cache">("cache");
 
-  const all = useMemo(() => listActs(config.actType), [config.actType]);
+  const refresh = useCallback(async () => {
+    const kind = ACT_KIND[config.actType];
+    if (session?.accessToken && kind) {
+      try {
+        const rows = await api.listActs(kind);
+        upsertActsFromApi(rows);
+        setSource("api");
+        setTick((n) => n + 1);
+        return;
+      } catch {
+        /* fall through to cache */
+      }
+    }
+    setSource("cache");
+    setTick((n) => n + 1);
+  }, [config.actType, session?.accessToken]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const all = useMemo(() => listActs(config.actType), [config.actType, tick]);
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -201,6 +239,7 @@ export default function ManageActsPage({
       const parts = [
         act.act_number,
         act.national_id,
+        act.status ?? "",
         ...config.summaryFields.map((f) => String(act.payload[f.key] ?? "")),
       ];
       return parts.join(" ").toLowerCase().includes(needle);
@@ -271,6 +310,7 @@ export default function ManageActsPage({
     const base: Record<string, string> = {
       act_number: a.act_number,
       national_id: a.national_id,
+      status: a.status ?? "",
       created_at: a.created_at,
     };
     for (const f of config.summaryFields) base[f.key] = cell(a, f.key);
@@ -304,6 +344,7 @@ export default function ManageActsPage({
                 <a href={config.justiciaUrl} target="_blank" rel="noreferrer">
                   {config.justiciaFile}
                 </a>
+                {source === "api" ? " · source API" : " · cache local"}
               </>
             )}
           </p>
@@ -356,6 +397,9 @@ export default function ManageActsPage({
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
+            <button type="button" className="btn-secondary btn-sm" onClick={() => void refresh()}>
+              Actualiser
+            </button>
           </div>
           <DataToolbar filename={`manage_${config.slug}`} rows={exportRows} />
         </div>
@@ -371,6 +415,7 @@ export default function ManageActsPage({
                 {primary ? <th>{primary.label}</th> : null}
                 {secondary ? <th>{secondary.label}</th> : null}
                 {tertiary ? <th>{tertiary.label}</th> : null}
+                <th>Statut</th>
                 <th>Enregistré le</th>
                 <th>Action</th>
               </tr>
@@ -378,7 +423,7 @@ export default function ManageActsPage({
             <tbody>
               {pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="muted">
+                  <td colSpan={10} className="muted">
                     Aucun enregistrement. Cliquez « + Ajouter » pour créer.
                   </td>
                 </tr>
@@ -405,6 +450,7 @@ export default function ManageActsPage({
                       {primary ? <td>{cell(a, primary.key)}</td> : null}
                       {secondary ? <td>{cell(a, secondary.key)}</td> : null}
                       {tertiary ? <td>{cell(a, tertiary.key)}</td> : null}
+                      <td>{a.status ?? "—"}</td>
                       <td>{new Date(a.created_at).toLocaleString("fr-CD")}</td>
                       <td className="table-actions">
                         <button
@@ -466,28 +512,29 @@ export default function ManageActsPage({
       {viewAct ? (
         <div className="modal-backdrop" onClick={() => setViewAct(null)}>
           <div className="modal-panel modal-wide" onClick={(e) => e.stopPropagation()}>
-            <div className="panel-head">
-              <div>
-                <h3 className="panel-title" style={{ margin: 0 }}>
-                  {actTypeLabel(viewAct.type)} — {viewAct.act_number}
-                </h3>
-                <p className="muted small" style={{ margin: "0.25rem 0 0" }}>
-                  Détail complet de l&apos;enregistrement
-                </p>
-              </div>
-              <button type="button" className="btn-secondary btn-sm" onClick={() => setViewAct(null)}>
-                Fermer
-              </button>
-            </div>
-            <dl className="act-print-fields" style={{ marginBottom: "1rem" }}>
-              {config.summaryFields.map((f) => (
-                <div key={f.key}>
-                  <dt>{f.label}</dt>
-                  <dd>{cell(viewAct, f.key)}</dd>
-                </div>
-              ))}
-            </dl>
-            <ActPrintCard act={viewAct} />
+            <ActWorkflowPanel
+              act={viewAct}
+              summaryFields={config.summaryFields}
+              onClose={() => setViewAct(null)}
+              onUpdated={(a) => {
+                upsertActsFromApi([
+                  {
+                    id: a.id,
+                    act_type: a.type,
+                    act_number: a.act_number,
+                    status: a.status ?? "DRAFT",
+                    payload: a.payload,
+                    created_at: a.created_at,
+                    verification_code:
+                      typeof a.payload.verification_code === "string"
+                        ? a.payload.verification_code
+                        : null,
+                  },
+                ]);
+                setViewAct(a);
+                setTick((n) => n + 1);
+              }}
+            />
           </div>
         </div>
       ) : null}

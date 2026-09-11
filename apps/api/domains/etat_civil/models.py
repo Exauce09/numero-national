@@ -24,7 +24,12 @@ class CivilAct(Base):
 
     __tablename__ = "civil_acts"
     __table_args__ = (
-        UniqueConstraint("act_number", "commune_code", name="uq_civil_acts_number_commune"),
+        UniqueConstraint(
+            "act_number",
+            "commune_code",
+            "act_type",
+            name="uq_civil_acts_number_commune_type",
+        ),
         Index("ix_civil_acts_commune_type", "commune_code", "act_type"),
         Index("ix_civil_acts_citizen", "citizen_id"),
         {"schema": "etat_civil"},
@@ -161,11 +166,47 @@ class ResidenceRecord(Base):
     )
 
 
+class ActNumberCounter(Base):
+    """Compteur séquentiel par commune + année + type d'acte."""
+
+    __tablename__ = "act_number_counters"
+    __table_args__ = (
+        UniqueConstraint(
+            "commune_code",
+            "year",
+            "act_type",
+            name="uq_act_number_counters_commune_year_type",
+        ),
+        Index("ix_act_number_counters_lookup", "commune_code", "year", "act_type"),
+        {"schema": "etat_civil"},
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
+    commune_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    act_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    last_seq: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
 class CorrectionRequest(Base):
     """Demande de correction initiée depuis le portail citoyen."""
 
     __tablename__ = "correction_requests"
-    __table_args__ = {"schema": "etat_civil"}
+    __table_args__ = (
+        Index("ix_correction_requests_status", "status"),
+        {"schema": "etat_civil"},
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -181,6 +222,9 @@ class CorrectionRequest(Base):
     status: Mapped[str] = mapped_column(
         String(32), nullable=False, default="SUBMITTED", server_default="SUBMITTED"
     )
+    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

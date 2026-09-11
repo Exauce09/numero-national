@@ -5,6 +5,7 @@ import {
   demoListActs,
   type CivilAct,
 } from "../api";
+import { getSession } from "../auth";
 import GeoCascade, { GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
 
 type Props = { kind: string; title: string };
@@ -31,7 +32,7 @@ const FIELDS: Record<string, { key: string; label: string }[]> = {
   ],
   deaths: [
     { key: "deceased_name", label: "Nom du défunt" },
-    { key: "date_of_death", label: "Date du décès" },
+    { key: "date_of_death", label: "Date de décès" },
     { key: "cause", label: "Cause (optionnel)" },
   ],
   recognitions: [
@@ -49,6 +50,7 @@ const FIELDS: Record<string, { key: string; label: string }[]> = {
 
 export default function ActPage({ kind, title }: Props) {
   const fields = FIELDS[kind] ?? [{ key: "notes", label: "Notes" }];
+  const session = getSession();
   const [commune, setCommune] = useState("KIN-GOMBE");
   const [geo, setGeo] = useState<GeoSelection>({});
   const [actNumber, setActNumber] = useState("");
@@ -57,20 +59,27 @@ export default function ActPage({ kind, title }: Props) {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [source, setSource] = useState<"api" | "demo">("demo");
 
   async function refresh() {
-    try {
-      const data = await api.listActs(kind, commune || undefined);
-      setRows(data);
-    } catch {
-      setRows(demoListActs(kind));
+    if (session?.accessToken) {
+      try {
+        const data = await api.listActs(kind, commune || undefined);
+        setRows(data);
+        setSource("api");
+        return;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Chargement API impossible");
+      }
     }
+    setRows(demoListActs(kind));
+    setSource("demo");
   }
 
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kind, commune]);
+  }, [kind, commune, session?.accessToken]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -91,12 +100,20 @@ export default function ActPage({ kind, title }: Props) {
       payload,
       status: "DRAFT",
     };
-    try {
-      await api.createAct(kind, body);
-      setMessage("Acte enregistré via l'API nationale.");
-    } catch {
+    if (session?.accessToken) {
+      try {
+        await api.createAct(kind, body);
+        setMessage("Acte enregistré via l'API nationale.");
+        setSource("api");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Échec API — enregistrement non effectué.");
+        setBusy(false);
+        return;
+      }
+    } else {
       demoCreateAct(kind, payload, geo.commune_code || commune);
-      setMessage("Acte enregistré en mode démo local (API indisponible).");
+      setMessage("Acte enregistré en mode démo local (pas de jeton API).");
+      setSource("demo");
     }
     setValues({});
     setActNumber("");
@@ -107,7 +124,10 @@ export default function ActPage({ kind, title }: Props) {
   return (
     <div>
       <h2 className="page-title">{title}</h2>
-      <p className="page-lead">Saisie et consultation des actes — Officier d&apos;état civil.</p>
+      <p className="page-lead">
+        Saisie et consultation des actes — Officier d&apos;état civil
+        {source === "api" ? " · source API" : " · mode démo"}.
+      </p>
 
       <div className="panel">
         <h3 style={{ marginTop: 0 }}>Nouvel acte</h3>
@@ -127,7 +147,9 @@ export default function ActPage({ kind, title }: Props) {
             />
           </div>
           <div>
-            <label className="form-label">N° d&apos;acte (optionnel)</label>
+            <label className="form-label">
+              N° d&apos;acte (optionnel — sinon séquence commune/année/seq)
+            </label>
             <input
               className="form-control"
               value={actNumber}

@@ -55,6 +55,8 @@ export type Act = {
   payload: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+  /** Statut workflow API (DRAFT…VALIDATED) — optionnel pour cache local. */
+  status?: string;
 };
 
 export type MarriageLink = {
@@ -535,6 +537,52 @@ export function listActs(type?: ActType): Act[] {
   const acts = [...load().acts].sort((a, b) => b.created_at.localeCompare(a.created_at));
   if (!type) return acts;
   return acts.filter((a) => a.type === type);
+}
+
+/** Merge API acts into local cache (offline fallback). */
+export function upsertActsFromApi(
+  rows: Array<{
+    id: string;
+    act_type: string;
+    act_number: string;
+    commune_code?: string;
+    status: string;
+    payload?: Record<string, unknown>;
+    created_at: string;
+    verification_code?: string | null;
+  }>,
+): Act[] {
+  const registry = load();
+  const out: Act[] = [];
+  for (const row of rows) {
+    const payload = { ...(row.payload ?? {}) };
+    if (row.verification_code) payload.verification_code = row.verification_code;
+    const national_id =
+      (typeof payload.national_id === "string" && payload.national_id) ||
+      (typeof payload.nic === "string" && payload.nic) ||
+      "";
+    const qr =
+      payload.qr && typeof payload.qr === "object"
+        ? JSON.stringify(payload.qr)
+        : JSON.stringify({ act_id: row.id, act_number: row.act_number });
+    const act: Act = {
+      id: row.id,
+      type: row.act_type as ActType,
+      act_number: row.act_number,
+      national_id,
+      qr_payload: qr,
+      payload,
+      status: row.status,
+      created_at: row.created_at,
+      updated_at: row.created_at,
+    };
+    const idx = registry.acts.findIndex((a) => a.id === act.id);
+    if (idx >= 0) registry.acts[idx] = { ...registry.acts[idx], ...act };
+    else registry.acts.unshift(act);
+    out.push(act);
+  }
+  save(registry);
+  return out;
 }
 
 export function getAct(id: string): Act | undefined {

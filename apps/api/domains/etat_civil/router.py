@@ -24,6 +24,8 @@ from apps.api.domains.etat_civil.schemas import (
     ActTransitionRequest,
     CivilActCreate,
     CivilActRead,
+    CorrectionRequestRead,
+    CorrectionReviewRequest,
     DeclarationCreate,
     DeclarationRead,
     DeclarationValidateRequest,
@@ -121,6 +123,31 @@ async def population_search(
             limit=limit,
         ),
     )
+
+
+@router.get("/acts/search", response_model=list[CivilActRead])
+async def search_acts(
+    q: str | None = None,
+    type: str | None = Query(None, alias="type"),
+    status_filter: str | None = Query(None, alias="status"),
+    commune: str | None = Query(None, alias="commune"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(require_permissions(PERM_CIVIL_READ)),
+) -> list[CivilActRead]:
+    """Recherche d'actes — résultats limités au périmètre bureau."""
+    rows = await services.search_acts(
+        db,
+        q=q,
+        act_type=type,
+        status_filter=status_filter,
+        commune_code=commune,
+        actor_id=principal.actor_id,
+        limit=limit,
+        offset=offset,
+    )
+    return [CivilActRead.model_validate(r) for r in rows]
 
 
 @router.get("/acts/{act_id}", response_model=CivilActRead)
@@ -406,6 +433,37 @@ async def verify_document(
 ) -> dict:
     """Public document authenticity check — no full PII."""
     return await services.verify_document_code(db, body.code)
+
+
+@router.get("/corrections", response_model=list[CorrectionRequestRead])
+async def list_corrections(
+    status_filter: str | None = Query(None, alias="status"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    _: Principal = Depends(require_permissions(PERM_CIVIL_READ)),
+) -> list[CorrectionRequestRead]:
+    rows = await services.list_correction_requests(
+        db, status_filter=status_filter, limit=limit, offset=offset
+    )
+    return [CorrectionRequestRead.model_validate(r) for r in rows]
+
+
+@router.post("/corrections/{request_id}/review", response_model=CorrectionRequestRead)
+async def review_correction(
+    request_id: UUID,
+    body: CorrectionReviewRequest,
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(require_permissions(PERM_CIVIL_VALIDATE)),
+) -> CorrectionRequestRead:
+    row = await services.review_correction_request(
+        db,
+        request_id,
+        approve=body.approve,
+        review_note=body.review_note,
+        actor_id=principal.actor_id,
+    )
+    return CorrectionRequestRead.model_validate(row)
 
 
 @router.get("/config")

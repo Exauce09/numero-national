@@ -11,6 +11,8 @@ export type CivilAct = {
   citizen_id: string | null;
   payload: Record<string, unknown>;
   created_at: string;
+  verification_code?: string | null;
+  version?: number | null;
 };
 
 export type Declaration = {
@@ -415,6 +417,32 @@ export const api = {
     }>(`/civil/acts/${actId}/extract`),
   transitionAct: (actId: string, body: Record<string, unknown>) =>
     request<CivilAct>(`/civil/acts/${actId}/transition`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  listActMentions: (actId: string) =>
+    request<Array<Record<string, unknown>>>(`/civil/acts/${actId}/mentions`),
+  searchActs: (params: URLSearchParams) =>
+    request<CivilAct[]>(`/civil/acts/search?${params}`),
+  listCorrections: (status?: string) => {
+    const q = new URLSearchParams();
+    if (status) q.set("status", status);
+    return request<
+      Array<{
+        id: string;
+        citizen_id: string;
+        field_name: string;
+        current_value: string | null;
+        requested_value: string;
+        justification: string;
+        status: string;
+        review_note?: string | null;
+        created_at: string;
+      }>
+    >(`/civil/corrections?${q}`);
+  },
+  reviewCorrection: (id: string, body: { approve: boolean; review_note?: string }) =>
+    request<Record<string, unknown>>(`/civil/corrections/${id}/review`, {
       method: "POST",
       body: JSON.stringify(body),
     }),

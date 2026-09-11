@@ -7,9 +7,10 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import String, cast, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from apps.api.domains.civil_config import NUMBERING_PATTERN
 from apps.api.domains.etat_civil.enums import (
     ActStatus,
     ActType,
@@ -17,7 +18,13 @@ from apps.api.domains.etat_civil.enums import (
     DeclarationType,
     ResidenceStatus,
 )
-from apps.api.domains.etat_civil.models import CivilAct, CivilDeclaration, ResidenceRecord
+from apps.api.domains.etat_civil.models import (
+    ActNumberCounter,
+    CivilAct,
+    CivilDeclaration,
+    CorrectionRequest,
+    ResidenceRecord,
+)
 from apps.api.domains.etat_civil.schemas import (
     CivilActCreate,
     DeclarationCreate,
@@ -30,10 +37,50 @@ from apps.api.domains.etat_civil.schemas import (
 logger = logging.getLogger(__name__)
 
 
-def _act_number(prefix: str, commune_code: str) -> str:
-    stamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
-    short = uuid.uuid4().hex[:6].upper()
-    return f"{prefix}-{commune_code}-{stamp}-{short}"
+def _advisory_lock_key(commune_code: str, year: int, act_type: str) -> int:
+    """Stable positive int64 for pg_advisory_xact_lock."""
+    raw = f"{commune_code}|{year}|{act_type}".encode()
+    return int.from_bytes(raw[:8].ljust(8, b"\0"), "big", signed=False) & 0x7FFFFFFFFFFFFFFF
+
+
+async def allocate_act_number(
+    db: AsyncSession,
+    *,
+    commune_code: str,
+    act_type: str,
+    year: int | None = None,
+) -> str:
+    """Allocate next sequential number: {commune}/{year}/{seq:06d}."""
+    y = year or datetime.now(UTC).year
+    lock_key = _advisory_lock_key(commune_code, y, act_type)
+    await db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": lock_key})
+
+    row = await db.scalar(
+        select(ActNumberCounter)
+        .where(
+            ActNumberCounter.commune_code == commune_code,
+            ActNumberCounter.year == y,
+            ActNumberCounter.act_type == act_type,
+        )
+        .with_for_update()
+    )
+    if row is None:
+        row = ActNumberCounter(
+            commune_code=commune_code,
+            year=y,
+            act_type=act_type,
+            last_seq=0,
+        )
+        db.add(row)
+        await db.flush()
+
+    row.last_seq = int(row.last_seq or 0) + 1
+    await db.flush()
+    return NUMBERING_PATTERN.format(
+        commune_code=commune_code,
+        year=y,
+        seq=row.last_seq,
+    )
 
 
 async def resolve_and_enforce_bureau(
@@ -187,8 +234,9 @@ async def create_act(
             detail="Acts must be created as DRAFT; use POST /civil/acts/{id}/transition to validate",
         )
 
-    prefix = data.act_type.value[:3]
-    number = data.act_number or _act_number(prefix, data.commune_code)
+    number = data.act_number or await allocate_act_number(
+        db, commune_code=data.commune_code, act_type=data.act_type.value
+    )
     payload = dict(data.payload or {})
     # NIC national unique porté dans l'acte (jamais dans le QR brut comme PII étendu)
     national_id = payload.get("national_id") or payload.get("nic")
@@ -280,6 +328,11 @@ async def transition_act_status(
             signature_ref=signature_ref,
             at=now,
         )
+        registry_result = await apply_registry_on_validation(
+            db, act, actor_id=actor_id, at=now
+        )
+    else:
+        registry_result = None
     if target_status == ActStatus.ARCHIVED.value:
         act.archived_at = now
     await write_audit(
@@ -289,7 +342,11 @@ async def transition_act_status(
         resource_type="civil_act",
         resource_id=str(act.id),
         old_value={"status": old},
-        new_value={"status": target_status, "authenticated": target_status == ActStatus.VALIDATED.value},
+        new_value={
+            "status": target_status,
+            "authenticated": target_status == ActStatus.VALIDATED.value,
+            "registry": registry_result,
+        },
         commit=False,
     )
     await db.commit()
@@ -752,33 +809,329 @@ async def create_declaration(
 
 
 async def signal_registry_status_change(
+    db: AsyncSession,
     *,
     citizen_id: uuid.UUID | None,
     event: str,
     payload: dict[str, Any] | None = None,
+    actor_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
-    """Stub: signal Core Registry status change when registry is importable."""
-    result = {
+    """Apply Core Registry status change (DECEASED / STATUS_CHANGED) when possible."""
+    result: dict[str, Any] = {
         "signalled": False,
         "citizen_id": str(citizen_id) if citizen_id else None,
         "event": event,
         "payload": payload or {},
     }
     if citizen_id is None:
+        result["note"] = "no citizen_id"
         return result
     try:
-        # Soft dependency — do not hard-import registry services if unfinished.
-        from apps.api.domains.core_registry import models as registry_models  # noqa: F401
+        from apps.api.domains.core_registry.enums import CitizenEventType, CitizenStatus
+        from apps.api.domains.core_registry.models import Citizen, CitizenHistory
 
-        logger.info(
-            "registry status change stub: citizen=%s event=%s", citizen_id, event
-        )
-        result["signalled"] = True
-        result["note"] = "registry module present; status change recorded conceptually"
+        citizen = await db.get(Citizen, citizen_id)
+        if citizen is None:
+            result["note"] = "citizen not found"
+            return result
+
+        now = datetime.now(UTC)
+        old_status = citizen.status
+        if event in {"CIVIL_DEATH_VALIDATED", "DEATH"}:
+            citizen.status = CitizenStatus.DECEASED.value
+            citizen.deceased_at = now
+            citizen.updated_at = now
+            db.add(
+                CitizenHistory(
+                    citizen_id=citizen.id,
+                    event_type=CitizenEventType.STATUS_CHANGED.value,
+                    payload={
+                        "old_status": old_status,
+                        "new_status": CitizenStatus.DECEASED.value,
+                        "source": "etat_civil",
+                        "event": event,
+                        **(payload or {}),
+                    },
+                    actor_id=actor_id,
+                    created_at=now,
+                )
+            )
+            result["signalled"] = True
+            result["new_status"] = CitizenStatus.DECEASED.value
+        else:
+            db.add(
+                CitizenHistory(
+                    citizen_id=citizen.id,
+                    event_type=CitizenEventType.STATUS_CHANGED.value,
+                    payload={
+                        "old_status": old_status,
+                        "event": event,
+                        "source": "etat_civil",
+                        **(payload or {}),
+                    },
+                    actor_id=actor_id,
+                    created_at=now,
+                )
+            )
+            result["signalled"] = True
+            result["note"] = "history recorded"
+        await db.flush()
     except Exception as exc:  # noqa: BLE001
-        result["note"] = f"registry not imported ({exc})"
-        logger.info("registry signal stub: %s", result["note"])
+        result["note"] = f"registry signal failed ({exc})"
+        logger.info("registry signal: %s", result["note"])
     return result
+
+
+def _payload_str(payload: dict[str, Any], *keys: str) -> str | None:
+    for k in keys:
+        v = payload.get(k)
+        if v is not None and str(v).strip():
+            return str(v).strip()
+    return None
+
+
+def _parse_birth_date(payload: dict[str, Any]) -> Any:
+    from datetime import date as date_cls
+
+    raw = _payload_str(payload, "date_of_birth", "date_naissance", "child_dob")
+    if not raw:
+        return None
+    try:
+        return date_cls.fromisoformat(raw[:10])
+    except ValueError:
+        return None
+
+
+def _map_sex(raw: str | None) -> str:
+    from apps.api.domains.core_registry.enums import Sex
+
+    if not raw:
+        return Sex.UNKNOWN.value
+    key = raw.strip().upper()
+    if key in {"M", "MALE", "H", "HOMME", "GARCON", "GARÇON"}:
+        return Sex.MALE.value
+    if key in {"F", "FEMALE", "FEMME", "FILLE"}:
+        return Sex.FEMALE.value
+    return Sex.UNKNOWN.value
+
+
+async def apply_registry_on_validation(
+    db: AsyncSession,
+    act: CivilAct,
+    *,
+    actor_id: uuid.UUID | None = None,
+    at: datetime | None = None,
+) -> dict[str, Any]:
+    """On VALIDATED BIRTH create/link citizen; on VALIDATED DEATH mark deceased."""
+    now = at or datetime.now(UTC)
+    payload = dict(act.payload or {})
+    result: dict[str, Any] = {"act_type": act.act_type, "action": None}
+
+    if act.act_type == ActType.BIRTH.value:
+        if act.citizen_id is not None:
+            result["action"] = "linked_existing"
+            result["citizen_id"] = str(act.citizen_id)
+            await signal_registry_status_change(
+                db,
+                citizen_id=act.citizen_id,
+                event="CIVIL_BIRTH_VALIDATED",
+                payload={"act_id": str(act.id), "act_number": act.act_number},
+                actor_id=actor_id,
+            )
+            return result
+
+        family_name = _payload_str(
+            payload, "child_family_name", "child_nom", "nom", "family_name"
+        )
+        given_names = _payload_str(
+            payload, "child_given_names", "child_prenom", "prenom", "given_names"
+        )
+        dob = _parse_birth_date(payload)
+        if not family_name or not given_names or dob is None:
+            result["action"] = "skipped"
+            result["note"] = "missing birth identity fields for citizen create"
+            return result
+
+        try:
+            from apps.api.domains.core_registry.duplicate_service import (
+                check_and_record_duplicates,
+            )
+            from apps.api.domains.core_registry.enums import CitizenEventType, CitizenStatus
+            from apps.api.domains.core_registry.models import Citizen, CitizenHistory
+
+            sex = _map_sex(_payload_str(payload, "sex", "sexe"))
+            place = _payload_str(
+                payload, "place_of_birth", "lieu_naissance", "lieu_etat_civil"
+            )
+            citizen = Citizen(
+                status=CitizenStatus.DRAFT.value,
+                nic=None,
+                sex=sex,
+                date_of_birth=dob,
+                place_of_birth=place,
+                nationality="COD",
+                given_names=given_names,
+                family_name=family_name,
+                created_at=now,
+                updated_at=now,
+            )
+            db.add(citizen)
+            await db.flush()
+            db.add(
+                CitizenHistory(
+                    citizen_id=citizen.id,
+                    event_type=CitizenEventType.CREATED.value,
+                    payload={
+                        "status": CitizenStatus.DRAFT.value,
+                        "source": "etat_civil.birth",
+                        "act_id": str(act.id),
+                        "act_number": act.act_number,
+                    },
+                    actor_id=actor_id,
+                    created_at=now,
+                )
+            )
+            try:
+                await check_and_record_duplicates(db, citizen)
+            except Exception as exc:  # noqa: BLE001
+                logger.info("birth duplicate check skipped: %s", exc)
+
+            act.citizen_id = citizen.id
+            # Keep NIC placeholder in payload aligned with citizen when assigned later.
+            if payload.get("national_id") or payload.get("nic"):
+                pass
+            else:
+                payload["citizen_id"] = str(citizen.id)
+                act.payload = payload
+            result["action"] = "created_citizen"
+            result["citizen_id"] = str(citizen.id)
+        except Exception as exc:  # noqa: BLE001
+            result["action"] = "error"
+            result["note"] = str(exc)
+            logger.exception("birth registry coupling failed")
+        return result
+
+    if act.act_type == ActType.DEATH.value:
+        citizen_id = act.citizen_id
+        if citizen_id is None:
+            raw = _payload_str(payload, "citizen_id")
+            if raw:
+                try:
+                    citizen_id = uuid.UUID(raw)
+                except ValueError:
+                    citizen_id = None
+        signal = await signal_registry_status_change(
+            db,
+            citizen_id=citizen_id,
+            event="CIVIL_DEATH_VALIDATED",
+            payload={"act_id": str(act.id), "act_number": act.act_number},
+            actor_id=actor_id,
+        )
+        result["action"] = "mark_deceased"
+        result.update(signal)
+        return result
+
+    result["action"] = "noop"
+    return result
+
+
+async def search_acts(
+    db: AsyncSession,
+    *,
+    q: str | None = None,
+    act_type: str | None = None,
+    status_filter: str | None = None,
+    commune_code: str | None = None,
+    actor_id: uuid.UUID | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[CivilAct]:
+    """Bureau-scoped act search for officers."""
+    stmt = (
+        select(CivilAct)
+        .where(CivilAct.deleted_at.is_(None))
+        .order_by(CivilAct.created_at.desc())
+    )
+    if act_type:
+        stmt = stmt.where(CivilAct.act_type == act_type.upper())
+    if status_filter:
+        stmt = stmt.where(CivilAct.status == status_filter.upper())
+    if commune_code:
+        stmt = stmt.where(CivilAct.commune_code == commune_code)
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(
+            or_(
+                CivilAct.act_number.ilike(like),
+                CivilAct.verification_code.ilike(like),
+                CivilAct.commune_code.ilike(like),
+                cast(CivilAct.payload, String).ilike(like),
+            )
+        )
+    if actor_id is not None:
+        from apps.api.domains.identity.iam_services import load_user_with_rbac, user_role_codes
+
+        user = await load_user_with_rbac(db, actor_id)
+        if user is not None:
+            roles = user_role_codes(user)
+            if not (roles & {"SUPER_ADMIN_NATIONAL", "CENTRAL_ADMIN", "ADMIN_NATIONAL"}):
+                allowed = await _actor_bureau_ids(db, user)
+                if allowed is not None:
+                    stmt = stmt.where(CivilAct.bureau_id.in_(allowed))
+    stmt = stmt.limit(limit).offset(offset)
+    return list((await db.execute(stmt)).scalars().all())
+
+
+async def list_correction_requests(
+    db: AsyncSession,
+    *,
+    status_filter: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[CorrectionRequest]:
+    stmt = select(CorrectionRequest).order_by(CorrectionRequest.created_at.desc())
+    if status_filter:
+        stmt = stmt.where(CorrectionRequest.status == status_filter.upper())
+    stmt = stmt.limit(limit).offset(offset)
+    return list((await db.execute(stmt)).scalars().all())
+
+
+async def review_correction_request(
+    db: AsyncSession,
+    request_id: uuid.UUID,
+    *,
+    approve: bool,
+    review_note: str | None = None,
+    actor_id: uuid.UUID | None = None,
+) -> CorrectionRequest:
+    from fastapi import HTTPException
+
+    from apps.api.domains.audit.services import write_audit
+
+    row = await db.get(CorrectionRequest, request_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Correction request not found")
+    if row.status not in {"SUBMITTED", "PENDING"}:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot review request in status {row.status}",
+        )
+    row.status = "APPROVED" if approve else "REJECTED"
+    row.reviewed_by = actor_id
+    row.reviewed_at = datetime.now(UTC)
+    row.review_note = review_note
+    await write_audit(
+        db,
+        action="civil.correction.approve" if approve else "civil.correction.reject",
+        actor_id=actor_id,
+        resource_type="correction_request",
+        resource_id=str(row.id),
+        new_value={"status": row.status, "review_note": review_note},
+        commit=False,
+    )
+    await db.commit()
+    await db.refresh(row)
+    return row
 
 
 async def validate_declaration(
@@ -854,7 +1207,10 @@ async def validate_declaration(
     else:
         act = CivilAct(
             act_type=act_type.value,
-            act_number=body.act_number or _act_number(act_type.value[:3], body.commune_code),
+            act_number=body.act_number
+            or await allocate_act_number(
+                db, commune_code=body.commune_code, act_type=act_type.value
+            ),
             commune_code=body.commune_code,
             status=ActStatus.DRAFT.value,
             citizen_id=citizen_id,
@@ -884,15 +1240,16 @@ async def validate_declaration(
         },
         commit=False,
     )
-    await db.commit()
-    await db.refresh(decl)
-    await db.refresh(act)
-
     registry_signal = await signal_registry_status_change(
+        db,
         citizen_id=act.citizen_id,
         event="CIVIL_DECLARATION_ACCEPTED",
         payload={"act_id": str(act.id), "act_type": act.act_type, "act_status": act.status},
+        actor_id=actor_id,
     )
+    await db.commit()
+    await db.refresh(decl)
+    await db.refresh(act)
     return decl, act, registry_signal
 
 
@@ -911,7 +1268,11 @@ async def create_residence(
         if data.status == ResidenceStatus.ACTIVE
         else data.status.value
     )
-    number = data.attestation_number or _act_number("RES", data.commune_code)
+    number = data.attestation_number or await allocate_act_number(
+        db,
+        commune_code=data.commune_code,
+        act_type=ActType.RESIDENCE_ATTESTATION.value,
+    )
     record = ResidenceRecord(
         citizen_id=data.citizen_id,
         line1=data.line1,

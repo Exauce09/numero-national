@@ -192,6 +192,10 @@ async def test_birth_validate_mention_and_soft_delete_guard(client: AsyncClient)
     )
     assert birth.status_code in {200, 201}, birth.text
     act_id = birth.json()["id"]
+    act_number = birth.json()["act_number"]
+    assert "/" in act_number, act_number
+    parts = act_number.split("/")
+    assert len(parts) == 3 and parts[0] == "KIN-GOMBE" and parts[1].isdigit() and parts[2].isdigit()
     tr = await client.post(
         f"/api/v1/civil/acts/{act_id}/transition",
         headers=officer_h,

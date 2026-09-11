@@ -1,15 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import ActPrintCard from "../components/ActPrintCard";
+import ActWorkflowPanel from "../components/ActWorkflowPanel";
 import { BarChart, PieChart } from "../components/Charts";
 import DataToolbar from "../components/DataToolbar";
 import { SimpleStatBlocks } from "../components/StatBlocks";
+import { api } from "../api";
+import { getSession } from "../auth";
 import {
   actTypeLabel,
   getAct,
   getPersonByNic,
   listActs,
   updateAct,
+  upsertActsFromApi,
   type Act,
   type ActType,
 } from "../registry";
@@ -26,11 +29,14 @@ const TYPES: Array<ActType | ""> = [
   "DOCUMENT",
 ];
 
+const API_KINDS = ["births", "deaths", "marriages", "divorces", "adoptions", "recognitions", "rectifications"] as const;
+
 const PAGE_SIZE = 10;
 const COLORS = ["#5d87ff", "#13deb9", "#fa896b", "#ffae1f", "#539bff", "#763ebd", "#49beff", "#fdd835"];
 
 export default function ActsPage({ showAnalytics = false }: { showAnalytics?: boolean }) {
   const navigate = useNavigate();
+  const session = getSession();
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<ActType | "">("");
   const [q, setQ] = useState("");
@@ -41,6 +47,42 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
+  const refresh = useCallback(async () => {
+    if (!session?.accessToken) {
+      setTick((n) => n + 1);
+      return;
+    }
+    try {
+      const batches = await Promise.all(
+        API_KINDS.map((kind) => api.listActs(kind).catch(() => [])),
+      );
+      upsertActsFromApi(batches.flat());
+    } catch {
+      /* keep cache */
+    }
+    setTick((n) => n + 1);
+  }, [session?.accessToken]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  async function runServerSearch() {
+    if (!session?.accessToken || !q.trim()) {
+      await refresh();
+      return;
+    }
+    try {
+      const params = new URLSearchParams({ q: q.trim() });
+      if (filter) params.set("type", filter);
+      const rows = await api.searchActs(params);
+      upsertActsFromApi(rows);
+      setTick((n) => n + 1);
+    } catch {
+      setTick((n) => n + 1);
+    }
+  }
+
   const all = useMemo(() => listActs(), [tick]);
 
   const acts = useMemo(() => {
@@ -48,7 +90,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
     const needle = q.trim().toLowerCase();
     if (!needle) return base;
     return base.filter((a) =>
-      `${a.act_number} ${a.national_id} ${a.type} ${JSON.stringify(a.payload)}`
+      `${a.act_number} ${a.national_id} ${a.type} ${a.status ?? ""} ${JSON.stringify(a.payload)}`
         .toLowerCase()
         .includes(needle),
     );
@@ -170,7 +212,13 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
               placeholder="Rechercher…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void runServerSearch();
+              }}
             />
+            <button type="button" className="btn-secondary btn-sm" onClick={() => void runServerSearch()}>
+              Chercher API
+            </button>
             <select
               className="form-control"
               style={{ marginBottom: 0, width: "auto" }}
@@ -197,6 +245,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
                 <th>N° acte</th>
                 <th>Type</th>
                 <th>Num. national</th>
+                <th>Statut</th>
                 <th>Enregistré le</th>
                 <th>Action</th>
               </tr>
@@ -204,7 +253,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
             <tbody>
               {pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="muted">
+                  <td colSpan={8} className="muted">
                     Aucun acte.
                   </td>
                 </tr>
@@ -228,6 +277,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
                       <td>
                         <code>{a.national_id || "—"}</code>
                       </td>
+                      <td>{a.status ?? "—"}</td>
                       <td>{new Date(a.created_at).toLocaleString("fr-CD")}</td>
                       <td className="table-actions">
                         <button
@@ -299,15 +349,28 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
       {viewAct ? (
         <div className="modal-backdrop" onClick={() => setViewAct(null)}>
           <div className="modal-panel modal-wide" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-actions" style={{ marginBottom: "1rem" }}>
-              <button type="button" className="btn-secondary" onClick={() => window.print()}>
-                Imprimer
-              </button>
-              <button type="button" className="btn-secondary" onClick={() => setViewAct(null)}>
-                Fermer
-              </button>
-            </div>
-            <ActPrintCard act={viewAct} />
+            <ActWorkflowPanel
+              act={viewAct}
+              onClose={() => setViewAct(null)}
+              onUpdated={(a) => {
+                upsertActsFromApi([
+                  {
+                    id: a.id,
+                    act_type: a.type,
+                    act_number: a.act_number,
+                    status: a.status ?? "DRAFT",
+                    payload: a.payload,
+                    created_at: a.created_at,
+                    verification_code:
+                      typeof a.payload.verification_code === "string"
+                        ? a.payload.verification_code
+                        : null,
+                  },
+                ]);
+                setViewAct(a);
+                setTick((n) => n + 1);
+              }}
+            />
           </div>
         </div>
       ) : null}

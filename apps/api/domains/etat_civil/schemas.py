@@ -233,3 +233,24 @@ class StatsByActType(BaseModel):
     commune_code: str
     counts: dict[str, int]
     total: int
+
+
+class CorrectionRequestRead(BaseModel):
+    id: UUID
+    citizen_id: UUID
+    field_name: str
+    current_value: str | None
+    requested_value: str
+    justification: str
+    status: str
+    reviewed_by: UUID | None = None
+    reviewed_at: datetime | None = None
+    review_note: str | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class CorrectionReviewRequest(BaseModel):
+    approve: bool
+    review_note: str | None = None

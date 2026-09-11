@@ -23,6 +23,7 @@ export type NavKey =
   | "divorces"
   | "declarations"
   | "validation"
+  | "corrections"
   | "census"
   | "admin_personnel"
   | "admin_bureaux"
@@ -82,6 +83,21 @@ export function can(permission: string, permissions: string[] | undefined | null
   return set.has(permission);
 }
 
+/** Officier / lead roles that may validate acts in UI (server still enforces). */
+export function canValidateActs(
+  roles: string[] | undefined | null,
+  permissions?: string[] | null,
+): boolean {
+  if (can("civil:act:validate", permissions) || can("*", permissions)) return true;
+  const r = normalizeRoles(roles);
+  return r.some((x) =>
+    OFFICIER.has(x) ||
+    BUREAU_LEAD.has(x) ||
+    NATIONAL.has(x) ||
+    PROVINCIAL.has(x),
+  );
+}
+
 export function canAny(keys: string[], permissions: string[] | undefined | null): boolean {
   return keys.some((k) => can(k, permissions));
 }
@@ -114,6 +130,8 @@ export function canSeeNav(key: NavKey, roles: string[], permissions?: string[] |
     case "documents":
       return isAgent || isOfficier || isLead || isProvincial || isNational;
     case "validation":
+      return isOfficier || isLead || isProvincial || isNational;
+    case "corrections":
       return isOfficier || isLead || isProvincial || isNational;
     case "census":
       return isLead || isProvincial || isNational || isOfficier;
