@@ -729,14 +729,51 @@
 .nav-group-label {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  padding: 0.45rem 0.85rem 0.2rem;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.55rem 0.85rem;
+  margin: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--egouv-muted, #64748b);
-  opacity: 0.95;
+  cursor: pointer;
+  text-align: left;
+}
+
+.nav-group-label:hover {
+  background: rgba(11, 61, 145, 0.06);
+  color: var(--egouv-primary, #0b3d91);
+}
+
+.nav-group.is-route-active > .nav-group-label,
+.nav-group.is-open > .nav-group-label {
+  color: var(--egouv-primary, #0b3d91);
+}
+
+.nav-group-label-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.nav-group-chevron {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.nav-group-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
 }
 
 .nav-group a {

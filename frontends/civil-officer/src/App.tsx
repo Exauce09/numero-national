@@ -476,6 +476,54 @@ function HealthShell() {
   );
 }
 
+function pathMatchesPrefixes(pathname: string, prefixes: string[]): boolean {
+  return prefixes.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`) || (p.length > 1 && pathname.startsWith(p)),
+  );
+}
+
+/** Groupe sidebar repliable : ouvert au clic ou si la route courante est dans le groupe. */
+function NavCollapsibleGroup({
+  label,
+  icon,
+  activePrefixes,
+  children,
+}: {
+  label: string;
+  icon: ReactNode;
+  activePrefixes: string[];
+  children: ReactNode;
+}) {
+  const location = useLocation();
+  const routeOpen = pathMatchesPrefixes(location.pathname, activePrefixes);
+  const [forced, setForced] = useState<"open" | "closed" | null>(null);
+
+  useEffect(() => {
+    setForced(null);
+  }, [location.pathname]);
+
+  const open = routeOpen ? forced !== "closed" : forced === "open";
+
+  return (
+    <div className={`nav-group${open ? " is-open" : ""}${routeOpen ? " is-route-active" : ""}`}>
+      <button
+        type="button"
+        className="nav-group-label"
+        aria-expanded={open}
+        onClick={() => setForced(open ? "closed" : "open")}
+      >
+        <span className="nav-group-label-main">
+          {icon} {label}
+        </span>
+        <span className="nav-group-chevron" aria-hidden>
+          {open ? "▾" : "▸"}
+        </span>
+      </button>
+      {open ? <div className="nav-group-items">{children}</div> : null}
+    </div>
+  );
+}
+
 function Shell() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -649,10 +697,17 @@ function Shell() {
             </NavLink>
           ) : null}
           {canSeeNav("population", roles, permissions) ? (
-            <div className="nav-group">
-              <div className="nav-group-label">
-                <IconUsers size={18} /> Population
-              </div>
+            <NavCollapsibleGroup
+              label="Population"
+              icon={<IconUsers size={18} />}
+              activePrefixes={[
+                "/population",
+                "/personnes",
+                "/lists/population",
+                "/census/scan-coupon",
+                "/cartes-livraison",
+              ]}
+            >
               <NavLink
                 to="/population"
                 className={({ isActive }) =>
@@ -677,7 +732,7 @@ function Shell() {
               {canSeeNav("cartes", roles, permissions) ? (
                 <NavLink to="/cartes-livraison">Impression carte</NavLink>
               ) : null}
-            </div>
+            </NavCollapsibleGroup>
           ) : null}
           {canSeeNav("naissances", roles, permissions) ? (
             <NavLink to="/manage/naissance">
@@ -725,10 +780,17 @@ function Shell() {
             </NavLink>
           ) : null}
           {canSeeNav("documents", roles, permissions) ? (
-            <div className="nav-group">
-              <div className="nav-group-label">
-                <IconFile size={18} /> Actes & documents
-              </div>
+            <NavCollapsibleGroup
+              label="Actes & documents"
+              icon={<IconFile size={18} />}
+              activePrefixes={[
+                "/acts",
+                "/declarations",
+                "/transcriptions",
+                "/corrections",
+                "/verify-document",
+              ]}
+            >
               <NavLink to="/acts">Registre</NavLink>
               <NavLink to="/acts/qrcode">QR code</NavLink>
               {canSeeNav("declarations", roles, permissions) ? (
@@ -741,7 +803,7 @@ function Shell() {
                 <NavLink to="/corrections">Corrections</NavLink>
               ) : null}
               <NavLink to="/verify-document">Vérifier document</NavLink>
-            </div>
+            </NavCollapsibleGroup>
           ) : null}
           {canSeeNav("admin_bureaux", roles, permissions) ? (
             <NavLink to="/admin/bureaux">
