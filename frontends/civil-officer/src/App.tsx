@@ -932,7 +932,6 @@ function Shell() {
             <Route path="/admin/bureaux" element={<BureauxPage />} />
             <Route path="/admin/personnel" element={<PersonnelPage />} />
             <Route path="/admin/account-requests" element={<AccountRequestsPage />} />
-            <Route path="/verify-document" element={<DocumentVerifyPage />} />
             <Route path="/territory" element={<TerritoryPage />} />
             <Route path="/search" element={<SearchPage />} />
           </Routes>
