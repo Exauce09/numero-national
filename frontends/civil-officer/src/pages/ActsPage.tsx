@@ -235,7 +235,12 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
               ))}
             </select>
           </div>
-          <DataToolbar filename="tous_actes" rows={exportRows} />
+          <div className="toolbar" style={{ margin: 0, display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+            <button type="button" className="btn-primary btn-sm" onClick={() => navigate("/documents")}>
+              Ajouter
+            </button>
+            <DataToolbar filename="tous_actes" rows={exportRows} />
+          </div>
         </div>
 
         <div className="table-scroll">
@@ -298,6 +303,14 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
                           }}
                         >
                           Modifier
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary btn-sm"
+                          title="Rectification officielle"
+                          onClick={() => navigate("/corrections")}
+                        >
+                          Supprimer
                         </button>
                       </td>
                     </tr>

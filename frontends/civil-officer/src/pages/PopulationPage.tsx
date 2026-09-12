@@ -10,13 +10,17 @@ import { getSession } from "../auth";
 import { nationalHitToPerson } from "../nationalSearch";
 import {
   ETAT_CIVIL_OPTIONS,
+  deletePerson,
   displayName,
+  getPerson,
   listActs,
   listPopulationPersons,
   personNationalite,
   populationBreakdown,
+  updatePerson,
   type EtatCivil,
   type Person,
+  type Sexe,
 } from "../registry";
 
 const PAGE_SIZE = 10;
@@ -72,6 +76,17 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
   const [source, setSource] = useState<"api" | "local">(hasApi ? "api" : "local");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editRow, setEditRow] = useState<PopRow | null>(null);
+  const [editForm, setEditForm] = useState({
+    nom: "",
+    postnom: "",
+    prenom: "",
+    sexe: "M" as Sexe,
+    date_naissance: "",
+    lieu_naissance: "",
+    etat_civil: "CELIBATAIRE" as EtatCivil,
+  });
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
 
   const censusIds = useMemo(() => {
     const ids = new Set<string>();
@@ -157,6 +172,27 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
     setPage(1);
   }, [q, sexe, nat, civilStatus, view]);
 
+  useEffect(() => {
+    const editId = params.get("edit");
+    if (!editId || persons.length === 0) return;
+    const row = persons.find((p) => p.id === editId);
+    if (!row) return;
+    const local = getPerson(row.id) ?? row;
+    setEditRow(row);
+    setEditForm({
+      nom: local.nom || "",
+      postnom: local.postnom || "",
+      prenom: local.prenom || "",
+      sexe: (local.sexe as Sexe) || "M",
+      date_naissance: (local.date_naissance || "").slice(0, 10),
+      lieu_naissance: local.lieu_naissance || "",
+      etat_civil: local.etat_civil || "CELIBATAIRE",
+    });
+    const next = new URLSearchParams(params);
+    next.delete("edit");
+    setParams(next, { replace: true });
+  }, [params, persons, setParams]);
+
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
   const pageRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
@@ -234,9 +270,11 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
             )}
           </p>
         </div>
-        <button type="button" className="btn-add" onClick={() => navigate("/census")}>
-          + Ajouter
-        </button>
+        <div className="toolbar" style={{ margin: 0, gap: "0.4rem", display: "flex", flexWrap: "wrap" }}>
+          <button type="button" className="btn-add" onClick={() => navigate("/census")}>
+            + Ajouter
+          </button>
+        </div>
       </div>
 
       <div className="dash-quick pop-action-bar" style={{ marginBottom: "1rem", flexWrap: "wrap" }}>
@@ -277,6 +315,12 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
       {error ? (
         <div className="login-error" role="alert" style={{ marginBottom: "1rem" }}>
           {error}
+        </div>
+      ) : null}
+
+      {actionMsg ? (
+        <div className="success-banner" role="status" style={{ marginBottom: "1rem" }}>
+          {actionMsg}
         </div>
       ) : null}
 
@@ -346,7 +390,12 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
               {busy ? "…" : "Actualiser"}
             </button>
           </div>
-          <DataToolbar filename="population" rows={exportRows} />
+          <div className="toolbar" style={{ margin: 0, display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center" }}>
+            <button type="button" className="btn-primary btn-sm" onClick={() => navigate("/census")}>
+              Ajouter
+            </button>
+            <DataToolbar filename="population" rows={exportRows} />
+          </div>
         </div>
 
         <div className="table-scroll">
@@ -403,6 +452,50 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                       <Link className="btn-add btn-sm" to={`/population/${p.id}`}>
                         Voir
                       </Link>
+                      <button
+                        type="button"
+                        className="btn-secondary btn-sm"
+                        onClick={() => {
+                          const local = getPerson(p.id) ?? p;
+                          setEditRow(p);
+                          setEditForm({
+                            nom: local.nom || "",
+                            postnom: local.postnom || "",
+                            prenom: local.prenom || "",
+                            sexe: (local.sexe as Sexe) || "M",
+                            date_naissance: (local.date_naissance || "").slice(0, 10),
+                            lieu_naissance: local.lieu_naissance || "",
+                            etat_civil: local.etat_civil || "CELIBATAIRE",
+                          });
+                          setActionMsg(null);
+                        }}
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary btn-sm"
+                        onClick={() => {
+                          if (
+                            !window.confirm(
+                              `Supprimer la fiche de ${displayName(p)} ?\n(Action locale — le registre national n’est pas effacé.)`,
+                            )
+                          ) {
+                            return;
+                          }
+                          const ok = deletePerson(p.id);
+                          if (ok) {
+                            setActionMsg(`Fiche locale supprimée : ${displayName(p)}`);
+                            void load();
+                          } else {
+                            setActionMsg(
+                              "Suppression locale impossible (fiche API uniquement). Utilisez Corrections pour une demande officielle.",
+                            );
+                          }
+                        }}
+                      >
+                        Supprimer
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -450,6 +543,123 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
           </div>
         </div>
       </div>
+
+      {editRow ? (
+        <div className="modal-backdrop" onClick={() => setEditRow(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <h3 style={{ marginTop: 0 }}>Modifier — {displayName(editRow)}</h3>
+            <p className="muted small">
+              Modification du cache local. Pour une rectification officielle du registre national, utilisez{" "}
+              <Link to="/corrections">Corrections</Link>.
+            </p>
+            <form
+              className="form-grid"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const existing = getPerson(editRow.id);
+                if (!existing) {
+                  setActionMsg(
+                    "Cette fiche n’existe qu’en API — ouvrez Corrections pour une demande de modification.",
+                  );
+                  setEditRow(null);
+                  return;
+                }
+                updatePerson(editRow.id, {
+                  nom: editForm.nom.trim(),
+                  postnom: editForm.postnom.trim(),
+                  prenom: editForm.prenom.trim(),
+                  sexe: editForm.sexe,
+                  date_naissance: editForm.date_naissance,
+                  lieu_naissance: editForm.lieu_naissance.trim(),
+                  etat_civil: editForm.etat_civil,
+                });
+                setActionMsg(`Fiche mise à jour : ${editForm.nom} ${editForm.prenom}`);
+                setEditRow(null);
+                void load();
+              }}
+            >
+              <div>
+                <label className="form-label">Nom</label>
+                <input
+                  className="form-control"
+                  value={editForm.nom}
+                  onChange={(e) => setEditForm((f) => ({ ...f, nom: e.target.value }))}
+                  required
+                />
+              </div>
+              <div>
+                <label className="form-label">Postnom</label>
+                <input
+                  className="form-control"
+                  value={editForm.postnom}
+                  onChange={(e) => setEditForm((f) => ({ ...f, postnom: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="form-label">Prénom</label>
+                <input
+                  className="form-control"
+                  value={editForm.prenom}
+                  onChange={(e) => setEditForm((f) => ({ ...f, prenom: e.target.value }))}
+                  required
+                />
+              </div>
+              <div>
+                <label className="form-label">Sexe</label>
+                <select
+                  className="form-control"
+                  value={editForm.sexe}
+                  onChange={(e) => setEditForm((f) => ({ ...f, sexe: e.target.value as Sexe }))}
+                >
+                  <option value="M">Masculin</option>
+                  <option value="F">Féminin</option>
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Date de naissance</label>
+                <input
+                  className="form-control"
+                  type="date"
+                  value={editForm.date_naissance}
+                  onChange={(e) => setEditForm((f) => ({ ...f, date_naissance: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="form-label">Situation</label>
+                <select
+                  className="form-control"
+                  value={editForm.etat_civil}
+                  onChange={(e) =>
+                    setEditForm((f) => ({ ...f, etat_civil: e.target.value as EtatCivil }))
+                  }
+                >
+                  {ETAT_CIVIL_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="full">
+                <label className="form-label">Lieu de naissance</label>
+                <input
+                  className="form-control"
+                  value={editForm.lieu_naissance}
+                  onChange={(e) => setEditForm((f) => ({ ...f, lieu_naissance: e.target.value }))}
+                />
+              </div>
+              <div className="full" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                <button type="submit" className="btn-primary">
+                  Enregistrer
+                </button>
+                <button type="button" className="btn-secondary" onClick={() => setEditRow(null)}>
+                  Annuler
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

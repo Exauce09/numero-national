@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, type CitizenDetail, type PersonCivilEvent } from "../api";
 import { getSession } from "../auth";
-import { displayName, getPerson, listActs, type Person } from "../registry";
+import { deletePerson, displayName, getPerson, listActs, type Person } from "../registry";
 import { nationalHitToPerson } from "../nationalSearch";
 
 type TabId =
@@ -46,8 +46,10 @@ function statusBadge(status: string, deceased: boolean): string {
 
 export default function PersonDetailPage() {
   const { id = "" } = useParams();
+  const navigate = useNavigate();
   const hasApi = Boolean(getSession()?.accessToken);
   const [tab, setTab] = useState<TabId>("identite");
+  const [msg, setMsg] = useState<string | null>(null);
   const [citizen, setCitizen] = useState<CitizenDetail | null>(null);
   const [events, setEvents] = useState<PersonCivilEvent[]>([]);
   const [prints, setPrints] = useState<
@@ -153,10 +155,42 @@ export default function PersonDetailPage() {
             </span>
           </p>
         </div>
-        <Link className="btn-secondary" to="/population">
-          ← Retour à la population
-        </Link>
+        <div className="toolbar" style={{ margin: 0, display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+          <button
+            type="button"
+            className="btn-secondary btn-sm"
+            onClick={() => navigate(`/population?edit=${encodeURIComponent(id)}`)}
+          >
+            Modifier
+          </button>
+          <Link className="btn-secondary btn-sm" to="/corrections">
+            Demande de correction
+          </Link>
+          <button
+            type="button"
+            className="btn-secondary btn-sm"
+            onClick={() => {
+              if (!window.confirm(`Supprimer la fiche locale de ${title} ?`)) return;
+              if (deletePerson(id)) {
+                navigate("/population", { replace: true });
+              } else {
+                setMsg("Fiche API uniquement — suppression locale impossible. Utilisez Corrections.");
+              }
+            }}
+          >
+            Supprimer
+          </button>
+          <Link className="btn-secondary" to="/population">
+            ← Retour
+          </Link>
+        </div>
       </div>
+
+      {msg ? (
+        <div className="login-error" role="alert" style={{ marginBottom: "1rem" }}>
+          {msg}
+        </div>
+      ) : null}
 
       {busy ? <p className="muted">Chargement de la fiche…</p> : null}
       {error ? (

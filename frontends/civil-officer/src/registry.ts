@@ -555,6 +555,16 @@ export function updatePerson(id: string, patch: Partial<Person>): Person | undef
   return next;
 }
 
+/** Retire une fiche du registre local (ne touche pas PostgreSQL). */
+export function deletePerson(id: string): boolean {
+  const registry = load();
+  const before = registry.persons.length;
+  registry.persons = registry.persons.filter((p) => p.id !== id);
+  if (registry.persons.length === before) return false;
+  save(registry);
+  return true;
+}
+
 export function listActs(type?: ActType): Act[] {
   const acts = [...load().acts].sort((a, b) => b.created_at.localeCompare(a.created_at));
   if (!type) return acts;

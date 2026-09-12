@@ -402,6 +402,9 @@ export default function ManageActsPage({
             </button>
           </div>
           <DataToolbar filename={`manage_${config.slug}`} rows={exportRows} />
+          <button type="button" className="btn-primary btn-sm" onClick={() => navigate(config.createPath)}>
+            Ajouter
+          </button>
         </div>
 
         <div className="table-scroll">
@@ -459,6 +462,21 @@ export default function ManageActsPage({
                           onClick={() => setViewAct(getAct(a.id) ?? a)}
                         >
                           Voir
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary btn-sm"
+                          onClick={() => setViewAct(getAct(a.id) ?? a)}
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary btn-sm"
+                          title="Les actes validés se rectifient via Corrections"
+                          onClick={() => navigate("/corrections")}
+                        >
+                          Supprimer
                         </button>
                       </td>
                     </tr>
