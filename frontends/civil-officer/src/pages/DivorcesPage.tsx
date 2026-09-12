@@ -99,7 +99,13 @@ export default function DivorcesPage() {
             <input className="form-control" value={cause} onChange={(e) => setCause(e.target.value)} />
           </div>
           <div className="full">
-            <PersonPicker label="Officier" value={officier} onChange={setOfficier} />
+            <PersonPicker
+              label="Officier (N° état civil)"
+              value={officier}
+              onChange={setOfficier}
+              nicSearchHint
+              hideAdd
+            />
           </div>
           <div className="full">
             <PersonPicker label="Témoin 1" value={temoin1} onChange={setTemoin1} />

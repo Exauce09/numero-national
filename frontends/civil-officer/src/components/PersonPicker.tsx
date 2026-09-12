@@ -28,6 +28,10 @@ type Props = {
    * secteur / chefferie / commune, village) — sans cascade visuelle.
    */
   originGeoFilter?: boolean;
+  /** Filtre les résultats (et verrouille le sexe à l'ajout) — mère F / père M. */
+  sexFilter?: Sexe;
+  /** Placeholders axés sur le N° d'état civil (NIC). */
+  nicSearchHint?: boolean;
 };
 
 const emptyForm = {
@@ -50,11 +54,15 @@ export default function PersonPicker({
   forceAddOpen = false,
   onForceAddConsumed,
   originGeoFilter = false,
+  sexFilter,
+  nicSearchHint = false,
 }: Props) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(() =>
+    sexFilter ? { ...emptyForm, sexe: sexFilter } : emptyForm,
+  );
   const [lieuNaissance, setLieuNaissance] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<Person[]>([]);
@@ -79,7 +87,9 @@ export default function PersonPicker({
       setSearching(true);
       void searchEveryone(q)
         .then((hits) => {
-          if (!cancelled) setResults(hits.slice(0, 20));
+          if (cancelled) return;
+          const filtered = sexFilter ? hits.filter((p) => p.sexe === sexFilter) : hits;
+          setResults(filtered.slice(0, 20));
         })
         .finally(() => {
           if (!cancelled) setSearching(false);
@@ -89,7 +99,7 @@ export default function PersonPicker({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [query, open, value]);
+  }, [query, open, value, sexFilter]);
 
   function select(person: Person) {
     onChange(person);
@@ -105,17 +115,18 @@ export default function PersonPicker({
       return;
     }
     try {
+      const sexe = sexFilter ?? form.sexe;
       const person = addPerson({
         nom: form.nom.trim(),
         postnom: form.postnom.trim(),
         prenom: form.prenom.trim(),
-        sexe: form.sexe,
+        sexe,
         date_naissance: form.date_naissance,
         lieu_naissance: lieuNaissance.trim(),
         etat_civil: form.etat_civil,
       });
       onChange(person);
-      setForm(emptyForm);
+      setForm(sexFilter ? { ...emptyForm, sexe: sexFilter } : emptyForm);
       setLieuNaissance("");
       setModal(false);
     } catch (err) {
@@ -159,9 +170,15 @@ export default function PersonPicker({
           <input
             className="form-control"
             placeholder={
-              originGeoFilter
-                ? "Sélection intelligente : nom, NIC, province, ville, territoire, secteur, village…"
-                : "Recherche nationale (nom, post-nom, prénom, NIC)…"
+              nicSearchHint
+                ? "N° d'état civil (NIC) ou nom de l'officier…"
+                : originGeoFilter
+                  ? "Sélection intelligente : nom, NIC, province, ville, territoire, secteur, village…"
+                  : sexFilter === "F"
+                    ? "Recherche mère (sexe féminin) — nom, NIC…"
+                    : sexFilter === "M"
+                      ? "Recherche père (sexe masculin) — nom, NIC…"
+                      : "Recherche nationale (nom, post-nom, prénom, NIC)…"
             }
             value={query}
             onChange={(e) => {
@@ -171,7 +188,14 @@ export default function PersonPicker({
             onFocus={() => setOpen(true)}
           />
           {!hideAdd ? (
-            <button type="button" className="btn-add" onClick={() => setModal(true)}>
+            <button
+              type="button"
+              className="btn-add"
+              onClick={() => {
+                setForm(sexFilter ? { ...emptyForm, sexe: sexFilter } : emptyForm);
+                setModal(true);
+              }}
+            >
               {addButtonLabel}
             </button>
           ) : null}
@@ -188,7 +212,11 @@ export default function PersonPicker({
           ) : searching ? (
             <li className="muted">Recherche nationale…</li>
           ) : results.length === 0 ? (
-            <li className="muted">Aucun résultat — vous pouvez « Ajouter ».</li>
+            <li className="muted">
+              {sexFilter
+                ? `Aucun résultat (${sexFilter === "F" ? "féminin" : "masculin"}) — vous pouvez « Ajouter ».`
+                : "Aucun résultat — vous pouvez « Ajouter »."}
+            </li>
           ) : (
             results.map((p) => {
               const o = personOrigin(p);
@@ -285,12 +313,18 @@ export default function PersonPicker({
                     <label className="form-label">Sexe *</label>
                     <select
                       className="form-control"
-                      value={form.sexe}
+                      value={sexFilter ?? form.sexe}
+                      disabled={Boolean(sexFilter)}
                       onChange={(e) => setForm({ ...form, sexe: e.target.value as Sexe })}
                     >
                       <option value="M">Masculin</option>
                       <option value="F">Féminin</option>
                     </select>
+                    {sexFilter ? (
+                      <div className="muted small" style={{ marginTop: 4 }}>
+                        Verrouillé ({sexFilter === "F" ? "mère" : "père"}).
+                      </div>
+                    ) : null}
                   </div>
                   <div>
                     <label className="form-label">Date de naissance *</label>

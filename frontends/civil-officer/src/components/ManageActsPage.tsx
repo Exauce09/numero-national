@@ -402,9 +402,6 @@ export default function ManageActsPage({
             </button>
           </div>
           <DataToolbar filename={`manage_${config.slug}`} rows={exportRows} />
-          <button type="button" className="btn-primary btn-sm" onClick={() => navigate(config.createPath)}>
-            Ajouter
-          </button>
         </div>
 
         <div className="table-scroll">

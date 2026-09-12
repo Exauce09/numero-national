@@ -31,6 +31,7 @@ import { getOfficerCommune } from "../commune";
 import { RDC_TRIBUS, RDC_TRIBUS_NOTE } from "../data/tribusRdc";
 import { LANGUES_PARLEES_RDC, formatLangues, parseLangues } from "../data/languesRdc";
 import { listFacilityAccounts } from "../healthAuth";
+import { HOPITAUX_KEY, PROFESSIONS_KEY, loadNamedList, rememberNamed } from "../namedLists";
 import GpsLocatePanel from "../components/GpsLocatePanel";
 import { captureGpsOnSave, captureGpsWithAddress, type ReverseGeo } from "../gpsCapture";
 import {
@@ -80,24 +81,6 @@ function buildNumeroQuartierOptions(): string[] {
 
 const NUMERO_QUARTIER_OPTIONS = buildNumeroQuartierOptions();
 
-function loadNamedList(key: string): string[] {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as string[];
-    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string" && x.trim()) : [];
-  } catch {
-    return [];
-  }
-}
-
-function rememberNamed(key: string, value: string) {
-  const v = value.trim();
-  if (!v) return;
-  const prev = loadNamedList(key);
-  if (prev.some((x) => x.toLowerCase() === v.toLowerCase())) return;
-  localStorage.setItem(key, JSON.stringify([v, ...prev].slice(0, 80)));
-}
 
 type StepId = (typeof STEPS)[number]["id"];
 
@@ -192,7 +175,7 @@ export default function CensusPage() {
   const [geoOrigine, setGeoOrigine] = useState<GeoSelection>({});
   const [tribu, setTribu] = useState("");
   const healthFacilities = listFacilityAccounts().filter((a) => a.active);
-  const hopitauxExtra = loadNamedList("nn_hopitaux_naissance");
+  const hopitauxExtra = loadNamedList(HOPITAUX_KEY);
   const hopitalOptions = [
     ...healthFacilities.map((f) => ({ id: f.id, name: f.facilityName, type: f.facilityType })),
     ...hopitauxExtra
@@ -200,7 +183,7 @@ export default function CensusPage() {
       .map((n) => ({ id: `extra-${n}`, name: n, type: "Autre" })),
   ];
   const [professionsConnues] = useState(() => {
-    const stored = loadNamedList("nn_professions_connues");
+    const stored = loadNamedList(PROFESSIONS_KEY);
     const fromPeople = listPopulationPersons()
       .map((p) => (p.parcours_professionnel || "").split("\n")[0]?.trim())
       .filter(Boolean) as string[];
@@ -665,8 +648,8 @@ export default function CensusPage() {
       const adresse = buildAdresse();
       const hopitalResolved =
         hopitalNaissance === "__autre__" ? hopitalAutre.trim() : hopitalNaissance.trim();
-      if (hopitalResolved) rememberNamed("nn_hopitaux_naissance", hopitalResolved);
-      if (profession.trim()) rememberNamed("nn_professions_connues", profession);
+      if (hopitalResolved) rememberNamed(HOPITAUX_KEY, hopitalResolved);
+      if (profession.trim()) rememberNamed(PROFESSIONS_KEY, profession);
       const languesResolved = formatLangues(languesSelected);
       const lieuNaissance = lieuNaissanceManuel.trim() || geoNaissance.label || "";
       const geoNaissancePayload: GeoSelection = {
@@ -1465,6 +1448,7 @@ export default function CensusPage() {
                       }
                     }}
                     originGeoFilter
+                    sexFilter="M"
                     addButtonLabel="Ajouter papa"
                   />
                 </div>
@@ -1473,6 +1457,7 @@ export default function CensusPage() {
                     label="Maman"
                     value={mere}
                     onChange={setMere}
+                    sexFilter="F"
                     addButtonLabel="Ajouter maman"
                   />
                 </div>

@@ -6,6 +6,8 @@ import PersonPicker from "../components/PersonPicker";
 import {
   addAct,
   addPerson,
+  findDuplicateBirthAct,
+  findDuplicatePerson,
   getAct,
   inheritParentOrigin,
   listActs,
@@ -17,6 +19,7 @@ import {
 } from "../registry";
 import { getOfficerCommune } from "../commune";
 import { listFacilityAccounts } from "../healthAuth";
+import { HOPITAUX_KEY, loadNamedList, rememberNamed } from "../namedLists";
 
 const MODES_NAISSANCE = [
   { value: "sans_procuration", label: "Sans procuration" },
@@ -36,24 +39,41 @@ export default function BirthsPage() {
     "sans_procuration",
   );
   const [hopitalNaissance, setHopitalNaissance] = useState("");
+  const [hopitalAutre, setHopitalAutre] = useState("");
   const [mother, setMother] = useState<Person | null>(null);
   const [father, setFather] = useState<Person | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [created, setCreated] = useState<Act | null>(null);
   const [viewAct, setViewAct] = useState<Act | null>(null);
   const [editAct, setEditAct] = useState<Act | null>(null);
   const [editJson, setEditJson] = useState("");
   const [gpsLat, setGpsLat] = useState<number | null>(null);
   const [gpsLng, setGpsLng] = useState<number | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [, bump] = useState(0);
 
   const acts = listActs("BIRTH");
   const inherited = inheritParentOrigin(father, mother);
-  const hospitals = useMemo(() => listFacilityAccounts().filter((a) => a.active), []);
+  const hospitals = useMemo(() => {
+    const facilities = listFacilityAccounts().filter((a) => a.active);
+    const extra = loadNamedList(HOPITAUX_KEY);
+    return [
+      ...facilities.map((h) => h.facilityName),
+      ...extra.filter((n) => !facilities.some((f) => f.facilityName === n)),
+    ];
+    // bump force le rechargement après mémorisation d'un hôpital
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [created]);
+
+  const hopitalResolved =
+    hopitalNaissance === "__autre__" ? hopitalAutre.trim() : hopitalNaissance.trim();
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (submitting) return;
     setError(null);
+    setWarning(null);
     if (!mother) {
       setError("La mère est obligatoire.");
       return;
@@ -62,13 +82,49 @@ export default function BirthsPage() {
       setError("Nom, prénom et date de naissance de l'enfant sont requis.");
       return;
     }
+
+    const identity = {
+      nom: nom.trim(),
+      postnom: postnom.trim() || mother.postnom || father?.postnom || "",
+      prenom: prenom.trim(),
+      date_naissance: dateNaissance,
+      sexe,
+      mother_id: mother.id,
+    };
+
+    const existingAct = findDuplicateBirthAct({
+      nom: identity.nom,
+      prenom: identity.prenom,
+      postnom: identity.postnom,
+      date_naissance: identity.date_naissance,
+      mother_id: mother.id,
+    });
+    if (existingAct) {
+      setError(
+        `Naissance déjà enregistrée — acte ${existingAct.act_number} (NIC ${existingAct.national_id}). Doublon refusé.`,
+      );
+      setViewAct(existingAct);
+      setCreated(existingAct);
+      return;
+    }
+
+    const existingPerson = findDuplicatePerson(identity);
+    if (existingPerson) {
+      setError(
+        `Enfant déjà au registre : ${existingPerson.nom} ${existingPerson.prenom} (NIC ${existingPerson.nic}). Doublon refusé.`,
+      );
+      return;
+    }
+
+    setSubmitting(true);
     try {
       const lieu = lieuNaissance.trim();
       const link = inheritParentOrigin(father, mother);
+      if (hopitalResolved) rememberNamed(HOPITAUX_KEY, hopitalResolved);
       const child = addPerson({
-        nom: nom.trim(),
-        postnom: postnom.trim() || mother.postnom || father?.postnom || "",
-        prenom: prenom.trim(),
+        nom: identity.nom,
+        postnom: identity.postnom,
+        prenom: identity.prenom,
         sexe,
         date_naissance: dateNaissance,
         lieu_naissance: lieu,
@@ -91,7 +147,7 @@ export default function BirthsPage() {
         mode: modeLabel,
         type_naissance: modeLabel,
         avec_procuration: modeNaissance === "avec_procuration",
-        hopital_naissance: hopitalNaissance.trim() || null,
+        hopital_naissance: hopitalResolved || null,
         geo_naissance: { label: lieu },
         commune_code: commune.code,
         mother_id: mother.id,
@@ -115,6 +171,8 @@ export default function BirthsPage() {
         gps_captured_at: gpsLat != null ? new Date().toISOString() : null,
       };
       const act = await addAct("BIRTH", payload, child.nic);
+      const syncWarn = act.payload.sync_warning ? String(act.payload.sync_warning) : null;
+      if (syncWarn) setWarning(syncWarn);
       setCreated(act);
       setNom("");
       setPostnom("");
@@ -123,6 +181,7 @@ export default function BirthsPage() {
       setLieuNaissance("");
       setModeNaissance("sans_procuration");
       setHopitalNaissance("");
+      setHopitalAutre("");
       setMother(null);
       setFather(null);
       setGpsLat(null);
@@ -130,6 +189,8 @@ export default function BirthsPage() {
       bump((n) => n + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Enregistrement impossible.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -174,6 +235,11 @@ export default function BirthsPage() {
       <div className="panel">
         <form className="form-grid" onSubmit={onSubmit}>
           {error ? <div className="login-error full">{error}</div> : null}
+          {warning ? (
+            <div className="full muted small" style={{ color: "#b45309" }}>
+              {warning}
+            </div>
+          ) : null}
           <div>
             <label className="form-label">Nom</label>
             <input className="form-control" value={nom} onChange={(e) => setNom(e.target.value)} required />
@@ -232,22 +298,57 @@ export default function BirthsPage() {
             <label className="form-label">Hôpital / structure</label>
             <select
               className="form-control"
-              value={hopitalNaissance}
-              onChange={(e) => setHopitalNaissance(e.target.value)}
+              value={
+                hopitalNaissance &&
+                hopitalNaissance !== "__autre__" &&
+                !hospitals.includes(hopitalNaissance)
+                  ? "__autre__"
+                  : hopitalNaissance
+              }
+              onChange={(e) => {
+                const v = e.target.value;
+                setHopitalNaissance(v);
+                if (v !== "__autre__") setHopitalAutre("");
+              }}
             >
               <option value="">— Optionnel —</option>
-              {hospitals.map((h) => (
-                <option key={h.id} value={h.facilityName}>
-                  {h.facilityName}
+              {hospitals.map((name) => (
+                <option key={name} value={name}>
+                  {name}
                 </option>
               ))}
+              <option value="__autre__">Autre (saisir)…</option>
             </select>
+            {hopitalNaissance === "__autre__" ||
+            (hopitalNaissance &&
+              hopitalNaissance !== "__autre__" &&
+              !hospitals.includes(hopitalNaissance)) ? (
+              <input
+                className="form-control"
+                style={{ marginTop: 8 }}
+                value={hopitalNaissance === "__autre__" ? hopitalAutre : hopitalNaissance}
+                onChange={(e) => {
+                  setHopitalNaissance("__autre__");
+                  setHopitalAutre(e.target.value);
+                }}
+                placeholder="Nom de l'hôpital / maternité — sera proposé aux autres"
+              />
+            ) : null}
+            <div className="muted small" style={{ marginTop: 4 }}>
+              Une fois saisi, l&apos;hôpital est mémorisé pour sélection ultérieure.
+            </div>
           </div>
           <div className="full">
-            <PersonPicker label="Mère" value={mother} onChange={setMother} required />
+            <PersonPicker label="Mère" value={mother} onChange={setMother} required sexFilter="F" />
           </div>
           <div className="full">
-            <PersonPicker label="Père (optionnel)" value={father} onChange={setFather} originGeoFilter />
+            <PersonPicker
+              label="Père (optionnel)"
+              value={father}
+              onChange={setFather}
+              originGeoFilter
+              sexFilter="M"
+            />
           </div>
           {inherited.source && inherited.parent ? (
             <div className="full success-banner" style={{ margin: 0 }}>
@@ -262,8 +363,13 @@ export default function BirthsPage() {
             </div>
           ) : null}
           <div className="full">
-            <button className="btn-primary" style={{ width: "auto", minWidth: 200 }} type="submit">
-              Enregistrer la naissance
+            <button
+              className="btn-primary"
+              style={{ width: "auto", minWidth: 200 }}
+              type="submit"
+              disabled={submitting}
+            >
+              {submitting ? "Enregistrement…" : "Enregistrer la naissance"}
             </button>
           </div>
         </form>

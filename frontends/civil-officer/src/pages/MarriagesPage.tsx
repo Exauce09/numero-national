@@ -129,7 +129,13 @@ export default function MarriagesPage() {
             <PersonPicker label="Témoin 2" value={temoin2} onChange={setTemoin2} />
           </div>
           <div className="full">
-            <PersonPicker label="Officier" value={officier} onChange={setOfficier} />
+            <PersonPicker
+              label="Officier (N° état civil)"
+              value={officier}
+              onChange={setOfficier}
+              nicSearchHint
+              hideAdd
+            />
           </div>
           <div className="full">
             <GeoCascade

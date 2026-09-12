@@ -91,7 +91,13 @@ export default function DisplacementsPage() {
             />
           </div>
           <div className="full">
-            <PersonPicker label="Officier" value={officier} onChange={setOfficier} />
+            <PersonPicker
+              label="Officier (N° état civil)"
+              value={officier}
+              onChange={setOfficier}
+              nicSearchHint
+              hideAdd
+            />
           </div>
           <div className="full">
             <button className="btn-primary" style={{ width: "auto", minWidth: 180 }} type="submit">

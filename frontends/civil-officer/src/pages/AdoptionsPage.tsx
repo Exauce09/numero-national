@@ -63,7 +63,13 @@ export default function AdoptionsPage() {
             <input className="form-control" value={motif} onChange={(e) => setMotif(e.target.value)} />
           </div>
           <div className="full">
-            <PersonPicker label="Officier" value={officier} onChange={setOfficier} />
+            <PersonPicker
+              label="Officier (N° état civil)"
+              value={officier}
+              onChange={setOfficier}
+              nicSearchHint
+              hideAdd
+            />
           </div>
           <div className="full">
             <GeoCascade

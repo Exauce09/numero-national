@@ -1,4 +1,4 @@
-import { getSession } from "./auth";
+import { getSession, updateSession } from "./auth";
 
 const STORAGE_KEY = "nn_civil_registry_v1";
 const COMMUNE_CODE = "KIN-GOMBE";
@@ -529,6 +529,19 @@ export function addPerson(input: PersonInput & { id?: string }): Person {
     const byNic = registry.persons.find((p) => p.nic === input.nic);
     if (byNic) return byNic;
   }
+  const dup = findDuplicatePerson({
+    nom: input.nom,
+    postnom: input.postnom,
+    prenom: input.prenom,
+    date_naissance: input.date_naissance,
+    sexe: input.sexe,
+    mother_id: input.mother_id,
+  });
+  if (dup) {
+    throw new Error(
+      `Personne déjà enregistrée : ${displayName(dup)} (NIC ${dup.nic}). Utilisez la fiche existante.`,
+    );
+  }
   const nic = input.nic ?? generateNic();
   if (registry.persons.some((p) => p.nic === nic)) {
     throw new Error(`NIC déjà attribué : ${nic}`);
@@ -543,6 +556,56 @@ export function addPerson(input: PersonInput & { id?: string }): Person {
   registry.persons.unshift(person);
   save(registry);
   return person;
+}
+
+function normIdentity(s: string | undefined | null): string {
+  return (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** Doublon identité (nom + postnom + prénom + date + sexe optionnel + mère). */
+export function findDuplicatePerson(input: {
+  nom: string;
+  postnom?: string;
+  prenom: string;
+  date_naissance: string;
+  sexe?: Sexe;
+  mother_id?: string | null;
+}): Person | undefined {
+  const nom = normIdentity(input.nom);
+  const postnom = normIdentity(input.postnom);
+  const prenom = normIdentity(input.prenom);
+  return load().persons.find(
+    (p) =>
+      normIdentity(p.nom) === nom &&
+      normIdentity(p.postnom) === postnom &&
+      normIdentity(p.prenom) === prenom &&
+      p.date_naissance === input.date_naissance &&
+      (!input.sexe || p.sexe === input.sexe) &&
+      (!input.mother_id || p.mother_id === input.mother_id),
+  );
+}
+
+/** Acte de naissance déjà présent pour le même enfant / mère. */
+export function findDuplicateBirthAct(input: {
+  nom: string;
+  prenom: string;
+  postnom?: string;
+  date_naissance: string;
+  mother_id: string;
+}): Act | undefined {
+  const nom = normIdentity(input.nom);
+  const prenom = normIdentity(input.prenom);
+  const postnom = normIdentity(input.postnom);
+  return listActs("BIRTH").find((a) => {
+    const p = a.payload;
+    return (
+      String(p.mother_id ?? "") === input.mother_id &&
+      normIdentity(String(p.nom ?? "")) === nom &&
+      normIdentity(String(p.prenom ?? "")) === prenom &&
+      normIdentity(String(p.postnom ?? "")) === postnom &&
+      String(p.date_naissance ?? "") === input.date_naissance
+    );
+  });
 }
 
 export function updatePerson(id: string, patch: Partial<Person>): Person | undefined {
@@ -642,13 +705,32 @@ async function tryPostCivil(
     body: JSON.stringify({ commune_code: COMMUNE_CODE, payload, status: "DRAFT" }),
   });
   if (!res.ok) {
+    const detail = await res.text();
+    const authFail =
+      res.status === 401 ||
+      res.status === 403 ||
+      /Could not validate credentials/i.test(detail);
+    if (authFail) {
+      // Jeton expiré / invalide : on ne bloque plus l'enregistrement local.
+      updateSession({ accessToken: undefined });
+      throw new CivilAuthError(
+        "Session API expirée ou invalide. L'acte est conservé localement — reconnectez-vous pour synchroniser.",
+      );
+    }
     if (session?.accessToken) {
-      const detail = await res.text();
       throw new Error(detail || `Sync API état civil échouée (${res.status})`);
     }
     return null;
   }
   return (await res.json()) as Record<string, unknown>;
+}
+
+/** Erreur d'auth API : l'acte local doit être conservé. */
+export class CivilAuthError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CivilAuthError";
+  }
 }
 
 export async function addAct(
@@ -722,6 +804,19 @@ export async function addAct(
       }
     }
   } catch (err) {
+    if (err instanceof CivilAuthError) {
+      const idx = registry.acts.findIndex((a) => a.id === id);
+      if (idx >= 0) {
+        registry.acts[idx] = {
+          ...registry.acts[idx],
+          payload: { ...registry.acts[idx].payload, sync_warning: err.message },
+          updated_at: new Date().toISOString(),
+        };
+        save(registry);
+        return registry.acts[idx];
+      }
+      return act;
+    }
     if (session?.accessToken && core.includes(type)) {
       registry.acts = registry.acts.filter((a) => a.id !== id);
       save(registry);
