@@ -696,7 +696,16 @@ async function tryPostCivil(
   const session = getSession();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (session?.accessToken) headers.Authorization = `Bearer ${session.accessToken}`;
-  const core: ActType[] = ["BIRTH", "MARRIAGE", "DIVORCE", "DEATH", "ADOPTION", "RECOGNITION", "RECTIFICATION"];
+  const core: ActType[] = [
+    "BIRTH",
+    "MARRIAGE",
+    "DIVORCE",
+    "DEATH",
+    "ADOPTION",
+    "RECOGNITION",
+    "RECTIFICATION",
+    "CENSUS",
+  ];
   // Types hors état civil authentique : pas d'écriture API (source de vérité locale uniquement).
   if (!core.includes(type)) return null;
   const res = await fetch(`${API_BASE}/civil/${ACT_ENDPOINT[type]}`, {
@@ -761,7 +770,16 @@ export async function addAct(
   registry.acts.unshift(act);
   save(registry);
   const session = getSession();
-  const core: ActType[] = ["BIRTH", "MARRIAGE", "DIVORCE", "DEATH", "ADOPTION", "RECOGNITION", "RECTIFICATION"];
+  const core: ActType[] = [
+    "BIRTH",
+    "MARRIAGE",
+    "DIVORCE",
+    "DEATH",
+    "ADOPTION",
+    "RECOGNITION",
+    "RECTIFICATION",
+    "CENSUS",
+  ];
   try {
     const server = await tryPostCivil(type, {
       ...payload,

@@ -76,8 +76,9 @@ export default function CardsPage() {
       <div className="hero-banner">
         <h1>Cartes d&apos;identité nationale</h1>
         <p>
-          Modèle RDC (drapeau, patrimoine, MRZ). Après génération, la carte et le numéro retournent
-          automatiquement à la commune pour livraison au titulaire.
+          Modèle RDC (drapeau, patrimoine, MRZ). Les recensements faits par l&apos;état civil
+          alimentent le registre national : recherchez le citoyen ici, générez la carte, imprimez,
+          puis la carte revient automatiquement à la commune pour livraison.
         </p>
       </div>
 

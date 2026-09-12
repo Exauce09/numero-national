@@ -1,12 +1,12 @@
 import {
   DIPLOMES_UNIV,
-  NIVEAUX_ETUDES,
   NIVEAUX_SCOLAIRES,
   emptyEtablissement,
   emptyFormationPro,
   emptyFormationUniv,
   type EtudesData,
 } from "../etudesFaites";
+import { DIPLOMES_SCOLAIRES, ETABLISSEMENTS_SUPERIEURS_RDC } from "../data/etablissementsRdc";
 
 type Props = {
   value: EtudesData;
@@ -16,63 +16,6 @@ type Props = {
 export default function EtudesFaitesForm({ value, onChange }: Props) {
   return (
     <div className="situation-familiale">
-      <fieldset className="id-fieldset">
-        <legend>Niveau général</legend>
-        <div className="form-grid">
-          <div>
-            <label className="form-label">Niveau d&apos;études atteint</label>
-            <select
-              className="form-control"
-              value={value.niveau_atteint}
-              onChange={(e) => onChange({ ...value, niveau_atteint: e.target.value })}
-            >
-              {NIVEAUX_ETUDES.map((n) => (
-                <option key={n.value || "empty"} value={n.value}>
-                  {n.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="form-label">Année de fin d&apos;études</label>
-            <input
-              className="form-control"
-              value={value.annee_fin_etudes}
-              onChange={(e) => onChange({ ...value, annee_fin_etudes: e.target.value })}
-              placeholder="Ex. 2018"
-            />
-          </div>
-          <div>
-            <label className="form-label">Sait lire</label>
-            <select
-              className="form-control"
-              value={value.sait_lire}
-              onChange={(e) =>
-                onChange({ ...value, sait_lire: e.target.value as EtudesData["sait_lire"] })
-              }
-            >
-              <option value="">—</option>
-              <option value="oui">Oui</option>
-              <option value="non">Non</option>
-            </select>
-          </div>
-          <div>
-            <label className="form-label">Sait écrire</label>
-            <select
-              className="form-control"
-              value={value.sait_ecrire}
-              onChange={(e) =>
-                onChange({ ...value, sait_ecrire: e.target.value as EtudesData["sait_ecrire"] })
-              }
-            >
-              <option value="">—</option>
-              <option value="oui">Oui</option>
-              <option value="non">Non</option>
-            </select>
-          </div>
-        </div>
-      </fieldset>
-
       <fieldset className="id-fieldset">
         <legend>Parcours scolaire</legend>
         {value.etablissements.length === 0 ? (
@@ -166,16 +109,58 @@ export default function EtudesFaitesForm({ value, onChange }: Props) {
               </div>
               <div className="full">
                 <label className="form-label">Diplôme / certificat obtenu</label>
-                <input
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {DIPLOMES_SCOLAIRES.filter(Boolean).map((d) => {
+                    const checked = row.diplome === d || row.diplome.split("|").includes(d);
+                    return (
+                      <label key={d} className="muted small" style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            const parts = row.diplome
+                              ? row.diplome.split("|").map((x) => x.trim()).filter(Boolean)
+                              : [];
+                            const next = e.target.checked
+                              ? [...new Set([...parts, d])]
+                              : parts.filter((x) => x !== d);
+                            const etablissements = [...value.etablissements];
+                            etablissements[index] = { ...row, diplome: next.join("|") };
+                            onChange({ ...value, etablissements });
+                          }}
+                        />
+                        {d}
+                      </label>
+                    );
+                  })}
+                </div>
+                <select
                   className="form-control"
-                  value={row.diplome}
+                  style={{ marginTop: 8 }}
+                  value={
+                    DIPLOMES_SCOLAIRES.includes(row.diplome as (typeof DIPLOMES_SCOLAIRES)[number])
+                      ? row.diplome
+                      : row.diplome.includes("|")
+                        ? ""
+                        : row.diplome
+                          ? "Autre"
+                          : ""
+                  }
                   onChange={(e) => {
                     const etablissements = [...value.etablissements];
-                    etablissements[index] = { ...row, diplome: e.target.value };
+                    etablissements[index] = {
+                      ...row,
+                      diplome: e.target.value === "Autre" ? row.diplome : e.target.value,
+                    };
                     onChange({ ...value, etablissements });
                   }}
-                  placeholder="CEPE, Diplôme d'État…"
-                />
+                >
+                  {DIPLOMES_SCOLAIRES.map((d) => (
+                    <option key={d || "empty"} value={d}>
+                      {d || "— Sélectionner —"}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
@@ -192,7 +177,7 @@ export default function EtudesFaitesForm({ value, onChange }: Props) {
       </fieldset>
 
       <fieldset className="id-fieldset">
-        <legend>Parcours universitaire</legend>
+        <legend>Parcours universitaire / supérieur</legend>
         {value.formations_universitaires.length === 0 ? (
           <p className="muted small">Aucune formation universitaire déclarée.</p>
         ) : null}
@@ -207,7 +192,7 @@ export default function EtudesFaitesForm({ value, onChange }: Props) {
                   onChange({
                     ...value,
                     formations_universitaires: value.formations_universitaires.filter(
-                      (_, i) => i !== index
+                      (_, i) => i !== index,
                     ),
                   })
                 }
@@ -217,16 +202,23 @@ export default function EtudesFaitesForm({ value, onChange }: Props) {
             </div>
             <div className="form-grid family-member-grid">
               <div className="full">
-                <label className="form-label">Établissement / université</label>
+                <label className="form-label">Établissement / université / institut</label>
                 <input
                   className="form-control"
+                  list="etablissements-superieurs-rdc"
                   value={row.etablissement}
                   onChange={(e) => {
                     const formations_universitaires = [...value.formations_universitaires];
                     formations_universitaires[index] = { ...row, etablissement: e.target.value };
                     onChange({ ...value, formations_universitaires });
                   }}
+                  placeholder="Choisir dans la liste ou saisir…"
                 />
+                <datalist id="etablissements-superieurs-rdc">
+                  {ETABLISSEMENTS_SUPERIEURS_RDC.map((e) => (
+                    <option key={e} value={e} />
+                  ))}
+                </datalist>
               </div>
               <div>
                 <label className="form-label">Filière / domaine</label>
@@ -324,7 +316,7 @@ export default function EtudesFaitesForm({ value, onChange }: Props) {
                   onChange({
                     ...value,
                     formations_professionnelles: value.formations_professionnelles.filter(
-                      (_, i) => i !== index
+                      (_, i) => i !== index,
                     ),
                   })
                 }
@@ -337,6 +329,7 @@ export default function EtudesFaitesForm({ value, onChange }: Props) {
                 <label className="form-label">Centre / établissement</label>
                 <input
                   className="form-control"
+                  list="etablissements-superieurs-rdc"
                   value={row.etablissement}
                   onChange={(e) => {
                     const formations_professionnelles = [...value.formations_professionnelles];

@@ -5,44 +5,10 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { getSession } from "../auth";
 
-const ZK_BRIDGE = "http://127.0.0.1:18765";
+import { captureZkFingerprint } from "../zkBridge";
 
-async function captureZk(finger: string): Promise<{
-  template_b64: string;
-  quality_score: number;
-  device: string;
-  note?: string;
-}> {
-  const health = await fetch(`${ZK_BRIDGE}/health`).then((r) => r.json()).catch(() => null);
-  if (!health?.sdk_loaded) {
-    throw new Error(
-      "Pont ZK9500 indisponible. Lancez scripts/start-zkteco-bridge.ps1 (lecteur USB branché).",
-    );
-  }
-  const cap = await fetch(`${ZK_BRIDGE}/capture`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ finger_position: finger, timeout_ms: 30000 }),
-  }).then(async (r) => {
-    const body = (await r.json().catch(() => ({}))) as {
-      template_b64?: string;
-      quality_score?: number;
-      device?: string;
-      note?: string;
-      detail?: string;
-      demo?: boolean;
-    };
-    if (!r.ok) throw new Error(body.detail || `Capture ZK ${r.status}`);
-    if (body.demo) throw new Error("Mode DEMO refusé — utilisez le pont EngX réel.");
-    if (!body.template_b64) throw new Error("Template vide");
-    return {
-      template_b64: body.template_b64,
-      quality_score: body.quality_score ?? 80,
-      device: body.device || "ZK9500",
-      note: body.note,
-    };
-  });
-  return cap;
+async function captureZk(finger: string) {
+  return captureZkFingerprint(finger, 30000);
 }
 
 export default function BiometricEnrollPage() {

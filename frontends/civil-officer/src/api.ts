@@ -146,6 +146,20 @@ export const api = {
   getCitizenByNic: (nic: string) =>
     request<CitizenDetail>(`/registry/citizens/by-nic/${encodeURIComponent(nic)}`),
 
+  createCitizen: (body: {
+    sex: string;
+    date_of_birth: string;
+    place_of_birth?: string | null;
+    nationality?: string;
+    given_names: string;
+    family_name: string;
+    addresses?: Array<Record<string, unknown>>;
+  }) =>
+    request<CitizenDetail>("/registry/citizens", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
   personCivilHistory: (citizenId: string) =>
     request<{ citizen_id: string; events: PersonCivilEvent[] }>(
       `/civil/persons/${citizenId}/history`,

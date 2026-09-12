@@ -113,10 +113,6 @@ export function emptyEtudes(): EtudesData {
 
 export function formatParcoursScolaire(data: EtudesData): string {
   const lines: string[] = [];
-  const niveau = NIVEAUX_ETUDES.find((n) => n.value === data.niveau_atteint)?.label;
-  if (niveau && niveau !== "—") lines.push(`Niveau atteint : ${niveau}`);
-  if (data.sait_lire) lines.push(`Sait lire : ${data.sait_lire}`);
-  if (data.sait_ecrire) lines.push(`Sait écrire : ${data.sait_ecrire}`);
   if (data.annee_fin_etudes.trim()) lines.push(`Année fin d'études : ${data.annee_fin_etudes.trim()}`);
   if (data.etablissements.length) {
     lines.push(`Établissements (${data.etablissements.length}) :`);
@@ -126,7 +122,7 @@ export function formatParcoursScolaire(data: EtudesData): string {
         e.niveau.trim(),
         e.ville.trim(),
         [e.annee_debut, e.annee_fin].filter(Boolean).join("–"),
-        e.diplome.trim() && `diplôme ${e.diplome.trim()}`,
+        e.diplome.trim() && `diplôme ${e.diplome.trim().replace(/\|/g, ", ")}`,
       ].filter(Boolean);
       lines.push(`  ${i + 1}. ${bits.join(", ")}`);
     });

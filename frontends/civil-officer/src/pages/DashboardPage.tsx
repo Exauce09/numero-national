@@ -338,6 +338,33 @@ export default function DashboardPage() {
             { label: "Rejeté / correction", value: rejected, color: "#ce1126" },
           ]}
         />
+        <div className="eg-chart-card" style={{ padding: "0.85rem 1rem" }}>
+          <h3 className="panel-title" style={{ marginTop: 0, fontSize: "1rem" }}>
+            Que signifient ces statuts ?
+          </h3>
+          <ul className="muted small" style={{ margin: 0, paddingLeft: "1.1rem", lineHeight: 1.55 }}>
+            <li>
+              <strong>Brouillon</strong> — l&apos;agent d&apos;état civil a commencé un acte (naissance,
+              mariage…) sans le finaliser.
+            </li>
+            <li>
+              <strong>Soumis / revue</strong> — l&apos;acte est transmis pour contrôle ; un officier /
+              responsable de bureau doit le vérifier.
+            </li>
+            <li>
+              <strong>Validé / auth.</strong> — l&apos;officier a validé (cachet / workflow) ; l&apos;acte
+              est authentique.
+            </li>
+            <li>
+              <strong>Rejeté / correction</strong> — dossier renvoyé pour correction (données
+              incomplètes ou erreur).
+            </li>
+          </ul>
+          <p className="muted small" style={{ marginBottom: 0, marginTop: "0.65rem" }}>
+            Si le graphique est à 0 : pas encore d&apos;actes synchronisés — enregistrez des actes ou
+            actualisez après connexion API.
+          </p>
+        </div>
         <PieChart
           title="Population locale — sexe"
           data={[

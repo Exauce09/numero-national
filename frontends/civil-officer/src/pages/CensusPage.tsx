@@ -34,6 +34,8 @@ import { listFacilityAccounts } from "../healthAuth";
 import { HOPITAUX_KEY, PROFESSIONS_KEY, loadNamedList, rememberNamed } from "../namedLists";
 import GpsLocatePanel from "../components/GpsLocatePanel";
 import { captureGpsOnSave, captureGpsWithAddress, type ReverseGeo } from "../gpsCapture";
+import { captureZkFingerprint, fingerprintDisplayCode } from "../zkBridge";
+import { pushCensusToOnip } from "../onipSync";
 import {
   emptySituationFamiliale,
   formatSituationFamiliale,
@@ -68,19 +70,6 @@ const STEPS = [
   { id: 5, label: "5. Identité administrative actuelle" },
   { id: 6, label: "6. Situation familiale" },
 ] as const;
-
-function buildNumeroQuartierOptions(): string[] {
-  const out: string[] = [];
-  for (let i = 1; i <= 80; i += 1) out.push(String(i));
-  for (let i = 1; i <= 40; i += 1) {
-    for (const suf of ["A", "B", "C", "D"]) out.push(`${i}${suf}`);
-  }
-  for (let i = 1; i <= 30; i += 1) out.push(`${i} bus`);
-  return out;
-}
-
-const NUMERO_QUARTIER_OPTIONS = buildNumeroQuartierOptions();
-
 
 type StepId = (typeof STEPS)[number]["id"];
 
@@ -168,7 +157,6 @@ export default function CensusPage() {
   const [paysResidence, setPaysResidence] = useState("RDC");
   const [geoActuelle, setGeoActuelle] = useState<GeoSelection>({});
   const [numeroAvenue, setNumeroAvenue] = useState("");
-  const [numeroMode, setNumeroMode] = useState<"libre" | "liste">("liste");
   const [telephone, setTelephone] = useState("");
   const [email, setEmail] = useState("");
   const [boitePostale, setBoitePostale] = useState("");
@@ -461,21 +449,32 @@ export default function CensusPage() {
     return true;
   }
 
-  function captureFinger(
+  async function captureFinger(
     n: 1 | 2 | 3,
     setter: (v: string) => void,
     also?: (v: string) => void,
   ) {
-    const code = `CAP-D${n}-${Date.now().toString(36).toUpperCase()}`;
-    setter(code);
-    also?.(code);
-    const next1 = n === 1 ? code : empreintePouceDroit;
-    const next2 = n === 2 ? code : empreinteIndexDroit;
-    const next3 = n === 3 ? code : empreinteIndexGauche;
-    if (next1 && next2 && next3) {
-      setFpNotice("Les trois doigts sont bien enregistrés.");
-    } else {
-      setFpNotice(`Doigt ${n} enregistré.`);
+    setError(null);
+    setFpNotice(`Capture ZK9500 — posez le doigt ${n} sur le lecteur…`);
+    try {
+      const fingerPos =
+        n === 1 ? "RIGHT_THUMB" : n === 2 ? "RIGHT_INDEX" : "LEFT_INDEX";
+      const cap = await captureZkFingerprint(fingerPos);
+      const code = fingerprintDisplayCode(cap, n);
+      setter(code);
+      also?.(code);
+      const next1 = n === 1 ? code : empreintePouceDroit;
+      const next2 = n === 2 ? code : empreinteIndexDroit;
+      const next3 = n === 3 ? code : empreinteIndexGauche;
+      if (next1 && next2 && next3) {
+        setFpNotice(`Les trois doigts sont enregistrés (${cap.device}).`);
+      } else {
+        setFpNotice(`Doigt ${n} capturé sur ${cap.device} (qualité ${cap.quality_score}).`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Capture impossible.";
+      setFpNotice(null);
+      setError(msg);
     }
   }
 
@@ -752,12 +751,19 @@ export default function CensusPage() {
         gps_address: gps && "display_name" in gps ? (gps as ReverseGeo).display_name ?? null : null,
       };
       const act = await addAct("CENSUS", payload, person.nic);
+      const onip = await pushCensusToOnip({
+        person,
+        adresse,
+        communeCode: String(payload.commune_code ?? commune.code),
+        censusActId: act.id,
+      });
       clearDraft();
       setSituationFamiliale(emptySituationFamiliale());
       setEtudes(emptyEtudes());
       setExperience(emptyExperience());
       setIdentiteAdmin(emptyIdentiteAdmin());
       setCreated(act);
+      setDraftNotice(onip.message);
       streamRef.current?.getTracks().forEach((t) => t.stop());
       setStep(1);
     } catch (err) {
@@ -1366,49 +1372,23 @@ export default function CensusPage() {
               />
               <div className="form-grid" style={{ marginTop: "0.75rem" }}>
                 <div>
-                  <label className="form-label">
-                    N°{geoActuelle.quartier_name ? ` — quartier ${geoActuelle.quartier_name}` : " (quartier)"}
-                  </label>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <select
-                      className="form-control"
-                      style={{ maxWidth: 140 }}
-                      value={numeroMode}
-                      onChange={(e) => setNumeroMode(e.target.value as "libre" | "liste")}
-                    >
-                      <option value="liste">Liste</option>
-                      <option value="libre">Saisie libre</option>
-                    </select>
-                    {numeroMode === "liste" ? (
-                      <select
-                        className="form-control"
-                        style={{ flex: 1, minWidth: 120 }}
-                        value={numeroAvenue}
-                        onChange={(e) => setNumeroAvenue(e.target.value)}
-                      >
-                        <option value="">— N° —</option>
-                        {NUMERO_QUARTIER_OPTIONS.map((n) => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        className="form-control"
-                        style={{ flex: 1, minWidth: 120 }}
-                        list="numeros-quartier"
-                        value={numeroAvenue}
-                        onChange={(e) => setNumeroAvenue(e.target.value)}
-                        placeholder="Ex. 12, 1A, 2 bus…"
-                      />
-                    )}
-                    <datalist id="numeros-quartier">
-                      {NUMERO_QUARTIER_OPTIONS.map((n) => (
-                        <option key={n} value={n} />
-                      ))}
-                    </datalist>
-                  </div>
+                  <label className="form-label">N°</label>
+                  <input
+                    className="form-control"
+                    value={numeroAvenue}
+                    onChange={(e) => setNumeroAvenue(e.target.value)}
+                    placeholder="N° de parcelle sur l'avenue"
+                    inputMode="text"
+                  />
+                  <p className="muted small" style={{ marginTop: "0.25rem" }}>
+                    Numéro de la parcelle dans l&apos;avenue (pas le quartier).
+                    {numeroAvenue.trim() ? (
+                      <>
+                        {" "}
+                        Affiché : <strong>N° {numeroAvenue.trim()}</strong>
+                      </>
+                    ) : null}
+                  </p>
                 </div>
                 <div>
                   <label className="form-label">Numéro de téléphone</label>
@@ -1504,7 +1484,11 @@ export default function CensusPage() {
                 </div>
               </div>
               <div className="bio-card">
-                <div className="bio-card-head">Empreintes — 3 doigts distincts</div>
+                <div className="bio-card-head">Empreintes ZK9500 — 3 doigts distincts</div>
+                <p className="muted small">
+                  Branchez le ZKTeco 9500 et lancez <code>scripts/start-zkteco-bridge.ps1</code>, puis
+                  capturez chaque doigt.
+                </p>
                 {fpNotice ? (
                   <p
                     style={{
@@ -1533,10 +1517,10 @@ export default function CensusPage() {
                       className="btn-add btn-sm"
                       style={{ marginTop: "0.45rem" }}
                       onClick={() =>
-                        captureFinger(1, setEmpreintePouceDroit, setEmpreinteDroite)
+                        void captureFinger(1, setEmpreintePouceDroit, setEmpreinteDroite)
                       }
                     >
-                      Capturer doigt 1
+                      Capturer ZK9500 — doigt 1
                     </button>
                     {empreintePouceDroit ? (
                       <p className="muted" style={{ marginTop: 4 }}>
@@ -1556,9 +1540,9 @@ export default function CensusPage() {
                       type="button"
                       className="btn-add btn-sm"
                       style={{ marginTop: "0.45rem" }}
-                      onClick={() => captureFinger(2, setEmpreinteIndexDroit)}
+                      onClick={() => void captureFinger(2, setEmpreinteIndexDroit)}
                     >
-                      Capturer doigt 2
+                      Capturer ZK9500 — doigt 2
                     </button>
                     {empreinteIndexDroit ? (
                       <p className="muted" style={{ marginTop: 4 }}>
@@ -1579,10 +1563,10 @@ export default function CensusPage() {
                       className="btn-add btn-sm"
                       style={{ marginTop: "0.45rem" }}
                       onClick={() =>
-                        captureFinger(3, setEmpreinteIndexGauche, setEmpreinteGauche)
+                        void captureFinger(3, setEmpreinteIndexGauche, setEmpreinteGauche)
                       }
                     >
-                      Capturer doigt 3
+                      Capturer ZK9500 — doigt 3
                     </button>
                     {empreinteIndexGauche ? (
                       <p className="muted" style={{ marginTop: 4 }}>

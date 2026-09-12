@@ -1,5 +1,7 @@
 /** Offline RDC geography fallback (seed mirror: provinces + CITY_COMMUNES + Kinshasa districts). */
 
+import { KIN_COMMUNE_QUARTIERS } from "./data/kinshasaQuartiers";
+
 export type GeoItem = { id: string; code: string; name: string; voie_type?: string; chef_lieu?: string };
 
 function slug(s: string): string {
@@ -283,8 +285,23 @@ export function fallbackLocalites(opts: { communeId?: string; districtId?: strin
   }));
 }
 
+function communeNameFromId(communeIdValue: string): string | undefined {
+  // id = com-{villeSlug}-{communeSlug}
+  const hit = Object.keys(KIN_COMMUNE_QUARTIERS).find((name) => {
+    const s = slug(name);
+    return communeIdValue.endsWith(`-${s}`) || communeIdValue.includes(`-${s}`);
+  });
+  return hit;
+}
+
+function quartiersForCommuneId(communeIdValue: string) {
+  const name = communeNameFromId(communeIdValue);
+  if (name) return KIN_COMMUNE_QUARTIERS[name];
+  return DEFAULT_QUARTIERS;
+}
+
 export function fallbackQuartiers(communeIdValue: string): GeoItem[] {
-  return DEFAULT_QUARTIERS.map((q) => ({
+  return quartiersForCommuneId(communeIdValue).map((q) => ({
     id: quartierId(communeIdValue, q.name),
     code: slug(q.name).toUpperCase().slice(0, 12),
     name: q.name,
@@ -292,6 +309,17 @@ export function fallbackQuartiers(communeIdValue: string): GeoItem[] {
 }
 
 export function fallbackVoies(quartierIdValue: string): GeoItem[] {
+  for (const list of Object.values(KIN_COMMUNE_QUARTIERS)) {
+    const matched = list.find((q) => quartierIdValue.includes(slug(q.name)));
+    if (matched) {
+      return matched.voies.map((v) => ({
+        id: voieId(quartierIdValue, v.type, v.name),
+        code: slug(v.name).toUpperCase().slice(0, 12),
+        name: v.name,
+        voie_type: v.type,
+      }));
+    }
+  }
   const matched = DEFAULT_QUARTIERS.find((q) => quartierIdValue.includes(slug(q.name)));
   const voies = (matched ?? DEFAULT_QUARTIERS[0]).voies;
   return voies.map((v) => ({
@@ -354,6 +382,8 @@ export function fallbackForGeoPath(path: string): GeoItem[] {
     return fallbackLocalites({ communeId: communeIdParam, districtId: districtIdParam });
   }
   if (pathname === "/geo/quartiers" && communeIdParam) return fallbackQuartiers(communeIdParam);
-  if (pathname === "/geo/voies" && quartierIdParam) return fallbackVoies(quartierIdParam);
+  if ((pathname === "/geo/voies" || pathname === "/geo/avenues") && quartierIdParam) {
+    return fallbackVoies(quartierIdParam);
+  }
   return [];
 }
