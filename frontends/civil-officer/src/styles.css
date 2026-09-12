@@ -811,9 +811,23 @@
 
 .topbar-fingerprint-btn {
   flex-shrink: 0;
-  width: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
   height: 36px;
+  min-width: 36px;
+  padding: 0 0.65rem;
+  border: 1px solid var(--egouv-line);
+  border-radius: 8px;
+  background: #fff;
   color: var(--egouv-primary);
+  box-sizing: border-box;
+}
+
+.topbar-fingerprint-btn:hover {
+  border-color: var(--egouv-primary);
+  background: #f5f8ff;
 }
 
 .topbar-search-form {

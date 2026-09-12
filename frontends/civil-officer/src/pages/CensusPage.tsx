@@ -61,15 +61,24 @@ import {
 
 const STEPS = [
   { id: 1, label: "1. Identité" },
-  { id: 2, label: "2. Parent" },
-  { id: 3, label: "3. Biométrie" },
-  { id: 4, label: "4. Études faites" },
-  { id: 5, label: "5. Expérience professionnelle" },
-  { id: 6, label: "6. Identité administrative actuelle" },
-  { id: 7, label: "7. Situation familiale" },
+  { id: 2, label: "2. Biométrie" },
+  { id: 3, label: "3. Études faites" },
+  { id: 4, label: "4. Expérience professionnelle" },
+  { id: 5, label: "5. Identité administrative actuelle" },
+  { id: 6, label: "6. Situation familiale" },
 ] as const;
 
-const NUMERO_QUARTIER_OPTIONS = Array.from({ length: 120 }, (_, i) => String(i + 1));
+function buildNumeroQuartierOptions(): string[] {
+  const out: string[] = [];
+  for (let i = 1; i <= 80; i += 1) out.push(String(i));
+  for (let i = 1; i <= 40; i += 1) {
+    for (const suf of ["A", "B", "C", "D"]) out.push(`${i}${suf}`);
+  }
+  for (let i = 1; i <= 30; i += 1) out.push(`${i} bus`);
+  return out;
+}
+
+const NUMERO_QUARTIER_OPTIONS = buildNumeroQuartierOptions();
 
 function loadNamedList(key: string): string[] {
   try {
@@ -176,7 +185,7 @@ export default function CensusPage() {
   const [paysResidence, setPaysResidence] = useState("RDC");
   const [geoActuelle, setGeoActuelle] = useState<GeoSelection>({});
   const [numeroAvenue, setNumeroAvenue] = useState("");
-  const [numeroMode, setNumeroMode] = useState<"libre" | "liste">("libre");
+  const [numeroMode, setNumeroMode] = useState<"libre" | "liste">("liste");
   const [telephone, setTelephone] = useState("");
   const [email, setEmail] = useState("");
   const [boitePostale, setBoitePostale] = useState("");
@@ -226,7 +235,7 @@ export default function CensusPage() {
       const raw = localStorage.getItem(CENSUS_DRAFT_KEY);
       if (!raw) return;
       const d = JSON.parse(raw) as CensusDraft;
-      setStep(d.step ?? 1);
+      setStep(Math.min(6, Math.max(1, Number(d.step) || 1)) as StepId);
       setFicheKind(d.ficheKind ?? "personne");
       setDateDeces(d.dateDeces ?? "");
       setHandicap(d.handicap ?? "NORMAL");
@@ -350,7 +359,7 @@ export default function CensusPage() {
   }, [etatCivil, situationFamiliale.a_conjoint]);
 
   useEffect(() => {
-    if (step !== 3) {
+    if (step !== 2) {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
       return;
@@ -462,7 +471,7 @@ export default function CensusPage() {
       const c = situationFamiliale.conjoint;
       if (!c.person_id && (!c.nom.trim() || !c.prenom.trim())) {
         setError("Conjoint(e) : liez une personne ou saisissez nom et prénom.");
-        setStep(7);
+        setStep(6);
         return false;
       }
     }
@@ -500,12 +509,12 @@ export default function CensusPage() {
 
   function goTo(next: StepId) {
     if (!validateStep(next)) return;
-    if (step === 3 && next > 3 && !validateFingerprints()) return;
+    if (step === 2 && next > 2 && !validateFingerprints()) return;
     setStep(next);
   }
 
   function goNext() {
-    if (step < 7) goTo((step + 1) as StepId);
+    if (step < 6) goTo((step + 1) as StepId);
   }
 
   function goPrev() {
@@ -647,7 +656,7 @@ export default function CensusPage() {
       setStep(1);
       return;
     }
-    if (!validateStep(7)) return;
+    if (!validateStep(6)) return;
     if (!validateFamille()) return;
     try {
       const gps = (await captureGpsWithAddress()) ?? (await captureGpsOnSave());
@@ -835,37 +844,124 @@ export default function CensusPage() {
               </div>
             </fieldset>
 
-            <fieldset className="id-fieldset">
-              <legend>Identité de la personne</legend>
-              <div className="form-grid">
-                <div className="full">
-                  <label className="form-label">
-                    {ficheKind === "bebe" ? "Nom du bébé * (ou « Enfant de … »)" : "Nom de la personne *"}
-                  </label>
-                  <input className="form-control" value={nom} onChange={(e) => setNom(e.target.value)} />
+            {ficheKind === "bebe" ? (
+              <fieldset className="id-fieldset">
+                <legend>Formulaire — Bébé (nouveau-né)</legend>
+                <div className="form-grid">
+                  <div className="full">
+                    <label className="form-label">Nom du bébé * (ou « Enfant de … »)</label>
+                    <input className="form-control" value={nom} onChange={(e) => setNom(e.target.value)} />
+                  </div>
+                  <div className="full">
+                    <label className="form-label">Post-nom</label>
+                    <input className="form-control" value={postnom} onChange={(e) => setPostnom(e.target.value)} />
+                  </div>
+                  <div className="full">
+                    <label className="form-label">Prénom</label>
+                    <input className="form-control" value={prenom} onChange={(e) => setPrenom(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="form-label">Sexe *</label>
+                    <select className="form-control" value={sexe} onChange={(e) => setSexe(e.target.value as Sexe)}>
+                      <option value="M">Masculin</option>
+                      <option value="F">Féminin</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="form-label">Date de naissance *</label>
+                    <input
+                      className="form-control"
+                      type="date"
+                      value={dateNaissance}
+                      onChange={(e) => setDateNaissance(e.target.value)}
+                    />
+                  </div>
+                  <div className="full">
+                    <label className="form-label">Lieu de naissance *</label>
+                    <input
+                      className="form-control"
+                      value={lieuNaissanceManuel}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setLieuNaissanceManuel(v);
+                        setGeoNaissance((prev) => ({ ...prev, label: v }));
+                      }}
+                      placeholder="Maternité, hôpital, domicile…"
+                    />
+                  </div>
+                  <div className="full">
+                    <label className="form-label">Hôpital / maternité de naissance</label>
+                    <select
+                      className="form-control"
+                      value={
+                        hopitalNaissance &&
+                        hopitalNaissance !== "__autre__" &&
+                        !hopitalOptions.some((f) => f.name === hopitalNaissance)
+                          ? "__autre__"
+                          : hopitalNaissance
+                      }
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setHopitalNaissance(v);
+                        if (v !== "__autre__") setHopitalAutre("");
+                      }}
+                    >
+                      <option value="">— Sélectionner —</option>
+                      {hopitalOptions.map((f) => (
+                        <option key={f.id} value={f.name}>
+                          {f.name} ({f.type})
+                        </option>
+                      ))}
+                      <option value="__autre__">Autre (saisie libre)</option>
+                    </select>
+                    {hopitalNaissance === "__autre__" ||
+                    (hopitalNaissance &&
+                      !hopitalOptions.some((f) => f.name === hopitalNaissance) &&
+                      hopitalNaissance !== "") ? (
+                      <input
+                        className="form-control"
+                        style={{ marginTop: 6 }}
+                        value={hopitalNaissance === "__autre__" ? hopitalAutre : hopitalNaissance}
+                        onChange={(e) => {
+                          setHopitalNaissance("__autre__");
+                          setHopitalAutre(e.target.value);
+                        }}
+                        placeholder="Nom de l'hôpital / maternité"
+                      />
+                    ) : null}
+                  </div>
                 </div>
-                <div className="full">
-                  <label className="form-label">Post-nom de la personne *</label>
-                  <input className="form-control" value={postnom} onChange={(e) => setPostnom(e.target.value)} />
-                </div>
-                <div className="full">
-                  <label className="form-label">{ficheKind === "bebe" ? "Prénom" : "Prénom *"}</label>
-                  <input className="form-control" value={prenom} onChange={(e) => setPrenom(e.target.value)} />
-                </div>
-                <div>
-                  <label className="form-label">Sexe *</label>
-                  <select className="form-control" value={sexe} onChange={(e) => setSexe(e.target.value as Sexe)}>
-                    <option value="M">Masculin</option>
-                    <option value="F">Féminin</option>
-                  </select>
-                </div>
-                {ficheKind !== "bebe" ? (
+              </fieldset>
+            ) : null}
+
+            {ficheKind === "decede" ? (
+              <fieldset className="id-fieldset">
+                <legend>Formulaire — Personne décédée</legend>
+                <div className="form-grid">
+                  <div className="full">
+                    <label className="form-label">Nom *</label>
+                    <input className="form-control" value={nom} onChange={(e) => setNom(e.target.value)} />
+                  </div>
+                  <div className="full">
+                    <label className="form-label">Post-nom *</label>
+                    <input className="form-control" value={postnom} onChange={(e) => setPostnom(e.target.value)} />
+                  </div>
+                  <div className="full">
+                    <label className="form-label">Prénom *</label>
+                    <input className="form-control" value={prenom} onChange={(e) => setPrenom(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="form-label">Sexe *</label>
+                    <select className="form-control" value={sexe} onChange={(e) => setSexe(e.target.value as Sexe)}>
+                      <option value="M">Masculin</option>
+                      <option value="F">Féminin</option>
+                    </select>
+                  </div>
                   <div>
                     <label className="form-label">État-civil</label>
                     <select
                       className="form-control"
-                      value={ficheKind === "marie" ? "MARIE" : etatCivil}
-                      disabled={ficheKind === "marie"}
+                      value={etatCivil}
                       onChange={(e) => setEtatCivil(e.target.value as EtatCivil)}
                     >
                       {ETAT_CIVIL_OPTIONS.map((o) => (
@@ -875,47 +971,15 @@ export default function CensusPage() {
                       ))}
                     </select>
                   </div>
-                ) : null}
-                {ficheKind !== "bebe" ? (
-                  <div className="full">
-                    <label className="form-label">Profession</label>
+                  <div>
+                    <label className="form-label">Date de naissance *</label>
                     <input
                       className="form-control"
-                      list="professions-connues"
-                      value={profession}
-                      onChange={(e) => setProfession(e.target.value)}
-                      placeholder="Saisir ou sélectionner une profession connue"
+                      type="date"
+                      value={dateNaissance}
+                      onChange={(e) => setDateNaissance(e.target.value)}
                     />
-                    <datalist id="professions-connues">
-                      {professionsConnues.map((p) => (
-                        <option key={p} value={p} />
-                      ))}
-                    </datalist>
                   </div>
-                ) : null}
-                <div className="full">
-                  <label className="form-label">Lieu de naissance *</label>
-                  <input
-                    className="form-control"
-                    value={lieuNaissanceManuel}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setLieuNaissanceManuel(v);
-                      setGeoNaissance((prev) => ({ ...prev, label: v }));
-                    }}
-                    placeholder="Saisie manuelle du lieu de naissance"
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Date de naissance *</label>
-                  <input
-                    className="form-control"
-                    type="date"
-                    value={dateNaissance}
-                    onChange={(e) => setDateNaissance(e.target.value)}
-                  />
-                </div>
-                {ficheKind === "decede" ? (
                   <div>
                     <label className="form-label">Date de décès *</label>
                     <input
@@ -925,115 +989,125 @@ export default function CensusPage() {
                       onChange={(e) => setDateDeces(e.target.value)}
                     />
                   </div>
-                ) : null}
-                <div>
-                  <label className="form-label">Hôpital de naissance</label>
-                  <select
-                    className="form-control"
-                    value={
-                      hopitalNaissance &&
-                      hopitalNaissance !== "__autre__" &&
-                      !hopitalOptions.some((f) => f.name === hopitalNaissance)
-                        ? "__autre__"
-                        : hopitalNaissance
-                    }
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setHopitalNaissance(v);
-                      if (v !== "__autre__") setHopitalAutre("");
-                    }}
-                  >
-                    <option value="">— Sélectionner —</option>
-                    {hopitalOptions.map((f) => (
-                      <option key={f.id} value={f.name}>
-                        {f.name} ({f.type})
-                      </option>
-                    ))}
-                    <option value="__autre__">Autre (saisie libre)</option>
-                  </select>
-                  {(hopitalNaissance === "__autre__" ||
-                    (hopitalNaissance &&
-                      !hopitalOptions.some((f) => f.name === hopitalNaissance) &&
-                      hopitalNaissance !== "")) &&
-                  hopitalNaissance !== "" ? (
+                  <div className="full">
+                    <label className="form-label">Lieu de naissance *</label>
                     <input
                       className="form-control"
-                      style={{ marginTop: 6 }}
-                      value={
-                        hopitalNaissance === "__autre__" ? hopitalAutre : hopitalNaissance
-                      }
+                      value={lieuNaissanceManuel}
                       onChange={(e) => {
-                        setHopitalNaissance("__autre__");
-                        setHopitalAutre(e.target.value);
+                        const v = e.target.value;
+                        setLieuNaissanceManuel(v);
+                        setGeoNaissance((prev) => ({ ...prev, label: v }));
                       }}
-                      placeholder="Nom de l'hôpital"
                     />
-                  ) : null}
-                </div>
-                <div className="full">
-                  <label className="form-label">Langues parlées (plusieurs possibles)</label>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: "0.45rem 0.85rem",
-                      marginTop: 6,
-                    }}
-                  >
-                    {LANGUES_PARLEES_RDC.map((lang) => {
-                      const checked = languesSelected.includes(lang);
-                      return (
-                        <label
-                          key={lang}
-                          style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => {
-                              setLanguesSelected((prev) =>
-                                checked ? prev.filter((x) => x !== lang) : [...prev, lang],
-                              );
-                            }}
-                          />
-                          {lang}
-                        </label>
-                      );
-                    })}
+                  </div>
+                  <div>
+                    <label className="form-label">Nationalité</label>
+                    <input
+                      className="form-control"
+                      value={nationalite}
+                      onChange={(e) => setNationalite(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Dernière profession</label>
+                    <input
+                      className="form-control"
+                      list="professions-connues"
+                      value={profession}
+                      onChange={(e) => setProfession(e.target.value)}
+                    />
+                    <datalist id="professions-connues">
+                      {professionsConnues.map((p) => (
+                        <option key={p} value={p} />
+                      ))}
+                    </datalist>
                   </div>
                 </div>
-                <div>
-                  <label className="form-label">Nationalité</label>
-                  <input
-                    className="form-control"
-                    value={nationalite}
-                    onChange={(e) => setNationalite(e.target.value)}
-                  />
+              </fieldset>
+            ) : null}
+
+            {ficheKind === "marie" ? (
+              <fieldset className="id-fieldset">
+                <legend>Formulaire — Marié(e)</legend>
+                <div className="form-grid">
+                  <div className="full">
+                    <label className="form-label">Nom *</label>
+                    <input className="form-control" value={nom} onChange={(e) => setNom(e.target.value)} />
+                  </div>
+                  <div className="full">
+                    <label className="form-label">Post-nom *</label>
+                    <input className="form-control" value={postnom} onChange={(e) => setPostnom(e.target.value)} />
+                  </div>
+                  <div className="full">
+                    <label className="form-label">Prénom *</label>
+                    <input className="form-control" value={prenom} onChange={(e) => setPrenom(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="form-label">Sexe *</label>
+                    <select className="form-control" value={sexe} onChange={(e) => setSexe(e.target.value as Sexe)}>
+                      <option value="M">Masculin</option>
+                      <option value="F">Féminin</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="form-label">État-civil</label>
+                    <input className="form-control" value="Marié(e)" disabled />
+                  </div>
+                  <div>
+                    <label className="form-label">Date de naissance *</label>
+                    <input
+                      className="form-control"
+                      type="date"
+                      value={dateNaissance}
+                      onChange={(e) => setDateNaissance(e.target.value)}
+                    />
+                  </div>
+                  <div className="full">
+                    <label className="form-label">Lieu de naissance *</label>
+                    <input
+                      className="form-control"
+                      value={lieuNaissanceManuel}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setLieuNaissanceManuel(v);
+                        setGeoNaissance((prev) => ({ ...prev, label: v }));
+                      }}
+                    />
+                  </div>
+                  <div className="full">
+                    <label className="form-label">Profession</label>
+                    <input
+                      className="form-control"
+                      list="professions-connues-marie"
+                      value={profession}
+                      onChange={(e) => setProfession(e.target.value)}
+                    />
+                    <datalist id="professions-connues-marie">
+                      {professionsConnues.map((p) => (
+                        <option key={p} value={p} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div>
+                    <label className="form-label">Nationalité</label>
+                    <input
+                      className="form-control"
+                      value={nationalite}
+                      onChange={(e) => setNationalite(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Pays de résidence</label>
+                    <input
+                      className="form-control"
+                      value={paysResidence}
+                      onChange={(e) => setPaysResidence(e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="form-label">Pays de résidence</label>
-                  <input
-                    className="form-control"
-                    value={paysResidence}
-                    onChange={(e) => setPaysResidence(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Type de handicap</label>
-                  <select
-                    className="form-control"
-                    value={handicap}
-                    onChange={(e) => setHandicap(e.target.value as HandicapType)}
-                  >
-                    {HANDICAP_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </fieldset>
+              </fieldset>
+            ) : null}
 
             {ficheKind === "marie" ? (
               <fieldset className="id-fieldset">
@@ -1096,6 +1170,188 @@ export default function CensusPage() {
               </fieldset>
             ) : null}
 
+            {ficheKind === "personne" ? (
+              <fieldset className="id-fieldset">
+                <legend>Formulaire — Personne vivante</legend>
+                <div className="form-grid">
+                  <div className="full">
+                    <label className="form-label">Nom de la personne *</label>
+                    <input className="form-control" value={nom} onChange={(e) => setNom(e.target.value)} />
+                  </div>
+                  <div className="full">
+                    <label className="form-label">Post-nom de la personne *</label>
+                    <input className="form-control" value={postnom} onChange={(e) => setPostnom(e.target.value)} />
+                  </div>
+                  <div className="full">
+                    <label className="form-label">Prénom *</label>
+                    <input className="form-control" value={prenom} onChange={(e) => setPrenom(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="form-label">Sexe *</label>
+                    <select className="form-control" value={sexe} onChange={(e) => setSexe(e.target.value as Sexe)}>
+                      <option value="M">Masculin</option>
+                      <option value="F">Féminin</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="form-label">État-civil</label>
+                    <select
+                      className="form-control"
+                      value={etatCivil}
+                      onChange={(e) => setEtatCivil(e.target.value as EtatCivil)}
+                    >
+                      {ETAT_CIVIL_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="full">
+                    <label className="form-label">Profession</label>
+                    <input
+                      className="form-control"
+                      list="professions-connues"
+                      value={profession}
+                      onChange={(e) => setProfession(e.target.value)}
+                      placeholder="Saisir ou sélectionner une profession connue"
+                    />
+                    <datalist id="professions-connues">
+                      {professionsConnues.map((p) => (
+                        <option key={p} value={p} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div className="full">
+                    <label className="form-label">Lieu de naissance *</label>
+                    <input
+                      className="form-control"
+                      value={lieuNaissanceManuel}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setLieuNaissanceManuel(v);
+                        setGeoNaissance((prev) => ({ ...prev, label: v }));
+                      }}
+                      placeholder="Saisie manuelle du lieu de naissance"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Date de naissance *</label>
+                    <input
+                      className="form-control"
+                      type="date"
+                      value={dateNaissance}
+                      onChange={(e) => setDateNaissance(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Hôpital de naissance</label>
+                    <select
+                      className="form-control"
+                      value={
+                        hopitalNaissance &&
+                        hopitalNaissance !== "__autre__" &&
+                        !hopitalOptions.some((f) => f.name === hopitalNaissance)
+                          ? "__autre__"
+                          : hopitalNaissance
+                      }
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setHopitalNaissance(v);
+                        if (v !== "__autre__") setHopitalAutre("");
+                      }}
+                    >
+                      <option value="">— Sélectionner —</option>
+                      {hopitalOptions.map((f) => (
+                        <option key={f.id} value={f.name}>
+                          {f.name} ({f.type})
+                        </option>
+                      ))}
+                      <option value="__autre__">Autre (saisie libre)</option>
+                    </select>
+                    {hopitalNaissance === "__autre__" ||
+                    (hopitalNaissance &&
+                      !hopitalOptions.some((f) => f.name === hopitalNaissance) &&
+                      hopitalNaissance !== "") ? (
+                      <input
+                        className="form-control"
+                        style={{ marginTop: 6 }}
+                        value={hopitalNaissance === "__autre__" ? hopitalAutre : hopitalNaissance}
+                        onChange={(e) => {
+                          setHopitalNaissance("__autre__");
+                          setHopitalAutre(e.target.value);
+                        }}
+                        placeholder="Nom de l'hôpital"
+                      />
+                    ) : null}
+                  </div>
+                  <div className="full">
+                    <label className="form-label">Langues parlées (plusieurs possibles)</label>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: "0.45rem 0.85rem",
+                        marginTop: 6,
+                      }}
+                    >
+                      {LANGUES_PARLEES_RDC.map((lang) => {
+                        const checked = languesSelected.includes(lang);
+                        return (
+                          <label
+                            key={lang}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {
+                                setLanguesSelected((prev) =>
+                                  checked ? prev.filter((x) => x !== lang) : [...prev, lang],
+                                );
+                              }}
+                            />
+                            {lang}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="form-label">Nationalité</label>
+                    <input
+                      className="form-control"
+                      value={nationalite}
+                      onChange={(e) => setNationalite(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Pays de résidence</label>
+                    <input
+                      className="form-control"
+                      value={paysResidence}
+                      onChange={(e) => setPaysResidence(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Type de handicap</label>
+                    <select
+                      className="form-control"
+                      value={handicap}
+                      onChange={(e) => setHandicap(e.target.value as HandicapType)}
+                    >
+                      {HANDICAP_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </fieldset>
+            ) : null}
+
+            {ficheKind !== "bebe" ? (
             <fieldset className="id-fieldset">
               <legend>Adresse actuelle</legend>
               <GpsLocatePanel
@@ -1135,17 +1391,11 @@ export default function CensusPage() {
                       style={{ maxWidth: 140 }}
                       value={numeroMode}
                       onChange={(e) => setNumeroMode(e.target.value as "libre" | "liste")}
-                      disabled={!geoActuelle.quartier_name}
-                      title={
-                        geoActuelle.quartier_name
-                          ? "Mode de saisie du N°"
-                          : "Sélectionnez d'abord un quartier"
-                      }
                     >
-                      <option value="libre">Saisie libre</option>
                       <option value="liste">Liste</option>
+                      <option value="libre">Saisie libre</option>
                     </select>
-                    {numeroMode === "liste" && geoActuelle.quartier_name ? (
+                    {numeroMode === "liste" ? (
                       <select
                         className="form-control"
                         style={{ flex: 1, minWidth: 120 }}
@@ -1163,15 +1413,17 @@ export default function CensusPage() {
                       <input
                         className="form-control"
                         style={{ flex: 1, minWidth: 120 }}
+                        list="numeros-quartier"
                         value={numeroAvenue}
                         onChange={(e) => setNumeroAvenue(e.target.value)}
-                        placeholder={
-                          geoActuelle.quartier_name
-                            ? `N° dans ${geoActuelle.quartier_name}`
-                            : "Sélectionnez un quartier puis le N°"
-                        }
+                        placeholder="Ex. 12, 1A, 2 bus…"
                       />
                     )}
+                    <datalist id="numeros-quartier">
+                      {NUMERO_QUARTIER_OPTIONS.map((n) => (
+                        <option key={n} value={n} />
+                      ))}
+                    </datalist>
                   </div>
                 </div>
                 <div>
@@ -1192,66 +1444,62 @@ export default function CensusPage() {
                 </div>
               </div>
             </fieldset>
+            ) : null}
+
+            <fieldset className="id-fieldset">
+              <legend>Parents (facultatif)</legend>
+              <p className="muted small" style={{ marginTop: 0 }}>
+                Recherche Papa limitée à l&apos;origine. Si le père a un conjoint enregistré, la mère est
+                remplie automatiquement.
+              </p>
+              <div className="form-grid">
+                <div className="full">
+                  <PersonPicker
+                    label="Papa"
+                    value={pere}
+                    onChange={(p) => {
+                      setPere(p);
+                      if (p) {
+                        const spouse = getSpouseOf(p.id);
+                        if (spouse) setMere(spouse);
+                      }
+                    }}
+                    originGeoFilter
+                    addButtonLabel="Ajouter papa"
+                  />
+                </div>
+                <div className="full">
+                  <PersonPicker
+                    label="Maman"
+                    value={mere}
+                    onChange={setMere}
+                    addButtonLabel="Ajouter maman"
+                  />
+                </div>
+                <div className="full">
+                  <label className="form-label">Tribu (optionnel)</label>
+                  <input
+                    className="form-control"
+                    list="tribus-rdc"
+                    value={tribu}
+                    onChange={(e) => setTribu(e.target.value)}
+                    placeholder="Rechercher une tribu…"
+                  />
+                  <datalist id="tribus-rdc">
+                    {RDC_TRIBUS.map((t) => (
+                      <option key={t} value={t} />
+                    ))}
+                  </datalist>
+                  <p className="muted" style={{ marginTop: "0.35rem", fontSize: "0.8rem" }}>
+                    {RDC_TRIBUS.length} entrées de référence — {RDC_TRIBUS_NOTE}
+                  </p>
+                </div>
+              </div>
+            </fieldset>
           </div>
         ) : null}
 
         {step === 2 ? (
-          <div className="id-form">
-            <h3 className="id-form-title" style={{ color: "var(--egouv-primary)" }}>
-              2. Parent
-            </h3>
-            <p className="muted small" style={{ marginBottom: "0.75rem" }}>
-              Sélectionnez le père et la mère. Pour Papa, un seul champ de recherche intelligente (nom, NIC,
-              province, ville, territoire, secteur, village). Aucun parent n&apos;est obligatoire. Si le père a
-              un conjoint enregistré, la mère est remplie automatiquement.
-            </p>
-            <div className="form-grid">
-              <div className="full">
-                <PersonPicker
-                  label="Papa"
-                  value={pere}
-                  onChange={(p) => {
-                    setPere(p);
-                    if (p) {
-                      const spouse = getSpouseOf(p.id);
-                      if (spouse) setMere(spouse);
-                    }
-                  }}
-                  originGeoFilter
-                  addButtonLabel="Ajouter papa"
-                />
-              </div>
-              <div className="full">
-                <PersonPicker
-                  label="Maman"
-                  value={mere}
-                  onChange={setMere}
-                  addButtonLabel="Ajouter maman"
-                />
-              </div>
-              <div className="full">
-                <label className="form-label">Tribu (optionnel)</label>
-                <input
-                  className="form-control"
-                  list="tribus-rdc"
-                  value={tribu}
-                  onChange={(e) => setTribu(e.target.value)}
-                  placeholder="Rechercher une tribu…"
-                />
-                <datalist id="tribus-rdc">
-                  {RDC_TRIBUS.map((t) => (
-                    <option key={t} value={t} />
-                  ))}
-                </datalist>
-                <p className="muted" style={{ marginTop: "0.35rem", fontSize: "0.8rem" }}>
-                  {RDC_TRIBUS.length} entrées de référence — {RDC_TRIBUS_NOTE}
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {step === 3 ? (
           <div className="bio-form">
             <h3 className="id-form-title">Système biométrique</h3>
             <div className="bio-grid">
@@ -1366,25 +1614,25 @@ export default function CensusPage() {
           </div>
         ) : null}
 
-        {step === 4 ? (
+        {step === 3 ? (
           <div className="full">
             <EtudesFaitesForm value={etudes} onChange={setEtudes} />
           </div>
         ) : null}
 
-        {step === 5 ? (
+        {step === 4 ? (
           <div className="full">
             <ExperienceProfessionnelleForm value={experience} onChange={setExperience} />
           </div>
         ) : null}
 
-        {step === 6 ? (
+        {step === 5 ? (
           <div className="full">
             <IdentiteAdministrativeForm value={identiteAdmin} onChange={setIdentiteAdmin} />
           </div>
         ) : null}
 
-        {step === 7 ? (
+        {step === 6 ? (
           <form className="form-grid" onSubmit={onSubmit}>
             <div className="full">
               <SituationFamilialeForm
@@ -1423,7 +1671,7 @@ export default function CensusPage() {
           </form>
         ) : null}
 
-        {step !== 7 ? (
+        {step !== 6 ? (
           <div className="census-nav">
             {step > 1 ? (
               <button type="button" className="btn-secondary" onClick={goPrev}>
