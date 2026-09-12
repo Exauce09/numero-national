@@ -1,4 +1,4 @@
-import { getSession } from "./auth";
+import { ensureAccessToken, getSession } from "./auth";
 
 const BASE = import.meta.env.VITE_API_BASE ?? "/api/v1";
 
@@ -120,13 +120,22 @@ function authHeaders(): HeadersInit {
   return headers;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: { ...authHeaders(), ...(init?.headers ?? {}) },
   });
+  if (res.status === 401 && !retried) {
+    const token = await ensureAccessToken();
+    if (token) return request<T>(path, init, true);
+  }
   if (!res.ok) {
     const detail = await res.text();
+    if (res.status === 401 || /Could not validate credentials/i.test(detail)) {
+      throw new Error(
+        "Session API expirée. Déconnectez-vous puis reconnectez-vous (officier / DemoCivil2026!).",
+      );
+    }
     throw new Error(detail || `Erreur HTTP ${res.status}`);
   }
   return (await res.json()) as T;
@@ -159,6 +168,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  validateCitizen: (citizenId: string) =>
+    request<{ id: string; nic: string; status: string }>(
+      `/registry/citizens/${citizenId}/validate`,
+      { method: "POST" },
+    ),
 
   personCivilHistory: (citizenId: string) =>
     request<{ citizen_id: string; events: PersonCivilEvent[] }>(

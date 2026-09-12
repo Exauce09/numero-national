@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, type CitizenDetail, type PersonCivilEvent } from "../api";
 import { getSession } from "../auth";
-import { deletePerson, displayName, getPerson, listActs, type Person } from "../registry";
+import { deletePerson, displayName, getActiveMarriage, getPerson, listActs, type Person } from "../registry";
 import { nationalHitToPerson } from "../nationalSearch";
 
 type TabId =
@@ -122,12 +122,33 @@ export default function PersonDetailPage() {
 
   const localActs = useMemo(() => {
     const nic = citizen?.nic || local?.nic;
-    return listActs().filter(
-      (a) =>
+    return listActs().filter((a) => {
+      const p = a.payload;
+      return (
         a.national_id === nic ||
-        String(a.payload.person_id ?? a.payload.citizen_id ?? "") === id,
-    );
+        String(p.person_id ?? p.citizen_id ?? p.child_id ?? "") === id ||
+        String(p.epoux_id ?? "") === id ||
+        String(p.epouse_id ?? "") === id ||
+        String(p.mother_id ?? "") === id ||
+        String(p.father_id ?? "") === id ||
+        String(p.tuteur_id ?? "") === id ||
+        String(p.enfant_id ?? "") === id
+      );
+    });
   }, [citizen?.nic, local?.nic, id]);
+
+  const localMarriages = useMemo(
+    () =>
+      listActs("MARRIAGE").filter(
+        (a) =>
+          String(a.payload.epoux_id ?? "") === id ||
+          String(a.payload.epouse_id ?? "") === id ||
+          a.national_id === (citizen?.nic || local?.nic),
+      ),
+    [id, citizen?.nic, local?.nic],
+  );
+
+  const marriageLink = useMemo(() => getActiveMarriage(id), [id]);
 
   const title = citizen
     ? `${citizen.family_name} ${citizen.given_names}`.trim()
@@ -329,14 +350,44 @@ export default function PersonDetailPage() {
             ) : null}
 
             {tab === "mariage" ? (
-              <p className="muted">
-                {events.filter((e) => e.act_type === "MARRIAGE").length
-                  ? events
+              <div>
+                {localMarriages.length > 0 ? (
+                  <ul>
+                    {localMarriages.map((a) => (
+                      <li key={a.id}>
+                        <strong>{a.act_number}</strong> ·{" "}
+                        {String(a.payload.epoux_name ?? "")} &amp;{" "}
+                        {String(a.payload.epouse_name ?? "")} ·{" "}
+                        {String(a.payload.date_mariage ?? "—")} ·{" "}
+                        <Link to="/manage/mariage">Voir la liste</Link>
+                      </li>
+                    ))}
+                  </ul>
+                ) : events.filter((e) => e.act_type === "MARRIAGE").length ? (
+                  <p className="muted">
+                    {events
                       .filter((e) => e.act_type === "MARRIAGE")
                       .map((e) => `${e.act_number} (${e.status})`)
-                      .join(" · ")
-                  : "Aucun mariage enregistré sur cette fiche."}
-              </p>
+                      .join(" · ")}
+                  </p>
+                ) : local?.etat_civil === "MARIE" || marriageLink ? (
+                  <div>
+                    <p className="login-error" style={{ marginBottom: 8 }}>
+                      La fiche est marquée marié(e)
+                      {marriageLink ? ` (lien ${marriageLink.act_number})` : ""}, mais aucun acte de
+                      mariage n&apos;est listé ici.
+                    </p>
+                    <p className="muted small">
+                      Cause fréquente : recensement avec statut « Marié » sans passer par{" "}
+                      <Link to="/marriages">Actes → Mariages → + Ajouter</Link>, ou session API
+                      expirée au moment de l&apos;enregistrement. Enregistrez l&apos;acte de mariage
+                      pour le voir dans « Gérer les mariages ».
+                    </p>
+                  </div>
+                ) : (
+                  <p className="muted">Aucun mariage enregistré sur cette fiche.</p>
+                )}
+              </div>
             ) : null}
 
             {tab === "divorce" ? (

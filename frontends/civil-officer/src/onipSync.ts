@@ -1,5 +1,5 @@
 import { api } from "./api";
-import { getSession } from "./auth";
+import { ensureAccessToken, getSession } from "./auth";
 import type { Person } from "./registry";
 
 export type OnipCardQueueItem = {
@@ -15,6 +15,7 @@ export type OnipCardQueueItem = {
   commune_code?: string | null;
   adresse?: string | null;
   citizen_id?: string | null;
+  registry_nic?: string | null;
   census_act_id?: string | null;
   status: "PENDING_ONIP" | "CITIZEN_CREATED" | "CARD_QUEUED";
   created_at: string;
@@ -42,16 +43,23 @@ export function listOnipCardQueue(): OnipCardQueueItem[] {
   return loadQueue();
 }
 
+function sexForRegistry(sexe: string): "MALE" | "FEMALE" | "UNKNOWN" {
+  const s = sexe.toUpperCase();
+  if (s === "M" || s === "MALE" || s.startsWith("H")) return "MALE";
+  if (s === "F" || s === "FEMALE") return "FEMALE";
+  return "UNKNOWN";
+}
+
 /**
- * Après recensement état civil : file d'attente locale + création citoyen API
- * pour que ONIP puisse générer / imprimer / renvoyer la carte à la commune.
+ * Après recensement état civil : file d'attente + citoyen registre (+ NIC)
+ * pour que ONIP puisse rechercher, générer et livrer la carte.
  */
 export async function pushCensusToOnip(input: {
   person: Person;
   adresse?: string | null;
   communeCode?: string | null;
   censusActId?: string | null;
-}): Promise<{ queueId: string; citizenId?: string; message: string }> {
+}): Promise<{ queueId: string; citizenId?: string; nic?: string; message: string }> {
   const item: OnipCardQueueItem = {
     id: crypto.randomUUID(),
     person_id: input.person.id,
@@ -65,6 +73,7 @@ export async function pushCensusToOnip(input: {
     commune_code: input.communeCode ?? null,
     adresse: input.adresse ?? null,
     citizen_id: null,
+    registry_nic: null,
     census_act_id: input.censusActId ?? null,
     status: "PENDING_ONIP",
     created_at: new Date().toISOString(),
@@ -75,20 +84,19 @@ export async function pushCensusToOnip(input: {
   queue.unshift(item);
   saveQueue(queue);
 
+  await ensureAccessToken();
   const session = getSession();
   if (!session?.accessToken) {
     return {
       queueId: item.id,
       message:
-        "Recensement local OK — reconnectez-vous pour envoyer le dossier à ONIP (registre + carte).",
+        "Recensement local OK — reconnectez-vous (officier / DemoCivil2026!) pour envoyer le dossier à ONIP.",
     };
   }
 
   try {
-    const sex =
-      input.person.sexe === "F" ? "F" : input.person.sexe === "M" ? "M" : "UNKNOWN";
     const citizen = await api.createCitizen({
-      sex,
+      sex: sexForRegistry(input.person.sexe),
       date_of_birth: input.person.date_naissance,
       place_of_birth: input.person.lieu_naissance || null,
       nationality: "COD",
@@ -109,13 +117,21 @@ export async function pushCensusToOnip(input: {
         : [],
     });
 
+    let registryNic: string | null = citizen.nic ?? null;
+    try {
+      const validated = await api.validateCitizen(citizen.id);
+      registryNic = validated.nic || registryNic;
+    } catch {
+      /* validation NIC optionnelle si doublon / permission */
+    }
+
     const next = loadQueue().map((row) =>
       row.id === item.id
         ? {
             ...row,
             citizen_id: citizen.id,
+            registry_nic: registryNic,
             status: "CITIZEN_CREATED" as const,
-            // NIC local conservé pour rapprochement ONIP / commune
           }
         : row,
     );
@@ -124,14 +140,16 @@ export async function pushCensusToOnip(input: {
     return {
       queueId: item.id,
       citizenId: citizen.id,
-      message:
-        "Dossier transmis au registre national — ONIP peut générer la carte, l'imprimer et la renvoyer à la commune pour livraison.",
+      nic: registryNic ?? undefined,
+      message: registryNic
+        ? `Dossier envoyé à ONIP — NIC ${registryNic}. Sur ONIP → Cartes, recherchez « ${input.person.nom} ${input.person.prenom} ».`
+        : `Citoyen créé dans le registre (brouillon). Sur ONIP → Cartes, recherchez « ${input.person.nom} » puis validez/générez la carte.`,
     };
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     return {
       queueId: item.id,
-      message: `File ONIP locale créée — sync API partielle (${detail.slice(0, 120)}).`,
+      message: `File locale OK — sync ONIP échouée : ${detail.slice(0, 160)}`,
     };
   }
 }

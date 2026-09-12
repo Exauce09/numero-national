@@ -1,4 +1,4 @@
-import { getSession, updateSession } from "./auth";
+import { getSession, updateSession, ensureAccessToken } from "./auth";
 
 const STORAGE_KEY = "nn_civil_registry_v1";
 const COMMUNE_CODE = "KIN-GOMBE";
@@ -689,10 +689,19 @@ function nextActNumber(type: ActType): string {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}`;
 }
 
+/** Erreur d'auth API : l'acte local doit être conservé. */
+export class CivilAuthError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CivilAuthError";
+  }
+}
+
 async function tryPostCivil(
   type: ActType,
   payload: Record<string, unknown>
 ): Promise<Record<string, unknown> | null> {
+  await ensureAccessToken();
   const session = getSession();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (session?.accessToken) headers.Authorization = `Bearer ${session.accessToken}`;
@@ -723,7 +732,7 @@ async function tryPostCivil(
       // Jeton expiré / invalide : on ne bloque plus l'enregistrement local.
       updateSession({ accessToken: undefined });
       throw new CivilAuthError(
-        "Session API expirée ou invalide. L'acte est conservé localement — reconnectez-vous pour synchroniser.",
+        "Session API expirée ou invalide. L'acte est conservé localement — reconnectez-vous (officier / DemoCivil2026!) pour synchroniser.",
       );
     }
     if (session?.accessToken) {
@@ -732,14 +741,6 @@ async function tryPostCivil(
     return null;
   }
   return (await res.json()) as Record<string, unknown>;
-}
-
-/** Erreur d'auth API : l'acte local doit être conservé. */
-export class CivilAuthError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "CivilAuthError";
-  }
 }
 
 export async function addAct(

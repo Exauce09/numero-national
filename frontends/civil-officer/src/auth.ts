@@ -224,3 +224,65 @@ export async function login(username: string, password: string): Promise<Session
   sessionStorage.setItem(KEY, JSON.stringify(session));
   return session;
 }
+
+/**
+ * Renouvelle le jeton API si absent / expiré (compte démo officier).
+ * Évite « Could not validate credentials » après une longue session.
+ */
+export async function ensureAccessToken(): Promise<string | null> {
+  const current = getSession();
+  const base = import.meta.env.VITE_API_BASE ?? "/api/v1";
+
+  if (current?.accessToken) {
+    const me = await fetchMe(current.accessToken);
+    if (me) return current.accessToken;
+  }
+
+  // Tentative de reconnexion API (compte démo / email de session)
+  const attempts: Array<{ email: string; password: string }> = [
+    { email: DEMO_API_EMAIL, password: DEMO_API_PASSWORD },
+  ];
+  if (current?.username?.includes("@")) {
+    attempts.unshift({ email: current.username, password: DEMO_API_PASSWORD });
+  }
+
+  for (const attempt of attempts) {
+    try {
+      const res = await fetch(`${base}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(attempt),
+      });
+      if (!res.ok) continue;
+      const data = (await res.json()) as { access_token?: string };
+      if (!data.access_token) continue;
+      const me = await fetchMe(data.access_token);
+      const roles = me?.roles?.length ? me.roles : ["OFFICIER_ETAT_CIVIL", "CIVIL_OFFICER"];
+      const labels = sessionLabel(current?.username || DEMO_USER, roles);
+      const next = attachCommune(
+        {
+          ...(current ?? { username: DEMO_USER }),
+          username: current?.username || DEMO_USER,
+          accessToken: data.access_token,
+          displayName: me?.full_name || current?.displayName || labels.displayName,
+          roleTitle: labels.roleTitle,
+          roles,
+          permissions: me?.permissions ?? [],
+          accountStatus: me?.account_status ?? "ACTIVE",
+          userId: me?.id,
+        },
+        current?.username || DEMO_USER,
+      );
+      sessionStorage.setItem(KEY, JSON.stringify(next));
+      return data.access_token;
+    } catch {
+      /* essai suivant */
+    }
+  }
+
+  if (current?.accessToken) {
+    updateSession({ accessToken: undefined });
+  }
+  return null;
+}
+
