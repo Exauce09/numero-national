@@ -46,7 +46,6 @@ import DeathsPage from "./pages/DeathsPage";
 import BureauxPage from "./pages/BureauxPage";
 import PersonnelPage from "./pages/PersonnelPage";
 import AccountRequestsPage from "./pages/AccountRequestsPage";
-import DocumentVerifyPage from "./pages/DocumentVerifyPage";
 import MarriagesPage from "./pages/MarriagesPage";
 import AdoptionsPage from "./pages/AdoptionsPage";
 import DisplacementsPage from "./pages/DisplacementsPage";
@@ -762,11 +761,6 @@ function Shell() {
           {canSeeNav("admin_accounts", roles, permissions) ? (
             <NavLink to="/admin/account-requests">
               <IconClipboard size={18} /> Demandes de compte
-            </NavLink>
-          ) : null}
-          {canSeeNav("documents", roles, permissions) ? (
-            <NavLink to="/verify-document">
-              <IconFile size={18} /> Vérifier document
             </NavLink>
           ) : null}
         </nav>
