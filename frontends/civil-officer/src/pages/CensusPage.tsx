@@ -1204,7 +1204,7 @@ export default function CensusPage() {
                   {RDC_TRIBUS.length} entrées de référence — {RDC_TRIBUS_NOTE}
                 </p>
               </div>
-              <div className="full" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <div className="full" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                 <button
                   type="button"
                   className="btn-add"
@@ -1213,10 +1213,10 @@ export default function CensusPage() {
                     setParentAddOpen(true);
                   }}
                 >
-                  Ajouter
+                  Ajouter papa / maman
                 </button>
-                <span className="muted small" style={{ alignSelf: "center" }}>
-                  Crée une nouvelle fiche et la lie au parent libre (papa puis maman).
+                <span className="muted small">
+                  Ouvre le formulaire structuré et lie la fiche au parent libre (papa d&apos;abord, puis maman).
                 </span>
               </div>
             </div>

@@ -216,84 +216,129 @@ export default function PersonPicker({
       ) : null}
 
       {modal ? (
-        <div className="modal-backdrop" onClick={() => setModal(false)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <h3>Nouvelle personne</h3>
-            <form onSubmit={onAdd} className="form-grid">
+        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setModal(false)}>
+          <div className="modal-panel modal-wide person-add-modal" onClick={(e) => e.stopPropagation()}>
+            <header className="person-add-head">
               <div>
-                <label className="form-label">Nom</label>
-                <input
-                  className="form-control"
-                  value={form.nom}
-                  onChange={(e) => setForm({ ...form, nom: e.target.value })}
-                />
+                <h3>
+                  {label.toLowerCase().includes("papa") || label.toLowerCase().includes("père")
+                    ? "Ajouter le père"
+                    : label.toLowerCase().includes("maman") || label.toLowerCase().includes("mère")
+                      ? "Ajouter la mère"
+                      : "Ajouter une personne"}
+                </h3>
+                <p className="muted small" style={{ margin: 0 }}>
+                  Renseignez l&apos;identité, puis validez pour lier la fiche.
+                </p>
               </div>
-              <div>
-                <label className="form-label">Post-nom</label>
-                <input
-                  className="form-control"
-                  value={form.postnom}
-                  onChange={(e) => setForm({ ...form, postnom: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="form-label">Prénom</label>
-                <input
-                  className="form-control"
-                  value={form.prenom}
-                  onChange={(e) => setForm({ ...form, prenom: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="form-label">Sexe</label>
-                <select
-                  className="form-control"
-                  value={form.sexe}
-                  onChange={(e) => setForm({ ...form, sexe: e.target.value as Sexe })}
-                >
-                  <option value="M">Masculin</option>
-                  <option value="F">Féminin</option>
-                </select>
-              </div>
-              <div>
-                <label className="form-label">Date de naissance</label>
-                <input
-                  className="form-control"
-                  type="date"
-                  value={form.date_naissance}
-                  onChange={(e) => setForm({ ...form, date_naissance: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="form-label">État civil</label>
-                <select
-                  className="form-control"
-                  value={form.etat_civil}
-                  onChange={(e) => setForm({ ...form, etat_civil: e.target.value as EtatCivil })}
-                >
-                  {ETAT_CIVIL_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="full">
-                <label className="form-label">Lieu de naissance</label>
-                <input
-                  className="form-control"
-                  value={lieuNaissance}
-                  onChange={(e) => setLieuNaissance(e.target.value)}
-                  placeholder="Saisie manuelle"
-                />
-              </div>
-              {error ? <p className="warn-inline full">{error}</p> : null}
-              <div className="full" style={{ display: "flex", gap: 8 }}>
-                <button type="submit" className="btn-primary">
-                  Enregistrer et lier
-                </button>
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                aria-label="Fermer"
+                onClick={() => setModal(false)}
+              >
+                ×
+              </button>
+            </header>
+
+            <form onSubmit={onAdd} className="person-add-form">
+              <fieldset className="id-fieldset">
+                <legend>Identité</legend>
+                <div className="form-grid person-add-grid">
+                  <div>
+                    <label className="form-label">Nom *</label>
+                    <input
+                      className="form-control"
+                      value={form.nom}
+                      onChange={(e) => setForm({ ...form, nom: e.target.value })}
+                      autoFocus
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Post-nom</label>
+                    <input
+                      className="form-control"
+                      value={form.postnom}
+                      onChange={(e) => setForm({ ...form, postnom: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Prénom *</label>
+                    <input
+                      className="form-control"
+                      value={form.prenom}
+                      onChange={(e) => setForm({ ...form, prenom: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+              </fieldset>
+
+              <fieldset className="id-fieldset">
+                <legend>État civil</legend>
+                <div className="form-grid person-add-grid">
+                  <div>
+                    <label className="form-label">Sexe *</label>
+                    <select
+                      className="form-control"
+                      value={form.sexe}
+                      onChange={(e) => setForm({ ...form, sexe: e.target.value as Sexe })}
+                    >
+                      <option value="M">Masculin</option>
+                      <option value="F">Féminin</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="form-label">Date de naissance *</label>
+                    <input
+                      className="form-control"
+                      type="date"
+                      value={form.date_naissance}
+                      onChange={(e) => setForm({ ...form, date_naissance: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Situation matrimoniale</label>
+                    <select
+                      className="form-control"
+                      value={form.etat_civil}
+                      onChange={(e) => setForm({ ...form, etat_civil: e.target.value as EtatCivil })}
+                    >
+                      {ETAT_CIVIL_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </fieldset>
+
+              <fieldset className="id-fieldset">
+                <legend>Naissance</legend>
+                <div className="form-grid">
+                  <div className="full">
+                    <label className="form-label">Lieu de naissance</label>
+                    <input
+                      className="form-control"
+                      value={lieuNaissance}
+                      onChange={(e) => setLieuNaissance(e.target.value)}
+                      placeholder="Ex. Kinshasa, Gombe…"
+                    />
+                  </div>
+                </div>
+              </fieldset>
+
+              {error ? <div className="login-error">{error}</div> : null}
+
+              <div className="modal-actions">
                 <button type="button" className="btn-secondary" onClick={() => setModal(false)}>
                   Annuler
+                </button>
+                <button type="submit" className="btn-primary" style={{ width: "auto", minWidth: 180 }}>
+                  Enregistrer et lier
                 </button>
               </div>
             </form>
