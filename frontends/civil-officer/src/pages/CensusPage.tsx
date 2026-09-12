@@ -196,6 +196,7 @@ export default function CensusPage() {
   const [error, setError] = useState<string | null>(null);
   const [draftNotice, setDraftNotice] = useState<string | null>(null);
   const [created, setCreated] = useState<Act | null>(null);
+  const [createdWasMarried, setCreatedWasMarried] = useState(false);
   const [camError, setCamError] = useState<string | null>(null);
   const [gpsInfo, setGpsInfo] = useState<ReverseGeo | null>(null);
 
@@ -786,6 +787,7 @@ export default function CensusPage() {
       setIdentiteAdmin(emptyIdentiteAdmin());
       setFpTemplates({});
       setCreated(act);
+      setCreatedWasMarried(ficheKind === "marie" || etatCivil === "MARIE");
       setDraftNotice(`${onip.message}${bioMsg}`);
       streamRef.current?.getTracks().forEach((t) => t.stop());
       setStep(1);
@@ -1042,6 +1044,12 @@ export default function CensusPage() {
             {ficheKind === "marie" ? (
               <fieldset className="id-fieldset">
                 <legend>Formulaire — Marié(e)</legend>
+                <p className="muted small" style={{ marginBottom: "0.75rem" }}>
+                  Ce formulaire crée la <strong>fiche population</strong> (statut marié). L&apos;acte
+                  officiel de mariage se crée ensuite dans{" "}
+                  <Link to="/marriages">Actes → Mariages</Link> (époux + épouse), pour qu&apos;il
+                  apparaisse dans « Gérer les mariages » et puisse être imprimé.
+                </p>
                 <div className="form-grid">
                   <div className="full">
                     <label className="form-label">Nom *</label>
@@ -1688,6 +1696,26 @@ export default function CensusPage() {
       {created ? (
         <div className="panel" style={{ marginTop: "1rem" }}>
           <div className="success-banner">Fiche de recensement créée — NIC {created.national_id}</div>
+          {createdWasMarried ? (
+            <div
+              style={{
+                margin: "0.75rem 0",
+                padding: "0.75rem 1rem",
+                borderRadius: 8,
+                background: "rgba(247,168,0,0.12)",
+              }}
+            >
+              <strong>Prochaine étape — acte de mariage</strong>
+              <p className="muted small" style={{ margin: "0.35rem 0 0.75rem" }}>
+                La personne est recensée comme mariée, mais elle n&apos;a pas encore d&apos;acte.
+                Pour qu&apos;elle ait l&apos;acte (liste, impression, archives) : ouvrez Mariages,
+                sélectionnez les deux conjoints, puis enregistrez.
+              </p>
+              <Link className="btn-primary" style={{ display: "inline-block", width: "auto" }} to="/marriages">
+                Créer l&apos;acte de mariage maintenant
+              </Link>
+            </div>
+          ) : null}
           <ActPrintCard act={created} />
         </div>
       ) : null}
