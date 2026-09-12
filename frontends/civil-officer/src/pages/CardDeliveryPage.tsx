@@ -69,7 +69,7 @@ export default function CardDeliveryPage() {
   return (
     <div>
       <div className="hero-banner">
-        <h1>Livraison des cartes d&apos;identité</h1>
+        <h1>Impression / livraison des cartes d&apos;identité</h1>
         <p>
           Après génération ONIP, chaque carte revient à votre commune (
           <strong>

@@ -4,7 +4,6 @@ import ActPrintCard from "../components/ActPrintCard";
 import GeoCascade, {
   ADDRESS_FIELD_LABELS,
   GEO_PRESETS,
-  ORIGIN_FIELD_LABELS,
   type GeoSelection,
 } from "../components/GeoCascade";
 import PersonPicker from "../components/PersonPicker";
@@ -28,6 +27,8 @@ import {
 import { api } from "../api";
 import { getOfficerCommune } from "../commune";
 import { RDC_TRIBUS, RDC_TRIBUS_NOTE } from "../data/tribusRdc";
+import { LANGUES_PARLEES_RDC, formatLangues, parseLangues } from "../data/languesRdc";
+import { listFacilityAccounts } from "../healthAuth";
 import GpsLocatePanel from "../components/GpsLocatePanel";
 import { captureGpsOnSave, captureGpsWithAddress, type ReverseGeo } from "../gpsCapture";
 import {
@@ -58,13 +59,15 @@ import {
 
 const STEPS = [
   { id: 1, label: "1. Identité" },
-  { id: 2, label: "2. Origine" },
+  { id: 2, label: "2. Parent" },
   { id: 3, label: "3. Biométrie" },
   { id: 4, label: "4. Études faites" },
   { id: 5, label: "5. Expérience professionnelle" },
   { id: 6, label: "6. Identité administrative actuelle" },
   { id: 7, label: "7. Situation familiale" },
 ] as const;
+
+const NUMERO_QUARTIER_OPTIONS = Array.from({ length: 120 }, (_, i) => String(i + 1));
 
 type StepId = (typeof STEPS)[number]["id"];
 
@@ -90,10 +93,13 @@ type CensusDraft = {
   sexe: Sexe;
   etatCivil: EtatCivil;
   profession: string;
+  /** Lieu de naissance saisie manuelle (remplace la cascade). */
+  lieuNaissanceManuel: string;
   geoNaissance: GeoSelection;
   dateNaissance: string;
   hopitalNaissance: string;
   languesParlees: string;
+  languesSelected?: string[];
   pereId: string | null;
   mereId: string | null;
   nationalite: string;
@@ -137,21 +143,27 @@ export default function CensusPage() {
   const [sexe, setSexe] = useState<Sexe>("M");
   const [etatCivil, setEtatCivil] = useState<EtatCivil>("CELIBATAIRE");
   const [profession, setProfession] = useState("");
+  const [lieuNaissanceManuel, setLieuNaissanceManuel] = useState("");
   const [geoNaissance, setGeoNaissance] = useState<GeoSelection>({});
   const [dateNaissance, setDateNaissance] = useState("");
   const [hopitalNaissance, setHopitalNaissance] = useState("");
-  const [languesParlees, setLanguesParlees] = useState("");
+  const [hopitalAutre, setHopitalAutre] = useState("");
+  const [languesSelected, setLanguesSelected] = useState<string[]>([]);
   const [pere, setPere] = useState<Person | null>(null);
   const [mere, setMere] = useState<Person | null>(null);
+  const [parentAddOpen, setParentAddOpen] = useState(false);
+  const [parentAddTarget, setParentAddTarget] = useState<"pere" | "mere">("pere");
   const [nationalite, setNationalite] = useState("Congolaise");
   const [paysResidence, setPaysResidence] = useState("RDC");
   const [geoActuelle, setGeoActuelle] = useState<GeoSelection>({});
   const [numeroAvenue, setNumeroAvenue] = useState("");
+  const [numeroMode, setNumeroMode] = useState<"libre" | "liste">("libre");
   const [telephone, setTelephone] = useState("");
   const [email, setEmail] = useState("");
   const [boitePostale, setBoitePostale] = useState("");
   const [geoOrigine, setGeoOrigine] = useState<GeoSelection>({});
   const [tribu, setTribu] = useState("");
+  const healthFacilities = listFacilityAccounts().filter((a) => a.active);
   const [photo, setPhoto] = useState<string | undefined>();
   const [empreinteGauche, setEmpreinteGauche] = useState("");
   const [empreinteDroite, setEmpreinteDroite] = useState("");
@@ -191,10 +203,18 @@ export default function CensusPage() {
       setSexe(d.sexe ?? "M");
       setEtatCivil(d.etatCivil ?? "CELIBATAIRE");
       setProfession(d.profession ?? "");
+      setLieuNaissanceManuel(
+        d.lieuNaissanceManuel || d.geoNaissance?.label || "",
+      );
       setGeoNaissance(d.geoNaissance ?? {});
       setDateNaissance(d.dateNaissance ?? "");
       setHopitalNaissance(d.hopitalNaissance ?? "");
-      setLanguesParlees(d.languesParlees ?? "");
+      {
+        const langs = d.languesSelected?.length
+          ? d.languesSelected
+          : parseLangues(d.languesParlees);
+        setLanguesSelected(langs);
+      }
       setPere(d.pereId ? getPerson(d.pereId) ?? null : null);
       setMere(d.mereId ? getPerson(d.mereId) ?? null : null);
       setNationalite(d.nationalite ?? "Congolaise");
@@ -328,7 +348,7 @@ export default function CensusPage() {
 
   function validateIdentity(): boolean {
     setError(null);
-    const lieuOk = Boolean(geoNaissance.province_name || geoNaissance.label);
+    const lieuOk = Boolean(lieuNaissanceManuel.trim() || geoNaissance.label);
     const adresseOk = Boolean(geoActuelle.province_name || geoActuelle.label);
 
     if (!nom.trim()) {
@@ -341,10 +361,6 @@ export default function CensusPage() {
     }
 
     if (ficheKind === "bebe") {
-      if (!mere && !pere) {
-        setError("Identité bébé : nommez la mère ou le père (recherche personne).");
-        return false;
-      }
       if (!lieuOk) {
         setError("Identité bébé : le lieu de naissance est requis.");
         return false;
@@ -352,7 +368,7 @@ export default function CensusPage() {
       return true;
     }
 
-    // Personne / décédé / marié — identité complète (e-mail facultatif).
+    // Personne / décédé / marié — téléphone, e-mail, père, mère, avenue non obligatoires.
     if (!postnom.trim()) {
       setError("Identité : le post-nom est requis.");
       return false;
@@ -365,14 +381,6 @@ export default function CensusPage() {
       setError("Identité : le lieu de naissance est requis.");
       return false;
     }
-    if (!pere) {
-      setError("Identité : le père est requis (recherche personne).");
-      return false;
-    }
-    if (!mere) {
-      setError("Identité : la mère est requise (recherche personne).");
-      return false;
-    }
     if (!nationalite.trim()) {
       setError("Identité : la nationalité est requise.");
       return false;
@@ -383,10 +391,6 @@ export default function CensusPage() {
     }
     if (!adresseOk) {
       setError("Identité : l'adresse actuelle (au moins la province) est requise.");
-      return false;
-    }
-    if (ficheKind !== "decede" && !telephone.trim()) {
-      setError("Identité : le numéro de téléphone est requis (e-mail facultatif).");
       return false;
     }
     if (ficheKind === "decede") {
@@ -517,10 +521,16 @@ export default function CensusPage() {
       sexe,
       etatCivil,
       profession,
-      geoNaissance,
+      lieuNaissanceManuel,
+      geoNaissance: {
+        ...geoNaissance,
+        label: lieuNaissanceManuel.trim() || geoNaissance.label,
+      },
       dateNaissance,
-      hopitalNaissance,
-      languesParlees,
+      hopitalNaissance:
+        hopitalNaissance === "__autre__" ? hopitalAutre.trim() : hopitalNaissance,
+      languesParlees: formatLangues(languesSelected),
+      languesSelected,
       pereId: pere?.id ?? null,
       mereId: mere?.id ?? null,
       nationalite,
@@ -611,7 +621,14 @@ export default function CensusPage() {
       if (gps && "latitude" in gps) setGpsInfo(gps as ReverseGeo);
       const commune = getOfficerCommune();
       const adresse = buildAdresse();
-      const lieuNaissance = geoNaissance.label || "";
+      const hopitalResolved =
+        hopitalNaissance === "__autre__" ? hopitalAutre.trim() : hopitalNaissance.trim();
+      const languesResolved = formatLangues(languesSelected);
+      const lieuNaissance = lieuNaissanceManuel.trim() || geoNaissance.label || "";
+      const geoNaissancePayload: GeoSelection = {
+        ...geoNaissance,
+        label: lieuNaissance,
+      };
       const situationSummary = formatSituationFamiliale(situationFamiliale);
       const scolaireSummary = formatParcoursScolaire(etudes);
       const univSummary = formatParcoursUniversitaire(etudes);
@@ -660,8 +677,8 @@ export default function CensusPage() {
         profession: profession.trim() || null,
         lieu_naissance: person.lieu_naissance,
         date_naissance: person.date_naissance,
-        hopital_naissance: hopitalNaissance.trim() || null,
-        langues_parlees: languesParlees.trim() || null,
+        hopital_naissance: hopitalResolved || null,
+        langues_parlees: languesResolved || null,
         nom_pere: pere ? displayName(pere) : null,
         nom_mere: mere ? displayName(mere) : null,
         pere_id: pere?.id ?? null,
@@ -698,7 +715,7 @@ export default function CensusPage() {
         secteur_chefferie_commune: geoOrigine.commune_name || null,
         village_origine: geoOrigine.localite_name || null,
         geo_origine: geoOrigine,
-        geo_naissance: geoNaissance,
+        geo_naissance: geoNaissancePayload,
         tribu: tribu.trim() || null,
         numero_admin: formatIdentiteAdmin(identiteAdmin) || null,
         identite_administrative_detail: identiteAdmin,
@@ -832,12 +849,15 @@ export default function CensusPage() {
                 ) : null}
                 <div className="full">
                   <label className="form-label">Lieu de naissance *</label>
-                  <GeoCascade
-                    embedded
-                    label="Lieu de naissance"
-                    levels={GEO_PRESETS.place}
-                    value={geoNaissance}
-                    onChange={setGeoNaissance}
+                  <input
+                    className="form-control"
+                    value={lieuNaissanceManuel}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setLieuNaissanceManuel(v);
+                      setGeoNaissance((prev) => ({ ...prev, label: v }));
+                    }}
+                    placeholder="Saisie manuelle du lieu de naissance"
                   />
                 </div>
                 <div>
@@ -862,34 +882,79 @@ export default function CensusPage() {
                 ) : null}
                 <div>
                   <label className="form-label">Hôpital de naissance</label>
-                  <input
+                  <select
                     className="form-control"
-                    value={hopitalNaissance}
-                    onChange={(e) => setHopitalNaissance(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Langues parlées</label>
-                  <input
-                    className="form-control"
-                    value={languesParlees}
-                    onChange={(e) => setLanguesParlees(e.target.value)}
-                    placeholder="Français, Lingala…"
-                  />
+                    value={
+                      hopitalNaissance &&
+                      hopitalNaissance !== "__autre__" &&
+                      !healthFacilities.some((f) => f.facilityName === hopitalNaissance)
+                        ? "__autre__"
+                        : hopitalNaissance
+                    }
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setHopitalNaissance(v);
+                      if (v !== "__autre__") setHopitalAutre("");
+                    }}
+                  >
+                    <option value="">— Sélectionner —</option>
+                    {healthFacilities.map((f) => (
+                      <option key={f.id} value={f.facilityName}>
+                        {f.facilityName} ({f.facilityType})
+                      </option>
+                    ))}
+                    <option value="__autre__">Autre (saisie libre)</option>
+                  </select>
+                  {(hopitalNaissance === "__autre__" ||
+                    (hopitalNaissance &&
+                      !healthFacilities.some((f) => f.facilityName === hopitalNaissance) &&
+                      hopitalNaissance !== "")) &&
+                  hopitalNaissance !== "" ? (
+                    <input
+                      className="form-control"
+                      style={{ marginTop: 6 }}
+                      value={
+                        hopitalNaissance === "__autre__" ? hopitalAutre : hopitalNaissance
+                      }
+                      onChange={(e) => {
+                        setHopitalNaissance("__autre__");
+                        setHopitalAutre(e.target.value);
+                      }}
+                      placeholder="Nom de l'hôpital"
+                    />
+                  ) : null}
                 </div>
                 <div className="full">
-                  <PersonPicker
-                    label={ficheKind === "bebe" ? "Nom du père * (si pas de mère)" : "Nom du père"}
-                    value={pere}
-                    onChange={setPere}
-                  />
-                </div>
-                <div className="full">
-                  <PersonPicker
-                    label={ficheKind === "bebe" ? "Nom de la mère * (si pas de père)" : "Nom de la mère"}
-                    value={mere}
-                    onChange={setMere}
-                  />
+                  <label className="form-label">Langues parlées (plusieurs possibles)</label>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "0.45rem 0.85rem",
+                      marginTop: 6,
+                    }}
+                  >
+                    {LANGUES_PARLEES_RDC.map((lang) => {
+                      const checked = languesSelected.includes(lang);
+                      return (
+                        <label
+                          key={lang}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              setLanguesSelected((prev) =>
+                                checked ? prev.filter((x) => x !== lang) : [...prev, lang],
+                              );
+                            }}
+                          />
+                          {lang}
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div>
                   <label className="form-label">Nationalité</label>
@@ -1015,12 +1080,53 @@ export default function CensusPage() {
               />
               <div className="form-grid" style={{ marginTop: "0.75rem" }}>
                 <div>
-                  <label className="form-label">N°</label>
-                  <input
-                    className="form-control"
-                    value={numeroAvenue}
-                    onChange={(e) => setNumeroAvenue(e.target.value)}
-                  />
+                  <label className="form-label">
+                    N°{geoActuelle.quartier_name ? ` — quartier ${geoActuelle.quartier_name}` : " (quartier)"}
+                  </label>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <select
+                      className="form-control"
+                      style={{ maxWidth: 140 }}
+                      value={numeroMode}
+                      onChange={(e) => setNumeroMode(e.target.value as "libre" | "liste")}
+                      disabled={!geoActuelle.quartier_name}
+                      title={
+                        geoActuelle.quartier_name
+                          ? "Mode de saisie du N°"
+                          : "Sélectionnez d'abord un quartier"
+                      }
+                    >
+                      <option value="libre">Saisie libre</option>
+                      <option value="liste">Liste</option>
+                    </select>
+                    {numeroMode === "liste" && geoActuelle.quartier_name ? (
+                      <select
+                        className="form-control"
+                        style={{ flex: 1, minWidth: 120 }}
+                        value={numeroAvenue}
+                        onChange={(e) => setNumeroAvenue(e.target.value)}
+                      >
+                        <option value="">— N° —</option>
+                        {NUMERO_QUARTIER_OPTIONS.map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        className="form-control"
+                        style={{ flex: 1, minWidth: 120 }}
+                        value={numeroAvenue}
+                        onChange={(e) => setNumeroAvenue(e.target.value)}
+                        placeholder={
+                          geoActuelle.quartier_name
+                            ? `N° dans ${geoActuelle.quartier_name}`
+                            : "Sélectionnez un quartier puis le N°"
+                        }
+                      />
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="form-label">Numéro de téléphone</label>
@@ -1051,19 +1157,36 @@ export default function CensusPage() {
         {step === 2 ? (
           <div className="id-form">
             <h3 className="id-form-title" style={{ color: "var(--egouv-primary)" }}>
-              3. Originaire
+              2. Parent
             </h3>
-            <GeoCascade
-              embedded
-              label="Origine"
-              levels={GEO_PRESETS.origin}
-              fieldLabels={ORIGIN_FIELD_LABELS}
-              value={geoOrigine}
-              onChange={setGeoOrigine}
-            />
-            <div className="form-grid" style={{ marginTop: "0.75rem" }}>
-              <div>
-                <label className="form-label">Tribu :</label>
+            <p className="muted small" style={{ marginBottom: "0.75rem" }}>
+              Sélectionnez le père et la mère. La recherche du père peut être filtrée par province,
+              territoire, secteur et village. Aucun parent n&apos;est obligatoire à l&apos;enregistrement.
+            </p>
+            <div className="form-grid">
+              <div className="full">
+                <PersonPicker
+                  label="Papa"
+                  value={pere}
+                  onChange={setPere}
+                  hideAdd
+                  originGeoFilter
+                  forceAddOpen={parentAddOpen && parentAddTarget === "pere"}
+                  onForceAddConsumed={() => setParentAddOpen(false)}
+                />
+              </div>
+              <div className="full">
+                <PersonPicker
+                  label="Maman"
+                  value={mere}
+                  onChange={setMere}
+                  hideAdd
+                  forceAddOpen={parentAddOpen && parentAddTarget === "mere"}
+                  onForceAddConsumed={() => setParentAddOpen(false)}
+                />
+              </div>
+              <div className="full">
+                <label className="form-label">Tribu (optionnel)</label>
                 <input
                   className="form-control"
                   list="tribus-rdc"
@@ -1079,6 +1202,21 @@ export default function CensusPage() {
                 <p className="muted" style={{ marginTop: "0.35rem", fontSize: "0.8rem" }}>
                   {RDC_TRIBUS.length} entrées de référence — {RDC_TRIBUS_NOTE}
                 </p>
+              </div>
+              <div className="full" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="btn-add"
+                  onClick={() => {
+                    setParentAddTarget(!pere ? "pere" : "mere");
+                    setParentAddOpen(true);
+                  }}
+                >
+                  Ajouter
+                </button>
+                <span className="muted small" style={{ alignSelf: "center" }}>
+                  Crée une nouvelle fiche et la lie au parent libre (papa puis maman).
+                </span>
               </div>
             </div>
           </div>

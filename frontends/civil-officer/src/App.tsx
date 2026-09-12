@@ -54,6 +54,7 @@ import DivorcesPage from "./pages/DivorcesPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import CardDeliveryPage from "./pages/CardDeliveryPage";
 import ActsPage from "./pages/ActsPage";
+import ActQrScanPage from "./pages/ActQrScanPage";
 import SearchPage from "./pages/SearchPage";
 import DeclarationsPage from "./pages/DeclarationsPage";
 import TranscriptionsPage from "./pages/TranscriptionsPage";
@@ -649,19 +650,30 @@ function Shell() {
             </NavLink>
           ) : null}
           {canSeeNav("population", roles, permissions) ? (
-            <NavLink
-              to="/population"
-              className={({ isActive }) =>
-                isActive ||
-                location.pathname.startsWith("/population") ||
-                location.pathname.startsWith("/personnes") ||
-                location.pathname.startsWith("/lists/population")
-                  ? "active"
-                  : undefined
-              }
-            >
-              <IconUsers size={18} /> Population
-            </NavLink>
+            <div className="nav-group">
+              <div className="nav-group-label">
+                <IconUsers size={18} /> Population
+              </div>
+              <NavLink
+                to="/population"
+                className={({ isActive }) =>
+                  isActive ||
+                  location.pathname.startsWith("/population/") ||
+                  location.pathname.startsWith("/personnes") ||
+                  location.pathname.startsWith("/lists/population")
+                    ? "active"
+                    : undefined
+                }
+              >
+                Registre population
+              </NavLink>
+              {canSeeNav("census", roles, permissions) ? (
+                <NavLink to="/census/scan-coupon">Scan coupon</NavLink>
+              ) : null}
+              {canSeeNav("cartes", roles, permissions) ? (
+                <NavLink to="/cartes-livraison">Impression carte</NavLink>
+              ) : null}
+            </div>
           ) : null}
           {canSeeNav("naissances", roles, permissions) ? (
             <NavLink to="/manage/naissance">
@@ -708,24 +720,18 @@ function Shell() {
               <IconClipboard size={18} /> Recensement
             </NavLink>
           ) : null}
-          {canSeeNav("census", roles, permissions) ? (
-            <NavLink to="/census/scan-coupon">
-              <IconClipboard size={18} /> Scan coupon APK
-            </NavLink>
-          ) : null}
           {canSeeNav("documents", roles, permissions) ? (
-            <NavLink to="/acts">
-              <IconFile size={18} /> Actes & documents
-            </NavLink>
-          ) : null}
-          {canSeeNav("cartes", roles, permissions) ? (
-            <NavLink to="/cartes-livraison">
-              <IconFile size={18} /> Livraison cartes ID
-            </NavLink>
+            <div className="nav-group">
+              <div className="nav-group-label">
+                <IconFile size={18} /> Actes
+              </div>
+              <NavLink to="/acts">Actes & documents</NavLink>
+              <NavLink to="/acts/qrcode">QR code</NavLink>
+            </div>
           ) : null}
           {canSeeNav("declarations", roles, permissions) ? (
             <NavLink to="/declarations">
-              <IconClipboard size={18} /> Déclarations santé
+              <IconClipboard size={18} /> Structures sanitaires
             </NavLink>
           ) : null}
           {canSeeNav("validation", roles, permissions) ? (
@@ -920,6 +926,7 @@ function Shell() {
             <Route path="/documents" element={<DocumentsPage />} />
             <Route path="/cartes-livraison" element={<CardDeliveryPage />} />
             <Route path="/acts" element={<ActsPage />} />
+            <Route path="/acts/qrcode" element={<ActQrScanPage />} />
             <Route path="/declarations" element={<DeclarationsPage />} />
             <Route path="/transcriptions" element={<TranscriptionsPage />} />
             <Route path="/corrections" element={<CorrectionsInboxPage />} />

@@ -1,13 +1,17 @@
-/** Tableaux synoptiques — forme officielle (Justicia), commune de l'officier uniquement. */
+/** Tableaux synoptiques — forme officielle (Justicia), toutes communes + quartiers. */
 
+import { useMemo, useState } from "react";
 import { Link, NavLink, Navigate, useParams } from "react-router-dom";
 import DataToolbar from "../components/DataToolbar";
-import { getOfficerCommune } from "../commune";
+import { getOfficerCommune, type OfficerCommune } from "../commune";
+import type { FlatCommune } from "../geoFallback";
 import {
+  listSynopticCommunes,
   synopticBirths,
   synopticDeaths,
   synopticDocuments,
   synopticMarriagesDivorces,
+  synopticQuartiersForCommune,
   type Gft,
 } from "../synoptic";
 
@@ -19,6 +23,7 @@ const TABS = [
 ] as const;
 
 type TabSlug = (typeof TABS)[number]["slug"];
+type CommuneSel = OfficerCommune | FlatCommune;
 
 function spreadGft(prefix: string, v: Gft): Record<string, number> {
   return {
@@ -48,8 +53,121 @@ function GftCells({ v }: { v: Gft }) {
   );
 }
 
-function BirthsTable() {
-  const d = synopticBirths();
+function CommunesPicker({
+  selected,
+  onSelect,
+}: {
+  selected: CommuneSel | null;
+  onSelect: (c: FlatCommune | null) => void;
+}) {
+  const communes = useMemo(() => listSynopticCommunes(), []);
+  const value = selected
+    ? communes.find(
+        (c) =>
+          c.code === selected.code ||
+          (c.name === selected.name && c.ville === selected.ville),
+      )?.code ?? ""
+    : "";
+
+  return (
+    <div className="panel no-print" style={{ marginBottom: "1rem" }}>
+      <div className="panel-head">
+        <h3 className="panel-title" style={{ margin: 0 }}>
+          Communes ({communes.length})
+        </h3>
+      </div>
+      <div className="form-grid">
+        <div className="full">
+          <label className="form-label">Sélectionner une commune</label>
+          <select
+            className="form-control"
+            value={value}
+            onChange={(e) => {
+              const hit = communes.find((c) => c.code === e.target.value) ?? null;
+              onSelect(hit);
+            }}
+          >
+            <option value="">— Choisir une commune —</option>
+            {communes.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.name} — {c.ville} ({c.province})
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="table-scroll" style={{ marginTop: "0.75rem", maxHeight: 220 }}>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Commune</th>
+              <th>Ville</th>
+              <th>Province</th>
+              <th>Code</th>
+            </tr>
+          </thead>
+          <tbody>
+            {communes.map((c) => (
+              <tr
+                key={c.code}
+                style={
+                  value === c.code
+                    ? { background: "rgba(0,127,255,0.08)", cursor: "pointer" }
+                    : { cursor: "pointer" }
+                }
+                onClick={() => onSelect(c)}
+              >
+                <td>
+                  <strong>{c.name}</strong>
+                </td>
+                <td>{c.ville}</td>
+                <td>{c.province}</td>
+                <td>
+                  <code>{c.code}</code>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function QuartiersPanel({ commune }: { commune: CommuneSel }) {
+  const q = synopticQuartiersForCommune(commune);
+  return (
+    <div className="panel" style={{ marginTop: "1rem" }}>
+      <h3 className="panel-title">
+        Quartiers de {q.commune.name} ({q.rows.length})
+      </h3>
+      <div className="table-scroll">
+        <table className="syn-official data-table">
+          <thead>
+            <tr>
+              <th>Quartier</th>
+              <GftHeads />
+            </tr>
+          </thead>
+          <tbody>
+            {q.rows.map((r) => (
+              <tr key={r.quartier}>
+                <td>{r.quartier}</td>
+                <td>{r.g}</td>
+                <td>{r.f}</td>
+                <td>{r.t}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="muted small">Total enregistrés rattachés aux quartiers : {q.total}</p>
+    </div>
+  );
+}
+
+function BirthsTable({ commune }: { commune: CommuneSel }) {
+  const d = synopticBirths(commune);
   const rows = [
     {
       commune: d.commune.name,
@@ -132,15 +250,14 @@ function BirthsTable() {
           </tbody>
         </table>
       </div>
-      <p className="syn-legend muted small">
-        G = Garçons · F = Filles · T = Total — une seule ligne : votre commune attribuée.
-      </p>
+      <p className="syn-legend muted small">G = Garçons · F = Filles · T = Total</p>
+      <QuartiersPanel commune={commune} />
     </>
   );
 }
 
-function MatrimonialTable() {
-  const d = synopticMarriagesDivorces();
+function MatrimonialTable({ commune }: { commune: CommuneSel }) {
+  const d = synopticMarriagesDivorces(commune);
   const rows = [
     {
       commune: d.commune.name,
@@ -200,12 +317,13 @@ function MatrimonialTable() {
           </tbody>
         </table>
       </div>
+      <QuartiersPanel commune={commune} />
     </>
   );
 }
 
-function DeathsTable() {
-  const d = synopticDeaths();
+function DeathsTable({ commune }: { commune: CommuneSel }) {
+  const d = synopticDeaths(commune);
   const rows = [
     {
       commune: d.commune.name,
@@ -214,11 +332,11 @@ function DeathsTable() {
       femmes: d.femmes,
       garcons: d.garcons,
       filles: d.filles,
-      total_a: d.totalA,
-      morts_nes_garcons: d.mortsNesG,
-      morts_nes_filles: d.mortsNesF,
-      total_b: d.totalB,
-      totaux_ab: d.totalAB,
+      totalA: d.totalA,
+      mortsNesG: d.mortsNesG,
+      mortsNesF: d.mortsNesF,
+      totalB: d.totalB,
+      totalAB: d.totalAB,
     },
   ];
 
@@ -228,7 +346,7 @@ function DeathsTable() {
         <DataToolbar filename={`synoptique_deces_${d.commune.code}`} rows={rows} />
       </div>
       <h2 className="syn-official-title">
-        TABLEAU RÉCAPITULATIF DES STATISTIQUES DES DÉCÈS
+        TABLEAU SYNOPTIQUE RÉCAPITULATIF DES STATISTIQUES DES DÉCÈS
         <br />
         COMMUNE DE {d.commune.name.toUpperCase()} — {d.commune.ville.toUpperCase()} ({d.commune.code})
       </h2>
@@ -236,20 +354,16 @@ function DeathsTable() {
         <table className="syn-official">
           <thead>
             <tr>
-              <th rowSpan={2}>COMMUNE</th>
-              <th colSpan={4}>DÉCÈS</th>
-              <th rowSpan={2}>TOTAL (a)</th>
-              <th colSpan={2}>MORTS NÉS</th>
-              <th rowSpan={2}>TOTAL (b)</th>
-              <th rowSpan={2}>TOTAUX (a+b)</th>
-            </tr>
-            <tr>
+              <th>COMMUNE</th>
               <th>HOMMES</th>
               <th>FEMMES</th>
               <th>GARÇONS</th>
               <th>FILLES</th>
-              <th>GARÇONS</th>
-              <th>FILLES</th>
+              <th>TOTAL (A)</th>
+              <th>MORTS-NÉS G</th>
+              <th>MORTS-NÉS F</th>
+              <th>TOTAL (B)</th>
+              <th>TOTAL (A+B)</th>
             </tr>
           </thead>
           <tbody>
@@ -268,21 +382,18 @@ function DeathsTable() {
           </tbody>
         </table>
       </div>
+      <QuartiersPanel commune={commune} />
     </>
   );
 }
 
-function DocumentsTable() {
-  const d = synopticDocuments();
-  const rows =
-    d.byType.length === 0
-      ? [{ commune: d.commune.name, code: d.commune.code, type_document: "—", nombre: 0 }]
-      : d.byType.map((r) => ({
-          commune: d.commune.name,
-          code: d.commune.code,
-          type_document: r.type,
-          nombre: r.count,
-        }));
+function DocumentsTable({ commune }: { commune: CommuneSel }) {
+  const d = synopticDocuments(commune);
+  const rows = d.byType.map((r) => ({
+    commune: d.commune.name,
+    type: r.type,
+    count: r.count,
+  }));
 
   return (
     <>
@@ -290,7 +401,7 @@ function DocumentsTable() {
         <DataToolbar filename={`synoptique_documents_${d.commune.code}`} rows={rows} />
       </div>
       <h2 className="syn-official-title">
-        TABLEAU SYNOPTIQUE DES DOCUMENTS DÉLIVRÉS
+        TABLEAU SYNOPTIQUE — DOCUMENTS
         <br />
         COMMUNE DE {d.commune.name.toUpperCase()} — {d.commune.ville.toUpperCase()} ({d.commune.code})
       </h2>
@@ -298,7 +409,6 @@ function DocumentsTable() {
         <table className="syn-official">
           <thead>
             <tr>
-              <th>COMMUNE</th>
               <th>TYPE DE DOCUMENT</th>
               <th>NOMBRE</th>
             </tr>
@@ -306,20 +416,20 @@ function DocumentsTable() {
           <tbody>
             {d.byType.length === 0 ? (
               <tr>
-                <td className="syn-commune-cell">{d.commune.name}</td>
-                <td colSpan={2}>Aucun document</td>
+                <td colSpan={2} className="muted">
+                  Aucun document
+                </td>
               </tr>
             ) : (
               d.byType.map((r) => (
                 <tr key={r.type}>
-                  <td className="syn-commune-cell">{d.commune.name}</td>
                   <td>{r.type}</td>
                   <td>{r.count}</td>
                 </tr>
               ))
             )}
             <tr>
-              <td className="syn-commune-cell" colSpan={2}>
+              <td className="syn-commune-cell">
                 <strong>TOTAL</strong>
               </td>
               <td>
@@ -329,15 +439,22 @@ function DocumentsTable() {
           </tbody>
         </table>
       </div>
+      <QuartiersPanel commune={commune} />
     </>
   );
 }
 
 export default function SynopticPage() {
   const { section } = useParams<{ section?: string }>();
+  const officer = getOfficerCommune();
+  const [selected, setSelected] = useState<FlatCommune | null>(() => {
+    const all = listSynopticCommunes();
+    return all.find((c) => c.code === officer.code || c.name === officer.name) ?? null;
+  });
+
   if (!section) return <Navigate to="/synoptique/naissances" replace />;
   const tab = (TABS.some((t) => t.slug === section) ? section : "naissances") as TabSlug;
-  const commune = getOfficerCommune();
+  const commune: CommuneSel = selected ?? officer;
 
   return (
     <div className="syn-page">
@@ -348,11 +465,13 @@ export default function SynopticPage() {
           </p>
           <h2 className="page-title">Tableau synoptique</h2>
           <p className="page-lead">
-            Forme officielle — données limitées à la commune du compte :{" "}
-            <strong>{commune.name}</strong> ({commune.code}).
+            Toutes les communes sont listées. Sélectionnez une commune pour afficher ses statistiques et
+            tous ses quartiers.
           </p>
         </div>
       </div>
+
+      <CommunesPicker selected={selected ?? commune} onSelect={setSelected} />
 
       <div className="syn-tabs no-print">
         {TABS.map((t) => (
@@ -367,10 +486,10 @@ export default function SynopticPage() {
       </div>
 
       <div className="syn-official-wrap">
-        {tab === "naissances" ? <BirthsTable /> : null}
-        {tab === "matrimonial" ? <MatrimonialTable /> : null}
-        {tab === "deces" ? <DeathsTable /> : null}
-        {tab === "documents" ? <DocumentsTable /> : null}
+        {tab === "naissances" ? <BirthsTable commune={commune} /> : null}
+        {tab === "matrimonial" ? <MatrimonialTable commune={commune} /> : null}
+        {tab === "deces" ? <DeathsTable commune={commune} /> : null}
+        {tab === "documents" ? <DocumentsTable commune={commune} /> : null}
       </div>
     </div>
   );

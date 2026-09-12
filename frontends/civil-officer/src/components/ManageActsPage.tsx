@@ -156,6 +156,7 @@ export const MANAGE_CONFIGS: Record<string, ManageConfig> = {
       { key: "sexe", label: "Sexe" },
       { key: "date_naissance", label: "Date" },
       { key: "lieu_naissance", label: "Lieu" },
+      { key: "mode", label: "Mode" },
     ],
   },
 };

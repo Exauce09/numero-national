@@ -1,7 +1,6 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
 import DataToolbar from "../components/DataToolbar";
-import GeoCascade, { GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
 import GpsLocatePanel from "../components/GpsLocatePanel";
 import PersonPicker from "../components/PersonPicker";
 import {
@@ -17,6 +16,14 @@ import {
   type Sexe,
 } from "../registry";
 import { getOfficerCommune } from "../commune";
+import { listFacilityAccounts } from "../healthAuth";
+
+const MODES_NAISSANCE = [
+  { value: "sans_procuration", label: "Sans procuration" },
+  { value: "avec_procuration", label: "Par procuration" },
+  { value: "jugement_suppletif", label: "Par jugement supplétif" },
+  { value: "declaration_tardive", label: "Déclaration tardive" },
+] as const;
 
 export default function BirthsPage() {
   const [nom, setNom] = useState("");
@@ -24,7 +31,11 @@ export default function BirthsPage() {
   const [prenom, setPrenom] = useState("");
   const [sexe, setSexe] = useState<Sexe>("M");
   const [dateNaissance, setDateNaissance] = useState("");
-  const [geoNaissance, setGeoNaissance] = useState<GeoSelection>({});
+  const [lieuNaissance, setLieuNaissance] = useState("");
+  const [modeNaissance, setModeNaissance] = useState<(typeof MODES_NAISSANCE)[number]["value"]>(
+    "sans_procuration",
+  );
+  const [hopitalNaissance, setHopitalNaissance] = useState("");
   const [mother, setMother] = useState<Person | null>(null);
   const [father, setFather] = useState<Person | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +49,7 @@ export default function BirthsPage() {
 
   const acts = listActs("BIRTH");
   const inherited = inheritParentOrigin(father, mother);
+  const hospitals = useMemo(() => listFacilityAccounts().filter((a) => a.active), []);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -51,7 +63,7 @@ export default function BirthsPage() {
       return;
     }
     try {
-      const lieuNaissance = geoNaissance.label || "";
+      const lieu = lieuNaissance.trim();
       const link = inheritParentOrigin(father, mother);
       const child = addPerson({
         nom: nom.trim(),
@@ -59,13 +71,14 @@ export default function BirthsPage() {
         prenom: prenom.trim(),
         sexe,
         date_naissance: dateNaissance,
-        lieu_naissance: lieuNaissance,
+        lieu_naissance: lieu,
         etat_civil: "CELIBATAIRE",
         mother_id: mother.id,
         father_id: father?.id,
         nationalite: personNationalite(father ?? mother),
       });
       const commune = getOfficerCommune();
+      const modeLabel = MODES_NAISSANCE.find((m) => m.value === modeNaissance)?.label ?? modeNaissance;
       const payload = {
         child_id: child.id,
         nom: child.nom,
@@ -74,8 +87,13 @@ export default function BirthsPage() {
         sexe: child.sexe,
         date_naissance: child.date_naissance,
         lieu_naissance: child.lieu_naissance,
-        geo_naissance: geoNaissance,
-        commune_code: geoNaissance.commune_code || commune.code,
+        mode_naissance: modeNaissance,
+        mode: modeLabel,
+        type_naissance: modeLabel,
+        avec_procuration: modeNaissance === "avec_procuration",
+        hopital_naissance: hopitalNaissance.trim() || null,
+        geo_naissance: { label: lieu },
+        commune_code: commune.code,
         mother_id: mother.id,
         mother_name: `${mother.nom} ${mother.prenom}`,
         mother_nic: mother.nic,
@@ -91,7 +109,7 @@ export default function BirthsPage() {
         territoire_origine: link.geo.territoire || null,
         secteur_chefferie_commune: link.geo.secteur || null,
         village_origine: link.geo.village || null,
-        note: "Nouveau-né lié aux informations du père/mère",
+        note: `Nouveau-né — ${modeLabel}`,
         latitude: gpsLat,
         longitude: gpsLng,
         gps_captured_at: gpsLat != null ? new Date().toISOString() : null,
@@ -102,7 +120,9 @@ export default function BirthsPage() {
       setPostnom("");
       setPrenom("");
       setDateNaissance("");
-      setGeoNaissance({});
+      setLieuNaissance("");
+      setModeNaissance("sans_procuration");
+      setHopitalNaissance("");
       setMother(null);
       setFather(null);
       setGpsLat(null);
@@ -131,6 +151,7 @@ export default function BirthsPage() {
     nom: String(a.payload.nom ?? ""),
     sexe: String(a.payload.sexe ?? ""),
     date_naissance: String(a.payload.date_naissance ?? ""),
+    mode: String(a.payload.mode ?? a.payload.mode_naissance ?? ""),
   }));
 
   return (
@@ -144,16 +165,9 @@ export default function BirthsPage() {
         onResolved={(g) => {
           setGpsLat(g.latitude);
           setGpsLng(g.longitude);
-          setGeoNaissance((prev) => ({
-            ...prev,
-            province_name: g.province || prev.province_name,
-            ville_name: g.ville || prev.ville_name,
-            commune_name: g.commune || prev.commune_name,
-            label:
-              g.display_name ||
-              [g.province, g.ville, g.commune].filter(Boolean).join(" · ") ||
-              prev.label,
-          }));
+          if (!lieuNaissance.trim() && g.display_name) {
+            setLieuNaissance(g.display_name);
+          }
         }}
       />
 
@@ -189,21 +203,51 @@ export default function BirthsPage() {
               required
             />
           </div>
+          <div>
+            <label className="form-label">Mode de naissance</label>
+            <select
+              className="form-control"
+              value={modeNaissance}
+              onChange={(e) =>
+                setModeNaissance(e.target.value as (typeof MODES_NAISSANCE)[number]["value"])
+              }
+            >
+              {MODES_NAISSANCE.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="full">
             <label className="form-label">Lieu de naissance</label>
-            <GeoCascade
-              embedded
-              levels={GEO_PRESETS.place}
-              value={geoNaissance}
-              onChange={setGeoNaissance}
-              label="Lieu de naissance"
+            <input
+              className="form-control"
+              value={lieuNaissance}
+              onChange={(e) => setLieuNaissance(e.target.value)}
+              placeholder="Saisie manuelle"
             />
+          </div>
+          <div className="full">
+            <label className="form-label">Hôpital / structure</label>
+            <select
+              className="form-control"
+              value={hopitalNaissance}
+              onChange={(e) => setHopitalNaissance(e.target.value)}
+            >
+              <option value="">— Optionnel —</option>
+              {hospitals.map((h) => (
+                <option key={h.id} value={h.facilityName}>
+                  {h.facilityName}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="full">
             <PersonPicker label="Mère" value={mother} onChange={setMother} required />
           </div>
           <div className="full">
-            <PersonPicker label="Père (optionnel)" value={father} onChange={setFather} />
+            <PersonPicker label="Père (optionnel)" value={father} onChange={setFather} originGeoFilter />
           </div>
           {inherited.source && inherited.parent ? (
             <div className="full success-banner" style={{ margin: 0 }}>
@@ -245,6 +289,7 @@ export default function BirthsPage() {
               <th>Nom</th>
               <th>Sexe</th>
               <th>Naissance</th>
+              <th>Mode</th>
               <th />
             </tr>
           </thead>
@@ -258,6 +303,7 @@ export default function BirthsPage() {
                 </td>
                 <td>{String(a.payload.sexe ?? "")}</td>
                 <td>{String(a.payload.date_naissance ?? "")}</td>
+                <td>{String(a.payload.mode ?? a.payload.mode_naissance ?? "—")}</td>
                 <td>
                   <button
                     type="button"

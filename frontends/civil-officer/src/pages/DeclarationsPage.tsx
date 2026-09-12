@@ -5,9 +5,9 @@ import {
   demoValidateDeclaration,
   type Declaration,
 } from "../api";
-import { addAct, addPerson, getPersonByNic, type Sexe } from "../registry";
+import { addAct, addPerson, getPersonByNic, listActs, type Sexe } from "../registry";
 import { pushNotification } from "../prefs";
-import { setDeclarationStatus } from "../civilDeclarations";
+import { listFacilityDeclarations, setDeclarationStatus } from "../civilDeclarations";
 import {
   HEALTH_DEMO_USER,
   createFacilityAccount,
@@ -26,6 +26,30 @@ const FACILITY_TYPES: { value: FacilityAccount["facilityType"]; label: string }[
   { value: "CS", label: "Centre de santé" },
   { value: "MATERNITE", label: "Maternité" },
 ];
+
+function facilityBirthStats(facility: FacilityAccountPublic): { g: number; f: number; t: number } {
+  const decls = listFacilityDeclarations(facility.id).filter(
+    (d) => d.declaration_type === "BIRTH" && d.status === "PENDING_OFFICER",
+  );
+  const acts = listActs("BIRTH").filter((a) => {
+    const name = String(a.payload.hopital_naissance ?? a.payload.facility_name ?? "");
+    const id = String(a.payload.facility_id ?? "");
+    return id === facility.id || name === facility.facilityName;
+  });
+  let g = 0;
+  let f = 0;
+  for (const d of decls) {
+    const s = String(d.payload.sexe ?? d.payload.child_sexe ?? "").toUpperCase();
+    if (s === "F") f += 1;
+    else g += 1;
+  }
+  for (const a of acts) {
+    const s = String(a.payload.sexe ?? "").toUpperCase();
+    if (s === "F") f += 1;
+    else g += 1;
+  }
+  return { g, f, t: g + f };
+}
 
 const emptyAccountForm = {
   facilityName: "",
@@ -327,10 +351,10 @@ export default function DeclarationsPage() {
 
   return (
     <div>
-      <h2 className="page-title">Déclarations structures sanitaires</h2>
+      <h2 className="page-title">Structures sanitaires</h2>
       <p className="page-lead">
-        File d&apos;attente des naissances et décès notifiés par les hôpitaux / cliniques — à valider pour mise à
-        jour du système. Gérez aussi les comptes administrateurs des structures sanitaires.
+        Créez et gérez les structures sanitaires. Chaque structure affiche les statistiques garçon / fille /
+        total. Validez aussi la file des déclarations naissances et décès.
       </p>
 
       {message ? <div className="success-banner">{message}</div> : null}
@@ -339,19 +363,19 @@ export default function DeclarationsPage() {
       <div className="panel">
         <div className="panel-head">
           <h3 className="panel-title" style={{ margin: 0 }}>
-            Comptes structures sanitaires
+            Structures sanitaires
           </h3>
           <div className="toolbar" style={{ margin: 0 }}>
             <button type="button" className="btn-secondary btn-sm" onClick={refreshAccounts}>
               Actualiser
             </button>
             <button type="button" className="btn-primary btn-sm" onClick={openCreate}>
-              Créer un compte
+              Créer une structure
             </button>
           </div>
         </div>
         <p className="muted small" style={{ marginTop: 0 }}>
-          Modifier, activer, désactiver ou supprimer un compte. Un compte désactivé ne peut plus se connecter
+          Créer, modifier, activer ou désactiver une structure. Un compte désactivé ne peut plus se connecter
           sur <code>/sante/login</code>.
         </p>
         <table className="data-table">
@@ -361,20 +385,24 @@ export default function DeclarationsPage() {
               <th>Type</th>
               <th>Identifiant</th>
               <th>Commune</th>
+              <th>Garçons</th>
+              <th>Filles</th>
+              <th>Total</th>
               <th>Statut</th>
-              <th>Créé</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {accounts.length === 0 ? (
               <tr>
-                <td colSpan={7} className="muted">
-                  Aucun compte.
+                <td colSpan={9} className="muted">
+                  Aucune structure.
                 </td>
               </tr>
             ) : (
-              accounts.map((a) => (
+              accounts.map((a) => {
+                const stats = facilityBirthStats(a);
+                return (
                 <tr key={a.id}>
                   <td>{a.facilityName}</td>
                   <td>{FACILITY_TYPES.find((t) => t.value === a.facilityType)?.label ?? a.facilityType}</td>
@@ -382,12 +410,16 @@ export default function DeclarationsPage() {
                     <code>{a.username}</code>
                   </td>
                   <td>{a.commune_name}</td>
+                  <td>{stats.g}</td>
+                  <td>{stats.f}</td>
+                  <td>
+                    <strong>{stats.t}</strong>
+                  </td>
                   <td>
                     <strong style={{ color: a.active ? "#1a5f4a" : "#8a4b1a" }}>
                       {a.active ? "Actif" : "Désactivé"}
                     </strong>
                   </td>
-                  <td>{new Date(a.created_at).toLocaleString("fr-FR")}</td>
                   <td>
                     <div className="table-actions">
                       <button type="button" className="btn-secondary btn-sm" onClick={() => startEdit(a)}>
@@ -426,7 +458,8 @@ export default function DeclarationsPage() {
                     </div>
                   </td>
                 </tr>
-              ))
+              );
+              })
             )}
           </tbody>
         </table>
@@ -550,7 +583,7 @@ export default function DeclarationsPage() {
           <div className="modal-panel modal-wide" onClick={(e) => e.stopPropagation()}>
             <div className="panel-head">
               <h3 className="panel-title" style={{ margin: 0 }}>
-                {editingId ? "Modifier le compte" : "Créer un compte administrateur"}
+                {editingId ? "Modifier la structure" : "Créer une structure sanitaire"}
               </h3>
               <button type="button" className="btn-secondary btn-sm" onClick={closeForm}>
                 Fermer

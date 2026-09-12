@@ -1,9 +1,11 @@
 import { FormEvent, useEffect, useState } from "react";
-import GeoCascade, { GEO_PRESETS, type GeoSelection } from "./GeoCascade";
+import GeoCascade, { GEO_PRESETS, ORIGIN_FIELD_LABELS, type GeoSelection } from "./GeoCascade";
 import {
   ETAT_CIVIL_OPTIONS,
   addPerson,
   displayName,
+  listPersons,
+  personOrigin,
   type EtatCivil,
   type Person,
   type Sexe,
@@ -16,6 +18,13 @@ type Props = {
   onChange: (person: Person | null) => void;
   required?: boolean;
   allowClear?: boolean;
+  /** Masque le bouton Ajouter (ex. un seul bouton partagé en bas de section). */
+  hideAdd?: boolean;
+  /** Force l'ouverture du modal d'ajout (contrôlé par le parent). */
+  forceAddOpen?: boolean;
+  onForceAddConsumed?: () => void;
+  /** Filtre recherche père : province → territoire → secteur → village. */
+  originGeoFilter?: boolean;
 };
 
 const emptyForm = {
@@ -27,36 +36,83 @@ const emptyForm = {
   etat_civil: "CELIBATAIRE" as EtatCivil,
 };
 
+function matchesOriginFilter(person: Person, geo: GeoSelection): boolean {
+  const hasFilter = Boolean(
+    geo.province_name || geo.district_name || geo.commune_name || geo.localite_name || geo.ville_name,
+  );
+  if (!hasFilter) return true;
+  const origin = personOrigin(person);
+  const norm = (s: string) => s.trim().toLowerCase();
+  if (geo.province_name && !norm(origin.province).includes(norm(geo.province_name))) return false;
+  if (geo.ville_name && origin.ville && !norm(origin.ville).includes(norm(geo.ville_name))) return false;
+  if (geo.district_name && !norm(origin.territoire).includes(norm(geo.district_name))) return false;
+  if (geo.commune_name && !norm(origin.secteur || origin.commune).includes(norm(geo.commune_name))) {
+    return false;
+  }
+  if (geo.localite_name && !norm(origin.village).includes(norm(geo.localite_name))) return false;
+  return true;
+}
+
 export default function PersonPicker({
   label,
   value,
   onChange,
   required,
   allowClear = true,
+  hideAdd = false,
+  forceAddOpen = false,
+  onForceAddConsumed,
+  originGeoFilter = false,
 }: Props) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
-  const [geoNaissance, setGeoNaissance] = useState<GeoSelection>({});
+  const [lieuNaissance, setLieuNaissance] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<Person[]>([]);
   const [searching, setSearching] = useState(false);
+  const [geoFilter, setGeoFilter] = useState<GeoSelection>({});
+
+  useEffect(() => {
+    if (forceAddOpen) {
+      setModal(true);
+      onForceAddConsumed?.();
+    }
+  }, [forceAddOpen, onForceAddConsumed]);
 
   useEffect(() => {
     if (!open || value) return;
     const q = query.trim();
-    if (q.length < 1) {
+    const hasGeo = Boolean(
+      geoFilter.province_name ||
+        geoFilter.district_name ||
+        geoFilter.commune_name ||
+        geoFilter.localite_name,
+    );
+    if (q.length < 1 && !(originGeoFilter && hasGeo)) {
       setResults([]);
       return;
     }
     let cancelled = false;
     const timer = window.setTimeout(() => {
       setSearching(true);
+      const apply = (hits: Person[]) => {
+        if (cancelled) return;
+        setResults(
+          (originGeoFilter ? hits.filter((p) => matchesOriginFilter(p, geoFilter)) : hits).slice(
+            0,
+            20,
+          ),
+        );
+      };
+      if (q.length < 1 && originGeoFilter && hasGeo) {
+        apply(listPersons());
+        setSearching(false);
+        return;
+      }
       void searchEveryone(q)
-        .then((hits) => {
-          if (!cancelled) setResults(hits);
-        })
+        .then(apply)
         .finally(() => {
           if (!cancelled) setSearching(false);
         });
@@ -65,7 +121,7 @@ export default function PersonPicker({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [query, open, value]);
+  }, [query, open, value, originGeoFilter, geoFilter]);
 
   function select(person: Person) {
     onChange(person);
@@ -87,12 +143,12 @@ export default function PersonPicker({
         prenom: form.prenom.trim(),
         sexe: form.sexe,
         date_naissance: form.date_naissance,
-        lieu_naissance: geoNaissance.label || "",
+        lieu_naissance: lieuNaissance.trim(),
         etat_civil: form.etat_civil,
       });
       onChange(person);
       setForm(emptyForm);
-      setGeoNaissance({});
+      setLieuNaissance("");
       setModal(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ajout impossible.");
@@ -105,6 +161,21 @@ export default function PersonPicker({
         {label}
         {required ? " *" : ""}
       </label>
+      {originGeoFilter && !value ? (
+        <div style={{ marginBottom: "0.65rem" }}>
+          <GeoCascade
+            embedded
+            label="Filtrer par origine (province → territoire → secteur → village)"
+            levels={GEO_PRESETS.origin}
+            fieldLabels={ORIGIN_FIELD_LABELS}
+            value={geoFilter}
+            onChange={(g) => {
+              setGeoFilter(g);
+              setOpen(true);
+            }}
+          />
+        </div>
+      ) : null}
       {value ? (
         <div className="person-picker-selected">
           <div>
@@ -121,7 +192,11 @@ export default function PersonPicker({
         <div className="person-picker-controls">
           <input
             className="form-control"
-            placeholder="Recherche nationale (nom, post-nom, prénom, NIC)…"
+            placeholder={
+              originGeoFilter
+                ? "Recherche père (nom, NIC…) — filtre géo ci-dessus…"
+                : "Recherche nationale (nom, post-nom, prénom, NIC)…"
+            }
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -129,30 +204,45 @@ export default function PersonPicker({
             }}
             onFocus={() => setOpen(true)}
           />
-          <button type="button" className="btn-add" onClick={() => setModal(true)}>
-            Ajouter
-          </button>
+          {!hideAdd ? (
+            <button type="button" className="btn-add" onClick={() => setModal(true)}>
+              Ajouter
+            </button>
+          ) : null}
         </div>
       )}
       {open && !value ? (
         <ul className="person-picker-list">
-          {query.trim().length < 1 ? (
+          {query.trim().length < 1 && !originGeoFilter ? (
             <li className="muted">Tapez pour chercher dans le registre national…</li>
           ) : searching ? (
             <li className="muted">Recherche nationale…</li>
           ) : results.length === 0 ? (
             <li className="muted">Aucun résultat — vous pouvez « Ajouter ».</li>
           ) : (
-            results.map((p) => (
-              <li key={p.id}>
-                <button type="button" onClick={() => select(p)}>
-                  <strong>{displayName(p)}</strong>
-                  <span className="muted small">
-                    {[p.nic, p.sexe, p.date_naissance, p.lieu_naissance].filter(Boolean).join(" · ")}
-                  </span>
-                </button>
-              </li>
-            ))
+            results.map((p) => {
+              const o = personOrigin(p);
+              return (
+                <li key={p.id}>
+                  <button type="button" onClick={() => select(p)}>
+                    <strong>{displayName(p)}</strong>
+                    <span className="muted small">
+                      {[
+                        p.nic,
+                        p.sexe,
+                        p.date_naissance,
+                        o.province,
+                        o.territoire,
+                        o.secteur || o.commune,
+                        o.village,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  </button>
+                </li>
+              );
+            })
           )}
         </ul>
       ) : null}
@@ -221,11 +311,12 @@ export default function PersonPicker({
                 </select>
               </div>
               <div className="full">
-                <GeoCascade
-                  {...GEO_PRESETS.place}
-                  value={geoNaissance}
-                  onChange={setGeoNaissance}
-                  label="Lieu de naissance"
+                <label className="form-label">Lieu de naissance</label>
+                <input
+                  className="form-control"
+                  value={lieuNaissance}
+                  onChange={(e) => setLieuNaissance(e.target.value)}
+                  placeholder="Saisie manuelle"
                 />
               </div>
               {error ? <p className="warn-inline full">{error}</p> : null}

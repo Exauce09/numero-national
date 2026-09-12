@@ -719,6 +719,31 @@
   gap: 0.65rem;
 }
 
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin: 0.35rem 0;
+}
+
+.nav-group-label {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0.85rem 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--egouv-muted, #64748b);
+  opacity: 0.95;
+}
+
+.nav-group a {
+  padding-left: 2.35rem !important;
+  font-size: 0.9rem;
+}
+
 .topbar-commune {
   display: block;
   font-size: 0.72rem;

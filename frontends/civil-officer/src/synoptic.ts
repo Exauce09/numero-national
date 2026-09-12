@@ -1,6 +1,7 @@
-/** Agrégats tableau synoptique — commune de l'officier uniquement. */
+/** Agrégats tableau synoptique — toutes communes + détail quartiers. */
 
-import { actBelongsToOfficerCommune, getOfficerCommune } from "./commune";
+import { actBelongsToOfficerCommune, getOfficerCommune, type OfficerCommune } from "./commune";
+import { listAllCommunesFlat, listQuartierNamesForCommune, type FlatCommune } from "./geoFallback";
 import {
   ageYears,
   getPerson,
@@ -26,7 +27,7 @@ function addGft(target: Gft, sexe: string) {
 }
 
 function birthMode(payload: Record<string, unknown>): "sans" | "avec" | "jugement" {
-  const blob = `${payload.note ?? ""} ${payload.mode ?? ""} ${payload.type_naissance ?? ""}`.toLowerCase();
+  const blob = `${payload.note ?? ""} ${payload.mode ?? ""} ${payload.mode_naissance ?? ""} ${payload.type_naissance ?? ""}`.toLowerCase();
   if (blob.includes("jugement") || blob.includes("supplétif") || blob.includes("suppletif")) return "jugement";
   if (blob.includes("procuration") || payload.avec_procuration === true) return "avec";
   return "sans";
@@ -47,9 +48,26 @@ function birthNat(act: Act): Nationalite {
   return p ? personNationalite(p) : "CONGOLAIS";
 }
 
-export function synopticBirths() {
-  const commune = getOfficerCommune();
-  const acts = listActs("BIRTH").filter((a) => actBelongsToOfficerCommune(a.payload, commune));
+function toOfficerCommune(c: FlatCommune | OfficerCommune): OfficerCommune {
+  return {
+    code: c.code,
+    name: c.name,
+    ville: c.ville,
+    province: c.province,
+  };
+}
+
+export function listSynopticCommunes(): FlatCommune[] {
+  return listAllCommunesFlat();
+}
+
+function actsForCommune(type: Act["type"], commune: OfficerCommune): Act[] {
+  return listActs(type).filter((a) => actBelongsToOfficerCommune(a.payload, commune));
+}
+
+export function synopticBirths(communeOverride?: OfficerCommune | FlatCommune | null) {
+  const commune = communeOverride ? toOfficerCommune(communeOverride) : getOfficerCommune();
+  const acts = actsForCommune("BIRTH", commune);
 
   const cong = { sans: emptyGft(), avec: emptyGft(), jugement: emptyGft() };
   const etr = { sans: emptyGft(), avec: emptyGft(), jugement: emptyGft() };
@@ -80,6 +98,39 @@ export function synopticBirths() {
   };
 }
 
+function extractQuartier(payload: Record<string, unknown>): string {
+  const nested = (payload.geo_actuelle ?? payload.geo_naissance ?? {}) as Record<string, unknown>;
+  return String(
+    payload.quartier_actuel ?? payload.quartier ?? nested.quartier_name ?? "",
+  ).trim();
+}
+
+/** Quartiers d'une commune sélectionnée (référentiel + stats G/F/T). */
+export function synopticQuartiersForCommune(commune: OfficerCommune | FlatCommune) {
+  const c = toOfficerCommune(commune);
+  const flat = listAllCommunesFlat().find(
+    (x) => x.code === c.code || (x.name === c.name && x.ville === c.ville),
+  );
+  const names = listQuartierNamesForCommune(flat?.id);
+  const acts = actsForCommune("BIRTH", c);
+  const census = listActs("CENSUS").filter((a) => actBelongsToOfficerCommune(a.payload, c));
+
+  const map = new Map<string, Gft>();
+  for (const name of names) map.set(name, emptyGft());
+
+  for (const act of [...acts, ...census]) {
+    const q = extractQuartier(act.payload) || "Non précisé";
+    if (!map.has(q)) map.set(q, emptyGft());
+    addGft(map.get(q)!, birthSexe(act));
+  }
+
+  const rows = [...map.entries()]
+    .map(([quartier, stats]) => ({ quartier, ...stats }))
+    .sort((a, b) => a.quartier.localeCompare(b.quartier, "fr"));
+
+  return { commune: c, rows, total: rows.reduce((acc, r) => acc + r.t, 0) };
+}
+
 function resolvePersonNat(id: unknown, name: unknown): Nationalite {
   if (typeof id === "string") {
     const byId = getPerson(id);
@@ -94,10 +145,10 @@ function resolvePersonNat(id: unknown, name: unknown): Nationalite {
   return hit ? personNationalite(hit) : "CONGOLAIS";
 }
 
-export function synopticMarriagesDivorces() {
-  const commune = getOfficerCommune();
-  const marriages = listActs("MARRIAGE").filter((a) => actBelongsToOfficerCommune(a.payload, commune));
-  const divorces = listActs("DIVORCE").filter((a) => actBelongsToOfficerCommune(a.payload, commune));
+export function synopticMarriagesDivorces(communeOverride?: OfficerCommune | FlatCommune | null) {
+  const commune = communeOverride ? toOfficerCommune(communeOverride) : getOfficerCommune();
+  const marriages = actsForCommune("MARRIAGE", commune);
+  const divorces = actsForCommune("DIVORCE", commune);
 
   function classify(acts: Act[]) {
     let nationaux = 0;
@@ -120,9 +171,9 @@ export function synopticMarriagesDivorces() {
   };
 }
 
-export function synopticDeaths() {
-  const commune = getOfficerCommune();
-  const acts = listActs("DEATH").filter((a) => actBelongsToOfficerCommune(a.payload, commune));
+export function synopticDeaths(communeOverride?: OfficerCommune | FlatCommune | null) {
+  const commune = communeOverride ? toOfficerCommune(communeOverride) : getOfficerCommune();
+  const acts = actsForCommune("DEATH", commune);
 
   let hommes = 0;
   let femmes = 0;
@@ -174,9 +225,9 @@ export function synopticDeaths() {
   };
 }
 
-export function synopticDocuments() {
-  const commune = getOfficerCommune();
-  const acts = listActs("DOCUMENT").filter((a) => actBelongsToOfficerCommune(a.payload, commune));
+export function synopticDocuments(communeOverride?: OfficerCommune | FlatCommune | null) {
+  const commune = communeOverride ? toOfficerCommune(communeOverride) : getOfficerCommune();
+  const acts = actsForCommune("DOCUMENT", commune);
   const byType = new Map<string, number>();
   for (const act of acts) {
     const t = String(act.payload.type_document ?? act.payload.nom_document ?? "Autre");

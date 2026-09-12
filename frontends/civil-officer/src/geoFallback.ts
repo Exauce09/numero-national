@@ -302,6 +302,38 @@ export function fallbackVoies(quartierIdValue: string): GeoItem[] {
   }));
 }
 
+export type FlatCommune = {
+  id: string;
+  code: string;
+  name: string;
+  ville: string;
+  province: string;
+};
+
+/** Toutes les communes du référentiel offline (synoptique multi-commune). */
+export function listAllCommunesFlat(): FlatCommune[] {
+  const out: FlatCommune[] = [];
+  for (const [provName, villes] of Object.entries(CITY_COMMUNES)) {
+    for (const [villeName, communes] of Object.entries(villes)) {
+      for (const name of communes) {
+        const id = communeId(villeName, name);
+        out.push({
+          id,
+          code: `${slug(villeName).toUpperCase().slice(0, 6)}-${slug(name).toUpperCase().slice(0, 10)}`,
+          name,
+          ville: villeName,
+          province: provName,
+        });
+      }
+    }
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name, "fr"));
+}
+
+export function listQuartierNamesForCommune(communeIdValue?: string): string[] {
+  return fallbackQuartiers(communeIdValue || "com-generic").map((q) => q.name);
+}
+
 /** Resolve offline items for a /geo/* path used by GeoCascade. */
 export function fallbackForGeoPath(path: string): GeoItem[] {
   const [pathname, qs = ""] = path.split("?");
