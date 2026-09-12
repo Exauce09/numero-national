@@ -158,10 +158,10 @@ export default function HealthBirthsPage() {
             />
           </div>
           <div className="full">
-            <PersonPicker label="Nom de la mère" value={mother} onChange={setMother} required />
+            <PersonPicker label="Nom de la mère" value={mother} onChange={setMother} required sexFilter="F" />
           </div>
           <div className="full">
-            <PersonPicker label="Nom du père" value={father} onChange={setFather} />
+            <PersonPicker label="Nom du père" value={father} onChange={setFather} sexFilter="M" />
           </div>
           <div className="full">
             <button className="btn-primary" type="submit" style={{ width: "auto", minWidth: 280 }}>

@@ -2,12 +2,13 @@ import { FormEvent, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
 import GeoCascade, { ADDRESS_FIELD_LABELS, GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
 import GpsLocatePanel, { applyGpsToGeo } from "../components/GpsLocatePanel";
+import OfficerSessionField from "../components/OfficerSessionField";
 import PersonPicker from "../components/PersonPicker";
 import { addAct, displayName, type Act, type Person } from "../registry";
+import { getLoggedOfficer } from "../officerContext";
 
 export default function DisplacementsPage() {
   const [personne, setPersonne] = useState<Person | null>(null);
-  const [officier, setOfficier] = useState<Person | null>(null);
   const [geo, setGeo] = useState<GeoSelection>({});
   const [motif, setMotif] = useState("");
   const [dateDeplacement, setDateDeplacement] = useState("");
@@ -23,6 +24,7 @@ export default function DisplacementsPage() {
       return;
     }
     try {
+      const officer = getLoggedOfficer();
       const payload = {
         person_id: personne.id,
         person_name: displayName(personne),
@@ -32,8 +34,9 @@ export default function DisplacementsPage() {
         motif,
         date_deplacement: dateDeplacement,
         date_retour: dateRetour,
-        officier_id: officier?.id ?? null,
-        officier_name: officier ? displayName(officier) : null,
+        officier_id: officer?.userId ?? officer?.username ?? null,
+        officier_name: officer?.displayName ?? null,
+        officier_username: officer?.username ?? null,
       };
       const act = await addAct("DISPLACEMENT", payload, personne.nic);
       setCreated(act);
@@ -68,8 +71,13 @@ export default function DisplacementsPage() {
             />
           </div>
           <div>
-            <label className="form-label">Motif</label>
-            <input className="form-control" value={motif} onChange={(e) => setMotif(e.target.value)} />
+            <label className="form-label">Motif du déplacement</label>
+            <input
+              className="form-control"
+              value={motif}
+              onChange={(e) => setMotif(e.target.value)}
+              placeholder="Ex. travail, famille, études…"
+            />
           </div>
           <div>
             <label className="form-label">Date de déplacement</label>
@@ -91,13 +99,7 @@ export default function DisplacementsPage() {
             />
           </div>
           <div className="full">
-            <PersonPicker
-              label="Officier (N° état civil)"
-              value={officier}
-              onChange={setOfficier}
-              nicSearchHint
-              hideAdd
-            />
+            <OfficerSessionField />
           </div>
           <div className="full">
             <button className="btn-primary" style={{ width: "auto", minWidth: 180 }} type="submit">

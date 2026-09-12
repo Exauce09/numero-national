@@ -322,7 +322,7 @@ export default function PersonPicker({
                     </select>
                     {sexFilter ? (
                       <div className="muted small" style={{ marginTop: 4 }}>
-                        Verrouillé ({sexFilter === "F" ? "mère" : "père"}).
+                        Verrouillé ({sexFilter === "F" ? "féminin" : "masculin"}).
                       </div>
                     ) : null}
                   </div>

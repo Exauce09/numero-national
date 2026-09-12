@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
+import OfficerSessionField from "../components/OfficerSessionField";
 import PersonPicker from "../components/PersonPicker";
 import {
   addAct,
@@ -10,13 +11,13 @@ import {
   type Act,
   type Person,
 } from "../registry";
+import { getLoggedOfficer } from "../officerContext";
 
 export default function DivorcesPage() {
   const [epoux, setEpoux] = useState<Person | null>(null);
   const [epouse, setEpouse] = useState<Person | null>(null);
   const [numeroMariage, setNumeroMariage] = useState("");
   const [cause, setCause] = useState("");
-  const [officier, setOfficier] = useState<Person | null>(null);
   const [temoin1, setTemoin1] = useState<Person | null>(null);
   const [temoin2, setTemoin2] = useState<Person | null>(null);
   const [dateDivorce, setDateDivorce] = useState("");
@@ -41,6 +42,7 @@ export default function DivorcesPage() {
       return;
     }
     try {
+      const officer = getLoggedOfficer();
       const payload = {
         epoux_id: epoux.id,
         epoux_name: displayName(epoux),
@@ -48,8 +50,9 @@ export default function DivorcesPage() {
         epouse_name: displayName(epouse),
         numero_mariage: numeroMariage,
         cause,
-        officier_id: officier?.id ?? null,
-        officier_name: officier ? displayName(officier) : null,
+        officier_id: officer?.userId ?? officer?.username ?? null,
+        officier_name: officer?.displayName ?? null,
+        officier_username: officer?.username ?? null,
         temoin1_id: temoin1?.id ?? null,
         temoin1_name: temoin1 ? displayName(temoin1) : null,
         temoin2_id: temoin2?.id ?? null,
@@ -75,10 +78,10 @@ export default function DivorcesPage() {
         <form className="form-grid" onSubmit={onSubmit}>
           {error ? <div className="login-error full">{error}</div> : null}
           <div className="full">
-            <PersonPicker label="Époux" value={epoux} onChange={setEpoux} required />
+            <PersonPicker label="Époux" value={epoux} onChange={setEpoux} required sexFilter="M" />
           </div>
           <div className="full">
-            <PersonPicker label="Épouse" value={epouse} onChange={setEpouse} required />
+            <PersonPicker label="Épouse" value={epouse} onChange={setEpouse} required sexFilter="F" />
           </div>
           <div>
             <label className="form-label">Numéro mariage</label>
@@ -99,13 +102,7 @@ export default function DivorcesPage() {
             <input className="form-control" value={cause} onChange={(e) => setCause(e.target.value)} />
           </div>
           <div className="full">
-            <PersonPicker
-              label="Officier (N° état civil)"
-              value={officier}
-              onChange={setOfficier}
-              nicSearchHint
-              hideAdd
-            />
+            <OfficerSessionField />
           </div>
           <div className="full">
             <PersonPicker label="Témoin 1" value={temoin1} onChange={setTemoin1} />

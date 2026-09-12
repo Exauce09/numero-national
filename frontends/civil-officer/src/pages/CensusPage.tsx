@@ -1104,6 +1104,7 @@ export default function CensusPage() {
                           ? getPerson(situationFamiliale.conjoint.person_id) ?? null
                           : null
                       }
+                      sexFilter={sexe === "M" ? "F" : "M"}
                       onChange={(p) =>
                         setSituationFamiliale((prev) => ({
                           ...prev,

@@ -1,16 +1,15 @@
 import { FormEvent, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
-import GeoCascade, { GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
-import GpsLocatePanel, { applyGpsToGeo } from "../components/GpsLocatePanel";
+import OfficerSessionField from "../components/OfficerSessionField";
+import OfficerTerritoryField from "../components/OfficerTerritoryField";
 import PersonPicker from "../components/PersonPicker";
 import { addAct, displayName, type Act, type Person } from "../registry";
+import { geoFromOfficer, getLoggedOfficer } from "../officerContext";
 
 export default function AdoptionsPage() {
   const [tuteur, setTuteur] = useState<Person | null>(null);
   const [enfant, setEnfant] = useState<Person | null>(null);
-  const [officier, setOfficier] = useState<Person | null>(null);
   const [motif, setMotif] = useState("");
-  const [geo, setGeo] = useState<GeoSelection>({});
   const [dateAdoption, setDateAdoption] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Act | null>(null);
@@ -23,14 +22,17 @@ export default function AdoptionsPage() {
       return;
     }
     try {
+      const officer = getLoggedOfficer();
+      const geo = geoFromOfficer();
       const payload = {
         tuteur_id: tuteur.id,
         tuteur_name: displayName(tuteur),
         enfant_id: enfant.id,
         enfant_name: displayName(enfant),
-        motif,
-        officier_id: officier?.id ?? null,
-        officier_name: officier ? displayName(officier) : null,
+        motif: motif.trim() || null,
+        officier_id: officer?.userId ?? officer?.username ?? null,
+        officier_name: officer?.displayName ?? null,
+        officier_username: officer?.username ?? null,
         lieu_adoption: geo.label || "",
         geo,
         commune_code: geo.commune_code ?? null,
@@ -47,7 +49,6 @@ export default function AdoptionsPage() {
     <div>
       <h2 className="page-title">Adoption</h2>
       <p className="page-lead">Enregistrement d&apos;un acte d&apos;adoption.</p>
-      <GpsLocatePanel title="GPS — lieu d’adoption" onResolved={(g) => setGeo((prev) => applyGpsToGeo(prev, g))} />
 
       <div className="panel">
         <form className="form-grid" onSubmit={onSubmit}>
@@ -59,26 +60,19 @@ export default function AdoptionsPage() {
             <PersonPicker label="Enfant" value={enfant} onChange={setEnfant} required />
           </div>
           <div className="full">
-            <label className="form-label">Motif</label>
-            <input className="form-control" value={motif} onChange={(e) => setMotif(e.target.value)} />
-          </div>
-          <div className="full">
-            <PersonPicker
-              label="Officier (N° état civil)"
-              value={officier}
-              onChange={setOfficier}
-              nicSearchHint
-              hideAdd
+            <label className="form-label">Remarque / motif (optionnel)</label>
+            <input
+              className="form-control"
+              value={motif}
+              onChange={(e) => setMotif(e.target.value)}
+              placeholder="Ex. jugement d'adoption, mention libre…"
             />
           </div>
           <div className="full">
-            <GeoCascade
-              embedded
-              levels={GEO_PRESETS.place}
-              value={geo}
-              onChange={setGeo}
-              label="Lieu d'adoption"
-            />
+            <OfficerSessionField />
+          </div>
+          <div className="full">
+            <OfficerTerritoryField label="Lieu d'adoption (bureau de l'agent)" />
           </div>
           <div>
             <label className="form-label">Date</label>

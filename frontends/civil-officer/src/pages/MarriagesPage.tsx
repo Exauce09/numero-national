@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
-import GeoCascade, { GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
-import GpsLocatePanel, { applyGpsToGeo } from "../components/GpsLocatePanel";
+import OfficerSessionField from "../components/OfficerSessionField";
+import OfficerTerritoryField from "../components/OfficerTerritoryField";
 import PersonPicker from "../components/PersonPicker";
 import {
   addAct,
@@ -12,6 +12,7 @@ import {
   type Act,
   type Person,
 } from "../registry";
+import { geoFromOfficer, getLoggedOfficer } from "../officerContext";
 
 type Regime = "COMMUNAUTE" | "SEPARATION" | "DOT";
 
@@ -24,8 +25,6 @@ export default function MarriagesPage() {
   const [receveurDote, setReceveurDote] = useState<Person | null>(null);
   const [temoin1, setTemoin1] = useState<Person | null>(null);
   const [temoin2, setTemoin2] = useState<Person | null>(null);
-  const [officier, setOfficier] = useState<Person | null>(null);
-  const [geo, setGeo] = useState<GeoSelection>({});
   const [motif, setMotif] = useState("");
   const [dateMariage, setDateMariage] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -47,11 +46,19 @@ export default function MarriagesPage() {
       return;
     }
     if (!ALLOWED_ETAT.has(conjoint.etat_civil) || !ALLOWED_ETAT.has(conjointe.etat_civil)) {
-      setError("État civil invalide : célibataire, divorcé(e) ou veuf/veuve uniquement.");
+      const bad = [conjoint, conjointe]
+        .filter((p) => !ALLOWED_ETAT.has(p.etat_civil))
+        .map((p) => `${displayName(p)} (${p.etat_civil})`)
+        .join(", ");
+      setError(
+        `Impossible de marier une personne déjà mariée ou au statut incompatible. Statut requis : célibataire, divorcé(e) ou veuf/veuve. Problème : ${bad}.`,
+      );
       return;
     }
 
     try {
+      const officer = getLoggedOfficer();
+      const geo = geoFromOfficer();
       const payload = {
         epoux_id: conjoint.id,
         epoux_name: displayName(conjoint),
@@ -64,12 +71,14 @@ export default function MarriagesPage() {
         temoin1_name: temoin1 ? displayName(temoin1) : null,
         temoin2_id: temoin2?.id ?? null,
         temoin2_name: temoin2 ? displayName(temoin2) : null,
-        officier_id: officier?.id ?? null,
-        officier_name: officier ? displayName(officier) : null,
+        officier_id: officer?.userId ?? officer?.username ?? null,
+        officier_name: officer?.displayName ?? null,
+        officier_username: officer?.username ?? null,
         lieu_etat_civil: geo.label || "",
         geo,
         commune_code: geo.commune_code ?? null,
-        motif,
+        motif: motif.trim() || null,
+        remarque: motif.trim() || null,
         date_mariage: dateMariage,
       };
       const act = await addAct("MARRIAGE", payload, conjoint.nic);
@@ -86,16 +95,27 @@ export default function MarriagesPage() {
     <div>
       <h2 className="page-title">Mariages</h2>
       <p className="page-lead">Célébration et enregistrement d&apos;un mariage civil.</p>
-      <GpsLocatePanel title="GPS — lieu d’état civil" onResolved={(g) => setGeo((prev) => applyGpsToGeo(prev, g))} />
 
       <div className="panel">
         <form className="form-grid" onSubmit={onSubmit}>
           {error ? <div className="login-error full">{error}</div> : null}
           <div className="full">
-            <PersonPicker label="Conjoint (époux)" value={conjoint} onChange={setConjoint} required />
+            <PersonPicker
+              label="Conjoint (époux)"
+              value={conjoint}
+              onChange={setConjoint}
+              required
+              sexFilter="M"
+            />
           </div>
           <div className="full">
-            <PersonPicker label="Conjointe (épouse)" value={conjointe} onChange={setConjointe} required />
+            <PersonPicker
+              label="Conjointe (épouse)"
+              value={conjointe}
+              onChange={setConjointe}
+              required
+              sexFilter="F"
+            />
           </div>
           <div>
             <label className="form-label">Régime matrimonial</label>
@@ -129,26 +149,22 @@ export default function MarriagesPage() {
             <PersonPicker label="Témoin 2" value={temoin2} onChange={setTemoin2} />
           </div>
           <div className="full">
-            <PersonPicker
-              label="Officier (N° état civil)"
-              value={officier}
-              onChange={setOfficier}
-              nicSearchHint
-              hideAdd
-            />
+            <OfficerSessionField />
           </div>
           <div className="full">
-            <GeoCascade
-              embedded
-              levels={GEO_PRESETS.place}
-              value={geo}
-              onChange={setGeo}
-              label="Lieu état civil"
-            />
+            <OfficerTerritoryField label="Lieu d'état civil (bureau de l'agent)" />
           </div>
-          <div>
-            <label className="form-label">Motif</label>
-            <input className="form-control" value={motif} onChange={(e) => setMotif(e.target.value)} />
+          <div className="full">
+            <label className="form-label">Remarque / motif (optionnel)</label>
+            <input
+              className="form-control"
+              value={motif}
+              onChange={(e) => setMotif(e.target.value)}
+              placeholder="Ex. mariage avec dispense, mention libre…"
+            />
+            <div className="muted small" style={{ marginTop: 4 }}>
+              Note libre sur l&apos;acte (pas une obligation légale). Laissez vide si rien à préciser.
+            </div>
           </div>
           <div className="full">
             <button className="btn-primary" style={{ width: "auto", minWidth: 180 }} type="submit">
