@@ -378,10 +378,10 @@ export default function PersonDetailPage() {
                       mariage n&apos;est listé ici.
                     </p>
                     <p className="muted small">
-                      Cause fréquente : recensement avec statut « Marié » sans passer par{" "}
-                      <Link to="/marriages">Actes → Mariages → + Ajouter</Link>, ou session API
-                      expirée au moment de l&apos;enregistrement. Enregistrez l&apos;acte de mariage
-                      pour le voir dans « Gérer les mariages ».
+                      Vous pouvez recensér d&apos;abord (statut Marié) <strong>ou</strong> créer
+                      l&apos;acte ensuite — l&apos;ordre est libre. Pour voir l&apos;acte dans « Gérer
+                      les mariages », enregistrez-le via{" "}
+                      <Link to="/marriages">Actes → Mariages → Enregistrer</Link> (époux + épouse).
                     </p>
                   </div>
                 ) : (

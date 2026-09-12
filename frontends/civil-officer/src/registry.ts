@@ -713,9 +713,8 @@ async function tryPostCivil(
     "ADOPTION",
     "RECOGNITION",
     "RECTIFICATION",
-    "CENSUS",
   ];
-  // Types hors état civil authentique : pas d'écriture API (source de vérité locale uniquement).
+  // CENSUS / DISPLACEMENT / DOCUMENT : pas d'écriture via /civil/* (modules dédiés).
   if (!core.includes(type)) return null;
   const res = await fetch(`${API_BASE}/civil/${ACT_ENDPOINT[type]}`, {
     method: "POST",
@@ -779,7 +778,6 @@ export async function addAct(
     "ADOPTION",
     "RECOGNITION",
     "RECTIFICATION",
-    "CENSUS",
   ];
   try {
     const server = await tryPostCivil(type, {

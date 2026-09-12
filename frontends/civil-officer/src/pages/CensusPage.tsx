@@ -36,6 +36,7 @@ import GpsLocatePanel from "../components/GpsLocatePanel";
 import { captureGpsOnSave, captureGpsWithAddress, type ReverseGeo } from "../gpsCapture";
 import { captureZkFingerprint, fingerprintDisplayCode } from "../zkBridge";
 import { pushCensusToOnip } from "../onipSync";
+import { enrollCapturedFingers, type CapturedFinger } from "../biometricEnrollFromCensus";
 import {
   emptySituationFamiliale,
   formatSituationFamiliale,
@@ -183,6 +184,7 @@ export default function CensusPage() {
   const [empreintePouceDroit, setEmpreintePouceDroit] = useState("");
   const [empreinteIndexDroit, setEmpreinteIndexDroit] = useState("");
   const [empreinteIndexGauche, setEmpreinteIndexGauche] = useState("");
+  const [fpTemplates, setFpTemplates] = useState<Partial<Record<CapturedFinger["position"], CapturedFinger>>>({});
   const [fpNotice, setFpNotice] = useState<string | null>(null);
   const [iris, setIris] = useState("");
   const [etudes, setEtudes] = useState<EtudesData>(emptyEtudes);
@@ -457,17 +459,26 @@ export default function CensusPage() {
     setError(null);
     setFpNotice(`Capture ZK9500 — posez le doigt ${n} sur le lecteur…`);
     try {
-      const fingerPos =
-        n === 1 ? "RIGHT_THUMB" : n === 2 ? "RIGHT_INDEX" : "LEFT_INDEX";
-      const cap = await captureZkFingerprint(fingerPos);
+      const position: CapturedFinger["position"] =
+        n === 1 ? "POUCE_DROIT" : n === 2 ? "INDEX_DROIT" : "INDEX_GAUCHE";
+      const cap = await captureZkFingerprint(position);
       const code = fingerprintDisplayCode(cap, n);
       setter(code);
       also?.(code);
+      setFpTemplates((prev) => ({
+        ...prev,
+        [position]: {
+          position,
+          template_b64: cap.template_b64,
+          quality_score: cap.quality_score,
+          device: cap.device,
+        },
+      }));
       const next1 = n === 1 ? code : empreintePouceDroit;
       const next2 = n === 2 ? code : empreinteIndexDroit;
       const next3 = n === 3 ? code : empreinteIndexGauche;
       if (next1 && next2 && next3) {
-        setFpNotice(`Les trois doigts sont enregistrés (${cap.device}).`);
+        setFpNotice(`Les trois doigts sont enregistrés (${cap.device}) — prêts pour la recherche 1:N.`);
       } else {
         setFpNotice(`Doigt ${n} capturé sur ${cap.device} (qualité ${cap.quality_score}).`);
       }
@@ -757,13 +768,25 @@ export default function CensusPage() {
         communeCode: String(payload.commune_code ?? commune.code),
         censusActId: act.id,
       });
+      let bioMsg = "";
+      if (onip.citizenId) {
+        const fingers = Object.values(fpTemplates).filter(Boolean) as CapturedFinger[];
+        if (fingers.length) {
+          const bio = await enrollCapturedFingers(onip.citizenId, fingers);
+          bioMsg = ` ${bio.message}`;
+        }
+      } else if (Object.keys(fpTemplates).length) {
+        bioMsg =
+          " Empreintes capturées localement — reconnectez-vous puis ré-enrôlez via Biométrie pour la recherche 1:N.";
+      }
       clearDraft();
       setSituationFamiliale(emptySituationFamiliale());
       setEtudes(emptyEtudes());
       setExperience(emptyExperience());
       setIdentiteAdmin(emptyIdentiteAdmin());
+      setFpTemplates({});
       setCreated(act);
-      setDraftNotice(onip.message);
+      setDraftNotice(`${onip.message}${bioMsg}`);
       streamRef.current?.getTracks().forEach((t) => t.stop());
       setStep(1);
     } catch (err) {
