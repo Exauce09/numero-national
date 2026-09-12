@@ -18,6 +18,8 @@ import {
   addPerson,
   displayName,
   getPerson,
+  getSpouseOf,
+  listPopulationPersons,
   type Act,
   type EtatCivil,
   type HandicapType,
@@ -68,6 +70,25 @@ const STEPS = [
 ] as const;
 
 const NUMERO_QUARTIER_OPTIONS = Array.from({ length: 120 }, (_, i) => String(i + 1));
+
+function loadNamedList(key: string): string[] {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as string[];
+    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string" && x.trim()) : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberNamed(key: string, value: string) {
+  const v = value.trim();
+  if (!v) return;
+  const prev = loadNamedList(key);
+  if (prev.some((x) => x.toLowerCase() === v.toLowerCase())) return;
+  localStorage.setItem(key, JSON.stringify([v, ...prev].slice(0, 80)));
+}
 
 type StepId = (typeof STEPS)[number]["id"];
 
@@ -162,6 +183,20 @@ export default function CensusPage() {
   const [geoOrigine, setGeoOrigine] = useState<GeoSelection>({});
   const [tribu, setTribu] = useState("");
   const healthFacilities = listFacilityAccounts().filter((a) => a.active);
+  const hopitauxExtra = loadNamedList("nn_hopitaux_naissance");
+  const hopitalOptions = [
+    ...healthFacilities.map((f) => ({ id: f.id, name: f.facilityName, type: f.facilityType })),
+    ...hopitauxExtra
+      .filter((n) => !healthFacilities.some((f) => f.facilityName === n))
+      .map((n) => ({ id: `extra-${n}`, name: n, type: "Autre" })),
+  ];
+  const [professionsConnues] = useState(() => {
+    const stored = loadNamedList("nn_professions_connues");
+    const fromPeople = listPopulationPersons()
+      .map((p) => (p.parcours_professionnel || "").split("\n")[0]?.trim())
+      .filter(Boolean) as string[];
+    return [...new Set([...stored, ...fromPeople])].slice(0, 80);
+  });
   const [photo, setPhoto] = useState<string | undefined>();
   const [empreinteGauche, setEmpreinteGauche] = useState("");
   const [empreinteDroite, setEmpreinteDroite] = useState("");
@@ -621,6 +656,8 @@ export default function CensusPage() {
       const adresse = buildAdresse();
       const hopitalResolved =
         hopitalNaissance === "__autre__" ? hopitalAutre.trim() : hopitalNaissance.trim();
+      if (hopitalResolved) rememberNamed("nn_hopitaux_naissance", hopitalResolved);
+      if (profession.trim()) rememberNamed("nn_professions_connues", profession);
       const languesResolved = formatLangues(languesSelected);
       const lieuNaissance = lieuNaissanceManuel.trim() || geoNaissance.label || "";
       const geoNaissancePayload: GeoSelection = {
@@ -692,7 +729,7 @@ export default function CensusPage() {
         numero_avenue: numeroAvenue.trim() || null,
         telephone: telephone.trim() || null,
         email: email.trim() || null,
-        boite_postale: boitePostale.trim() || null,
+        boite_postale: null,
         adresse_actuelle: adresse || null,
         geo_actuelle: geoActuelle,
         commune_code: geoActuelle.commune_code || commune.code,
@@ -842,7 +879,18 @@ export default function CensusPage() {
                 {ficheKind !== "bebe" ? (
                   <div className="full">
                     <label className="form-label">Profession</label>
-                    <input className="form-control" value={profession} onChange={(e) => setProfession(e.target.value)} />
+                    <input
+                      className="form-control"
+                      list="professions-connues"
+                      value={profession}
+                      onChange={(e) => setProfession(e.target.value)}
+                      placeholder="Saisir ou sélectionner une profession connue"
+                    />
+                    <datalist id="professions-connues">
+                      {professionsConnues.map((p) => (
+                        <option key={p} value={p} />
+                      ))}
+                    </datalist>
                   </div>
                 ) : null}
                 <div className="full">
@@ -885,7 +933,7 @@ export default function CensusPage() {
                     value={
                       hopitalNaissance &&
                       hopitalNaissance !== "__autre__" &&
-                      !healthFacilities.some((f) => f.facilityName === hopitalNaissance)
+                      !hopitalOptions.some((f) => f.name === hopitalNaissance)
                         ? "__autre__"
                         : hopitalNaissance
                     }
@@ -896,16 +944,16 @@ export default function CensusPage() {
                     }}
                   >
                     <option value="">— Sélectionner —</option>
-                    {healthFacilities.map((f) => (
-                      <option key={f.id} value={f.facilityName}>
-                        {f.facilityName} ({f.facilityType})
+                    {hopitalOptions.map((f) => (
+                      <option key={f.id} value={f.name}>
+                        {f.name} ({f.type})
                       </option>
                     ))}
                     <option value="__autre__">Autre (saisie libre)</option>
                   </select>
                   {(hopitalNaissance === "__autre__" ||
                     (hopitalNaissance &&
-                      !healthFacilities.some((f) => f.facilityName === hopitalNaissance) &&
+                      !hopitalOptions.some((f) => f.name === hopitalNaissance) &&
                       hopitalNaissance !== "")) &&
                   hopitalNaissance !== "" ? (
                     <input
@@ -1129,6 +1177,9 @@ export default function CensusPage() {
                 <div>
                   <label className="form-label">Numéro de téléphone</label>
                   <input className="form-control" value={telephone} onChange={(e) => setTelephone(e.target.value)} />
+                  <p className="muted small" style={{ marginTop: "0.25rem" }}>
+                    Facultatif
+                  </p>
                 </div>
                 <div>
                   <label className="form-label">Adresse e-mail</label>
@@ -1137,14 +1188,6 @@ export default function CensusPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Boîte postale</label>
-                  <input
-                    className="form-control"
-                    value={boitePostale}
-                    onChange={(e) => setBoitePostale(e.target.value)}
                   />
                 </div>
               </div>
@@ -1159,15 +1202,21 @@ export default function CensusPage() {
             </h3>
             <p className="muted small" style={{ marginBottom: "0.75rem" }}>
               Sélectionnez le père et la mère. Pour Papa, un seul champ de recherche intelligente (nom, NIC,
-              province, ville, territoire, secteur, village). Aucun parent n&apos;est obligatoire à
-              l&apos;enregistrement.
+              province, ville, territoire, secteur, village). Aucun parent n&apos;est obligatoire. Si le père a
+              un conjoint enregistré, la mère est remplie automatiquement.
             </p>
             <div className="form-grid">
               <div className="full">
                 <PersonPicker
                   label="Papa"
                   value={pere}
-                  onChange={setPere}
+                  onChange={(p) => {
+                    setPere(p);
+                    if (p) {
+                      const spouse = getSpouseOf(p.id);
+                      if (spouse) setMere(spouse);
+                    }
+                  }}
                   originGeoFilter
                   addButtonLabel="Ajouter papa"
                 />

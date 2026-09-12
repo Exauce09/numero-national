@@ -727,26 +727,21 @@ function Shell() {
           {canSeeNav("documents", roles, permissions) ? (
             <div className="nav-group">
               <div className="nav-group-label">
-                <IconFile size={18} /> Actes
+                <IconFile size={18} /> Actes & documents
               </div>
-              <NavLink to="/acts">Actes & documents</NavLink>
+              <NavLink to="/acts">Registre</NavLink>
               <NavLink to="/acts/qrcode">QR code</NavLink>
+              {canSeeNav("declarations", roles, permissions) ? (
+                <NavLink to="/declarations">Déclarations santé</NavLink>
+              ) : null}
+              {canSeeNav("validation", roles, permissions) ? (
+                <NavLink to="/transcriptions">Transcriptions</NavLink>
+              ) : null}
+              {canSeeNav("corrections", roles, permissions) ? (
+                <NavLink to="/corrections">Corrections</NavLink>
+              ) : null}
+              <NavLink to="/verify-document">Vérifier document</NavLink>
             </div>
-          ) : null}
-          {canSeeNav("declarations", roles, permissions) ? (
-            <NavLink to="/declarations">
-              <IconClipboard size={18} /> Structures sanitaires
-            </NavLink>
-          ) : null}
-          {canSeeNav("validation", roles, permissions) ? (
-            <NavLink to="/transcriptions">
-              <IconFile size={18} /> Transcriptions
-            </NavLink>
-          ) : null}
-          {canSeeNav("corrections", roles, permissions) ? (
-            <NavLink to="/corrections">
-              <IconClipboard size={18} /> Corrections
-            </NavLink>
           ) : null}
           {canSeeNav("admin_bureaux", roles, permissions) ? (
             <NavLink to="/admin/bureaux">
@@ -784,9 +779,6 @@ function Shell() {
             >
               <span />
             </button>
-            <div title="République démocratique du Congo">
-              <h1 className="topbar-title">SIGPOP-RDC</h1>
-            </div>
           </div>
 
           <div className="topbar-center">

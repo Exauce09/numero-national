@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { api, type CivilAct } from "../api";
 import { getSession } from "../auth";
 import { BarChart, LineChart, PieChart, Sparkline } from "../components/Charts";
@@ -193,27 +193,14 @@ export default function DashboardPage() {
 
   const popBreakdown = useMemo(() => populationBreakdown(localPop), [localPop]);
 
-  const helloName = session?.displayName || session?.username || "utilisateur";
+  const helloName =
+    variant === "officier"
+      ? "Officier de l'état civil"
+      : session?.displayName || session?.username || "utilisateur";
   const roleTitle = session?.roleTitle || "Agent opérationnel";
   const territory = [session?.commune_province, session?.commune_ville, session?.commune_name]
     .filter(Boolean)
     .join(" · ");
-
-  const quickActions =
-    variant === "officier"
-      ? [
-          { label: "Nouvelle naissance", href: "/manage/naissance" },
-          { label: "Biométrie", href: "/biometrie/identification" },
-        ]
-      : variant === "agent"
-        ? [
-            { label: "Nouvelle naissance", href: "/manage/naissance" },
-            { label: "Déclarations", href: "/declarations" },
-          ]
-        : [
-            { label: "Naissances", href: "/manage/naissance" },
-            { label: "Recensement", href: "/census" },
-          ];
 
   return (
     <div className="dash-page">
@@ -224,13 +211,6 @@ export default function DashboardPage() {
             {roleTitle}
             {territory ? ` · ${territory}` : ""}
           </p>
-        </div>
-        <div className="dash-quick">
-          {quickActions.map((a) => (
-            <Link key={a.href + a.label} className="btn-secondary btn-sm" to={a.href}>
-              {a.label}
-            </Link>
-          ))}
         </div>
       </div>
 

@@ -27,23 +27,6 @@ function toCsv(rows: Row[], columns: string[]): string {
   return `${header}\n${body}`;
 }
 
-function toSql(rows: Row[], columns: string[], table: string): string {
-  if (rows.length === 0) return `-- aucune donnée\n`;
-  return rows
-    .map((r) => {
-      const vals = columns
-        .map((c) => {
-          const v = r[c];
-          if (v == null) return "NULL";
-          if (typeof v === "number" || typeof v === "boolean") return String(v);
-          return `'${String(v).replace(/'/g, "''")}'`;
-        })
-        .join(", ");
-      return `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${vals});`;
-    })
-    .join("\n");
-}
-
 export default function DataToolbar({ filename, rows, columns }: Props) {
   const cols =
     columns ??
@@ -53,23 +36,13 @@ export default function DataToolbar({ filename, rows, columns }: Props) {
     downloadBlob(`${filename}.${ext}`, toCsv(rows, cols), "text/csv;charset=utf-8");
   }
 
-  function exportSql() {
-    downloadBlob(`${filename}.sql`, toSql(rows, cols, filename.replace(/\W+/g, "_")), "text/sql");
-  }
-
   return (
     <div className="data-toolbar no-print">
-      <button type="button" className="btn-secondary btn-sm" onClick={() => exportCsv("csv")}>
-        CSV
-      </button>
       <button type="button" className="btn-secondary btn-sm" onClick={() => exportCsv("xls")}>
         Excel
       </button>
       <button type="button" className="btn-secondary btn-sm" onClick={() => window.print()}>
         PDF / Imprimer
-      </button>
-      <button type="button" className="btn-secondary btn-sm" onClick={exportSql}>
-        SQL
       </button>
     </div>
   );

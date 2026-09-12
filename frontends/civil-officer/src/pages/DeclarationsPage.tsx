@@ -1,4 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import ActsDocsNav from "../components/ActsDocsNav";
 import {
   api,
   demoListDeclarations,
@@ -351,11 +353,15 @@ export default function DeclarationsPage() {
 
   return (
     <div>
+      <p className="eg-breadcrumb">
+        <Link to="/">Accueil</Link> / <Link to="/acts">Actes & documents</Link> / Structures sanitaires
+      </p>
       <h2 className="page-title">Structures sanitaires</h2>
       <p className="page-lead">
         Créez et gérez les structures sanitaires. Chaque structure affiche les statistiques garçon / fille /
         total. Validez aussi la file des déclarations naissances et décès.
       </p>
+      <ActsDocsNav />
 
       {message ? <div className="success-banner">{message}</div> : null}
       {error ? <div className="login-error">{error}</div> : null}

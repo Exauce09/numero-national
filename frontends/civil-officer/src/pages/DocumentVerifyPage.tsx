@@ -1,4 +1,6 @@
 import { FormEvent, useState } from "react";
+import { Link } from "react-router-dom";
+import ActsDocsNav from "../components/ActsDocsNav";
 import { api } from "../api";
 import { getSession } from "../auth";
 
@@ -20,11 +22,15 @@ export default function DocumentVerifyPage() {
 
   return (
     <div>
+      <p className="eg-breadcrumb">
+        <Link to="/">Accueil</Link> / <Link to="/acts">Actes & documents</Link> / Vérifier
+      </p>
       <h2 className="page-title">Vérification de document</h2>
       <p className="page-lead">
         Contrôle d&apos;authenticité par code — sans exposer toutes les données personnelles de
         l&apos;acte.
       </p>
+      <ActsDocsNav />
       {error ? <div className="login-error">{error}</div> : null}
       <form className="panel form-grid" onSubmit={onSubmit}>
         <div className="full">

@@ -747,6 +747,14 @@ export function getActiveMarriage(personId: string): MarriageLink | undefined {
   );
 }
 
+/** Conjoint(e) lié(e) via un mariage actif. */
+export function getSpouseOf(personId: string): Person | null {
+  const link = getActiveMarriage(personId);
+  if (!link) return null;
+  const otherId = link.epoux_id === personId ? link.epouse_id : link.epoux_id;
+  return getPerson(otherId) ?? null;
+}
+
 export function addMarriageLink(
   act_number: string,
   epoux_id: string,

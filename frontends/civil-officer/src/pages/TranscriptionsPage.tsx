@@ -1,4 +1,6 @@
 import { FormEvent, useState } from "react";
+import { Link } from "react-router-dom";
+import ActsDocsNav from "../components/ActsDocsNav";
 import { api } from "../api";
 
 export default function TranscriptionsPage() {
@@ -47,10 +49,15 @@ export default function TranscriptionsPage() {
 
   return (
     <div>
+      <p className="eg-breadcrumb">
+        <Link to="/">Accueil</Link> / <Link to="/acts">Actes & documents</Link> / Transcriptions
+      </p>
       <h2 className="page-title">Transcriptions</h2>
       <p className="page-lead">
-        Transcription d&apos;un acte établi ailleurs (autre commune / autorité) dans le registre local.
+        Reprise d&apos;un acte papier (registre ancien) dans le système numérique — utile quand l&apos;original
+        existe hors SIGPOP-RDC.
       </p>
+      <ActsDocsNav />
       <div className="panel">
         <form className="form-grid" onSubmit={onSubmit}>
           {error ? <div className="login-error full">{error}</div> : null}

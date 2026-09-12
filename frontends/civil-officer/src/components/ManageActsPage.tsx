@@ -9,7 +9,6 @@ import { SimpleStatBlocks } from "./StatBlocks";
 import { api } from "../api";
 import { getSession } from "../auth";
 import {
-  actTypeLabel,
   getAct,
   getPersonByNic,
   listActs,

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import ActWorkflowPanel from "../components/ActWorkflowPanel";
+import ActsDocsNav from "../components/ActsDocsNav";
 import { BarChart, PieChart } from "../components/Charts";
 import DataToolbar from "../components/DataToolbar";
 import { SimpleStatBlocks } from "../components/StatBlocks";
@@ -166,8 +167,9 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
           <p className="page-lead">
             {showAnalytics
               ? "Vue statistique depuis le tableau de bord — camembert, histogramme, recherche et pagination."
-              : "Registre opérationnel — filtre par type, recherche, export et fiche détail."}
+              : "Registre opérationnel — filtre par type, recherche, export et fiche détail. Déclarations santé = naissances/décès hôpital à valider. Transcriptions = reprise d’actes papier. Corrections = rectification d’état civil. Vérifier document = contrôle d’authenticité."}
           </p>
+          <ActsDocsNav />
         </div>
         <button type="button" className="btn-add" onClick={() => navigate("/documents")}>
           + Document

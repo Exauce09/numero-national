@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import ActsDocsNav from "../components/ActsDocsNav";
 import { api } from "../api";
 import { getSession } from "../auth";
 import { canValidateActs } from "../rbac";
@@ -63,10 +65,15 @@ export default function CorrectionsInboxPage() {
 
   return (
     <div>
+      <p className="eg-breadcrumb">
+        <Link to="/">Accueil</Link> / <Link to="/acts">Actes & documents</Link> / Corrections
+      </p>
       <h2 className="page-title">Demandes de correction</h2>
       <p className="page-lead">
-        Boîte de réception officier — demandes citoyennes de rectification d&apos;identité / état civil.
+        Rectification d&apos;une fiche déjà enregistrée (nom, date, etc.) après demande citoyenne — l&apos;officier
+        approuve ou refuse.
       </p>
+      <ActsDocsNav />
       {error ? <div className="login-error">{error}</div> : null}
       {message ? <div className="success-banner">{message}</div> : null}
 

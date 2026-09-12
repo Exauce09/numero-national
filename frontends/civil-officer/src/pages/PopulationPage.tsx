@@ -1,7 +1,7 @@
 /** Liste population / personnes — registre national (API) + fallback local. */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { BarChart, PieChart } from "../components/Charts";
 import DataToolbar from "../components/DataToolbar";
 import { PopulationStatBlocks } from "../components/StatBlocks";
@@ -9,16 +9,25 @@ import { api, type CitizenListItem } from "../api";
 import { getSession } from "../auth";
 import { nationalHitToPerson } from "../nationalSearch";
 import {
+  ETAT_CIVIL_OPTIONS,
   displayName,
+  listActs,
   listPopulationPersons,
   personNationalite,
   populationBreakdown,
+  type EtatCivil,
   type Person,
 } from "../registry";
 
 const PAGE_SIZE = 10;
 
-type PopRow = Person & { registryStatus?: string };
+type PopView = "all" | "recenses" | "identification";
+
+type PopRow = Person & {
+  registryStatus?: string;
+  hasCensus?: boolean;
+  biometricNote?: string;
+};
 
 function citizenToRow(c: CitizenListItem): PopRow {
   const p = nationalHitToPerson({
@@ -37,13 +46,24 @@ function citizenToRow(c: CitizenListItem): PopRow {
   return { ...p, registryStatus: c.status };
 }
 
+function civilStatusLabel(p: PopRow): string {
+  if ((p.registryStatus || "").toUpperCase() === "DECEASED" || p.etat_civil === "UNKNOWN") {
+    const rs = (p.registryStatus || "").toUpperCase();
+    if (rs === "DECEASED") return "Décédé(e)";
+  }
+  const hit = ETAT_CIVIL_OPTIONS.find((o) => o.value === p.etat_civil);
+  return hit?.label || p.etat_civil || "—";
+}
+
 export default function PopulationPage({ showAnalytics = false }: { showAnalytics?: boolean }) {
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const view = (params.get("view") as PopView) || "all";
   const hasApi = Boolean(getSession()?.accessToken);
   const [q, setQ] = useState("");
   const [sexe, setSexe] = useState("");
   const [nat, setNat] = useState("");
-  const [status, setStatus] = useState("");
+  const [civilStatus, setCivilStatus] = useState("");
   const [page, setPage] = useState(1);
   const [persons, setPersons] = useState<PopRow[]>(() =>
     hasApi ? [] : listPopulationPersons().map((p) => ({ ...p, registryStatus: "LOCAL" })),
@@ -53,9 +73,24 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const censusIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const a of listActs().filter((x) => x.type === "CENSUS")) {
+      const pid = String(a.payload.person_id ?? a.payload.citizen_id ?? "");
+      if (pid) ids.add(pid);
+      if (a.national_id) ids.add(a.national_id);
+    }
+    return ids;
+  }, [persons.length]);
+
   const load = useCallback(async () => {
     if (!hasApi) {
-      const local = listPopulationPersons().map((p) => ({ ...p, registryStatus: "LOCAL" }));
+      const local = listPopulationPersons().map((p) => ({
+        ...p,
+        registryStatus: "LOCAL",
+        hasCensus: Boolean(p.id && censusIds.has(p.id)) || Boolean(p.nic && censusIds.has(p.nic)),
+        biometricNote: [p.fingerprint_note, p.iris_note].filter(Boolean).join(" · ") || "Non enrôlé",
+      }));
       setPersons(local);
       setSource("local");
       setTotal(local.length);
@@ -64,26 +99,38 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
     setBusy(true);
     setError(null);
     try {
-      const params = new URLSearchParams({
+      const qs = new URLSearchParams({
         page: "1",
         page_size: "100",
       });
-      if (q.trim()) params.set("q", q.trim());
-      const data = await api.searchCitizens(params);
-      const rows = (data.items ?? []).map(citizenToRow);
+      if (q.trim()) qs.set("q", q.trim());
+      const data = await api.searchCitizens(qs);
+      const rows = (data.items ?? []).map((c) => {
+        const row = citizenToRow(c);
+        return {
+          ...row,
+          hasCensus: Boolean(row.id && censusIds.has(row.id)) || Boolean(row.nic && censusIds.has(row.nic)),
+          biometricNote: [row.fingerprint_note, row.iris_note].filter(Boolean).join(" · ") || "Non enrôlé",
+        };
+      });
       setPersons(rows);
       setTotal(data.total ?? rows.length);
       setSource("api");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Impossible de charger le registre national.");
-      const local = listPopulationPersons().map((p) => ({ ...p, registryStatus: "LOCAL" }));
+      const local = listPopulationPersons().map((p) => ({
+        ...p,
+        registryStatus: "LOCAL",
+        hasCensus: Boolean(p.id && censusIds.has(p.id)) || Boolean(p.nic && censusIds.has(p.nic)),
+        biometricNote: [p.fingerprint_note, p.iris_note].filter(Boolean).join(" · ") || "Non enrôlé",
+      }));
       setPersons(local);
       setTotal(local.length);
       setSource("local");
     } finally {
       setBusy(false);
     }
-  }, [hasApi, q]);
+  }, [hasApi, q, censusIds]);
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), q ? 280 : 0);
@@ -94,18 +141,21 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
 
   const rows = useMemo(() => {
     return persons.filter((p) => {
+      if (view === "recenses" && !p.hasCensus) return false;
       if (sexe && p.sexe !== sexe) return false;
       if (nat && personNationalite(p) !== nat) return false;
-      if (status && (p.registryStatus || "").toUpperCase().indexOf(status.toUpperCase()) < 0) {
-        return false;
+      if (civilStatus === "DECEDE") {
+        if ((p.registryStatus || "").toUpperCase() !== "DECEASED") return false;
+      } else if (civilStatus) {
+        if (p.etat_civil !== (civilStatus as EtatCivil)) return false;
       }
       return true;
     });
-  }, [persons, sexe, nat, status]);
+  }, [persons, sexe, nat, civilStatus, view]);
 
   useEffect(() => {
     setPage(1);
-  }, [q, sexe, nat, status]);
+  }, [q, sexe, nat, civilStatus, view]);
 
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
@@ -118,7 +168,8 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
     nationalite: personNationalite(p),
     date_naissance: p.date_naissance,
     lieu_naissance: p.lieu_naissance,
-    statut: p.registryStatus || p.etat_civil,
+    statut_civil: civilStatusLabel(p),
+    biometrie: p.biometricNote || "",
   }));
 
   const pieSexe = [
@@ -144,26 +195,42 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
     { label: "F maj. É", value: stats.femmes.majeurs.etranger, color: "#fc4b6c" },
   ];
 
+  function setView(next: PopView) {
+    const p = new URLSearchParams(params);
+    if (next === "all") p.delete("view");
+    else p.set("view", next);
+    setParams(p, { replace: true });
+  }
+
+  const title =
+    view === "recenses"
+      ? "Personnes recensées"
+      : view === "identification"
+        ? "Identification biométrique"
+        : showAnalytics
+          ? "Liste de la population"
+          : "Population";
+
   return (
     <div>
       <div className="eg-page-head">
         <div>
           <p className="eg-breadcrumb">
-            <Link to="/">Accueil</Link> / Population
+            <Link to="/">Accueil</Link> / <Link to="/population">Population</Link>
           </p>
-          <h2 className="page-title">{showAnalytics ? "Liste de la population" : "Population"}</h2>
+          <h2 className="page-title">{title}</h2>
           <p className="page-lead">
-            {source === "api" ? (
+            {view === "identification" ? (
+              <>Données biométriques et statut civil de chaque personne du registre.</>
+            ) : view === "recenses" ? (
+              <>Personnes déjà recensées (acte de recensement lié).</>
+            ) : source === "api" ? (
               <>
                 Registre national — {total} fiche(s) en base. Les fiches recensement non promues
-                (SYNCED/DRAFT) n&apos;apparaissent pas tant qu&apos;elles ne sont pas dans{" "}
-                <code>core_registry.citizens</code>.
+                (SYNCED/DRAFT) n&apos;apparaissent pas tant qu&apos;elles ne sont pas dans le registre.
               </>
             ) : (
-              <>
-                Mode local (navigateur). Connectez-vous avec un compte API pour voir PostgreSQL.
-                Vivants uniquement ; nouveaux-nés (≤ 90 j) exclus en mode local.
-              </>
+              <>Mode local (navigateur). Connectez-vous avec un compte API pour le registre national.</>
             )}
           </p>
         </div>
@@ -172,18 +239,48 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
         </button>
       </div>
 
+      <div className="dash-quick pop-action-bar" style={{ marginBottom: "1rem", flexWrap: "wrap" }}>
+        <button
+          type="button"
+          className={`btn-secondary btn-sm${view === "all" ? " active" : ""}`}
+          onClick={() => setView("all")}
+        >
+          Tous
+        </button>
+        <button
+          type="button"
+          className={`btn-secondary btn-sm${view === "recenses" ? " active" : ""}`}
+          onClick={() => setView("recenses")}
+        >
+          Recensement
+        </button>
+        <button
+          type="button"
+          className={`btn-secondary btn-sm${view === "identification" ? " active" : ""}`}
+          onClick={() => setView("identification")}
+        >
+          Identification
+        </button>
+        <Link className="btn-secondary btn-sm" to="/census/scan-coupon">
+          Scanner QR code
+        </Link>
+        <Link className="btn-secondary btn-sm" to="/cartes-livraison">
+          Impression carte
+        </Link>
+        {view === "identification" ? (
+          <Link className="btn-primary btn-sm" to="/biometrie/identification">
+            Recherche 1:N
+          </Link>
+        ) : null}
+      </div>
+
       {error ? (
         <div className="login-error" role="alert" style={{ marginBottom: "1rem" }}>
           {error}
         </div>
       ) : null}
-      {!hasApi ? (
-        <p className="muted" style={{ marginBottom: "1rem" }}>
-          Sans jeton API, la liste ne lit que le stockage local du navigateur — pas PostgreSQL.
-        </p>
-      ) : null}
 
-      {showAnalytics ? (
+      {showAnalytics && view === "all" ? (
         <>
           <PopulationStatBlocks hommes={stats.hommes} femmes={stats.femmes} total={stats.total} />
           <div className="eg-charts-row">
@@ -232,13 +329,18 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
             <select
               className="form-control"
               style={{ marginBottom: 0, width: "auto" }}
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              aria-label="Statut"
+              value={civilStatus}
+              onChange={(e) => setCivilStatus(e.target.value)}
+              aria-label="Situation"
+              title="Situation de la personne (marié, célibataire, décédé…)"
             >
-              <option value="">Tous statuts</option>
-              <option value="ACTIVE">ACTIVE</option>
-              <option value="PENDING">PENDING</option>
+              <option value="">Toutes situations</option>
+              {ETAT_CIVIL_OPTIONS.filter((o) => o.value !== "UNKNOWN").map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+              <option value="DECEDE">Décédé(e)</option>
             </select>
             <button type="button" className="btn-secondary btn-sm" onClick={() => void load()} disabled={busy}>
               {busy ? "…" : "Actualiser"}
@@ -257,14 +359,16 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                 <th>Postnom</th>
                 <th>Prénom</th>
                 <th>Naissance</th>
-                <th>Statut</th>
+                <th>Situation</th>
+                {view === "identification" ? <th>Biométrie</th> : null}
+                {view === "recenses" ? <th>Recensement</th> : null}
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="muted">
+                  <td colSpan={view === "identification" || view === "recenses" ? 9 : 8} className="muted">
                     {busy ? "Chargement…" : "Aucune personne trouvée."}
                   </td>
                 </tr>
@@ -283,8 +387,18 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                       {p.lieu_naissance ? ` · ${p.lieu_naissance}` : ""}
                     </td>
                     <td>
-                      <span className="status-badge">{p.registryStatus || "—"}</span>
+                      <span className="status-badge">{civilStatusLabel(p)}</span>
                     </td>
+                    {view === "identification" ? (
+                      <td>
+                        <span className="muted small">{p.biometricNote || "Non enrôlé"}</span>
+                      </td>
+                    ) : null}
+                    {view === "recenses" ? (
+                      <td>
+                        <span className="status-badge">Recensé</span>
+                      </td>
+                    ) : null}
                     <td className="table-actions">
                       <Link className="btn-add btn-sm" to={`/population/${p.id}`}>
                         Voir
