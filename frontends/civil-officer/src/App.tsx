@@ -640,7 +640,7 @@ function Shell() {
   }
 
   const responsableLabel = session?.displayName ?? session?.username ?? "—";
-  const roleTitle = session?.roleTitle ?? "Responsable — Officier d'état civil";
+  const roleTitle = "Officier de l'état civil";
   const communeLabel = session?.commune_name
     ? `Commune de ${session.commune_name}`
     : null;
@@ -706,6 +706,7 @@ function Shell() {
                 "/lists/population",
                 "/census/scan-coupon",
                 "/cartes-livraison",
+                "/biometrie",
               ]}
             >
               <NavLink
@@ -721,6 +722,16 @@ function Shell() {
               >
                 Registre population
               </NavLink>
+              {canSeeNav("biometrie", roles, permissions) ? (
+                <NavLink
+                  to="/biometrie"
+                  className={({ isActive }) =>
+                    isActive || location.pathname.startsWith("/biometrie") ? "active" : undefined
+                  }
+                >
+                  Biométrie
+                </NavLink>
+              ) : null}
               {canSeeNav("census", roles, permissions) || canSeeNav("population", roles, permissions) ? (
                 <NavLink
                   to="/census/scan-coupon"
@@ -762,16 +773,6 @@ function Shell() {
           {canSeeNav("census", roles, permissions) ? (
             <NavLink to="/manage/deplacement">
               <IconCar size={18} /> Déplacement
-            </NavLink>
-          ) : null}
-          {canSeeNav("biometrie", roles, permissions) ? (
-            <NavLink
-              to="/biometrie"
-              className={({ isActive }) =>
-                isActive || location.pathname.startsWith("/biometrie") ? "active" : undefined
-              }
-            >
-              <IconClipboard size={18} /> Biométrie
             </NavLink>
           ) : null}
           {canSeeNav("census", roles, permissions) ? (

@@ -57,7 +57,7 @@ export function resolveCommuneForUsername(username: string): OfficerCommune {
   if (user === "officier") {
     const demo = assignOfficerAccount({
       username: "officier",
-      displayName: "Officier de commune",
+      displayName: "Officier de l'état civil",
       commune: DEFAULT_OFFICER_COMMUNE,
     });
     return { ...demo.commune };

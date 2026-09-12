@@ -25,12 +25,12 @@ export const DEMO_PASSWORD = "DemoCivil2026!";
 /** Compte API lié au login démo « officier » (registre national / NIC). */
 export const DEMO_API_EMAIL = "officier.etatcivil@example.gov";
 export const DEMO_API_PASSWORD = "CivilOfficer123!";
-export const MODULE_ROLE_TITLE = "Responsable — Officier d'état civil";
+export const MODULE_ROLE_TITLE = "Officier de l'état civil";
 
 function sessionLabel(username: string, roles?: string[]): { displayName: string; roleTitle: string } {
   const pretty =
     username === DEMO_USER
-      ? "Officier de commune"
+      ? "Officier de l'état civil"
       : username.replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   return {
     displayName: pretty,

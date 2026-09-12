@@ -299,6 +299,9 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
         >
           Identification
         </button>
+        <Link className="btn-secondary btn-sm" to="/biometrie">
+          Biométrie
+        </Link>
         <Link className="btn-secondary btn-sm" to="/census/scan-coupon">
           Scanner QR code
         </Link>

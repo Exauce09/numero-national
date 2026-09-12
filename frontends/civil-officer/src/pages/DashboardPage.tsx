@@ -197,7 +197,7 @@ export default function DashboardPage() {
     variant === "officier"
       ? "Officier de l'état civil"
       : session?.displayName || session?.username || "utilisateur";
-  const roleTitle = session?.roleTitle || "Agent opérationnel";
+  const roleTitle = "Officier de l'état civil";
   const territory = [session?.commune_province, session?.commune_ville, session?.commune_name]
     .filter(Boolean)
     .join(" · ");

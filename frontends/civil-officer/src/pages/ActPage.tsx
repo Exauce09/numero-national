@@ -125,7 +125,7 @@ export default function ActPage({ kind, title }: Props) {
     <div>
       <h2 className="page-title">{title}</h2>
       <p className="page-lead">
-        Saisie et consultation des actes — Officier d&apos;état civil
+        Saisie et consultation des actes — Officier de l&apos;état civil
         {source === "api" ? " · source API" : " · mode démo"}.
       </p>
 
