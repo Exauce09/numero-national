@@ -1,10 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
-import GeoCascade, { GEO_PRESETS, ORIGIN_FIELD_LABELS, type GeoSelection } from "./GeoCascade";
 import {
   ETAT_CIVIL_OPTIONS,
   addPerson,
   displayName,
-  listPersons,
   personOrigin,
   type EtatCivil,
   type Person,
@@ -23,7 +21,10 @@ type Props = {
   /** Force l'ouverture du modal d'ajout (contrôlé par le parent). */
   forceAddOpen?: boolean;
   onForceAddConsumed?: () => void;
-  /** Filtre recherche père : province → territoire → secteur → village. */
+  /**
+   * Recherche intelligente père : un seul champ (nom, NIC, province, territoire,
+   * secteur / chefferie / commune, village) — sans cascade visuelle.
+   */
   originGeoFilter?: boolean;
 };
 
@@ -35,23 +36,6 @@ const emptyForm = {
   date_naissance: "",
   etat_civil: "CELIBATAIRE" as EtatCivil,
 };
-
-function matchesOriginFilter(person: Person, geo: GeoSelection): boolean {
-  const hasFilter = Boolean(
-    geo.province_name || geo.district_name || geo.commune_name || geo.localite_name || geo.ville_name,
-  );
-  if (!hasFilter) return true;
-  const origin = personOrigin(person);
-  const norm = (s: string) => s.trim().toLowerCase();
-  if (geo.province_name && !norm(origin.province).includes(norm(geo.province_name))) return false;
-  if (geo.ville_name && origin.ville && !norm(origin.ville).includes(norm(geo.ville_name))) return false;
-  if (geo.district_name && !norm(origin.territoire).includes(norm(geo.district_name))) return false;
-  if (geo.commune_name && !norm(origin.secteur || origin.commune).includes(norm(geo.commune_name))) {
-    return false;
-  }
-  if (geo.localite_name && !norm(origin.village).includes(norm(geo.localite_name))) return false;
-  return true;
-}
 
 export default function PersonPicker({
   label,
@@ -72,7 +56,6 @@ export default function PersonPicker({
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<Person[]>([]);
   const [searching, setSearching] = useState(false);
-  const [geoFilter, setGeoFilter] = useState<GeoSelection>({});
 
   useEffect(() => {
     if (forceAddOpen) {
@@ -84,35 +67,17 @@ export default function PersonPicker({
   useEffect(() => {
     if (!open || value) return;
     const q = query.trim();
-    const hasGeo = Boolean(
-      geoFilter.province_name ||
-        geoFilter.district_name ||
-        geoFilter.commune_name ||
-        geoFilter.localite_name,
-    );
-    if (q.length < 1 && !(originGeoFilter && hasGeo)) {
+    if (q.length < 1) {
       setResults([]);
       return;
     }
     let cancelled = false;
     const timer = window.setTimeout(() => {
       setSearching(true);
-      const apply = (hits: Person[]) => {
-        if (cancelled) return;
-        setResults(
-          (originGeoFilter ? hits.filter((p) => matchesOriginFilter(p, geoFilter)) : hits).slice(
-            0,
-            20,
-          ),
-        );
-      };
-      if (q.length < 1 && originGeoFilter && hasGeo) {
-        apply(listPersons());
-        setSearching(false);
-        return;
-      }
       void searchEveryone(q)
-        .then(apply)
+        .then((hits) => {
+          if (!cancelled) setResults(hits.slice(0, 20));
+        })
         .finally(() => {
           if (!cancelled) setSearching(false);
         });
@@ -121,7 +86,7 @@ export default function PersonPicker({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [query, open, value, originGeoFilter, geoFilter]);
+  }, [query, open, value]);
 
   function select(person: Person) {
     onChange(person);
@@ -161,26 +126,24 @@ export default function PersonPicker({
         {label}
         {required ? " *" : ""}
       </label>
-      {originGeoFilter && !value ? (
-        <div style={{ marginBottom: "0.65rem" }}>
-          <GeoCascade
-            embedded
-            label="Filtrer par origine (province → territoire → secteur → village)"
-            levels={GEO_PRESETS.origin}
-            fieldLabels={ORIGIN_FIELD_LABELS}
-            value={geoFilter}
-            onChange={(g) => {
-              setGeoFilter(g);
-              setOpen(true);
-            }}
-          />
-        </div>
-      ) : null}
       {value ? (
         <div className="person-picker-selected">
           <div>
             <strong>{displayName(value)}</strong>
             <div className="muted small">{value.nic}</div>
+            {originGeoFilter ? (
+              <div className="muted small">
+                {[
+                  personOrigin(value).province,
+                  personOrigin(value).ville,
+                  personOrigin(value).territoire,
+                  personOrigin(value).secteur || personOrigin(value).commune,
+                  personOrigin(value).village,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </div>
+            ) : null}
           </div>
           {allowClear ? (
             <button type="button" className="btn-secondary btn-sm" onClick={() => onChange(null)}>
@@ -194,7 +157,7 @@ export default function PersonPicker({
             className="form-control"
             placeholder={
               originGeoFilter
-                ? "Recherche père (nom, NIC…) — filtre géo ci-dessus…"
+                ? "Sélection intelligente : nom, NIC, province, ville, territoire, secteur, village…"
                 : "Recherche nationale (nom, post-nom, prénom, NIC)…"
             }
             value={query}
@@ -213,8 +176,12 @@ export default function PersonPicker({
       )}
       {open && !value ? (
         <ul className="person-picker-list">
-          {query.trim().length < 1 && !originGeoFilter ? (
-            <li className="muted">Tapez pour chercher dans le registre national…</li>
+          {query.trim().length < 1 ? (
+            <li className="muted">
+              {originGeoFilter
+                ? "Tapez un nom ou un lieu (province, territoire, secteur, village)…"
+                : "Tapez pour chercher dans le registre national…"}
+            </li>
           ) : searching ? (
             <li className="muted">Recherche nationale…</li>
           ) : results.length === 0 ? (
@@ -232,6 +199,7 @@ export default function PersonPicker({
                         p.sexe,
                         p.date_naissance,
                         o.province,
+                        o.ville,
                         o.territoire,
                         o.secteur || o.commune,
                         o.village,

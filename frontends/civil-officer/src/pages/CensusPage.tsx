@@ -1160,8 +1160,9 @@ export default function CensusPage() {
               2. Parent
             </h3>
             <p className="muted small" style={{ marginBottom: "0.75rem" }}>
-              Sélectionnez le père et la mère. La recherche du père peut être filtrée par province,
-              territoire, secteur et village. Aucun parent n&apos;est obligatoire à l&apos;enregistrement.
+              Sélectionnez le père et la mère. Pour Papa, un seul champ de recherche intelligente (nom, NIC,
+              province, ville, territoire, secteur, village). Aucun parent n&apos;est obligatoire à
+              l&apos;enregistrement.
             </p>
             <div className="form-grid">
               <div className="full">
