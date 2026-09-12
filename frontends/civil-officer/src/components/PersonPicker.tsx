@@ -46,6 +46,7 @@ export default function PersonPicker({
   required,
   allowClear = true,
   hideAdd = false,
+  addButtonLabel = "Ajouter",
   forceAddOpen = false,
   onForceAddConsumed,
   originGeoFilter = false,
@@ -171,7 +172,7 @@ export default function PersonPicker({
           />
           {!hideAdd ? (
             <button type="button" className="btn-add" onClick={() => setModal(true)}>
-              Ajouter
+              {addButtonLabel}
             </button>
           ) : null}
         </div>
