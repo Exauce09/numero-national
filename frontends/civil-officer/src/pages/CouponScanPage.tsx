@@ -17,16 +17,6 @@ type BarcodeDetectorLike = {
   detect: (source: ImageBitmapSource) => Promise<Array<{ rawValue?: string }>>;
 };
 
-const DEMO_QR = JSON.stringify({
-  type: "nn_census_coupon",
-  v: 1,
-  local_id: "demo-local-001",
-  family_name: "KABILA",
-  given_names: "Jean Paul",
-  sex: "M",
-  date_of_birth: "1990-05-12",
-});
-
 function getDetector(): (new (opts: { formats: string[] }) => BarcodeDetectorLike) | null {
   return (
     (window as unknown as { BarcodeDetector?: new (opts: { formats: string[] }) => BarcodeDetectorLike })
@@ -112,31 +102,6 @@ export default function CouponScanPage() {
     setScanning(false);
   }
 
-  async function onImageFile(file: File | null) {
-    if (!file) return;
-    setError(null);
-    const Detector = getDetector();
-    if (!Detector) {
-      setCamError("Lecture d'image QR non supportée — collez le JSON du coupon.");
-      return;
-    }
-    try {
-      const bitmap = await createImageBitmap(file);
-      const detector = new Detector({ formats: ["qr_code"] });
-      const codes = await detector.detect(bitmap);
-      bitmap.close();
-      const value = codes[0]?.rawValue?.trim();
-      if (!value) {
-        setError("Aucun QR détecté sur l'image.");
-        return;
-      }
-      setRaw(value);
-      await resolve(value);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Lecture image impossible.");
-    }
-  }
-
   async function resolve(payload: string) {
     const text = payload.trim();
     if (!text) {
@@ -183,8 +148,8 @@ export default function CouponScanPage() {
     <div>
       <h2 className="page-title">Scanner coupon recensement</h2>
       <p className="page-lead">
-        Scannez un QR <code>nn_census_coupon</code> (APK terrain), collez le JSON, ou importez une photo du
-        coupon. Fonctionne même si l&apos;API est temporairement indisponible (lecture locale du QR).
+        Scannez un QR <code>nn_census_coupon</code> (APK terrain) ou collez le JSON / la réf. locale. Fonctionne
+        même si l&apos;API est temporairement indisponible (lecture locale du QR).
       </p>
 
       <div className="panel">
@@ -213,27 +178,6 @@ export default function CouponScanPage() {
               Arrêter la caméra
             </button>
           )}
-          <label className="btn-secondary" style={{ width: "auto", cursor: "pointer", margin: 0 }}>
-            Importer une image QR
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              style={{ display: "none" }}
-              onChange={(e) => void onImageFile(e.target.files?.[0] ?? null)}
-            />
-          </label>
-          <button
-            type="button"
-            className="btn-secondary"
-            style={{ width: "auto" }}
-            onClick={() => {
-              setRaw(DEMO_QR);
-              void resolve(DEMO_QR);
-            }}
-          >
-            Tester un coupon démo
-          </button>
         </div>
 
         <form className="toolbar" style={{ marginTop: "1rem" }} onSubmit={onSubmit}>
