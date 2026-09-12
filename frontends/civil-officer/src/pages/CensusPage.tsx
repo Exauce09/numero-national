@@ -151,8 +151,6 @@ export default function CensusPage() {
   const [languesSelected, setLanguesSelected] = useState<string[]>([]);
   const [pere, setPere] = useState<Person | null>(null);
   const [mere, setMere] = useState<Person | null>(null);
-  const [parentAddOpen, setParentAddOpen] = useState(false);
-  const [parentAddTarget, setParentAddTarget] = useState<"pere" | "mere">("pere");
   const [nationalite, setNationalite] = useState("Congolaise");
   const [paysResidence, setPaysResidence] = useState("RDC");
   const [geoActuelle, setGeoActuelle] = useState<GeoSelection>({});
@@ -1170,10 +1168,8 @@ export default function CensusPage() {
                   label="Papa"
                   value={pere}
                   onChange={setPere}
-                  hideAdd
                   originGeoFilter
-                  forceAddOpen={parentAddOpen && parentAddTarget === "pere"}
-                  onForceAddConsumed={() => setParentAddOpen(false)}
+                  addButtonLabel="Ajouter papa"
                 />
               </div>
               <div className="full">
@@ -1181,9 +1177,7 @@ export default function CensusPage() {
                   label="Maman"
                   value={mere}
                   onChange={setMere}
-                  hideAdd
-                  forceAddOpen={parentAddOpen && parentAddTarget === "mere"}
-                  onForceAddConsumed={() => setParentAddOpen(false)}
+                  addButtonLabel="Ajouter maman"
                 />
               </div>
               <div className="full">
@@ -1203,21 +1197,6 @@ export default function CensusPage() {
                 <p className="muted" style={{ marginTop: "0.35rem", fontSize: "0.8rem" }}>
                   {RDC_TRIBUS.length} entrées de référence — {RDC_TRIBUS_NOTE}
                 </p>
-              </div>
-              <div className="full" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <button
-                  type="button"
-                  className="btn-add"
-                  onClick={() => {
-                    setParentAddTarget(!pere ? "pere" : "mere");
-                    setParentAddOpen(true);
-                  }}
-                >
-                  Ajouter papa / maman
-                </button>
-                <span className="muted small">
-                  Ouvre le formulaire structuré et lie la fiche au parent libre (papa d&apos;abord, puis maman).
-                </span>
               </div>
             </div>
           </div>

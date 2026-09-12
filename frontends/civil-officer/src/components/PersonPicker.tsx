@@ -18,6 +18,8 @@ type Props = {
   allowClear?: boolean;
   /** Masque le bouton Ajouter (ex. un seul bouton partagé en bas de section). */
   hideAdd?: boolean;
+  /** Libellé du bouton Ajouter à côté du champ. */
+  addButtonLabel?: string;
   /** Force l'ouverture du modal d'ajout (contrôlé par le parent). */
   forceAddOpen?: boolean;
   onForceAddConsumed?: () => void;
