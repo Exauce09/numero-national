@@ -667,8 +667,13 @@ function Shell() {
               >
                 Registre population
               </NavLink>
-              {canSeeNav("census", roles, permissions) ? (
-                <NavLink to="/census/scan-coupon">Scan coupon</NavLink>
+              {canSeeNav("census", roles, permissions) || canSeeNav("population", roles, permissions) ? (
+                <NavLink
+                  to="/census/scan-coupon"
+                  className={({ isActive }) => (isActive ? "active" : undefined)}
+                >
+                  Scan coupon
+                </NavLink>
               ) : null}
               {canSeeNav("cartes", roles, permissions) ? (
                 <NavLink to="/cartes-livraison">Impression carte</NavLink>

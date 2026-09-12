@@ -172,8 +172,8 @@ export const api = {
       body: JSON.stringify({ status: "FINALIZED" }),
     }),
 
-  resolveCoupon: (raw: string) =>
-    request<{
+  resolveCoupon: async (raw: string) => {
+    type CouponResolve = {
       found: boolean;
       source: string;
       local_id?: string | null;
@@ -187,10 +187,76 @@ export const api = {
       census_record_id?: string | null;
       qr_payload?: Record<string, unknown> | null;
       message?: string | null;
-    }>("/census/coupons/resolve", {
-      method: "POST",
-      body: JSON.stringify({ raw }),
-    }),
+    };
+
+    const localResolve = (text: string): CouponResolve => {
+      const trimmed = text.trim();
+      if (!trimmed) {
+        return { found: false, source: "local", message: "QR vide" };
+      }
+      if (trimmed.startsWith("{")) {
+        try {
+          const decoded = JSON.parse(trimmed) as Record<string, unknown>;
+          const qtype = String(decoded.type ?? "");
+          if (qtype && qtype !== "nn_census_coupon") {
+            return {
+              found: false,
+              source: "local",
+              message: `Type QR non supporté (${qtype})`,
+            };
+          }
+          const localId = String(decoded.local_id ?? "").trim() || null;
+          const family = String(decoded.family_name ?? "").trim() || null;
+          const given = String(decoded.given_names ?? "").trim() || null;
+          if (!localId && !family && !given) {
+            return {
+              found: false,
+              source: "local",
+              message: "QR sans identité (local_id / nom)",
+            };
+          }
+          return {
+            found: true,
+            source: "qr_local",
+            local_id: localId,
+            campaign_id: decoded.campaign_id ? String(decoded.campaign_id) : null,
+            household_local_id: decoded.household_local_id
+              ? String(decoded.household_local_id)
+              : decoded.household_id
+                ? String(decoded.household_id)
+                : null,
+            family_name: family,
+            given_names: given,
+            sex: decoded.sex ? String(decoded.sex) : null,
+            date_of_birth: String(decoded.date_of_birth ?? decoded.dob ?? "") || null,
+            qr_payload: decoded,
+            message: "Lu depuis le QR (mode local)",
+          };
+        } catch {
+          return { found: false, source: "local", message: "QR JSON invalide" };
+        }
+      }
+      return {
+        found: true,
+        source: "local_id",
+        local_id: trimmed,
+        family_name: null,
+        given_names: null,
+        sex: null,
+        date_of_birth: null,
+        message: "Réf. locale — complétez le recensement (API non contactée)",
+      };
+    };
+
+    try {
+      return await request<CouponResolve>("/census/coupons/resolve", {
+        method: "POST",
+        body: JSON.stringify({ raw }),
+      });
+    } catch {
+      return localResolve(raw);
+    }
+  },
 
   listActs: (kind: string, commune?: string) => {
     const q = new URLSearchParams();
