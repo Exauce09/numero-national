@@ -120,7 +120,7 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
     try {
       const qs = new URLSearchParams({
         page: "1",
-        page_size: "100",
+        page_size: "200",
       });
       if (q.trim()) qs.set("q", q.trim());
       const data = await api.searchCitizens(qs);
@@ -160,11 +160,15 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
     try {
       const campaigns = await api.listCensusCampaigns();
       const out: Array<{ id: string; label: string; status: string; campaign: string }> = [];
+      const seen = new Set<string>();
       for (const c of campaigns) {
-        for (const st of ["SYNCED", "DRAFT", "APPROVED"] as const) {
+        // Inclure PROMOTED : sinon les personnes « disparaissent » après promotion NIC.
+        for (const st of ["SYNCED", "DRAFT", "APPROVED", "PROMOTED", "REJECTED"] as const) {
           try {
             const recs = await api.listCensusRecords(c.id, st);
             for (const r of recs) {
+              if (seen.has(r.id)) continue;
+              seen.add(r.id);
               const p = r.payload ?? {};
               const given =
                 r.given_names ||
@@ -187,6 +191,14 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
           }
         }
       }
+      const rank: Record<string, number> = {
+        DRAFT: 0,
+        SYNCED: 1,
+        APPROVED: 2,
+        REJECTED: 3,
+        PROMOTED: 4,
+      };
+      out.sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9) || a.label.localeCompare(b.label));
       setTerrainRows(out);
     } catch (e) {
       setTerrainError(e instanceof Error ? e.message : "Fiches terrain indisponibles");
@@ -342,21 +354,32 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
           {terrainError ? <div className="login-error">{terrainError}</div> : null}
           {!terrainError && terrainRows.length === 0 ? (
             <p className="muted small" style={{ margin: 0 }}>
-              Aucune fiche SYNCED/DRAFT sur l&apos;API. Sur la tablette, vérifiez « Sync à jour » (même
-              Wi‑Fi / API).
+              Aucune fiche reçue de l&apos;APK. Sur la tablette : Sync à jour (USB 127.0.0.1 ou Wi‑Fi PC).
             </p>
           ) : null}
           {terrainRows.length > 0 ? (
-            <ul className="muted small" style={{ margin: 0, paddingLeft: "1.1rem" }}>
-              {terrainRows.slice(0, 30).map((r) => (
-                <li key={`${r.campaign}-${r.id}`}>
-                  <strong>{r.label}</strong> — {r.status} · campagne {r.campaign}
-                </li>
-              ))}
-            </ul>
+            <>
+              <p className="muted small" style={{ margin: "0 0 0.5rem" }}>
+                En attente contrôle :{" "}
+                {terrainRows.filter((r) => ["DRAFT", "SYNCED", "APPROVED"].includes(r.status)).length}
+                {" · "}
+                Déjà au registre (PROMOTED) :{" "}
+                {terrainRows.filter((r) => r.status === "PROMOTED").length}
+                {" · "}
+                Rejetées : {terrainRows.filter((r) => r.status === "REJECTED").length}
+              </p>
+              <ul className="muted small" style={{ margin: 0, paddingLeft: "1.1rem" }}>
+                {terrainRows.slice(0, 50).map((r) => (
+                  <li key={`${r.campaign}-${r.id}`}>
+                    <strong>{r.label}</strong> — {r.status} · campagne {r.campaign}
+                  </li>
+                ))}
+              </ul>
+            </>
           ) : null}
           <p className="muted small" style={{ margin: "0.75rem 0 0" }}>
-            Contrôle / promotion NIC :{" "}
+            Les fiches <strong>PROMOTED</strong> apparaissent aussi dans la liste Population ci-dessous.
+            Contrôle restant :{" "}
             <a href="http://127.0.0.1:5183/campaigns" target="_blank" rel="noreferrer">
               ONIP → Campagnes
             </a>{" "}
