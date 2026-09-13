@@ -160,6 +160,7 @@ async def list_map_points(
                        r.sex,
                        r.date_of_birth,
                        r.status AS record_status,
+                       r.payload AS payload,
                        h.address_line,
                        COALESCE(h.latitude, -4.3276) AS latitude,
                        COALESCE(h.longitude, 15.3136) AS longitude,
@@ -187,16 +188,37 @@ async def list_map_points(
             ),
             params,
         )
+        from apps.api.domains.recensement.service import _coords_for_province, _jitter
+
         for idx, row in enumerate(result.mappings()):
             # Décalage ~8–25 m pour distinguer les personnes d'un même ménage
             offset = ((idx % 17) - 8) * 0.00008
             offset2 = ((idx % 13) - 6) * 0.00008
-            lat = float(row["latitude"]) + offset
-            lng = float(row["longitude"]) + offset2
+            lat = float(row["latitude"])
+            lng = float(row["longitude"])
+            payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+            province_hint = (
+                (payload or {}).get("province_actuelle")
+                or (payload or {}).get("province_origine")
+                or (payload or {}).get("province_code")
+                or row.get("address_line")
+            )
+            near_kin = abs(lat - (-4.3276)) < 0.25 and abs(lng - 15.3136) < 0.25
+            src = row.get("address_source") or "gps"
+            if near_kin and province_hint and str(src).lower() in {
+                "manual",
+                "manual_offline",
+                "cascade",
+                "offline_manual",
+            }:
+                base = _coords_for_province(str(province_hint))
+                if base:
+                    lat, lng = _jitter(base[0], base[1], str(row.get("local_id") or row["id"]))
+            lat = lat + offset
+            lng = lng + offset2
             name = " ".join(
                 p for p in [row["family_name"], row["given_names"]] if p
             ).strip() or "Personne"
-            src = row.get("address_source") or "gps"
             points.append(
                 {
                     "id": row["id"],

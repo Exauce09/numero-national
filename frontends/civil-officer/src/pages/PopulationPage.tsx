@@ -7,7 +7,7 @@ import DataToolbar from "../components/DataToolbar";
 import { PopulationStatBlocks } from "../components/StatBlocks";
 import { api, type CitizenListItem } from "../api";
 import { getSession } from "../auth";
-import { nationalHitToPerson } from "../nationalSearch";
+import { displayNic, splitFamilyName, splitGivenNames } from "../nationalSearch";
 import {
   ETAT_CIVIL_OPTIONS,
   deletePerson,
@@ -23,7 +23,7 @@ import {
   type Sexe,
 } from "../registry";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 25;
 
 type PopView = "all" | "recenses" | "identification";
 
@@ -33,21 +33,30 @@ type PopRow = Person & {
   biometricNote?: string;
 };
 
+function mapSex(sex?: string | null): Sexe {
+  const s = (sex || "").toUpperCase();
+  if (s === "F" || s === "FEMALE" || s === "FEMININ") return "F";
+  return "M";
+}
+
+/** Mapping liste sans inventer de NIC et sans polluer le registre local. */
 function citizenToRow(c: CitizenListItem): PopRow {
-  const p = nationalHitToPerson({
+  const { nom, postnom: postFromFam } = splitFamilyName(c.family_name || "");
+  const { prenom, postnom: postFromGiven } = splitGivenNames(c.given_names || "");
+  const realNic = (c.nic || "").trim();
+  const nic = realNic && !realNic.toUpperCase().startsWith("REG-") ? realNic : "";
+  return {
     id: c.id,
-    nic: c.nic,
-    status: c.status,
-    family_name: c.family_name,
-    given_names: c.given_names,
-    date_of_birth: c.date_of_birth,
-    sex: c.sex,
-    place_of_birth: c.place_of_birth,
-    province_code: c.province_code,
-    ville: c.ville,
-    commune_code: c.commune_code,
-  });
-  return { ...p, registryStatus: c.status };
+    nom,
+    postnom: postFromFam || postFromGiven,
+    prenom,
+    sexe: mapSex(c.sex),
+    date_naissance: (c.date_of_birth || "").slice(0, 10),
+    lieu_naissance: c.place_of_birth || c.ville || "",
+    etat_civil: "UNKNOWN",
+    nic,
+    registryStatus: c.status,
+  };
 }
 
 function civilStatusLabel(p: PopRow): string {
@@ -55,6 +64,7 @@ function civilStatusLabel(p: PopRow): string {
     const rs = (p.registryStatus || "").toUpperCase();
     if (rs === "DECEASED") return "Décédé(e)";
   }
+  if (p.etat_civil === "UNKNOWN") return "Non renseigné";
   const hit = ETAT_CIVIL_OPTIONS.find((o) => o.value === p.etat_civil);
   return hit?.label || p.etat_civil || "—";
 }
@@ -274,8 +284,10 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
               <>Personnes déjà recensées (acte de recensement lié).</>
             ) : source === "api" ? (
               <>
-                Registre national — {total} fiche(s). Les personnes recensées (promues NIC)
-                apparaissent dans la liste ci-dessous.
+                Registre national — {total} fiche(s) au total. Affichage {PAGE_SIZE} par page
+                ({rows.length} après filtres) — utilisez la pagination en bas. Les NIC
+                officiels ont 14 chiffres ; « Sans NIC » = brouillon non encore validé
+                (non utilisable comme mère/père tant que le NIC n’est pas attribué).
               </>
             ) : (
               <>Mode local (navigateur). Connectez-vous avec un compte API pour le registre national.</>
@@ -441,7 +453,12 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                   <tr key={p.id}>
                     <td>{(safePage - 1) * PAGE_SIZE + i + 1}</td>
                     <td>
-                      <code>{p.nic || "—"}</code>
+                      <code title={p.registryStatus || ""}>
+                        {displayNic(p.nic, p.registryStatus)}
+                      </code>
+                      {(p.registryStatus || "").toUpperCase() === "DRAFT" ? (
+                        <div className="muted small">Brouillon</div>
+                      ) : null}
                     </td>
                     <td>{p.nom}</td>
                     <td>{p.postnom || "—"}</td>
@@ -523,6 +540,11 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
           <span className="muted small">
             Showing {rows.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1} to{" "}
             {Math.min(safePage * PAGE_SIZE, rows.length)} of {rows.length} entries
+            {source === "api" && total > rows.length
+              ? ` (registre: ${total})`
+              : source === "api"
+                ? ` (registre: ${total})`
+                : ""}
           </span>
           <div className="eg-pager-btns">
             <button type="button" className="btn-secondary btn-sm" disabled={safePage <= 1} onClick={() => setPage(1)}>

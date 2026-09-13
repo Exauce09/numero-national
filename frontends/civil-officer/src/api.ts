@@ -212,6 +212,22 @@ export const api = {
   listCensusCampaigns: () =>
     request<Array<{ id: string; code: string; name: string; status: string }>>("/census/campaigns"),
 
+  syncCensusPush: (body: {
+    device_uid: string;
+    campaign_id: string;
+    agent_user_id?: string;
+    items: Array<{
+      entity_type: string;
+      local_id: string;
+      version?: number;
+      data: Record<string, unknown>;
+    }>;
+  }) =>
+    request<{ batch_id: string; accepted: number; conflicts: number }>("/census/sync/push", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
   listCensusRecords: (campaignId: string, status = "SYNCED") => {
     const q = new URLSearchParams({ status });
     return request<

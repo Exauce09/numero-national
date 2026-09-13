@@ -358,6 +358,11 @@ async def promote_record(
         return await service.promote_record(db, rec, current_user.id, req)
     except ValueError as exc:
         code = str(exc)
+        if code.startswith("duplicate_citizen"):
+            raise HTTPException(
+                status_code=409,
+                detail="Doublon refusé: cette identité existe déjà dans le registre national",
+            ) from exc
         mapping = {
             "not_promotable": (409, f"Record status {rec.status.value} cannot be promoted"),
             "missing_given_names": (422, "given_names required"),

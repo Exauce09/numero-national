@@ -1,22 +1,32 @@
-import { getSession } from "./auth";
+/** Recherche nationale (registre API) + fusion avec le registre local. */
+
 import { api, type FormDraft } from "./api";
+import { getSession } from "./auth";
 import {
   addPerson,
   getPerson,
   searchPersons,
+  updatePerson,
   type Person,
   type Sexe,
 } from "./registry";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "/api/v1";
 
+function authHeaders(): HeadersInit {
+  const session = getSession();
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (session?.accessToken) headers.Authorization = `Bearer ${session.accessToken}`;
+  return headers;
+}
+
 export type NationalCitizenHit = {
   id: string;
-  nic: string | null;
-  status: string;
-  family_name: string;
-  given_names: string;
-  date_of_birth: string;
+  nic?: string | null;
+  status?: string;
+  family_name?: string;
+  given_names?: string;
+  date_of_birth?: string;
   sex?: string;
   place_of_birth?: string | null;
   province_code?: string | null;
@@ -24,18 +34,17 @@ export type NationalCitizenHit = {
   commune_code?: string | null;
 };
 
-export type DraftSearchHit = FormDraft & {
-  kind: "draft";
-};
+export type DraftSearchHit = FormDraft & { kind: "draft" };
 
-function authHeaders(): HeadersInit {
-  const session = getSession();
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (session?.accessToken) headers.Authorization = `Bearer ${session.accessToken}`;
-  return headers;
+/** Nom de famille « Nom Postnom » → { nom, postnom }. */
+export function splitFamilyName(family: string): { nom: string; postnom: string } {
+  const parts = family.trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return { nom: family.trim(), postnom: "" };
+  return { nom: parts[0], postnom: parts.slice(1).join(" ") };
 }
 
-function splitGivenNames(given: string): { prenom: string; postnom: string } {
+/** Prénoms « Prénom Autre » → { prenom, postnom } (postnom seulement si famille vide). */
+export function splitGivenNames(given: string): { prenom: string; postnom: string } {
   const parts = given.trim().split(/\s+/).filter(Boolean);
   if (parts.length <= 1) return { prenom: given.trim(), postnom: "" };
   return { prenom: parts[0], postnom: parts.slice(1).join(" ") };
@@ -47,21 +56,46 @@ function mapSex(sex?: string): Sexe {
   return "M";
 }
 
+/** Affichage NIC : jamais inventer un faux préfixe REG-. */
+export function displayNic(nic?: string | null, status?: string | null): string {
+  const n = (nic || "").trim();
+  if (n && !n.toUpperCase().startsWith("REG-")) return n;
+  const st = (status || "").toUpperCase();
+  if (st === "DRAFT" || st === "PENDING_VALIDATION") return "Sans NIC (brouillon)";
+  return "Sans NIC";
+}
+
 /** Convertit un hit national en Person locale (pour autofill + liaison). */
 export function nationalHitToPerson(hit: NationalCitizenHit): Person {
   const existing = getPerson(hit.id);
-  if (existing) return existing;
-  const { prenom, postnom } = splitGivenNames(hit.given_names || "");
+  const { nom, postnom: postFromFam } = splitFamilyName(hit.family_name || "");
+  const { prenom, postnom: postFromGiven } = splitGivenNames(hit.given_names || "");
+  const postnom = postFromFam || postFromGiven;
+  const realNic = (hit.nic || "").trim();
+  const nic = realNic && !realNic.toUpperCase().startsWith("REG-") ? realNic : "";
+
+  if (existing) {
+    const patch: Partial<Person> = {};
+    if (nic && (existing.nic?.startsWith("REG-") || !existing.nic)) patch.nic = nic;
+    if (!existing.nom && nom) patch.nom = nom;
+    if (!existing.postnom && postnom) patch.postnom = postnom;
+    if (!existing.prenom && prenom) patch.prenom = prenom;
+    if (Object.keys(patch).length) {
+      return updatePerson(existing.id, patch) ?? { ...existing, ...patch };
+    }
+    return existing;
+  }
+
   return addPerson({
     id: hit.id,
-    nom: hit.family_name || "",
+    nom,
     postnom,
     prenom,
     sexe: mapSex(hit.sex),
     date_naissance: hit.date_of_birth?.slice(0, 10) || "",
     lieu_naissance: hit.place_of_birth || hit.ville || "",
     etat_civil: "UNKNOWN",
-    nic: hit.nic || `REG-${hit.id.replace(/-/g, "").slice(0, 12)}`,
+    nic,
   });
 }
 

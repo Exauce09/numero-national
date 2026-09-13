@@ -42,7 +42,33 @@ async def create_draft_citizen(
     *,
     actor_id: uuid.UUID | None = None,
 ) -> tuple[Citizen, int]:
-    """Create a DRAFT citizen without NIC; run demographic duplicate check."""
+    """Create a DRAFT citizen without NIC; run demographic duplicate check.
+
+    Hard rule: refuse exact identity matches (same names + date of birth).
+    Soft / probabilistic duplicates are recorded but do not create a second file
+    with the same identity key.
+    """
+    existing = await session.scalar(
+        select(Citizen)
+        .where(
+            func.lower(Citizen.family_name) == data.family_name.strip().lower(),
+            func.lower(Citizen.given_names) == data.given_names.strip().lower(),
+            Citizen.date_of_birth == data.date_of_birth,
+            Citizen.status != CitizenStatus.MERGED.value,
+        )
+        .limit(1)
+    )
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "Doublon refusé: un citoyen existe déjà avec la même identité",
+                "existing_citizen_id": str(existing.id),
+                "existing_nic": existing.nic,
+                "existing_status": existing.status,
+            },
+        )
+
     now = datetime.now(timezone.utc)
     citizen = Citizen(
         status=CitizenStatus.DRAFT.value,

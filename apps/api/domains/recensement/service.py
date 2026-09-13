@@ -1172,55 +1172,106 @@ async def promote_record(
 
     dob = _parse_dob(rec.date_of_birth)
 
+    # Prefer explicit payload fields (nom / postnom / prenom) over merged columns.
+    payload = rec.payload if isinstance(rec.payload, dict) else {}
+    prenom = str(payload.get("prenom") or "").strip() or (rec.given_names or "").strip()
+    nom = str(payload.get("nom") or "").strip()
+    postnom = str(payload.get("postnom") or "").strip()
+    if not nom:
+        # family_name may already be "Nom Postnom"
+        fam_parts = (rec.family_name or "").strip().split()
+        if len(fam_parts) >= 2 and not postnom:
+            nom, postnom = fam_parts[0], " ".join(fam_parts[1:])
+        else:
+            nom = (rec.family_name or "").strip()
+    family_for_registry = f"{nom} {postnom}".strip() if postnom else nom
+    given_for_registry = prenom
+
     hh = await db.get(Household, rec.household_id)
     zone = None
     if hh and hh.zone_id:
         zone = await db.get(Zone, hh.zone_id)
 
+    # Province from census payload (manual address) for registry + cartography.
+    prov_code = (
+        str(payload.get("province_code") or "").strip()
+        or (zone.province_code if zone else None)
+    )
+    prov_name = str(payload.get("province_origine") or "").strip()
+
     addresses: list[CitizenAddressIn] = []
     if hh and hh.address_line and hh.address_line.strip():
-        city = (zone.name if zone else None) or (zone.commune_code if zone else None) or "Kinshasa"
+        city = prov_name or (zone.name if zone else None) or (zone.commune_code if zone else None) or "RDC"
         addresses.append(
             CitizenAddressIn(
                 address_type=AddressType.RESIDENTIAL,
                 line1=hh.address_line.strip()[:255],
                 city=str(city)[:128],
                 commune_code=zone.commune_code if zone else None,
-                province_code=zone.province_code if zone else None,
+                province_code=str(prov_code)[:32] if prov_code else None,
                 is_primary=True,
             )
         )
 
-    create_data = CitizenCreate(
-        given_names=rec.given_names.strip(),
-        family_name=rec.family_name.strip(),
-        date_of_birth=dob,
-        sex=_map_sex(rec.sex),
-        nationality="COD",
-        addresses=addresses,
-    )
-    citizen, _dupes = await registry_service.create_draft_citizen(
-        db, create_data, actor_id=promoter_id
-    )
-
-    db.add(
-        CitizenHistory(
-            citizen_id=citizen.id,
-            event_type=CitizenEventType.STATUS_CHANGED.value,
-            payload={
-                "source": "census_promote",
-                "census_record_id": str(rec.id),
-                "campaign_id": str(rec.campaign_id),
-                "local_id": rec.local_id,
-            },
-            actor_id=promoter_id,
+    # Hard block: never create a second citizen with same identity (name + DOB).
+    # If one already exists, link the census fiche to that citizen (no doublon).
+    existing_dup = await db.scalar(
+        select(Citizen).where(
+            func.lower(Citizen.family_name) == family_for_registry.lower(),
+            func.lower(Citizen.given_names) == given_for_registry.lower(),
+            Citizen.date_of_birth == dob,
+            Citizen.status != "MERGED",
         )
     )
-    await db.commit()
+
+    already = False
+    if existing_dup is not None:
+        citizen = existing_dup
+        already = True
+    else:
+        create_data = CitizenCreate(
+            given_names=given_for_registry,
+            family_name=family_for_registry,
+            date_of_birth=dob,
+            sex=_map_sex(rec.sex),
+            nationality="COD",
+            place_of_birth=prov_name or None,
+            addresses=addresses,
+        )
+        try:
+            citizen, _dupes = await registry_service.create_draft_citizen(
+                db, create_data, actor_id=promoter_id
+            )
+        except HTTPException as exc:
+            detail = exc.detail if isinstance(exc.detail, dict) else {}
+            if exc.status_code == 409 and detail.get("existing_citizen_id"):
+                linked = await db.get(Citizen, uuid.UUID(str(detail["existing_citizen_id"])))
+                if linked is None:
+                    raise ValueError("duplicate_citizen") from exc
+                citizen = linked
+                already = True
+            else:
+                raise
+
+        if not already:
+            db.add(
+                CitizenHistory(
+                    citizen_id=citizen.id,
+                    event_type=CitizenEventType.STATUS_CHANGED.value,
+                    payload={
+                        "source": "census_promote",
+                        "census_record_id": str(rec.id),
+                        "campaign_id": str(rec.campaign_id),
+                        "local_id": rec.local_id,
+                    },
+                    actor_id=promoter_id,
+                )
+            )
+            await db.commit()
 
     nic_assigned = False
     nic_error: str | None = None
-    if body.assign_nic:
+    if body.assign_nic and citizen.nic is None:
         try:
             citizen, _ = await registry_service.validate_and_assign_nic(
                 db,
@@ -1254,7 +1305,7 @@ async def promote_record(
         citizen_id=citizen.id,
         nic=citizen.nic,
         citizen_status=citizen.status,
-        already_promoted=False,
+        already_promoted=already,
         nic_assigned=nic_assigned,
         nic_error=nic_error,
     )

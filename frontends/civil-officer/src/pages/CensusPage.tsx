@@ -847,6 +847,9 @@ export default function CensusPage() {
         adresse,
         communeCode: String(payload.commune_code ?? commune.code),
         censusActId: act.id,
+        provinceName: geoActuelle.province_name || geoNaissance.province_name || null,
+        provinceCode: geoActuelle.province_name || geoNaissance.province_name || null,
+        villeName: geoActuelle.ville_name || null,
       });
       let bioMsg = "";
       if (onip.citizenId) {

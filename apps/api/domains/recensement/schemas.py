@@ -137,7 +137,7 @@ class RecordRejectRequest(BaseModel):
 class PromoteRequest(BaseModel):
     """Promote an APPROVED census fiche into core_registry."""
 
-    assign_nic: bool = False
+    assign_nic: bool = True
     force_despite_duplicates: bool = False
     override_justification: str | None = Field(default=None, max_length=2000)
 
@@ -153,7 +153,7 @@ class PromoteResult(BaseModel):
 
 
 class BatchPromoteRequest(BaseModel):
-    assign_nic: bool = False
+    assign_nic: bool = True
     limit: int = Field(default=50, ge=1, le=200)
 
 

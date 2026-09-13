@@ -239,7 +239,7 @@ def main() -> int:
                 p = client.post(
                     f"/api/v1/census/records/{rid}/promote",
                     headers=sh,
-                    json={},
+                    json={"assign_nic": True},
                 )
                 if p.status_code >= 400:
                     print(f"  promote fail {name}: {p.status_code} {p.text[:160]}")
