@@ -199,7 +199,7 @@ export function LineChart({
 /** Mini sparkline pour KPI. */
 export function Sparkline({
   values,
-  color = "#0b3d91",
+  color = "#007FFF",
   width = 88,
   height = 28,
 }: {

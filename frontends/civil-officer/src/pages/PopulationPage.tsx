@@ -8,6 +8,7 @@ import { PopulationStatBlocks } from "../components/StatBlocks";
 import { api, type CitizenListItem } from "../api";
 import { ensureAccessToken, getSession } from "../auth";
 import { displayNic, splitFamilyName, splitGivenNames } from "../nationalSearch";
+import { RDC, rdcColor } from "../rdcColors";
 import {
   ETAT_CIVIL_OPTIONS,
   deletePerson,
@@ -243,26 +244,26 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
   }));
 
   const pieSexe = [
-    { label: "Hommes", value: stats.hommes.total, color: "#5d87ff" },
-    { label: "Femmes", value: stats.femmes.total, color: "#fa896b" },
+    { label: "Hommes", value: stats.hommes.total, color: RDC.blue },
+    { label: "Femmes", value: stats.femmes.total, color: RDC.red },
   ];
   const pieNat = [
-    { label: "Congolais(e)", value: stats.total.congolais, color: "#13deb9" },
-    { label: "Étranger", value: stats.total.etranger, color: "#ffae1f" },
+    { label: "Congolais(e)", value: stats.total.congolais, color: RDC.yellow },
+    { label: "Étranger", value: stats.total.etranger, color: RDC.blueDeep },
   ];
   const pieAge = [
-    { label: "Mineurs", value: stats.total.mineurs.total, color: "#763ebd" },
-    { label: "Majeurs", value: stats.total.majeurs.total, color: "#49beff" },
+    { label: "Mineurs", value: stats.total.mineurs.total, color: RDC.yellowDeep },
+    { label: "Majeurs", value: stats.total.majeurs.total, color: RDC.blue },
   ];
   const histo = [
-    { label: "H min. C", value: stats.hommes.mineurs.congolais, color: "#5d87ff" },
-    { label: "H min. É", value: stats.hommes.mineurs.etranger, color: "#539bff" },
-    { label: "H maj. C", value: stats.hommes.majeurs.congolais, color: "#13deb9" },
-    { label: "H maj. É", value: stats.hommes.majeurs.etranger, color: "#0aad8a" },
-    { label: "F min. C", value: stats.femmes.mineurs.congolais, color: "#fa896b" },
-    { label: "F min. É", value: stats.femmes.mineurs.etranger, color: "#fdd835" },
-    { label: "F maj. C", value: stats.femmes.majeurs.congolais, color: "#ffae1f" },
-    { label: "F maj. É", value: stats.femmes.majeurs.etranger, color: "#fc4b6c" },
+    { label: "H min. C", value: stats.hommes.mineurs.congolais, color: rdcColor(0) },
+    { label: "H min. É", value: stats.hommes.mineurs.etranger, color: rdcColor(1) },
+    { label: "H maj. C", value: stats.hommes.majeurs.congolais, color: rdcColor(2) },
+    { label: "H maj. É", value: stats.hommes.majeurs.etranger, color: rdcColor(3) },
+    { label: "F min. C", value: stats.femmes.mineurs.congolais, color: rdcColor(4) },
+    { label: "F min. É", value: stats.femmes.mineurs.etranger, color: rdcColor(5) },
+    { label: "F maj. C", value: stats.femmes.majeurs.congolais, color: rdcColor(6) },
+    { label: "F maj. É", value: stats.femmes.majeurs.etranger, color: rdcColor(7) },
   ];
 
   function setView(next: PopView) {

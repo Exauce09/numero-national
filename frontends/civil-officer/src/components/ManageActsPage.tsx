@@ -16,6 +16,7 @@ import {
   type Act,
   type ActType,
 } from "../registry";
+import { RDC_CHART_SERIES, rdcColor } from "../rdcColors";
 
 export type ManageConfig = {
   slug: string;
@@ -161,7 +162,7 @@ export const MANAGE_CONFIGS: Record<string, ManageConfig> = {
 };
 
 const PAGE_SIZE = 10;
-const COLORS = ["#5d87ff", "#13deb9", "#fa896b", "#ffae1f", "#539bff", "#763ebd"];
+const COLORS = RDC_CHART_SERIES;
 
 const ACT_KIND: Partial<Record<ActType, string>> = {
   BIRTH: "births",
@@ -359,10 +360,10 @@ export default function ManageActsPage({
           <SimpleStatBlocks
             title={config.listTitle}
             items={[
-              { label: "TOTAL", value: all.length, color: "#5d87ff" },
-              { label: "30 DERNIERS JOURS", value: last30, color: "#13deb9" },
-              { label: "90 DERNIERS JOURS", value: last90, color: "#ffae1f" },
-              { label: "FILTRÉS", value: rows.length, color: "#fa896b" },
+              { label: "TOTAL", value: all.length, color: rdcColor(0) },
+              { label: "30 DERNIERS JOURS", value: last30, color: rdcColor(1) },
+              { label: "90 DERNIERS JOURS", value: last90, color: rdcColor(2) },
+              { label: "FILTRÉS", value: rows.length, color: rdcColor(3) },
             ]}
           />
 

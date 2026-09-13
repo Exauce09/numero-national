@@ -17,6 +17,7 @@ import {
   type Act,
   type ActType,
 } from "../registry";
+import { RDC_CHART_SERIES, rdcColor } from "../rdcColors";
 
 const TYPES: Array<ActType | ""> = [
   "",
@@ -33,7 +34,7 @@ const TYPES: Array<ActType | ""> = [
 const API_KINDS = ["births", "deaths", "marriages", "divorces", "adoptions", "recognitions", "rectifications"] as const;
 
 const PAGE_SIZE = 10;
-const COLORS = ["#5d87ff", "#13deb9", "#fa896b", "#ffae1f", "#539bff", "#763ebd", "#49beff", "#fdd835"];
+const COLORS = RDC_CHART_SERIES;
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "Brouillon",
@@ -210,10 +211,10 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
           <SimpleStatBlocks
             title="LISTE DES ACTES & DOCUMENTS"
             items={[
-              { label: "TOTAL ACTES", value: all.length, color: "#5d87ff" },
-              { label: "DOCUMENTS", value: docs, color: "#13deb9" },
-              { label: "AUTRES ACTES", value: all.length - docs, color: "#ffae1f" },
-              { label: "FILTRÉS", value: acts.length, color: "#fa896b" },
+              { label: "TOTAL ACTES", value: all.length, color: rdcColor(0) },
+              { label: "DOCUMENTS", value: docs, color: rdcColor(1) },
+              { label: "AUTRES ACTES", value: all.length - docs, color: rdcColor(2) },
+              { label: "FILTRÉS", value: acts.length, color: rdcColor(3) },
             ]}
           />
 

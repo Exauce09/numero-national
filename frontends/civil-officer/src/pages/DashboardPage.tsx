@@ -13,6 +13,7 @@ import {
   IconUsers,
 } from "../components/Icons";
 import { dashboardVariant } from "../rbac";
+import { RDC } from "../rdcColors";
 import {
   listActs,
   listPopulationPersons,
@@ -305,7 +306,7 @@ export default function DashboardPage() {
               : `Cache local (${localPop.length}) — reconnectez-vous`
           }
           icon={<IconUsers size={22} />}
-          color="#0b3d91"
+          color={RDC.blue}
           spark={demoAll}
           href="/population"
           demo={apiPop == null && localPop.length === 0}
@@ -315,7 +316,7 @@ export default function DashboardPage() {
           value={births.length}
           subtitle="Actes enregistrés"
           icon={<IconBaby size={22} />}
-          color="#0aad8a"
+          color={RDC.yellowDeep}
           spark={demoBirth}
           href="/lists/naissance"
         />
@@ -324,7 +325,7 @@ export default function DashboardPage() {
           value={marriages.length}
           subtitle="Unions"
           icon={<IconRing size={22} />}
-          color="#f7a800"
+          color={RDC.yellow}
           spark={marriageSeries.some((v) => v > 0) ? marriageSeries : demoAll}
           href="/lists/mariage"
         />
@@ -333,7 +334,7 @@ export default function DashboardPage() {
           value={deaths.length}
           subtitle="Actes de décès"
           icon={<IconCross size={22} />}
-          color="#ce1126"
+          color={RDC.red}
           spark={demoDeath}
           href="/lists/deces"
         />
@@ -342,7 +343,7 @@ export default function DashboardPage() {
           value={divorces.length}
           subtitle="Dissolutions"
           icon={<IconSplit size={22} />}
-          color="#5b6b7c"
+          color={RDC.redDeep}
           spark={demoAll}
           href="/lists/divorce"
         />
@@ -351,7 +352,7 @@ export default function DashboardPage() {
           value={drafts + submitted}
           subtitle={`${drafts} brouillons · ${submitted} soumis`}
           icon={<IconClipboard size={22} />}
-          color="#3b6ea5"
+          color={RDC.blueDeep}
           spark={demoAll}
           href="/declarations"
         />
@@ -383,9 +384,9 @@ export default function DashboardPage() {
           title={demoTemporal ? "Évolution des actes (DEMO)" : "Évolution des actes (6 mois)"}
           labels={months.map((m) => m.label)}
           series={[
-            { name: "Tous actes", color: "#0b3d91", values: demoAll },
-            { name: "Naissances", color: "#0aad8a", values: demoBirth },
-            { name: "Décès", color: "#ce1126", values: demoDeath },
+            { name: "Tous actes", color: RDC.blue, values: demoAll },
+            { name: "Naissances", color: RDC.yellow, values: demoBirth },
+            { name: "Décès", color: RDC.red, values: demoDeath },
           ]}
           height={240}
         />
@@ -393,10 +394,10 @@ export default function DashboardPage() {
           title="Actes d'état civil par type"
           height={200}
           data={[
-            { label: "Naiss.", value: births.length, color: "#0aad8a" },
-            { label: "Mariages", value: marriages.length, color: "#f7a800" },
-            { label: "Divorces", value: divorces.length, color: "#5b6b7c" },
-            { label: "Décès", value: deaths.length, color: "#ce1126" },
+            { label: "Naiss.", value: births.length, color: RDC.yellow },
+            { label: "Mariages", value: marriages.length, color: RDC.yellowDeep },
+            { label: "Divorces", value: divorces.length, color: RDC.redSoft },
+            { label: "Décès", value: deaths.length, color: RDC.red },
           ]}
         />
       </div>
@@ -405,10 +406,10 @@ export default function DashboardPage() {
         <PieChart
           title="Statut des dossiers"
           data={[
-            { label: "Brouillon", value: drafts, color: "#9aa8c0" },
-            { label: "Soumis / revue", value: submitted, color: "#f7a800" },
-            { label: "Validé / auth.", value: validated, color: "#0aad8a" },
-            { label: "Rejeté / correction", value: rejected, color: "#ce1126" },
+            { label: "Brouillon", value: drafts, color: RDC.blueSoft },
+            { label: "Soumis / revue", value: submitted, color: RDC.yellow },
+            { label: "Validé / auth.", value: validated, color: RDC.blue },
+            { label: "Rejeté / correction", value: rejected, color: RDC.red },
           ]}
         />
         <div className="eg-chart-card" style={{ padding: "0.85rem 1rem" }}>
@@ -450,8 +451,8 @@ export default function DashboardPage() {
               : "Population locale — sexe (cache navigateur)"
           }
           data={[
-            { label: "Hommes", value: popBreakdown.hommes.total, color: "#0b3d91" },
-            { label: "Femmes", value: popBreakdown.femmes.total, color: "#ce1126" },
+            { label: "Hommes", value: popBreakdown.hommes.total, color: RDC.blue },
+            { label: "Femmes", value: popBreakdown.femmes.total, color: RDC.red },
           ]}
         />
         <BarChart
@@ -462,8 +463,8 @@ export default function DashboardPage() {
           }
           height={180}
           data={[
-            { label: "Mineurs", value: popBreakdown.total.mineurs.total, color: "#3b6ea5" },
-            { label: "Majeurs", value: popBreakdown.total.majeurs.total, color: "#0b3d91" },
+            { label: "Mineurs", value: popBreakdown.total.mineurs.total, color: RDC.yellow },
+            { label: "Majeurs", value: popBreakdown.total.majeurs.total, color: RDC.blueDeep },
           ]}
         />
       </div>
@@ -473,8 +474,8 @@ export default function DashboardPage() {
           title={demoTemporal ? "Naissances vs décès (DEMO)" : "Naissances vs décès"}
           labels={months.map((m) => m.label)}
           series={[
-            { name: "Naissances", color: "#0aad8a", values: demoBirth },
-            { name: "Décès", color: "#ce1126", values: demoDeath },
+            { name: "Naissances", color: RDC.yellow, values: demoBirth },
+            { name: "Décès", color: RDC.red, values: demoDeath },
           ]}
         />
         <div className="eg-chart-card">
