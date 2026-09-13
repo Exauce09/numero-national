@@ -6,7 +6,7 @@ import { BarChart, PieChart } from "../components/Charts";
 import DataToolbar from "../components/DataToolbar";
 import { PopulationStatBlocks } from "../components/StatBlocks";
 import { api, type CitizenListItem } from "../api";
-import { getSession } from "../auth";
+import { ensureAccessToken, getSession } from "../auth";
 import { displayNic, splitFamilyName, splitGivenNames } from "../nationalSearch";
 import {
   ETAT_CIVIL_OPTIONS,
@@ -109,7 +109,8 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
   }, [persons.length]);
 
   const load = useCallback(async () => {
-    if (!hasApi) {
+    const token = hasApi ? await ensureAccessToken() : null;
+    if (!token) {
       const local = listPopulationPersons().map((p) => ({
         ...p,
         registryStatus: "LOCAL",
@@ -119,6 +120,9 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
       setPersons(local);
       setSource("local");
       setTotal(local.length);
+      setError(
+        "Session API absente — affichage du cache navigateur uniquement (chiffre local, pas le registre national).",
+      );
       return;
     }
     setBusy(true);
@@ -144,9 +148,14 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
       }
       const rows = allItems.map((c) => {
         const row = citizenToRow(c);
+        const status = (c.status || "").toUpperCase();
+        const linkedLocal =
+          Boolean(row.id && censusIds.has(row.id)) || Boolean(row.nic && censusIds.has(row.nic));
+        // Recensé national = fiche ACTIVE avec NIC (promue) ou acte local CENSUS
+        const hasCensus = linkedLocal || (status === "ACTIVE" && Boolean(row.nic));
         return {
           ...row,
-          hasCensus: Boolean(row.id && censusIds.has(row.id)) || Boolean(row.nic && censusIds.has(row.nic)),
+          hasCensus,
           biometricNote: [row.fingerprint_note, row.iris_note].filter(Boolean).join(" · ") || "Non enrôlé",
         };
       });
@@ -154,16 +163,13 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
       setTotal(total || rows.length);
       setSource("api");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Impossible de charger le registre national.");
-      const local = listPopulationPersons().map((p) => ({
-        ...p,
-        registryStatus: "LOCAL",
-        hasCensus: Boolean(p.id && censusIds.has(p.id)) || Boolean(p.nic && censusIds.has(p.nic)),
-        biometricNote: [p.fingerprint_note, p.iris_note].filter(Boolean).join(" · ") || "Non enrôlé",
-      }));
-      setPersons(local);
-      setTotal(local.length);
-      setSource("local");
+      setError(
+        `${e instanceof Error ? e.message : "Erreur API"} — le registre national n’a pas pu être chargé (ne pas confondre avec le cache local).`,
+      );
+      // Ne plus masquer l’échec API avec un faux total local : liste vide + message clair.
+      setPersons([]);
+      setTotal(0);
+      setSource("api");
     } finally {
       setBusy(false);
     }
@@ -281,16 +287,20 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
             {view === "identification" ? (
               <>Données biométriques et statut civil de chaque personne du registre.</>
             ) : view === "recenses" ? (
-              <>Personnes déjà recensées (acte de recensement lié).</>
+              <>
+                Personnes recensées (NIC actif national ou acte local). Total registre : {total}.
+              </>
             ) : source === "api" ? (
               <>
-                Registre national — {total} fiche(s) au total. Affichage {PAGE_SIZE} par page
-                ({rows.length} après filtres) — utilisez la pagination en bas. Les NIC
-                officiels ont 14 chiffres ; « Sans NIC » = brouillon non encore validé
-                (non utilisable comme mère/père tant que le NIC n’est pas attribué).
+                Registre national — <strong>{total}</strong> fiche(s) au total. Affichage {PAGE_SIZE}{" "}
+                par page ({rows.length} après filtres) — pagination en bas. Les NIC officiels ont 14
+                chiffres.
               </>
             ) : (
-              <>Mode local (navigateur). Connectez-vous avec un compte API pour le registre national.</>
+              <>
+                Mode local navigateur — <strong>{total}</strong> fiche(s) en cache seulement (ce n’est
+                pas le registre national à 110). Reconnectez-vous : officier / DemoCivil2026!
+              </>
             )}
           </p>
         </div>

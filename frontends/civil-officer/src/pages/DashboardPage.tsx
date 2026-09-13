@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type CivilAct } from "../api";
-import { getSession } from "../auth";
+import { ensureAccessToken, getSession } from "../auth";
 import { BarChart, LineChart, PieChart, Sparkline } from "../components/Charts";
 import {
   IconBaby,
@@ -123,12 +123,16 @@ export default function DashboardPage() {
   const [apiError, setApiError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!session?.accessToken) {
-      setApiLoaded(true);
-      return;
-    }
     let cancelled = false;
     void (async () => {
+      const token = await ensureAccessToken();
+      if (!token) {
+        if (!cancelled) {
+          setApiLoaded(true);
+          setApiError("Non connecté à l’API — KPI Population = cache local du navigateur");
+        }
+        return;
+      }
       try {
         const [citizens, births, deaths, marriages, divorces] = await Promise.all([
           api.searchCitizens(new URLSearchParams({ page: "1", page_size: "1" })),
@@ -140,6 +144,7 @@ export default function DashboardPage() {
         if (cancelled) return;
         setApiPop(citizens.total ?? 0);
         setApiActs([...births, ...deaths, ...marriages, ...divorces]);
+        setApiError(null);
       } catch (e) {
         if (!cancelled) setApiError(e instanceof Error ? e.message : "Stats API indisponibles");
       } finally {
@@ -241,7 +246,11 @@ export default function DashboardPage() {
         <StatCard
           title="Population"
           value={popCount}
-          subtitle={apiPop != null ? "Registre national" : "Registre local"}
+          subtitle={
+            apiPop != null
+              ? "Registre national"
+              : `Cache local (${localPop.length}) — reconnectez-vous`
+          }
           icon={<IconUsers size={22} />}
           color="#0b3d91"
           spark={demoAll}
