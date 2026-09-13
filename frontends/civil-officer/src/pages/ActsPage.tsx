@@ -42,13 +42,19 @@ const STATUS_LABEL: Record<string, string> = {
   VALIDATED: "Validé",
   REJECTED: "Rejeté",
   ARCHIVED: "Archivé",
+  RECORDED: "Enregistré",
 };
 
 function displayActStatus(a: Act): string {
+  // Recensement : jamais « Brouillon » civil — même si ancien cache local en DRAFT.
+  if (a.type === "CENSUS") {
+    const raw = (a.status || "RECORDED").toUpperCase();
+    if (raw === "DRAFT" || !a.status) return "Enregistré (hors workflow civil)";
+    if (raw === "RECORDED") return "Enregistré (hors workflow civil)";
+    return STATUS_LABEL[raw] ?? "Enregistré (hors workflow civil)";
+  }
   const raw = (a.status || "").toUpperCase();
   if (raw && STATUS_LABEL[raw]) return STATUS_LABEL[raw];
-  if (a.type === "CENSUS") return "Hors workflow civil";
-  // Actes locaux / non sync : traités comme brouillon à valider
   return "Brouillon";
 }
 
@@ -66,6 +72,12 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
   const [tick, setTick] = useState(0);
 
   const refresh = useCallback(async () => {
+    // Anciens CEN- locaux restés en DRAFT → Enregistré (hors workflow).
+    for (const a of listActs()) {
+      if (a.type === "CENSUS" && (!a.status || a.status.toUpperCase() === "DRAFT")) {
+        updateAct(a.id, { status: "RECORDED" });
+      }
+    }
     if (!session?.accessToken) {
       setTick((n) => n + 1);
       return;

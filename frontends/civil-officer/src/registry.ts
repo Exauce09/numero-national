@@ -764,6 +764,8 @@ export async function addAct(
     national_id: subjectNic,
     qr_payload: JSON.stringify(qrObject),
     payload,
+    // Recensement / docs : pas de workflow civil — déjà « enregistré », pas brouillon.
+    status: type === "CENSUS" || type === "DOCUMENT" || type === "DISPLACEMENT" ? "RECORDED" : "DRAFT",
     created_at: now,
     updated_at: now,
   };
@@ -843,7 +845,10 @@ export async function addAct(
   return act;
 }
 
-export function updateAct(id: string, patch: { payload?: Record<string, unknown> }): Act | undefined {
+export function updateAct(
+  id: string,
+  patch: { payload?: Record<string, unknown>; status?: string },
+): Act | undefined {
   const registry = load();
   const idx = registry.acts.findIndex((a) => a.id === id);
   if (idx < 0) return undefined;
@@ -851,6 +856,7 @@ export function updateAct(id: string, patch: { payload?: Record<string, unknown>
   const next: Act = {
     ...registry.acts[idx],
     payload: patch.payload ?? registry.acts[idx].payload,
+    status: patch.status ?? registry.acts[idx].status,
     updated_at: now,
   };
   registry.acts[idx] = next;

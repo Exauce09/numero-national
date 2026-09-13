@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api, type CivilAct } from "../api";
 import { getSession } from "../auth";
 import { can, canValidateActs } from "../rbac";
-import { actTypeLabel, replaceAct, type Act, type ActType } from "../registry";
+import { actTypeLabel, replaceAct, updateAct, type Act, type ActType } from "../registry";
 import ActPrintCard from "./ActPrintCard";
 
 const NEXT: Record<string, string[]> = {
@@ -34,6 +34,7 @@ const STATUS_LABEL: Record<string, string> = {
   VALIDATED: "Validé",
   REJECTED: "Rejeté",
   ARCHIVED: "Archivé",
+  RECORDED: "Enregistré",
 };
 
 type MentionRow = {
@@ -98,10 +99,18 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
   );
   const [showPrint, setShowPrint] = useState(false);
 
-  const status = (current.status || "DRAFT").toUpperCase();
-  const isValidated = status === "VALIDATED" || status === "ARCHIVED";
   const civilKind = CIVIL_API_KIND[current.type];
   const supportsCivilWorkflow = Boolean(civilKind);
+  const status = (
+    current.status || (supportsCivilWorkflow ? "DRAFT" : "RECORDED")
+  ).toUpperCase();
+  const displayStatus =
+    current.type === "CENSUS"
+      ? status === "DRAFT" || !current.status
+        ? "Enregistré"
+        : STATUS_LABEL[status] ?? status
+      : STATUS_LABEL[status] ?? status;
+  const isValidated = status === "VALIDATED" || status === "ARCHIVED" || status === "RECORDED";
   const nextSteps = supportsCivilWorkflow ? (NEXT[status] ?? []) : [];
   const serverActId =
     (typeof current.payload?.server_act_id === "string" && current.payload.server_act_id) ||
@@ -338,7 +347,7 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
             {actTypeLabel(current.type)} — {current.act_number}
           </h3>
           <p className="muted small" style={{ margin: "0.25rem 0 0" }}>
-            Statut : <strong>{STATUS_LABEL[status] ?? status}</strong>
+            Statut : <strong>{displayStatus}</strong>
             {serverActId ? " · sync API" : supportsCivilWorkflow ? " · local" : " · hors workflow civil"}
           </p>
         </div>
@@ -370,6 +379,23 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
               marginBottom: "0.75rem",
             }}
           >
+            {(status === "DRAFT" || !current.status) && current.type === "CENSUS" ? (
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ width: "auto" }}
+                onClick={() => {
+                  const next = updateAct(current.id, { status: "RECORDED" });
+                  if (next) {
+                    setCurrent(next);
+                    onUpdated?.(next);
+                    setMessage("Fiche recensement marquée « Enregistré » (plus de brouillon).");
+                  }
+                }}
+              >
+                Quitter le brouillon → Enregistré
+              </button>
+            ) : null}
             <a
               className="btn-primary"
               style={{ width: "auto", textDecoration: "none" }}
