@@ -118,13 +118,25 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
     setBusy(true);
     setError(null);
     try {
-      const qs = new URLSearchParams({
-        page: "1",
-        page_size: "200",
-      });
-      if (q.trim()) qs.set("q", q.trim());
-      const data = await api.searchCitizens(qs);
-      const rows = (data.items ?? []).map((c) => {
+      // API: page_size max = 100 (sinon 422 "Input should be less than or equal to 100")
+      const pageSize = 100;
+      const allItems: Awaited<ReturnType<typeof api.searchCitizens>>["items"] = [];
+      let page = 1;
+      let total = 0;
+      for (;;) {
+        const qs = new URLSearchParams({
+          page: String(page),
+          page_size: String(pageSize),
+        });
+        if (q.trim()) qs.set("q", q.trim());
+        const data = await api.searchCitizens(qs);
+        total = data.total ?? 0;
+        allItems.push(...(data.items ?? []));
+        if (allItems.length >= total || !(data.items?.length)) break;
+        page += 1;
+        if (page > 50) break;
+      }
+      const rows = allItems.map((c) => {
         const row = citizenToRow(c);
         return {
           ...row,
@@ -133,7 +145,7 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
         };
       });
       setPersons(rows);
-      setTotal(data.total ?? rows.length);
+      setTotal(total || rows.length);
       setSource("api");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Impossible de charger le registre national.");

@@ -630,10 +630,57 @@ export default function CensusPage() {
       });
   }
 
-  function clearDraft() {
+  function clearDraftStorage() {
     localStorage.removeItem(CENSUS_DRAFT_KEY);
     const localId = localStorage.getItem(`${CENSUS_DRAFT_KEY}:id`);
     localStorage.removeItem(`${CENSUS_DRAFT_KEY}:id`);
+    return localId;
+  }
+
+  function resetFormFields() {
+    setStep(1);
+    setFicheKind("personne");
+    setDateDeces("");
+    setHandicap("NORMAL");
+    setNom("");
+    setPostnom("");
+    setPrenom("");
+    setSexe("M");
+    setEtatCivil("CELIBATAIRE");
+    setProfession("");
+    setLieuNaissanceManuel("");
+    setGeoNaissance({});
+    setDateNaissance("");
+    setHopitalNaissance("");
+    setHopitalAutre("");
+    setLanguesSelected([]);
+    setPere(null);
+    setMere(null);
+    setNationalite("Congolaise");
+    setPaysResidence("RDC");
+    setGeoActuelle({});
+    setNumeroAvenue("");
+    setTelephone("");
+    setEmail("");
+    setBoitePostale("");
+    setGeoOrigine({});
+    setTribu("");
+    setPhoto(undefined);
+    setEmpreinteGauche("");
+    setEmpreinteDroite("");
+    setEmpreintePouceDroit("");
+    setEmpreinteIndexDroit("");
+    setEmpreinteIndexGauche("");
+    setIris("");
+    setSituationFamiliale(emptySituationFamiliale());
+    setEtudes(emptyEtudes());
+    setExperience(emptyExperience());
+    setIdentiteAdmin(emptyIdentiteAdmin());
+    setFpTemplates({});
+  }
+
+  function clearDraft() {
+    const localId = clearDraftStorage();
     if (localId) {
       void api
         .listFormDrafts(
@@ -648,6 +695,19 @@ export default function CensusPage() {
           if (mine) return api.finalizeFormDraft(mine.id);
         })
         .catch(() => undefined);
+    }
+  }
+
+  function discardDraft() {
+    clearDraft();
+    resetFormFields();
+    setDraftNotice(null);
+    setError(null);
+    setCreated(null);
+    if (searchParams.get("draft")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("draft");
+      setSearchParams(next, { replace: true });
     }
   }
 
@@ -790,16 +850,12 @@ export default function CensusPage() {
           " Empreintes capturées localement — reconnectez-vous puis ré-enrôlez via Biométrie pour la recherche 1:N.";
       }
       clearDraft();
-      setSituationFamiliale(emptySituationFamiliale());
-      setEtudes(emptyEtudes());
-      setExperience(emptyExperience());
-      setIdentiteAdmin(emptyIdentiteAdmin());
-      setFpTemplates({});
+      const wasMarried = ficheKind === "marie" || etatCivil === "MARIE";
+      resetFormFields();
       setCreated(act);
-      setCreatedWasMarried(ficheKind === "marie" || etatCivil === "MARIE");
+      setCreatedWasMarried(wasMarried);
       setDraftNotice(`${onip.message}${bioMsg}`);
       streamRef.current?.getTracks().forEach((t) => t.stop());
-      setStep(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Recensement impossible.");
     }
@@ -828,7 +884,14 @@ export default function CensusPage() {
       </div>
 
       {error ? <div className="login-error">{error}</div> : null}
-      {draftNotice ? <div className="success-banner">{draftNotice}</div> : null}
+      {draftNotice ? (
+        <div className="success-banner" style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ flex: 1 }}>{draftNotice}</span>
+          <button type="button" className="btn-secondary" style={{ width: "auto" }} onClick={discardDraft}>
+            Effacer le brouillon
+          </button>
+        </div>
+      ) : null}
 
       <div className="panel">
         {step === 1 ? (
