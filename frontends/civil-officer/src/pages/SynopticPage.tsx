@@ -16,10 +16,34 @@ import {
 } from "../synoptic";
 
 const TABS = [
-  { slug: "naissances", label: "Liste des Nouveaux-nés" },
-  { slug: "matrimonial", label: "Liste des État-matrimoniaux" },
-  { slug: "deces", label: "Liste des Décès" },
-  { slug: "documents", label: "Liste des Documents" },
+  {
+    slug: "naissances",
+    label: "Liste des Nouveaux-nés",
+    createLabel: "Enregistrer une naissance",
+    createPath: "/births",
+    managePath: "/manage/naissance",
+  },
+  {
+    slug: "matrimonial",
+    label: "Liste des État-matrimoniaux",
+    createLabel: "Enregistrer un mariage",
+    createPath: "/marriages",
+    managePath: "/manage/mariage",
+  },
+  {
+    slug: "deces",
+    label: "Liste des Décès",
+    createLabel: "Enregistrer un décès",
+    createPath: "/deaths",
+    managePath: "/manage/deces",
+  },
+  {
+    slug: "documents",
+    label: "Liste des Documents",
+    createLabel: "Délivrer un document",
+    createPath: "/documents",
+    managePath: "/manage/document",
+  },
 ] as const;
 
 type TabSlug = (typeof TABS)[number]["slug"];
@@ -465,8 +489,8 @@ export default function SynopticPage() {
           </p>
           <h2 className="page-title">Tableau synoptique</h2>
           <p className="page-lead">
-            Toutes les communes sont listées. Sélectionnez une commune pour afficher ses statistiques et
-            tous ses quartiers.
+            Ces onglets sont des <strong>statistiques</strong> (lecture seule) — on ne remplit pas ici.
+            Pour ajouter un acte, utilisez le bouton ci-dessous ou le menu Mariages / Décès / Documents.
           </p>
         </div>
       </div>
@@ -484,6 +508,38 @@ export default function SynopticPage() {
           </NavLink>
         ))}
       </div>
+
+      {(() => {
+        const active = TABS.find((t) => t.slug === tab) ?? TABS[0];
+        return (
+          <div
+            className="panel no-print"
+            style={{
+              marginBottom: "1rem",
+              padding: "0.85rem 1rem",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "0.75rem",
+              alignItems: "center",
+            }}
+          >
+            <p className="muted small" style={{ margin: 0, flex: "1 1 220px" }}>
+              Onglet <strong>{active.label}</strong> = totaux automatiques. Pour saisir :
+            </p>
+            <Link className="btn-primary" style={{ width: "auto" }} to={active.createPath}>
+              + {active.createLabel}
+            </Link>
+            <Link className="btn-secondary" style={{ width: "auto" }} to={active.managePath}>
+              Voir la liste gérable
+            </Link>
+            {active.slug === "matrimonial" ? (
+              <Link className="btn-secondary" style={{ width: "auto" }} to="/divorces">
+                Enregistrer un divorce
+              </Link>
+            ) : null}
+          </div>
+        );
+      })()}
 
       <div className="syn-official-wrap">
         {tab === "naissances" ? <BirthsTable commune={commune} /> : null}
