@@ -16,46 +16,51 @@ AGENT_PASSWORD = "CensusAgent123!"
 SUP_EMAIL = "supervisor.recensement@example.gov"
 SUP_PASSWORD = "CensusSupervisor123!"
 CAMPAIGN_CODE = "RGPH-2026"
-DEVICE_UID = "civil-batch-seed-20260913"
+DEVICE_UID = "civil-batch-seed-20260913-b2"
+BATCH_PREFIX = "batch2-rec-"
 
-# nom, postnom, prenom | sexe | province_code | province | profession | telephone
+# prenom|nom|postnom|sexe|province_code|province|profession|telephone
 RAW = """
-Emmanuel|Kabasele|Mulumba|M|10|Haut-Katanga|Ingénieur|+243 977 325 418
-Christine|Mbayo|Mukendi|F|01|Kinshasa|Infirmière|+243 825 631 947
-Joseph|Kasongo|Lwamba|M|11|Lualaba|Agriculteur|+243 991 458 276
-Thérèse|Nsimba|Mabiala|F|01|Kinshasa|Avocate|+243 814 729 563
-Daniel|Banza|Makengo|M|04|Kongo-Central|Entrepreneur|+243 856 310 000
-Jacqueline|Lukusa|Kiala|F|04|Kongo-Central|Pharmacienne|+243 822 547 316
-François|Mungala|Nzambe|M|03|Kwango|Enseignant|+243 899 632 154
-Angélique|Nsoki|Matondo|F|01|Kinshasa|Commerçante|+243 817 425 638
-Michel|Kimbangu|Mavungu|M|04|Kongo-Central|Journaliste|+243 843 716 295
-Solange|Kalume|Bahati|F|13|Sud-Kivu|Médecin|+243 975 284 631
-André|Ilunga|Kabeya|M|09|Lomami|Agriculteur|+243 816 539 742
-Bernadette|Mulumba|Tshibanda|F|08|Kasaï-Central|Couturière|+243 829 641 573
-Christian|Mbuyi|Kalambayi|M|06|Kasaï|Fonctionnaire|+243 898 315 624
-Joséphine|Tshilombo|Kanku|F|10|Haut-Katanga|Enseignante|+243 824 753 916
-Albert|Mukendi|Kasongo|M|12|Haut-Lomami|Chauffeur|+243 973 426 185
-Pauline|Kabeya|Luyeye|F|01|Kinshasa|Architecte|+243 815 672 439
-Robert|Mabiala|Nsimba|M|04|Kongo-Central|Policier|+243 891 347 526
-Marthe|Kiala|Lukusa|F|14|Maniema|Infirmière|+243 827 516 394
-Serge|Makengo|Banza|M|01|Kinshasa|Développeur|+243 810 683 257
-Véronique|Matondo|Nsoki|F|04|Kongo-Central|Avocate|+243 855 429 713
-Théophile|Nzita|Mbemba|M|15|Nord-Kivu|Commerçant|+243 975 613 482
-Cécile|Mavungu|Kimbangu|F|04|Kongo-Central|Agricultrice|+243 821 754 369
-Christophe|Lwamba|Kasongo|M|13|Sud-Kivu|Enseignant|+243 896 235 714
-Madeleine|Bahati|Kalume|F|13|Sud-Kivu|Sage-femme|+243 814 563 927
-Bernard|Tshibanda|Mbuyi|M|08|Kasaï-Central|Ingénieur|+243 977 418 625
-Germaine|Ilunga|Mulumba|F|09|Lomami|Fonctionnaire|+243 825 739 416
-Augustin|Kabeya|Kabasele|M|10|Haut-Katanga|Électricien|+243 812 654 783
-Monique|Kanku|Tshilombo|F|06|Kasaï|Commerçante|+243 899 247 531
-Roger|Kalambayi|Mukendi|M|01|Kinshasa|Chauffeur|+243 816 425 897
-Suzanne|Mbuyi|Kabeya|F|07|Sankuru|Enseignante|+243 843 591 726
-Denis|Nsimba|Matondo|M|04|Kongo-Central|Technicien|+243 822 638 451
-Rosalie|Mabiala|Kiala|F|14|Maniema|Agricultrice|+243 991 524 637
-Olivier|Banza|Makengo|M|03|Kwango|Entrepreneur|+243 857 316 942
-Alice|Lukusa|Nsimba|F|16|Nord-Ubangi|Infirmière|+243 817 649 325
-Mathieu|Kasongo|Lwamba|M|11|Lualaba|Mécanicien|+243 975 831 264
-Florence|Mbayo|Tshibanda|F|08|Kasaï-Central|Secrétaire|+243 829 475 613
+Alain|Mbemba|Nsaku|M|04|Kongo-Central|Économiste|+243 812 347 651
+Chantal|Mbuyi|Kalonji|F|06|Kasaï|Enseignante|+243 821 563 274
+Didier|Kanku|Kabongo|M|08|Kasaï-Central|Médecin|+243 895 427 316
+Nadège|Mukendi|Tshomba|F|01|Kinshasa|Informaticienne|+243 817 692 435
+Benoît|Kyungu|Katumba|M|10|Haut-Katanga|Architecte|+243 977 314 628
+Chérie|Lunda|Mbuyi|F|09|Lomami|Commerçante|+243 825 471 936
+Fabrice|Musau|Kitenge|M|11|Lualaba|Géologue|+243 991 638 425
+Esther|Masele|Lukusa|F|15|Nord-Kivu|Infirmière|+243 814 529 763
+Dieudonné|Nlandu|Mavungu|M|04|Kongo-Central|Avocat|+243 856 314 792
+Grâce|Kabamba|Muanza|F|01|Kinshasa|Journaliste|+243 822 745 316
+Arnaud|Tshibangu|Kalume|M|13|Sud-Kivu|Enseignant|+243 898 361 527
+Prisca|Mulamba|Kayembe|F|08|Kasaï-Central|Comptable|+243 816 527 439
+Serge|Kambale|Muhindo|M|15|Nord-Kivu|Entrepreneur|+243 973 641 825
+Clarisse|Bisimwa|Ndaye|F|13|Sud-Kivu|Pharmacienne|+243 829 316 754
+Roland|Lofombo|Nzambe|M|03|Kwango|Agriculteur|+243 810 574 326
+Mireille|Mbala|Kiala|F|04|Kongo-Central|Secrétaire|+243 843 725 619
+Patrick|Tshilombo|Kabeya|M|06|Kasaï|Fonctionnaire|+243 899 462 713
+Jeanne|Kanku|Ilunga|F|10|Haut-Katanga|Sage-femme|+243 815 638 247
+Georges|Kalambayi|Mukendi|M|09|Lomami|Mécanicien|+243 827 451 936
+Odette|Tshibanda|Mbuyi|F|08|Kasaï-Central|Couturière|+243 891 326 574
+Hervé|Nsimba|Makengo|M|01|Kinshasa|Développeur|+243 812 695 431
+Béatrice|Mavungu|Luyeye|F|03|Kwango|Agricultrice|+243 824 513 769
+Cédric|Matondo|Banza|M|04|Kongo-Central|Électricien|+243 977 625 314
+Martine|Bahati|Mugenzi|F|13|Sud-Kivu|Enseignante|+243 817 346 925
+André|Kabasele|Tshomba|M|10|Haut-Katanga|Ingénieur|+243 896 571 243
+Sylvie|Kasongo|Kabeya|F|12|Haut-Lomami|Infirmière|+243 821 634 759
+Jérôme|Mbuyi|Kalala|M|06|Kasaï|Chauffeur|+243 855 427 681
+Agnès|Ilunga|Mulamba|F|09|Lomami|Fonctionnaire|+243 814 753 296
+Éric|Makengo|Nzita|M|04|Kongo-Central|Technicien|+243 991 362 547
+Dorothée|Kiala|Mabiala|F|04|Kongo-Central|Avocate|+243 829 541 376
+Marcel|Katumba|Kyungu|M|10|Haut-Katanga|Professeur|+243 975 624 813
+Noëlla|Tshomba|Kanku|F|01|Kinshasa|Dentiste|+243 816 439 725
+Gilbert|Lwamba|Mungala|M|11|Lualaba|Conducteur|+243 843 617 529
+Élodie|Nsoki|Mbemba|F|01|Kinshasa|Psychologue|+243 825 364 791
+Théodore|Mavungu|Nsimba|M|03|Kwango|Pasteur|+243 898 527 416
+Amanda|Lukusa|Kiala|F|14|Maniema|Agricultrice|+243 812 736 495
+Benjamin|Kalume|Bahati|M|13|Sud-Kivu|Militaire|+243 977 451 628
+Isabelle|Mbuyi|Tshibanda|F|08|Kasaï-Central|Juriste|+243 821 695 347
+Laurent|Kabongo|Mulumba|M|10|Haut-Katanga|Comptable|+243 895 316 742
+Hélène|Mukendi|Kabasele|F|01|Kinshasa|Architecte|+243 817 524 639
 """.strip()
 
 
@@ -66,13 +71,13 @@ def parse_people() -> list[dict[str, Any]]:
         if len(parts) < 8:
             raise SystemExit(f"bad line {i}: {line}")
         prenom, nom, postnom, sexe, pcode, province, profession, tel = [p.strip() for p in parts]
-        # Dates fictives distinctes (année 1970+i) pour éviter collisions NIC exactes.
-        year = 1970 + (i % 35)
-        month = (i % 12) + 1
-        day = (i % 27) + 1
+        # Dates fictives distinctes (décalées vs lot 1)
+        year = 1965 + (i % 40)
+        month = ((i + 3) % 12) + 1
+        day = ((i + 5) % 27) + 1
         rows.append(
             {
-                "idx": i,
+                "idx": i + 100,
                 "prenom": prenom,
                 "nom": nom,
                 "postnom": postnom,
@@ -121,8 +126,8 @@ def main() -> int:
         items: list[dict[str, Any]] = []
         local_ids: list[str] = []
         for p in people:
-            hh_local = f"batch-hh-{p['idx']:02d}-{uuid.uuid4().hex[:8]}"
-            rec_local = f"batch-rec-{p['idx']:02d}-{uuid.uuid4().hex[:8]}"
+            hh_local = f"batch2-hh-{p['idx']:03d}-{uuid.uuid4().hex[:8]}"
+            rec_local = f"{BATCH_PREFIX}{p['idx']:03d}-{uuid.uuid4().hex[:8]}"
             local_ids.append(rec_local)
             address = f"{p['province']} (code {p['province_code']}) — batch recensement"
             items.append(
@@ -204,7 +209,7 @@ def main() -> int:
         )
         synced.raise_for_status()
         rows = synced.json()
-        to_process = [r for r in rows if str(r.get("local_id") or "").startswith("batch-rec-")]
+        to_process = [r for r in rows if str(r.get("local_id") or "").startswith(BATCH_PREFIX)]
         print(f"synced_total={len(rows)} to_process={len(to_process)}")
 
         promoted = 0
