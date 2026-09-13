@@ -22,15 +22,23 @@ $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
 $env:ANDROID_SDK_ROOT = $env:ANDROID_HOME
 
 if (-not $ApiHost) {
-  $ApiHost = (
-    Get-NetIPAddress -AddressFamily IPv4 |
-      Where-Object {
-        $_.IPAddress -notlike "127.*" -and
-        $_.IPAddress -notlike "169.*" -and
-        $_.PrefixOrigin -ne "WellKnown"
-      } |
-      Select-Object -First 1
-  ).IPAddress
+  # Prefer private LAN Wi-Fi (avoid VPN/ProTUN/WSL first hop).
+  $candidates = Get-NetIPAddress -AddressFamily IPv4 |
+    Where-Object {
+      $_.IPAddress -notlike "127.*" -and
+      $_.IPAddress -notlike "169.*" -and
+      $_.PrefixOrigin -ne "WellKnown"
+    }
+  $wifi = $candidates | Where-Object {
+    $_.InterfaceAlias -match 'Wi-?Fi|WLAN' -and
+    $_.IPAddress -notlike "10.2.*" -and
+    $_.IPAddress -notlike "172.27.*"
+  } | Select-Object -First 1
+  if ($wifi) {
+    $ApiHost = $wifi.IPAddress
+  } else {
+    $ApiHost = ($candidates | Select-Object -First 1).IPAddress
+  }
 }
 
 $ApiBase = "http://${ApiHost}:8000/api/v1"

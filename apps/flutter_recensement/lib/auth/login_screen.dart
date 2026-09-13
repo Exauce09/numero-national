@@ -220,10 +220,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                   keyboardType: TextInputType.url,
                                   autocorrect: false,
                                   decoration: const InputDecoration(
-                                    labelText: 'URL API (PC Wi‑Fi)',
-                                    hintText: 'http://192.168.x.x:8000/api/v1',
+                                    labelText: 'URL API',
+                                    hintText: 'http://127.0.0.1:8000/api/v1',
                                     prefixIcon: Icon(Icons.dns_outlined),
-                                    helperText: 'Même Wi‑Fi que le serveur. Timeout 12 s.',
+                                    helperText:
+                                        'USB: http://127.0.0.1:8000/api/v1 (+ adb reverse). '
+                                        'Wi‑Fi: http://IP-du-PC:8000/api/v1 (même réseau).',
                                   ),
                                 ),
                                 const SizedBox(height: 8),
