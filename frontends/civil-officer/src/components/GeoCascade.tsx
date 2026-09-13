@@ -163,6 +163,7 @@ export default function GeoCascade({
   const [addError, setAddError] = useState<string | null>(null);
   const [addBusy, setAddBusy] = useState(false);
   const [addOk, setAddOk] = useState<string | null>(null);
+  const [hydratedKey, setHydratedKey] = useState("");
 
   useEffect(() => {
     void (async () => {
@@ -181,6 +182,64 @@ export default function GeoCascade({
       setProvinces(rows);
     })();
   }, []);
+
+  /** Restaure province → ville → commune quand value est déjà remplie (ex. édition). */
+  useEffect(() => {
+    const key = [
+      value?.province_id,
+      value?.ville_id,
+      value?.commune_id,
+      value?.district_id,
+      value?.label,
+    ].join("|");
+    if (!key || key === "||||" || key === hydratedKey) return;
+    if (!value?.province_id && !value?.label) return;
+
+    let cancelled = false;
+    void (async () => {
+      const markLocal = () =>
+        setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
+      const next = { ...value };
+      if (value.province_id) {
+        if (show("ville")) {
+          const vrows = await fetchItems(`/geo/villes?province_id=${value.province_id}`, markLocal);
+          if (cancelled) return;
+          setVilles(vrows);
+        }
+        if (show("district")) {
+          const drows = await fetchItems(`/geo/districts?province_id=${value.province_id}`, markLocal);
+          if (cancelled) return;
+          setDistricts(drows);
+        }
+      }
+      if (value.ville_id && show("commune")) {
+        let crows = await fetchItems(`/geo/communes?ville_id=${value.ville_id}`, markLocal);
+        if (crows.length === 0 && value.province_id) {
+          crows = await fetchItems(`/geo/communes?province_id=${value.province_id}`, markLocal);
+        }
+        if (cancelled) return;
+        setCommunes(crows);
+      } else if (value.district_id && show("commune")) {
+        const crows = await fetchItems(`/geo/communes?district_id=${value.district_id}`, markLocal);
+        if (cancelled) return;
+        setCommunes(crows);
+      }
+      if (value.commune_id && show("quartier")) {
+        const qrows = await fetchItems(`/geo/quartiers?commune_id=${value.commune_id}`, markLocal);
+        if (cancelled) return;
+        setQuartiers(qrows);
+      }
+      if (!cancelled) {
+        setSel(next);
+        setHydratedKey(key);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hydrate once per value identity
+  }, [value?.province_id, value?.ville_id, value?.commune_id, value?.district_id, value?.label]);
 
   function emit(next: GeoSelection) {
     const parts = [

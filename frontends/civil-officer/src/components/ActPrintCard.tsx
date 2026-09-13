@@ -10,6 +10,54 @@ type Props = {
   mentions?: { label: string; value: string }[];
 };
 
+/** Affiche un libellé lisible pour les objets géo (évite le JSON brut). */
+function formatPayloadValue(key: string, value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const o = value as Record<string, unknown>;
+    if (typeof o.label === "string" && o.label.trim()) return o.label.trim();
+    const parts = [
+      o.province_name,
+      o.ville_name,
+      o.district_name,
+      o.commune_name,
+      o.localite_name,
+      o.quartier_name,
+      o.avenue_name ? `Av. ${o.avenue_name}` : null,
+      o.rue_name ? `Rue ${o.rue_name}` : null,
+    ]
+      .map((x) => (typeof x === "string" ? x.trim() : ""))
+      .filter(Boolean);
+    if (parts.length) return parts.join(" · ");
+    // Ne pas afficher le JSON technique (ids UUID, etc.)
+    if (key.startsWith("geo_")) return null;
+    return null;
+  }
+  const s = String(value).trim();
+  return s || null;
+}
+
+function fieldLabel(key: string): string {
+  const labels: Record<string, string> = {
+    geo_enregistrement: "Lieu d'enregistrement",
+    lieu_enregistrement: "Lieu d'enregistrement",
+    geo_deces: "Lieu du décès",
+    lieu_deces: "Lieu du décès",
+    geo_enterrement: "Lieu d'enterrement",
+    lieu_enterrement: "Lieu d'enterrement",
+    geo_naissance: "Lieu de naissance",
+    lieu_naissance: "Lieu de naissance",
+    geo_actuelle: "Adresse actuelle",
+    cause_deces: "Cause du décès",
+    date_deces: "Date du décès",
+    date_enterrement: "Date d'enterrement",
+    cimetiere: "Cimetière",
+    deceased_name: "Défunt",
+    responsable_name: "Responsable",
+  };
+  return labels[key] ?? key.replace(/_/g, " ");
+}
+
 export default function ActPrintCard({
   act,
   title,
@@ -32,16 +80,19 @@ export default function ActPrintCard({
 
   const payloadEntries =
     extraFields ??
-    Object.entries(act.payload)
-      .filter(([k, v]) => {
-        if (k === "authentication" || k === "qr") return false;
-        return v !== null && v !== undefined && String(v).trim() !== "";
-      })
-      .slice(0, 10)
-      .map(([k, v]) => ({
-        label: k.replace(/_/g, " "),
-        value: typeof v === "object" ? JSON.stringify(v) : String(v),
+    (() => {
+      const entries = Object.entries(act.payload).filter(([k, v]) => {
+        if (k === "authentication" || k === "qr" || k === "verification_code") return false;
+        if (k.endsWith("_id") && typeof v === "string" && v.length > 20) return false;
+        // Évite doublon lieu_* + geo_* : on privilégie le libellé formaté.
+        if (k.startsWith("geo_") && act.payload[`lieu_${k.slice(4)}`]) return false;
+        return formatPayloadValue(k, v) !== null;
+      });
+      return entries.slice(0, 14).map(([k, v]) => ({
+        label: fieldLabel(k),
+        value: formatPayloadValue(k, v)!,
       }));
+    })();
 
   const serverQr = act.payload?.qr;
   let qrValue = act.qr_payload;
