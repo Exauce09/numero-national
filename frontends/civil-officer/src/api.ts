@@ -209,6 +209,24 @@ export const api = {
   listFormDrafts: (params?: URLSearchParams) =>
     request<FormDraft[]>(`/census/form-drafts?${params ?? new URLSearchParams({ status: "DRAFT" })}`),
 
+  listCensusCampaigns: () =>
+    request<Array<{ id: string; code: string; name: string; status: string }>>("/census/campaigns"),
+
+  listCensusRecords: (campaignId: string, status = "SYNCED") => {
+    const q = new URLSearchParams({ status });
+    return request<
+      Array<{
+        id: string;
+        given_names?: string | null;
+        family_name?: string | null;
+        date_of_birth?: string | null;
+        sex?: string | null;
+        status: string;
+        payload?: Record<string, unknown> | null;
+      }>
+    >(`/census/campaigns/${campaignId}/records?${q}`);
+  },
+
   upsertFormDraft: (body: Record<string, unknown>) =>
     request<FormDraft>("/census/form-drafts", {
       method: "POST",

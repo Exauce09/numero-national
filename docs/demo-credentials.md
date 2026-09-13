@@ -8,6 +8,9 @@
 | Alias UI | `officier` | `DemoCivil2026!` |
 | Admin API | `admin.recensement@example.gov` | `CensusAdmin123!` |
 
+Les fiches APK (Tecno / tablette) apparaissent dans **Population → Fiches terrain** (état civil)
+et dans **ONIP → Campagnes → Contrôle** (compte superviseur).
+
 ## Recensement (tablette Flutter)
 
 | Rôle | Identifiant | Mot de passe |

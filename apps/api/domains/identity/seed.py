@@ -157,6 +157,9 @@ ROLE_PERMISSION_MAP: dict[str, tuple[str, ...]] = {
         "biometric:enroll",
         "biometric:match",
         "biometric:review",
+        # Voir / contrôler les fiches APK terrain depuis le site état civil
+        "census:sync",
+        "census:manage",
     ),
     "HEALTH_AGENT": (
         "health:declare",

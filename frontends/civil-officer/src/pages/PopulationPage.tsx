@@ -76,6 +76,10 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
   const [source, setSource] = useState<"api" | "local">(hasApi ? "api" : "local");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [terrainRows, setTerrainRows] = useState<
+    Array<{ id: string; label: string; status: string; campaign: string }>
+  >([]);
+  const [terrainError, setTerrainError] = useState<string | null>(null);
   const [editRow, setEditRow] = useState<PopRow | null>(null);
   const [editForm, setEditForm] = useState({
     nom: "",
@@ -147,10 +151,57 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
     }
   }, [hasApi, q, censusIds]);
 
+  const loadTerrain = useCallback(async () => {
+    if (!hasApi) {
+      setTerrainRows([]);
+      return;
+    }
+    setTerrainError(null);
+    try {
+      const campaigns = await api.listCensusCampaigns();
+      const out: Array<{ id: string; label: string; status: string; campaign: string }> = [];
+      for (const c of campaigns) {
+        for (const st of ["SYNCED", "DRAFT", "APPROVED"] as const) {
+          try {
+            const recs = await api.listCensusRecords(c.id, st);
+            for (const r of recs) {
+              const p = r.payload ?? {};
+              const given =
+                r.given_names ||
+                (typeof p.prenom === "string" ? p.prenom : "") ||
+                "";
+              const family =
+                r.family_name ||
+                (typeof p.nom === "string" ? p.nom : "") ||
+                "";
+              const postnom = typeof p.postnom === "string" ? p.postnom : "";
+              out.push({
+                id: r.id,
+                label: [family, postnom, given].filter(Boolean).join(" ") || "(sans nom)",
+                status: r.status,
+                campaign: c.code,
+              });
+            }
+          } catch {
+            /* campagne sans droit ou vide */
+          }
+        }
+      }
+      setTerrainRows(out);
+    } catch (e) {
+      setTerrainError(e instanceof Error ? e.message : "Fiches terrain indisponibles");
+      setTerrainRows([]);
+    }
+  }, [hasApi]);
+
   useEffect(() => {
     const t = window.setTimeout(() => void load(), q ? 280 : 0);
     return () => window.clearTimeout(t);
   }, [load, q]);
+
+  useEffect(() => {
+    void loadTerrain();
+  }, [loadTerrain]);
 
   const stats = useMemo(() => populationBreakdown(persons), [persons]);
 
@@ -262,8 +313,9 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
               <>Personnes déjà recensées (acte de recensement lié).</>
             ) : source === "api" ? (
               <>
-                Registre national — {total} fiche(s) en base. Les fiches recensement non promues
-                (SYNCED/DRAFT) n&apos;apparaissent pas tant qu&apos;elles ne sont pas dans le registre.
+                Registre national — {total} fiche(s) promues. Les enregistrements tablette/Tecno
+                apparaissent d&apos;abord ci-dessous (file terrain SYNCED), puis ici après promotion
+                NIC sur ONIP.
               </>
             ) : (
               <>Mode local (navigateur). Connectez-vous avec un compte API pour le registre national.</>
@@ -276,6 +328,42 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
           </button>
         </div>
       </div>
+
+      {hasApi ? (
+        <div className="panel" style={{ marginBottom: "1rem" }}>
+          <div className="panel-head" style={{ marginBottom: "0.5rem" }}>
+            <h3 className="panel-title" style={{ margin: 0 }}>
+              Fiches terrain (APK) — {terrainRows.length}
+            </h3>
+            <button type="button" className="btn-secondary btn-sm" onClick={() => void loadTerrain()}>
+              Rafraîchir
+            </button>
+          </div>
+          {terrainError ? <div className="login-error">{terrainError}</div> : null}
+          {!terrainError && terrainRows.length === 0 ? (
+            <p className="muted small" style={{ margin: 0 }}>
+              Aucune fiche SYNCED/DRAFT sur l&apos;API. Sur la tablette, vérifiez « Sync à jour » (même
+              Wi‑Fi / API).
+            </p>
+          ) : null}
+          {terrainRows.length > 0 ? (
+            <ul className="muted small" style={{ margin: 0, paddingLeft: "1.1rem" }}>
+              {terrainRows.slice(0, 30).map((r) => (
+                <li key={`${r.campaign}-${r.id}`}>
+                  <strong>{r.label}</strong> — {r.status} · campagne {r.campaign}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <p className="muted small" style={{ margin: "0.75rem 0 0" }}>
+            Contrôle / promotion NIC :{" "}
+            <a href="http://127.0.0.1:5183/campaigns" target="_blank" rel="noreferrer">
+              ONIP → Campagnes
+            </a>{" "}
+            (superviseur <code>supervisor.recensement@example.gov</code>).
+          </p>
+        </div>
+      ) : null}
 
       <div className="dash-quick pop-action-bar" style={{ marginBottom: "1rem", flexWrap: "wrap" }}>
         <button

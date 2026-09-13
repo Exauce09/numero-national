@@ -53,6 +53,33 @@ def _kinshasa_fallback_coords() -> tuple[float, float]:
     return (-4.3276, 15.3136)
 
 
+def _names_from_census_data(data: dict[str, Any]) -> tuple[str | None, str | None]:
+    """Map Flutter FR fields (nom/prenom) or EN (family_name/given_names) to columns."""
+    payload = data.get("payload") if isinstance(data.get("payload"), dict) else {}
+    given = (
+        data.get("given_names")
+        or data.get("prenom")
+        or payload.get("given_names")
+        or payload.get("prenom")
+    )
+    family = (
+        data.get("family_name")
+        or data.get("nom")
+        or payload.get("family_name")
+        or payload.get("nom")
+    )
+    postnom = data.get("postnom") or payload.get("postnom")
+    if family and postnom and postnom not in str(family):
+        family = f"{family} {postnom}".strip()
+    given_s = str(given).strip() if given else None
+    family_s = str(family).strip() if family else None
+    if given_s in {"", "(brouillon)"}:
+        given_s = None
+    if family_s in {"", "Sans nom"}:
+        family_s = None
+    return given_s, family_s
+
+
 def _ensure_geo_fields(data: dict[str, Any]) -> tuple[float | None, float | None, str | None]:
     """Resolve lat/lng + address_source; never leave manual households without coords."""
     src = _resolve_address_source(data)
@@ -295,11 +322,25 @@ async def sync_push(db: AsyncSession, req: SyncPushRequest) -> SyncPushResult:
                 if isinstance(raw_payload, dict):
                     payload = raw_payload
                 else:
+                    # Flutter envoie souvent tout le formulaire à la racine (nom/prenom/…).
                     payload = {
-                        k: item.data.get(k)
-                        for k in ("relationship_to_head",)
-                        if item.data.get(k) is not None
+                        k: v
+                        for k, v in item.data.items()
+                        if k
+                        not in {
+                            "local_id",
+                            "household_local_id",
+                            "household_id",
+                            "campaign_id",
+                            "version",
+                            "status",
+                            "payload",
+                        }
+                        and v is not None
                     } or None
+                given, family = _names_from_census_data(item.data)
+                sex = item.data.get("sex") or (payload or {}).get("sexe")
+                dob = item.data.get("date_of_birth") or (payload or {}).get("date_naissance")
                 client_status = str(item.data.get("status") or "SYNCED").upper()
                 if client_status == "DRAFT":
                     rec_status = CensusRecordStatus.DRAFT
@@ -311,10 +352,10 @@ async def sync_push(db: AsyncSession, req: SyncPushRequest) -> SyncPushResult:
                     household_id=household.id,
                     campaign_id=req.campaign_id,
                     local_id=item.local_id,
-                    given_names=item.data.get("given_names"),
-                    family_name=item.data.get("family_name"),
-                    sex=item.data.get("sex"),
-                    date_of_birth=item.data.get("date_of_birth"),
+                    given_names=given,
+                    family_name=family,
+                    sex=sex,
+                    date_of_birth=dob,
                     payload=payload,
                     photo_ref=item.data.get("photo_ref"),
                     status=rec_status,
@@ -340,13 +381,37 @@ async def sync_push(db: AsyncSession, req: SyncPushRequest) -> SyncPushResult:
                         }
                     )
                     continue
-                existing_rec.given_names = item.data.get("given_names", existing_rec.given_names)
-                existing_rec.family_name = item.data.get("family_name", existing_rec.family_name)
-                existing_rec.sex = item.data.get("sex", existing_rec.sex)
+                given, family = _names_from_census_data(item.data)
+                if given:
+                    existing_rec.given_names = given
+                if family:
+                    existing_rec.family_name = family
+                existing_rec.sex = item.data.get("sex") or existing_rec.sex
                 existing_rec.date_of_birth = item.data.get(
                     "date_of_birth", existing_rec.date_of_birth
                 )
-                existing_rec.payload = item.data.get("payload", existing_rec.payload)
+                if item.data.get("payload") is not None:
+                    existing_rec.payload = item.data.get("payload")
+                elif isinstance(item.data, dict) and (
+                    item.data.get("nom") or item.data.get("prenom")
+                ):
+                    existing_rec.payload = {
+                        **(existing_rec.payload or {}),
+                        **{
+                            k: v
+                            for k, v in item.data.items()
+                            if k
+                            not in {
+                                "local_id",
+                                "household_local_id",
+                                "household_id",
+                                "campaign_id",
+                                "version",
+                                "status",
+                                "payload",
+                            }
+                        },
+                    }
                 existing_rec.version = max(item.version, existing_rec.version)
                 client_status = str(item.data.get("status") or "SYNCED").upper()
                 if client_status == "DRAFT":

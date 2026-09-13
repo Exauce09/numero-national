@@ -56,8 +56,9 @@ export default function CampaignsPage() {
         <h1>Campagnes &amp; contrôle</h1>
         <p>
           Flux : <strong>Comptes</strong> → cette page (campagne / zones / contrôle) →{" "}
-          <strong>Numéros NIC</strong> pour voir le numéro attribué. Choisissez bien la campagne{" "}
-          <em>ACTIVE</em> (ex. TEST123), pas une campagne fermée.
+          <strong>Numéros NIC</strong> pour voir le numéro attribué. Sélectionnez la campagne qui a
+          reçu les sync APK (ex. <em>RGPH-2026</em> ou <em>TEST123</em>), pas seulement la première
+          ACTIVE.
         </p>
       </div>
 
