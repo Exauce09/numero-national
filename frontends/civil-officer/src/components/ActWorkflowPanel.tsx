@@ -126,10 +126,25 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
 
   const summary = useMemo(() => {
     if (!summaryFields?.length) return [];
-    return summaryFields.map((f) => ({
-      label: f.label,
-      value: String(current.payload[f.key] ?? "—"),
-    }));
+    return summaryFields.map((f) => {
+      const raw = current.payload[f.key];
+      let value = "—";
+      if (raw !== null && raw !== undefined) {
+        if (typeof raw === "object" && !Array.isArray(raw)) {
+          const o = raw as Record<string, unknown>;
+          if (typeof o.label === "string" && o.label.trim()) value = o.label.trim();
+          else {
+            const parts = [o.province_name, o.ville_name, o.commune_name]
+              .map((x) => (typeof x === "string" ? x.trim() : ""))
+              .filter(Boolean);
+            value = parts.length ? parts.join(" · ") : "—";
+          }
+        } else {
+          value = String(raw);
+        }
+      }
+      return { label: f.label, value };
+    });
   }, [current.payload, summaryFields]);
 
   /** Pousse l'acte local vers l'API si besoin, puis renvoie l'id serveur. */
