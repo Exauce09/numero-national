@@ -409,6 +409,16 @@ export default function CensusPage() {
       setError("Identité : l'adresse actuelle (au moins la province) est requise.");
       return false;
     }
+    if (!geoActuelle.commune_name) {
+      setError("Identité : choisissez la commune (ex. Gombe) dans l'adresse actuelle.");
+      return false;
+    }
+    if (!geoActuelle.quartier_name) {
+      setError(
+        "Identité : choisissez le quartier (ex. Batetela, Golf, Lemera…) — sinon le synoptique affiche « Non précisé ».",
+      );
+      return false;
+    }
     if (ficheKind === "decede") {
       if (!dateDeces) {
         setError("Identité décédé : la date de décès est requise.");
