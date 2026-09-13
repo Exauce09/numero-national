@@ -73,6 +73,9 @@ ROLE_PERMISSION_MAP: dict[str, tuple[str, ...]] = {
         "account_request:manage",
         "civil:act:read",
         "civil:stats:read",
+        "registry:citizen:read",
+        "census:sync",
+        "census:manage",
         "audit:read",
     ),
     "RESPONSABLE_BUREAU": (
@@ -81,7 +84,13 @@ ROLE_PERMISSION_MAP: dict[str, tuple[str, ...]] = {
         "bureau:read",
         "account_request:create",
         "civil:act:read",
+        "civil:act:write",
         "civil:stats:read",
+        "registry:citizen:read",
+        "registry:citizen:create",
+        "census:sync",
+        "census:manage",
+        "documents:read",
     ),
     "OFFICIER_ETAT_CIVIL": (
         "civil:act:read",
@@ -100,6 +109,8 @@ ROLE_PERMISSION_MAP: dict[str, tuple[str, ...]] = {
         "bureau:read",
         "biometric:enroll",
         "biometric:match",
+        "census:sync",
+        "census:manage",
     ),
     "AGENT_ETAT_CIVIL": (
         "civil:act:read",
@@ -111,13 +122,17 @@ ROLE_PERMISSION_MAP: dict[str, tuple[str, ...]] = {
         "documents:write",
         "bureau:read",
         "biometric:enroll",
+        "census:sync",
     ),
     "AUDITEUR": (
         "audit:read",
         "civil:act:read",
+        "civil:stats:read",
         "permissions:read",
         "personnel:read",
         "bureau:read",
+        "registry:citizen:read",
+        "census:sync",
     ),
     "CENSUS_AGENT": (
         "census:sync",
@@ -232,6 +247,8 @@ SEED_PERMISSIONS: list[dict[str, str]] = IAM_PERMISSIONS + _domain_permission_di
 
 async def seed_roles_and_permissions(db: AsyncSession) -> None:
     """Idempotent seed of roles, permissions, and role grants."""
+    from sqlalchemy import text
+
     perm_by_code: dict[str, Permission] = {}
     for item in SEED_PERMISSIONS:
         existing = await db.scalar(select(Permission).where(Permission.code == item["code"]))
@@ -258,14 +275,24 @@ async def seed_roles_and_permissions(db: AsyncSession) -> None:
             )
             assert role is not None
 
-        current = {p.code for p in role.permissions}
         if role.code in {"CENTRAL_ADMIN", "SUPER_ADMIN_NATIONAL"}:
             wanted = set(perm_by_code.keys())
         else:
             wanted = set(ROLE_PERMISSION_MAP.get(role.code, ()))
 
         for code in wanted:
-            if code not in current and code in perm_by_code:
-                role.permissions.append(perm_by_code[code])
+            if code not in perm_by_code:
+                continue
+            # SQL upsert — relationship.append() is unreliable with AsyncSession.
+            await db.execute(
+                text(
+                    "INSERT INTO identity.role_permissions (role_id, permission_id) "
+                    "SELECT :rid, :pid WHERE NOT EXISTS ("
+                    "  SELECT 1 FROM identity.role_permissions "
+                    "  WHERE role_id = :rid AND permission_id = :pid"
+                    ")"
+                ),
+                {"rid": role.id, "pid": perm_by_code[code].id},
+            )
 
     await db.commit()
