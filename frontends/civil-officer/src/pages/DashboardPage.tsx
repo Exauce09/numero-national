@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, type CivilAct } from "../api";
+import { api, type CitizenListItem, type CivilAct } from "../api";
 import { ensureAccessToken, getSession } from "../auth";
 import { BarChart, LineChart, PieChart, Sparkline } from "../components/Charts";
 import {
@@ -13,7 +13,53 @@ import {
   IconUsers,
 } from "../components/Icons";
 import { dashboardVariant } from "../rbac";
-import { listActs, listPopulationPersons, populationBreakdown } from "../registry";
+import {
+  listActs,
+  listPopulationPersons,
+  populationBreakdown,
+  type Person,
+  type Sexe,
+} from "../registry";
+
+function mapApiSex(sex?: string | null): Sexe {
+  const s = (sex || "").toUpperCase();
+  if (s === "F" || s === "FEMALE" || s === "FEMININ") return "F";
+  return "M";
+}
+
+function citizenToBreakdownPerson(c: CitizenListItem): Person {
+  return {
+    id: c.id,
+    nom: c.family_name || "",
+    postnom: "",
+    prenom: c.given_names || "",
+    sexe: mapApiSex(c.sex),
+    date_naissance: (c.date_of_birth || "").slice(0, 10),
+    lieu_naissance: c.place_of_birth || "",
+    etat_civil: "UNKNOWN",
+    nic: c.nic || "",
+    handicap_type: "NORMAL",
+    created_at: "",
+  };
+}
+
+async function fetchAllCitizens(): Promise<{ total: number; items: CitizenListItem[] }> {
+  const pageSize = 100;
+  const items: CitizenListItem[] = [];
+  let page = 1;
+  let total = 0;
+  for (;;) {
+    const data = await api.searchCitizens(
+      new URLSearchParams({ page: String(page), page_size: String(pageSize) }),
+    );
+    total = data.total ?? 0;
+    items.push(...(data.items ?? []));
+    if (items.length >= total || !(data.items?.length)) break;
+    page += 1;
+    if (page > 50) break;
+  }
+  return { total, items };
+}
 
 const MONTHS_FR = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
 
@@ -118,6 +164,7 @@ export default function DashboardPage() {
   const localActs = listActs();
 
   const [apiPop, setApiPop] = useState<number | null>(null);
+  const [apiCitizens, setApiCitizens] = useState<CitizenListItem[]>([]);
   const [apiActs, setApiActs] = useState<CivilAct[]>([]);
   const [apiLoaded, setApiLoaded] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -134,15 +181,16 @@ export default function DashboardPage() {
         return;
       }
       try {
-        const [citizens, births, deaths, marriages, divorces] = await Promise.all([
-          api.searchCitizens(new URLSearchParams({ page: "1", page_size: "1" })),
+        const [citizensPack, births, deaths, marriages, divorces] = await Promise.all([
+          fetchAllCitizens(),
           api.listActs("births").catch(() => [] as CivilAct[]),
           api.listActs("deaths").catch(() => [] as CivilAct[]),
           api.listActs("marriages").catch(() => [] as CivilAct[]),
           api.listActs("divorces").catch(() => [] as CivilAct[]),
         ]);
         if (cancelled) return;
-        setApiPop(citizens.total ?? 0);
+        setApiPop(citizensPack.total);
+        setApiCitizens(citizensPack.items);
         setApiActs([...births, ...deaths, ...marriages, ...divorces]);
         setApiError(null);
       } catch (e) {
@@ -157,6 +205,13 @@ export default function DashboardPage() {
   }, [session?.accessToken]);
 
   const popCount = apiPop ?? localPop.length;
+  const popSourceNational = apiCitizens.length > 0;
+  const popBreakdown = useMemo(() => {
+    if (popSourceNational) {
+      return populationBreakdown(apiCitizens.map(citizenToBreakdownPerson));
+    }
+    return populationBreakdown(localPop);
+  }, [apiCitizens, localPop, popSourceNational]);
   const acts = useMemo(() => {
     const fromApi = apiActs.map((a) => ({
       ...a,
@@ -206,8 +261,6 @@ export default function DashboardPage() {
   const demoBirth = demoTemporal ? [2, 3, 4, 3, 5, 4] : birthSeries;
   const demoDeath = demoTemporal ? [1, 1, 2, 1, 2, 1] : deathSeries;
   const demoAll = demoTemporal ? [4, 5, 7, 6, 9, 8] : allActsSeries;
-
-  const popBreakdown = useMemo(() => populationBreakdown(localPop), [localPop]);
 
   const helloName =
     variant === "officier"
@@ -391,14 +444,22 @@ export default function DashboardPage() {
           </p>
         </div>
         <PieChart
-          title="Population locale — sexe"
+          title={
+            popSourceNational
+              ? `Registre national — sexe (${popBreakdown.hommes.total + popBreakdown.femmes.total})`
+              : "Population locale — sexe (cache navigateur)"
+          }
           data={[
             { label: "Hommes", value: popBreakdown.hommes.total, color: "#0b3d91" },
             { label: "Femmes", value: popBreakdown.femmes.total, color: "#ce1126" },
           ]}
         />
         <BarChart
-          title="Population — mineurs / majeurs"
+          title={
+            popSourceNational
+              ? "Registre national — mineurs / majeurs"
+              : "Population locale — mineurs / majeurs"
+          }
           height={180}
           data={[
             { label: "Mineurs", value: popBreakdown.total.mineurs.total, color: "#3b6ea5" },
