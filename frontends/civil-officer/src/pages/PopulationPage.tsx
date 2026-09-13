@@ -76,10 +76,6 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
   const [source, setSource] = useState<"api" | "local">(hasApi ? "api" : "local");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [terrainRows, setTerrainRows] = useState<
-    Array<{ id: string; label: string; status: string; campaign: string }>
-  >([]);
-  const [terrainError, setTerrainError] = useState<string | null>(null);
   const [editRow, setEditRow] = useState<PopRow | null>(null);
   const [editForm, setEditForm] = useState({
     nom: "",
@@ -163,69 +159,10 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
     }
   }, [hasApi, q, censusIds]);
 
-  const loadTerrain = useCallback(async () => {
-    if (!hasApi) {
-      setTerrainRows([]);
-      return;
-    }
-    setTerrainError(null);
-    try {
-      const campaigns = await api.listCensusCampaigns();
-      const out: Array<{ id: string; label: string; status: string; campaign: string }> = [];
-      const seen = new Set<string>();
-      for (const c of campaigns) {
-        // Inclure PROMOTED : sinon les personnes « disparaissent » après promotion NIC.
-        for (const st of ["SYNCED", "DRAFT", "APPROVED", "PROMOTED", "REJECTED"] as const) {
-          try {
-            const recs = await api.listCensusRecords(c.id, st);
-            for (const r of recs) {
-              if (seen.has(r.id)) continue;
-              seen.add(r.id);
-              const p = r.payload ?? {};
-              const given =
-                r.given_names ||
-                (typeof p.prenom === "string" ? p.prenom : "") ||
-                "";
-              const family =
-                r.family_name ||
-                (typeof p.nom === "string" ? p.nom : "") ||
-                "";
-              const postnom = typeof p.postnom === "string" ? p.postnom : "";
-              out.push({
-                id: r.id,
-                label: [family, postnom, given].filter(Boolean).join(" ") || "(sans nom)",
-                status: r.status,
-                campaign: c.code,
-              });
-            }
-          } catch {
-            /* campagne sans droit ou vide */
-          }
-        }
-      }
-      const rank: Record<string, number> = {
-        DRAFT: 0,
-        SYNCED: 1,
-        APPROVED: 2,
-        REJECTED: 3,
-        PROMOTED: 4,
-      };
-      out.sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9) || a.label.localeCompare(b.label));
-      setTerrainRows(out);
-    } catch (e) {
-      setTerrainError(e instanceof Error ? e.message : "Fiches terrain indisponibles");
-      setTerrainRows([]);
-    }
-  }, [hasApi]);
-
   useEffect(() => {
     const t = window.setTimeout(() => void load(), q ? 280 : 0);
     return () => window.clearTimeout(t);
   }, [load, q]);
-
-  useEffect(() => {
-    void loadTerrain();
-  }, [loadTerrain]);
 
   const stats = useMemo(() => populationBreakdown(persons), [persons]);
 
@@ -337,9 +274,8 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
               <>Personnes déjà recensées (acte de recensement lié).</>
             ) : source === "api" ? (
               <>
-                Registre national — {total} fiche(s) promues. Les enregistrements tablette/Tecno
-                apparaissent d&apos;abord ci-dessous (file terrain SYNCED), puis ici après promotion
-                NIC sur SIGPOP-RDC.
+                Registre national — {total} fiche(s). Les personnes recensées (promues NIC)
+                apparaissent dans la liste ci-dessous.
               </>
             ) : (
               <>Mode local (navigateur). Connectez-vous avec un compte API pour le registre national.</>
@@ -352,53 +288,6 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
           </button>
         </div>
       </div>
-
-      {hasApi ? (
-        <div className="panel" style={{ marginBottom: "1rem" }}>
-          <div className="panel-head" style={{ marginBottom: "0.5rem" }}>
-            <h3 className="panel-title" style={{ margin: 0 }}>
-              Fiches terrain (APK) — {terrainRows.length}
-            </h3>
-            <button type="button" className="btn-secondary btn-sm" onClick={() => void loadTerrain()}>
-              Rafraîchir
-            </button>
-          </div>
-          {terrainError ? <div className="login-error">{terrainError}</div> : null}
-          {!terrainError && terrainRows.length === 0 ? (
-            <p className="muted small" style={{ margin: 0 }}>
-              Aucune fiche reçue de l&apos;APK. Sur la tablette : Sync à jour (USB 127.0.0.1 ou Wi‑Fi PC).
-            </p>
-          ) : null}
-          {terrainRows.length > 0 ? (
-            <>
-              <p className="muted small" style={{ margin: "0 0 0.5rem" }}>
-                En attente contrôle :{" "}
-                {terrainRows.filter((r) => ["DRAFT", "SYNCED", "APPROVED"].includes(r.status)).length}
-                {" · "}
-                Déjà au registre (PROMOTED) :{" "}
-                {terrainRows.filter((r) => r.status === "PROMOTED").length}
-                {" · "}
-                Rejetées : {terrainRows.filter((r) => r.status === "REJECTED").length}
-              </p>
-              <ul className="muted small" style={{ margin: 0, paddingLeft: "1.1rem" }}>
-                {terrainRows.slice(0, 50).map((r) => (
-                  <li key={`${r.campaign}-${r.id}`}>
-                    <strong>{r.label}</strong> — {r.status} · campagne {r.campaign}
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
-          <p className="muted small" style={{ margin: "0.75rem 0 0" }}>
-            Les fiches <strong>PROMOTED</strong> apparaissent aussi dans la liste Population ci-dessous.
-            Contrôle restant :{" "}
-            <a href="http://127.0.0.1:5183/campaigns" target="_blank" rel="noreferrer">
-              SIGPOP-RDC → Campagnes
-            </a>{" "}
-            (superviseur <code>supervisor.recensement@example.gov</code>).
-          </p>
-        </div>
-      ) : null}
 
       <div className="dash-quick pop-action-bar" style={{ marginBottom: "1rem", flexWrap: "wrap" }}>
         <button
