@@ -1,6 +1,11 @@
 import { FormEvent, useMemo, useState } from "react";
 import ActPrintCard from "../components/ActPrintCard";
 import DataToolbar from "../components/DataToolbar";
+import GeoCascade, {
+  ADDRESS_FIELD_LABELS,
+  type GeoLevel,
+  type GeoSelection,
+} from "../components/GeoCascade";
 import GpsLocatePanel from "../components/GpsLocatePanel";
 import PersonPicker from "../components/PersonPicker";
 import {
@@ -28,13 +33,33 @@ const MODES_NAISSANCE = [
   { value: "declaration_tardive", label: "Déclaration tardive" },
 ] as const;
 
+/** Lieu de naissance : jusqu'au quartier (Gombe → Batetela, etc.). */
+const BIRTH_PLACE_LEVELS: GeoLevel[] = ["province", "ville", "commune", "quartier"];
+
+function geoBirthLabel(geo: GeoSelection, manual: string): string {
+  const parts = [
+    geo.quartier_name,
+    geo.commune_name,
+    geo.ville_name,
+    geo.province_name,
+  ].filter(Boolean);
+  return manual.trim() || geo.label || parts.join(", ") || "";
+}
+
 export default function BirthsPage() {
+  const officer = getOfficerCommune();
   const [nom, setNom] = useState("");
   const [postnom, setPostnom] = useState("");
   const [prenom, setPrenom] = useState("");
   const [sexe, setSexe] = useState<Sexe>("M");
   const [dateNaissance, setDateNaissance] = useState("");
   const [lieuNaissance, setLieuNaissance] = useState("");
+  const [geoNaissance, setGeoNaissance] = useState<GeoSelection>({
+    commune_code: officer.code,
+    commune_name: officer.name,
+    ville_name: officer.ville,
+    province_name: officer.province,
+  });
   const [modeNaissance, setModeNaissance] = useState<(typeof MODES_NAISSANCE)[number]["value"]>(
     "sans_procuration",
   );
@@ -82,6 +107,16 @@ export default function BirthsPage() {
       setError("Nom, prénom et date de naissance de l'enfant sont requis.");
       return;
     }
+    if (!geoNaissance.commune_name && !lieuNaissance.trim()) {
+      setError("Indiquez le lieu de naissance (commune) ou une saisie manuelle.");
+      return;
+    }
+    if (geoNaissance.commune_name && !geoNaissance.quartier_name && !lieuNaissance.trim()) {
+      setError(
+        "Choisissez le quartier de naissance (ex. Batetela, Golf…) ou précisez le lieu manuellement.",
+      );
+      return;
+    }
 
     const identity = {
       nom: nom.trim(),
@@ -118,7 +153,11 @@ export default function BirthsPage() {
 
     setSubmitting(true);
     try {
-      const lieu = lieuNaissance.trim();
+      const lieu = geoBirthLabel(geoNaissance, lieuNaissance);
+      const geoPayload: GeoSelection = {
+        ...geoNaissance,
+        label: lieu,
+      };
       const link = inheritParentOrigin(father, mother);
       if (hopitalResolved) rememberNamed(HOPITAUX_KEY, hopitalResolved);
       const child = addPerson({
@@ -148,8 +187,12 @@ export default function BirthsPage() {
         type_naissance: modeLabel,
         avec_procuration: modeNaissance === "avec_procuration",
         hopital_naissance: hopitalResolved || null,
-        geo_naissance: { label: lieu },
-        commune_code: commune.code,
+        geo_naissance: geoPayload,
+        quartier_naissance: geoNaissance.quartier_name || null,
+        commune_naissance: geoNaissance.commune_name || null,
+        ville_naissance: geoNaissance.ville_name || null,
+        province_naissance: geoNaissance.province_name || null,
+        commune_code: geoNaissance.commune_code || commune.code,
         mother_id: mother.id,
         mother_name: `${mother.nom} ${mother.prenom}`,
         mother_nic: mother.nic,
@@ -179,6 +222,12 @@ export default function BirthsPage() {
       setPrenom("");
       setDateNaissance("");
       setLieuNaissance("");
+      setGeoNaissance({
+        commune_code: officer.code,
+        commune_name: officer.name,
+        ville_name: officer.ville,
+        province_name: officer.province,
+      });
       setModeNaissance("sans_procuration");
       setHopitalNaissance("");
       setHopitalAutre("");
@@ -212,6 +261,11 @@ export default function BirthsPage() {
     nom: String(a.payload.nom ?? ""),
     sexe: String(a.payload.sexe ?? ""),
     date_naissance: String(a.payload.date_naissance ?? ""),
+    quartier: String(
+      a.payload.quartier_naissance ??
+        (a.payload.geo_naissance as { quartier_name?: string } | undefined)?.quartier_name ??
+        "",
+    ),
     mode: String(a.payload.mode ?? a.payload.mode_naissance ?? ""),
   }));
 
@@ -226,6 +280,18 @@ export default function BirthsPage() {
         onResolved={(g) => {
           setGpsLat(g.latitude);
           setGpsLng(g.longitude);
+          setGeoNaissance((prev) => ({
+            ...prev,
+            province_name: g.province || prev.province_name,
+            ville_name: g.ville || prev.ville_name,
+            commune_name: g.commune || prev.commune_name,
+            quartier_name: g.quartier || prev.quartier_name,
+            avenue_name: g.avenue || prev.avenue_name,
+            label:
+              g.display_name ||
+              [g.quartier, g.commune, g.ville, g.province].filter(Boolean).join(", ") ||
+              prev.label,
+          }));
           if (!lieuNaissance.trim() && g.display_name) {
             setLieuNaissance(g.display_name);
           }
@@ -286,12 +352,34 @@ export default function BirthsPage() {
             </select>
           </div>
           <div className="full">
-            <label className="form-label">Lieu de naissance</label>
+            <GeoCascade
+              embedded
+              label="Lieu de naissance (province → commune → quartier)"
+              levels={BIRTH_PLACE_LEVELS}
+              fieldLabels={{
+                ...ADDRESS_FIELD_LABELS,
+                quartier: "Quartier *",
+              }}
+              value={geoNaissance}
+              onChange={(g) => {
+                setGeoNaissance(g);
+                if (g.quartier_name || g.commune_name) {
+                  setLieuNaissance(geoBirthLabel(g, ""));
+                }
+              }}
+            />
+            <p className="muted small" style={{ marginTop: "0.35rem" }}>
+              Ex. Kinshasa → Gombe → Batetela / Golf / Lemera… (bouton + Ajouter sur le quartier si
+              besoin)
+            </p>
+          </div>
+          <div className="full">
+            <label className="form-label">Lieu (complément / saisie libre)</label>
             <input
               className="form-control"
               value={lieuNaissance}
               onChange={(e) => setLieuNaissance(e.target.value)}
-              placeholder="Saisie manuelle"
+              placeholder="Optionnel si le quartier est déjà choisi — sinon hôpital, clinique…"
             />
           </div>
           <div className="full">
@@ -354,7 +442,11 @@ export default function BirthsPage() {
             <div className="full success-banner" style={{ margin: 0 }}>
               Origine liée au {inherited.source === "father" ? "père" : "mère"}{" "}
               <strong>{inherited.parent.name}</strong>
-              {inherited.parent.geo_label ? <> — {inherited.parent.geo_label}</> : " (province / ville non renseignées)"}
+              {inherited.parent.geo_label ? (
+                <> — {inherited.parent.geo_label}</>
+              ) : (
+                " (province / ville non renseignées)"
+              )}
             </div>
           ) : mother || father ? (
             <div className="full muted small">
@@ -395,6 +487,7 @@ export default function BirthsPage() {
               <th>Nom</th>
               <th>Sexe</th>
               <th>Naissance</th>
+              <th>Quartier</th>
               <th>Mode</th>
               <th />
             </tr>
@@ -409,6 +502,14 @@ export default function BirthsPage() {
                 </td>
                 <td>{String(a.payload.sexe ?? "")}</td>
                 <td>{String(a.payload.date_naissance ?? "")}</td>
+                <td>
+                  {String(
+                    a.payload.quartier_naissance ??
+                      (a.payload.geo_naissance as { quartier_name?: string } | undefined)
+                        ?.quartier_name ??
+                      "—",
+                  )}
+                </td>
                 <td>{String(a.payload.mode ?? a.payload.mode_naissance ?? "—")}</td>
                 <td>
                   <button
@@ -453,7 +554,12 @@ export default function BirthsPage() {
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="modal-panel" style={{ maxWidth: 640 }}>
             <h3>Éditer {editAct.act_number}</h3>
-            <textarea className="form-control" rows={12} value={editJson} onChange={(e) => setEditJson(e.target.value)} />
+            <textarea
+              className="form-control"
+              rows={12}
+              value={editJson}
+              onChange={(e) => setEditJson(e.target.value)}
+            />
             <div className="modal-actions">
               <button type="button" className="btn-secondary" onClick={() => setEditAct(null)}>
                 Annuler
