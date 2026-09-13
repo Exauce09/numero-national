@@ -61,3 +61,6 @@ scripts/kinshasa_avenues_osm.json
 /*.png
 /*.xml
 .tmp-device-shots/
+
+# Local screenshot scratch
+.tmp-site-shots/
