@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api, type CivilAct } from "../api";
 import { getSession } from "../auth";
-import { canValidateActs } from "../rbac";
+import { can, canValidateActs } from "../rbac";
 import { actTypeLabel, replaceAct, type Act, type ActType } from "../registry";
 import ActPrintCard from "./ActPrintCard";
 
@@ -80,6 +80,10 @@ function toLocalAct(server: CivilAct, fallback: Act): Act {
 export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClose }: Props) {
   const session = getSession();
   const canValidate = canValidateActs(session?.roles, session?.permissions);
+  const canSubmit =
+    can("civil:act:write", session?.permissions) ||
+    canValidate ||
+    Boolean(session?.roles?.some((r) => ["AGENT_ETAT_CIVIL", "OFFICIER_ETAT_CIVIL", "CIVIL_OFFICER", "RESPONSABLE_BUREAU"].includes(r)));
 
   const [current, setCurrent] = useState<Act>(act);
   const [busy, setBusy] = useState(false);
@@ -94,7 +98,7 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
   );
   const [showPrint, setShowPrint] = useState(false);
 
-  const status = current.status || "DRAFT";
+  const status = (current.status || "DRAFT").toUpperCase();
   const isValidated = status === "VALIDATED" || status === "ARCHIVED";
   const civilKind = CIVIL_API_KIND[current.type];
   const supportsCivilWorkflow = Boolean(civilKind);
@@ -102,6 +106,14 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
   const serverActId =
     (typeof current.payload?.server_act_id === "string" && current.payload.server_act_id) ||
     null;
+
+  /** Boutons visibles selon le rôle (agent soumet, officier valide). */
+  const visibleSteps = nextSteps.filter((s) => {
+    if (s === "SUBMITTED" || s === "DRAFT") return canSubmit;
+    if (s === "UNDER_REVIEW" || s === "VALIDATED") return canValidate;
+    return canValidate;
+  });
+  const canSubmitAndValidate = canValidate && status === "DRAFT" && supportsCivilWorkflow;
 
   useEffect(() => {
     setCurrent(act);
@@ -188,21 +200,72 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
       );
       return;
     }
+    if ((target === "VALIDATED" || target === "UNDER_REVIEW") && !canValidate) {
+      setError("Seuls l'officier / responsable de bureau peuvent valider (civil:act:validate).");
+      return;
+    }
     setBusy(true);
     setError(null);
     setMessage(null);
     try {
-      const { act: synced, id } = await ensureServerActId(current);
+      let { act: synced, id } = await ensureServerActId(current);
+      // Toujours relire le statut serveur (évite DRAFT → VALIDATED illégal).
+      try {
+        const fresh = await api.getAct(id);
+        synced = toLocalAct(fresh, synced);
+        synced.payload = { ...synced.payload, server_act_id: id };
+        replaceAct(current.id, synced);
+      } catch {
+        /* garde le sync local */
+      }
       setCurrent(synced);
       onUpdated?.(synced);
-      const updated = await api.transitionAct(id, { status: target });
-      const local = toLocalAct(updated, synced);
-      setCurrent(local);
-      onUpdated?.(local);
-      setMessage(`Statut passé à ${STATUS_LABEL[target] ?? target}.`);
-      if (updated.verification_code) setVerificationCode(updated.verification_code);
+
+      const serverStatus = (synced.status || "DRAFT").toUpperCase();
+      const chain: string[] = [];
+      if (target === "VALIDATED" && serverStatus === "DRAFT") {
+        chain.push("SUBMITTED", "VALIDATED");
+      } else if (target === "VALIDATED" && serverStatus === "UNDER_REVIEW") {
+        chain.push("VALIDATED");
+      } else if (target === "VALIDATED" && serverStatus === "SUBMITTED") {
+        chain.push("VALIDATED");
+      } else if (target === "SUBMITTED" && serverStatus === "DRAFT") {
+        chain.push("SUBMITTED");
+      } else {
+        const allowed = NEXT[serverStatus] ?? [];
+        if (!allowed.includes(target)) {
+          throw new Error(
+            `Transition impossible ${serverStatus} → ${target}. ` +
+              (serverStatus === "DRAFT"
+                ? "Cliquez d'abord « Soumettre », puis « Valider l'acte » (officier)."
+                : `Étapes possibles : ${allowed.join(", ") || "aucune"}.`),
+          );
+        }
+        chain.push(target);
+      }
+
+      let updated = synced;
+      for (const step of chain) {
+        const res = await api.transitionAct(id, { status: step });
+        updated = toLocalAct(res, updated);
+        updated.payload = { ...updated.payload, server_act_id: id };
+        replaceAct(current.id, updated);
+        setCurrent(updated);
+        onUpdated?.(updated);
+        if (res.verification_code) setVerificationCode(res.verification_code);
+      }
+      setMessage(
+        chain.includes("VALIDATED")
+          ? "Acte validé par l'officier."
+          : `Statut passé à ${STATUS_LABEL[chain[chain.length - 1]] ?? chain[chain.length - 1]}.`,
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Transition impossible");
+      const msg = err instanceof Error ? err.message : "Transition impossible";
+      setError(
+        msg.includes("Illegal transition")
+          ? "Impossible de valider un brouillon directement. Soumettez d'abord (agent ou officier), puis validez avec le compte officier."
+          : msg,
+      );
     }
     setBusy(false);
   }
@@ -307,9 +370,9 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
         </dl>
       ) : null}
 
-      {canValidate && nextSteps.length > 0 ? (
+      {visibleSteps.length > 0 || canSubmitAndValidate ? (
         <div className="toolbar" style={{ marginBottom: "1rem", gap: "0.5rem", flexWrap: "wrap" }}>
-          {nextSteps.map((s) => (
+          {visibleSteps.map((s) => (
             <button
               key={s}
               type="button"
@@ -328,12 +391,33 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
                       : s}
             </button>
           ))}
+          {canSubmitAndValidate ? (
+            <button
+              type="button"
+              className="btn-primary btn-sm"
+              disabled={busy}
+              onClick={() => void transition("VALIDATED")}
+              title="Soumettre puis valider (officier)"
+            >
+              Soumettre et valider
+            </button>
+          ) : null}
         </div>
       ) : null}
 
-      {!canValidate && nextSteps.length > 0 ? (
-        <p className="muted small">Validation réservée aux officiers (`civil:act:validate`).</p>
+      {!canValidate && status === "SUBMITTED" ? (
+        <p className="muted small">
+          Acte soumis — validation réservée à l&apos;officier (`officier` / DemoCivil2026!).
+        </p>
       ) : null}
+      {!canSubmit && nextSteps.length > 0 ? (
+        <p className="muted small">Vous n&apos;avez pas le droit de modifier le workflow de cet acte.</p>
+      ) : null}
+
+      <p className="muted small" style={{ marginBottom: "0.75rem" }}>
+        Circuit : <strong>Agent</strong> saisit / soumet → <strong>Officier</strong> valide. Impossible
+        de passer directement de Brouillon à Validé sans soumission.
+      </p>
 
       <div className="toolbar" style={{ marginBottom: "1rem" }}>
         <button

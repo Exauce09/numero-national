@@ -545,6 +545,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  getAct: (actId: string) => request<CivilAct>(`/civil/acts/${actId}`),
   getOfficialExtract: (actId: string) =>
     request<{
       act: CivilAct;

@@ -106,7 +106,8 @@ function countByMonth(acts: Array<{ created_at: string }>, months: { key: string
 }
 
 function actStatus(a: { status?: string; payload?: Record<string, unknown> }): string {
-  return String(a.status ?? a.payload?.status ?? "").toUpperCase();
+  const raw = String(a.status ?? a.payload?.status ?? "DRAFT").toUpperCase().trim();
+  return raw || "DRAFT";
 }
 
 export default function DashboardPage() {
@@ -151,16 +152,26 @@ export default function DashboardPage() {
   }, [session?.accessToken]);
 
   const popCount = apiPop ?? localPop.length;
-  const acts = apiActs.length ? apiActs : localActs.map((a) => ({
-    id: a.id,
-    act_type: a.type,
-    act_number: a.act_number,
-    commune_code: "",
-    status: String(a.payload?.status ?? "DRAFT"),
-    citizen_id: null,
-    payload: a.payload,
-    created_at: a.created_at,
-  }));
+  const acts = useMemo(() => {
+    const fromApi = apiActs.map((a) => ({
+      ...a,
+      status: a.status || "DRAFT",
+    }));
+    const apiIds = new Set(fromApi.map((a) => a.id));
+    const fromLocal = localActs
+      .filter((a) => !apiIds.has(a.id) && !apiIds.has(String(a.payload?.server_act_id ?? "")))
+      .map((a) => ({
+        id: a.id,
+        act_type: a.type,
+        act_number: a.act_number,
+        commune_code: "",
+        status: String(a.status ?? a.payload?.status ?? "DRAFT"),
+        citizen_id: null as string | null,
+        payload: a.payload,
+        created_at: a.created_at,
+      }));
+    return [...fromApi, ...fromLocal];
+  }, [apiActs, localActs]);
 
   const births = acts.filter((a) => a.act_type === "BIRTH" || a.act_type === "births");
   const deaths = acts.filter((a) => a.act_type === "DEATH" || a.act_type === "deaths");
@@ -361,8 +372,13 @@ export default function DashboardPage() {
             </li>
           </ul>
           <p className="muted small" style={{ marginBottom: 0, marginTop: "0.65rem" }}>
-            Si le graphique est à 0 : pas encore d&apos;actes synchronisés — enregistrez des actes ou
-            actualisez après connexion API.
+            <strong>Qui valide ?</strong> l&apos;officier d&apos;état civil (
+            <code>officier</code> / <code>DemoCivil2026!</code>). L&apos;agent saisit et{" "}
+            <em>soumet</em> ; l&apos;officier clique <em>Valider l&apos;acte</em> (pas de saut
+            Brouillon → Validé).
+            {drafts + submitted + validated + rejected === 0
+              ? " Graphique à 0 : ouvrez un acte (Naissances…) → Voir → Soumettre / Valider."
+              : ""}
           </p>
         </div>
         <PieChart
