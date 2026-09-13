@@ -12,12 +12,13 @@ import {
   ETAT_CIVIL_OPTIONS,
   deletePerson,
   displayName,
+  getCivilStatusOverride,
   getPerson,
   listActs,
   listPopulationPersons,
   personNationalite,
   populationBreakdown,
-  updatePerson,
+  upsertLocalPersonFromApi,
   type EtatCivil,
   type Person,
   type Sexe,
@@ -39,22 +40,27 @@ function mapSex(sex?: string | null): Sexe {
   return "M";
 }
 
-/** Mapping liste sans inventer de NIC et sans polluer le registre local. */
+/** Mapping liste : API + situation civile locale (sinon toujours « Non renseigné »). */
 function citizenToRow(c: CitizenListItem): PopRow {
   const { nom, postnom: postFromFam } = splitFamilyName(c.family_name || "");
   const { prenom, postnom: postFromGiven } = splitGivenNames(c.given_names || "");
   const realNic = (c.nic || "").trim();
   const nic = realNic && !realNic.toUpperCase().startsWith("REG-") ? realNic : "";
+  const local = getPerson(c.id);
+  const override = getCivilStatusOverride(c.id);
+  const etat =
+    override ||
+    (local?.etat_civil && local.etat_civil !== "UNKNOWN" ? local.etat_civil : "UNKNOWN");
   return {
     id: c.id,
-    nom,
-    postnom: postFromFam || postFromGiven,
-    prenom,
-    sexe: mapSex(c.sex),
-    date_naissance: (c.date_of_birth || "").slice(0, 10),
-    lieu_naissance: c.place_of_birth || c.ville || "",
-    etat_civil: "UNKNOWN",
-    nic,
+    nom: local?.nom || nom,
+    postnom: local?.postnom || postFromFam || postFromGiven,
+    prenom: local?.prenom || prenom,
+    sexe: local?.sexe || mapSex(c.sex),
+    date_naissance: local?.date_naissance || (c.date_of_birth || "").slice(0, 10),
+    lieu_naissance: local?.lieu_naissance || c.place_of_birth || c.ville || "",
+    etat_civil: etat,
+    nic: nic || local?.nic || "",
     registryStatus: c.status,
   };
 }
@@ -596,22 +602,16 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
           <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
             <h3 style={{ marginTop: 0 }}>Modifier — {displayName(editRow)}</h3>
             <p className="muted small">
-              Modification du cache local. Pour une rectification officielle du registre national, utilisez{" "}
+              La situation (célibataire, marié…) est enregistrée sur ce poste et reste visible après
+              Actualiser. Les autres champs du registre national se rectifient via{" "}
               <Link to="/corrections">Corrections</Link>.
             </p>
             <form
               className="form-grid"
               onSubmit={(e) => {
                 e.preventDefault();
-                const existing = getPerson(editRow.id);
-                if (!existing) {
-                  setActionMsg(
-                    "Cette fiche n’existe qu’en API — ouvrez Corrections pour une demande de modification.",
-                  );
-                  setEditRow(null);
-                  return;
-                }
-                updatePerson(editRow.id, {
+                upsertLocalPersonFromApi({
+                  id: editRow.id,
                   nom: editForm.nom.trim(),
                   postnom: editForm.postnom.trim(),
                   prenom: editForm.prenom.trim(),
@@ -619,10 +619,31 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                   date_naissance: editForm.date_naissance,
                   lieu_naissance: editForm.lieu_naissance.trim(),
                   etat_civil: editForm.etat_civil,
+                  nic: editRow.nic || "",
                 });
-                setActionMsg(`Fiche mise à jour : ${editForm.nom} ${editForm.prenom}`);
+                setPersons((prev) =>
+                  prev.map((p) =>
+                    p.id === editRow.id
+                      ? {
+                          ...p,
+                          nom: editForm.nom.trim(),
+                          postnom: editForm.postnom.trim(),
+                          prenom: editForm.prenom.trim(),
+                          sexe: editForm.sexe,
+                          date_naissance: editForm.date_naissance,
+                          lieu_naissance: editForm.lieu_naissance.trim(),
+                          etat_civil: editForm.etat_civil,
+                        }
+                      : p,
+                  ),
+                );
+                setActionMsg(
+                  `Situation mise à jour : ${editForm.nom} ${editForm.prenom} → ${
+                    ETAT_CIVIL_OPTIONS.find((o) => o.value === editForm.etat_civil)?.label ||
+                    editForm.etat_civil
+                  }`,
+                );
                 setEditRow(null);
-                void load();
               }}
             >
               <div>

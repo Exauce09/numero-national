@@ -954,6 +954,78 @@ export const ETAT_CIVIL_OPTIONS: { value: EtatCivil; label: string }[] = [
   { value: "UNKNOWN", label: "Inconnu" },
 ];
 
+/** Surcouche situation civile pour fiches API (le registre national n’a pas encore ce champ). */
+const CIVIL_STATUS_KEY = "nn_civil_status_overrides";
+
+function loadCivilStatusOverrides(): Record<string, EtatCivil> {
+  try {
+    const raw = localStorage.getItem(CIVIL_STATUS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, string>;
+    const out: Record<string, EtatCivil> = {};
+    for (const [id, v] of Object.entries(parsed || {})) {
+      if (["CELIBATAIRE", "MARIE", "DIVORCE", "VEUF", "UNKNOWN"].includes(v)) {
+        out[id] = v as EtatCivil;
+      }
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export function getCivilStatusOverride(citizenId: string): EtatCivil | null {
+  const v = loadCivilStatusOverrides()[citizenId];
+  return v ?? null;
+}
+
+export function setCivilStatusOverride(citizenId: string, etat: EtatCivil): void {
+  const map = loadCivilStatusOverrides();
+  map[citizenId] = etat;
+  localStorage.setItem(CIVIL_STATUS_KEY, JSON.stringify(map));
+}
+
+/** Crée ou met à jour la fiche locale liée à un citoyen API. */
+export function upsertLocalPersonFromApi(
+  base: Pick<Person, "id" | "nom" | "postnom" | "prenom" | "sexe" | "date_naissance" | "lieu_naissance" | "nic"> & {
+    etat_civil: EtatCivil;
+  },
+): Person {
+  setCivilStatusOverride(base.id, base.etat_civil);
+  const existing = getPerson(base.id);
+  if (existing) {
+    return (
+      updatePerson(base.id, {
+        nom: base.nom,
+        postnom: base.postnom,
+        prenom: base.prenom,
+        sexe: base.sexe,
+        date_naissance: base.date_naissance,
+        lieu_naissance: base.lieu_naissance,
+        etat_civil: base.etat_civil,
+        nic: base.nic || existing.nic,
+      }) ?? existing
+    );
+  }
+  const registry = load();
+  const person: Person = {
+    id: base.id,
+    nom: base.nom,
+    postnom: base.postnom,
+    prenom: base.prenom,
+    sexe: base.sexe,
+    date_naissance: base.date_naissance,
+    lieu_naissance: base.lieu_naissance,
+    etat_civil: base.etat_civil,
+    nic: base.nic || `API-${base.id.replace(/-/g, "").slice(0, 12)}`,
+    handicap_type: "NORMAL",
+    created_at: new Date().toISOString(),
+  };
+  registry.persons.unshift(person);
+  save(registry);
+  return person;
+}
+
 export const HANDICAP_OPTIONS: { value: HandicapType; label: string }[] = [
   { value: "NORMAL", label: "Normal" },
   { value: "PIED", label: "Pied" },
