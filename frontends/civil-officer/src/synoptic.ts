@@ -101,7 +101,11 @@ export function synopticBirths(communeOverride?: OfficerCommune | FlatCommune | 
 function extractQuartier(payload: Record<string, unknown>): string {
   const nested = (payload.geo_actuelle ?? payload.geo_naissance ?? {}) as Record<string, unknown>;
   return String(
-    payload.quartier_actuel ?? payload.quartier ?? nested.quartier_name ?? "",
+    payload.quartier_naissance ??
+      payload.quartier_actuel ??
+      payload.quartier ??
+      nested.quartier_name ??
+      "",
   ).trim();
 }
 
