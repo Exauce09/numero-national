@@ -204,24 +204,7 @@ def main() -> int:
         )
         synced.raise_for_status()
         rows = synced.json()
-        batch_rows = [
-            r
-            for r in rows
-            if str(r.get("local_id") or "").startswith("batch-rec-")
-            or (r.get("payload") or {}).get("source") == "batch_liste_utilisateur"
-            or any(
-                (r.get("family_name") == p["nom"] and (r.get("given_names") or "").startswith(p["prenom"]))
-                for p in people
-            )
-        ]
-        # Prefer matching by family+given from our push
-        want = {(p["nom"].upper(), p["prenom"].upper()) for p in people}
-        to_process = []
-        for r in rows:
-            key = (str(r.get("family_name") or "").upper(), str(r.get("given_names") or "").upper())
-            if key in want:
-                to_process.append(r)
-
+        to_process = [r for r in rows if str(r.get("local_id") or "").startswith("batch-rec-")]
         print(f"synced_total={len(rows)} to_process={len(to_process)}")
 
         promoted = 0
