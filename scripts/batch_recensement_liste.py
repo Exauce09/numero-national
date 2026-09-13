@@ -130,6 +130,11 @@ def main() -> int:
             rec_local = f"{BATCH_PREFIX}{p['idx']:03d}-{uuid.uuid4().hex[:8]}"
             local_ids.append(rec_local)
             address = f"{p['province']} (code {p['province_code']}) — batch recensement"
+            sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[1]))
+            from scripts.redistribute_map_rdc import coords_for, jitter  # noqa: WPS433
+
+            base = coords_for(p["province_code"]) or coords_for(p["province"]) or (-4.3276, 15.3136)
+            lat, lng = jitter(base[0], base[1], rec_local)
             items.append(
                 {
                     "entity_type": "household",
@@ -139,8 +144,11 @@ def main() -> int:
                         "address_line": address,
                         "member_count": 1,
                         "address_source": "manual",
-                        "latitude": -4.32 + (p["idx"] * 0.001),
-                        "longitude": 15.30 + (p["idx"] * 0.001),
+                        "province": p["province"],
+                        "province_code": p["province_code"],
+                        "province_origine": p["province"],
+                        "latitude": lat,
+                        "longitude": lng,
                     },
                 }
             )

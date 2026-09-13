@@ -48,9 +48,106 @@ from apps.api.domains.recensement.schemas import (
 )
 
 
+# Approximate chef-lieu / centre coords for RDC provinces (WGS84).
+_PROVINCE_COORDS: dict[str, tuple[float, float]] = {
+    "01": (-4.3276, 15.3136),  # Kinshasa
+    "kinshasa": (-4.3276, 15.3136),
+    "02": (-5.8962, 22.3080),  # Kwilu (Bandundu area) — approx Kikwit
+    "kwilu": (-5.0410, 18.8160),
+    "03": (-5.0410, 18.8160),  # Kwango — Kenge approx
+    "kwango": (-5.0410, 18.8160),
+    "04": (-5.8160, 13.4500),  # Kongo-Central — Matadi
+    "kongo-central": (-5.8160, 13.4500),
+    "kongo central": (-5.8160, 13.4500),
+    "05": (-2.1500, 16.2333),  # Mai-Ndombe — Inongo approx
+    "mai-ndombe": (-2.1500, 16.2333),
+    "06": (-5.9000, 22.4000),  # Kasaï — Tshikapa
+    "kasai": (-5.9000, 22.4000),
+    "kasaï": (-5.9000, 22.4000),
+    "07": (-2.1500, 22.4667),  # Sankuru — Lusambo
+    "sankuru": (-2.1500, 22.4667),
+    "08": (-5.9000, 22.4000),  # Kasaï-Central — Kananga (use Kananga)
+    "kasai-central": (-5.8960, 22.4170),
+    "kasaï-central": (-5.8960, 22.4170),
+    "09": (-6.1333, 24.4833),  # Lomami — Kabinda
+    "lomami": (-6.1333, 24.4833),
+    "10": (-11.6647, 27.4794),  # Haut-Katanga — Lubumbashi
+    "haut-katanga": (-11.6647, 27.4794),
+    "11": (-10.7167, 25.4667),  # Lualaba — Kolwezi
+    "lualaba": (-10.7167, 25.4667),
+    "12": (-8.7333, 24.9833),  # Haut-Lomami — Kamina
+    "haut-lomami": (-8.7333, 24.9833),
+    "13": (-2.5000, 28.8667),  # Sud-Kivu — Bukavu
+    "sud-kivu": (-2.5000, 28.8667),
+    "14": (-2.9500, 25.9500),  # Maniema — Kindu
+    "maniema": (-2.9500, 25.9500),
+    "15": (-1.6780, 29.2220),  # Nord-Kivu — Goma
+    "nord-kivu": (-1.6780, 29.2220),
+    "16": (-4.3000, 21.0333),  # Nord-Ubangi / use Gbadolite for 16 if Nord-Ubangi
+    "nord-ubangi": (4.2833, 21.0167),
+    "17": (3.6167, 23.5833),  # Bas-Uele — Buta
+    "bas-uele": (3.6167, 23.5833),
+    "18": (2.7833, 24.7333),  # Haut-Uele — Isiro
+    "haut-uele": (2.7833, 24.7333),
+    "19": (0.5167, 25.2000),  # Tshopo — Kisangani
+    "tshopo": (0.5167, 25.2000),
+    "20": (-0.0500, 18.2667),  # Mongala — Lisala
+    "mongala": (-0.0500, 18.2667),
+    "21": (-2.1500, 18.2667),  # Équateur — Mbandaka area tweak
+    "equateur": (0.0500, 18.2667),
+    "équateur": (0.0500, 18.2667),
+    "22": (3.2500, 19.7667),  # Sud-Ubangi — Gemena
+    "sud-ubangi": (3.2500, 19.7667),
+    "23": (-6.1333, 23.6000),  # Kasaï-Oriental — Mbuji-Mayi
+    "kasai-oriental": (-6.1333, 23.6000),
+    "kasaï-oriental": (-6.1333, 23.6000),
+    "24": (-5.0333, 18.8160),  # leftover
+    "25": (-4.3200, 15.3100),
+    "ituri": (1.5667, 30.2500),  # Bunia
+    "tshuapa": (-0.7333, 22.2500),
+    "tanganyika": (-5.9000, 29.2000),  # Kalemie
+    "haut-uele": (2.7833, 24.7333),
+}
+
+
+def _coords_for_province(hint: str | None) -> tuple[float, float] | None:
+    if not hint:
+        return None
+    key = str(hint).strip().lower().replace("_", "-")
+    if key in _PROVINCE_COORDS:
+        return _PROVINCE_COORDS[key]
+    # strip accents lightly
+    key2 = (
+        key.replace("é", "e")
+        .replace("è", "e")
+        .replace("ê", "e")
+        .replace("à", "a")
+        .replace("î", "i")
+        .replace("ô", "o")
+        .replace("û", "u")
+        .replace("ç", "c")
+    )
+    if key2 in _PROVINCE_COORDS:
+        return _PROVINCE_COORDS[key2]
+    for name, coords in _PROVINCE_COORDS.items():
+        if name.isdigit():
+            continue
+        if name in key2 or key2 in name:
+            return coords
+    return None
+
+
 def _kinshasa_fallback_coords() -> tuple[float, float]:
-    """Approximate Kinshasa centre — keeps manual addresses visible on the map."""
+    """Legacy fallback — prefer province centroids via `_coords_for_province`."""
     return (-4.3276, 15.3136)
+
+
+def _jitter(lat: float, lng: float, salt: str | None = None) -> tuple[float, float]:
+    """Small deterministic scatter so markers do not stack on one pixel."""
+    h = abs(hash(salt or f"{lat},{lng}")) % 10_000
+    dlat = ((h % 100) - 50) / 1000.0  # ±0.05°
+    dlng = (((h // 100) % 100) - 50) / 1000.0
+    return (lat + dlat, lng + dlng)
 
 
 def _names_from_census_data(data: dict[str, Any]) -> tuple[str | None, str | None]:
@@ -93,10 +190,48 @@ def _ensure_geo_fields(data: dict[str, Any]) -> tuple[float | None, float | None
         lng_f = float(lng) if lng is not None and lng != "" else None
     except (TypeError, ValueError):
         lng_f = None
+
+    payload = data.get("payload") if isinstance(data.get("payload"), dict) else {}
+    province_hint = (
+        data.get("province")
+        or data.get("province_origine")
+        or data.get("province_name")
+        or data.get("province_code")
+        or payload.get("province_origine")
+        or payload.get("province_code")
+        or data.get("address_line")
+    )
+
+    # If coords look like the old Kinshasa-cluster batch (±0.15° of centre) but a
+    # province is known, redistribute to that province.
+    near_kin = (
+        lat_f is not None
+        and lng_f is not None
+        and abs(lat_f - (-4.3276)) < 0.2
+        and abs(lng_f - 15.3136) < 0.2
+    )
+    prov_coords = _coords_for_province(str(province_hint) if province_hint else None)
+    if prov_coords and (lat_f is None or lng_f is None or near_kin):
+        # Prefer province centroid when address is manual / batch near Kinshasa.
+        if src in {None, "manual"} or near_kin:
+            salt = str(
+                data.get("local_id")
+                or data.get("address_line")
+                or province_hint
+                or ""
+            )
+            lat_f, lng_f = _jitter(prov_coords[0], prov_coords[1], salt)
+            if src is None:
+                src = "manual"
+
     if (lat_f is None or lng_f is None) and (
         src == "manual" or data.get("address_line") or data.get("geo_label")
     ):
-        lat_f, lng_f = _kinshasa_fallback_coords()
+        if prov_coords:
+            salt = str(data.get("local_id") or data.get("address_line") or "")
+            lat_f, lng_f = _jitter(prov_coords[0], prov_coords[1], salt)
+        else:
+            lat_f, lng_f = _kinshasa_fallback_coords()
         if src is None:
             src = "manual"
     if src is None and lat_f is not None and lng_f is not None:
