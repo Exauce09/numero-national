@@ -27,11 +27,91 @@ export const DEMO_API_EMAIL = "officier.etatcivil@example.gov";
 export const DEMO_API_PASSWORD = "CivilOfficer123!";
 export const MODULE_ROLE_TITLE = "Officier de l'état civil";
 
+/** Comptes démo état civil par rôle (alias UI → API). */
+export const CIVIL_DEMO_ACCOUNTS: Array<{
+  alias: string;
+  uiPassword: string;
+  email: string;
+  apiPassword: string;
+  label: string;
+  rolesHint: string[];
+}> = [
+  {
+    alias: "officier",
+    uiPassword: DEMO_PASSWORD,
+    email: DEMO_API_EMAIL,
+    apiPassword: DEMO_API_PASSWORD,
+    label: "Officier (validation)",
+    rolesHint: ["OFFICIER_ETAT_CIVIL", "CIVIL_OFFICER"],
+  },
+  {
+    alias: "agent",
+    uiPassword: "DemoAgentCivil2026!",
+    email: "agent.etatcivil@example.gov",
+    apiPassword: "AgentCivil123!",
+    label: "Agent (saisie)",
+    rolesHint: ["AGENT_ETAT_CIVIL"],
+  },
+  {
+    alias: "responsable",
+    uiPassword: "DemoResponsable2026!",
+    email: "responsable.bureau@example.gov",
+    apiPassword: "ResponsableBureau123!",
+    label: "Responsable de bureau",
+    rolesHint: ["RESPONSABLE_BUREAU"],
+  },
+  {
+    alias: "auditeur",
+    uiPassword: "DemoAuditeur2026!",
+    email: "auditeur.etatcivil@example.gov",
+    apiPassword: "AuditeurCivil123!",
+    label: "Auditeur",
+    rolesHint: ["AUDITEUR"],
+  },
+  {
+    alias: "admin",
+    uiPassword: "DemoAdminProv2026!",
+    email: "admin.provincial@example.gov",
+    apiPassword: "AdminProvincial123!",
+    label: "Admin provincial",
+    rolesHint: ["ADMIN_PROVINCIAL"],
+  },
+];
+
+function resolveDemoAccount(
+  username: string,
+  password: string,
+  passwordOverride?: string,
+): { email: string; password: string; alias: string; rolesHint: string[] } | null {
+  const user = username.trim().toLowerCase();
+  for (const acc of CIVIL_DEMO_ACCOUNTS) {
+    if (user !== acc.alias && user !== acc.email) continue;
+    const passOk =
+      password === acc.apiPassword ||
+      password === acc.uiPassword ||
+      (Boolean(passwordOverride) && password === passwordOverride);
+    if (!passOk) continue;
+    return {
+      email: acc.email,
+      password: acc.apiPassword,
+      alias: acc.alias,
+      rolesHint: acc.rolesHint,
+    };
+  }
+  return null;
+}
+
+function demoAccountBySessionUser(username?: string | null) {
+  if (!username) return null;
+  const user = username.trim().toLowerCase();
+  return CIVIL_DEMO_ACCOUNTS.find((a) => a.alias === user || a.email === user) ?? null;
+}
+
 function sessionLabel(username: string, roles?: string[]): { displayName: string; roleTitle: string } {
-  const pretty =
-    username === DEMO_USER
-      ? "Officier de l'état civil"
-      : username.replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const demo = CIVIL_DEMO_ACCOUNTS.find((a) => a.alias === username || a.email === username);
+  const pretty = demo
+    ? demo.label
+    : username.replace(/[._@]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   return {
     displayName: pretty,
     roleTitle: roles?.length ? roleTitleFor(roles) : MODULE_ROLE_TITLE,
@@ -134,11 +214,20 @@ export async function login(username: string, password: string): Promise<Session
 
   const base = import.meta.env.VITE_API_BASE ?? "/api/v1";
 
-  const apiAttempts: Array<{ email: string; password: string }> = [];
-  if (user.includes("@")) {
-    apiAttempts.push({ email: user, password });
-  } else if (user === DEMO_USER && (password === DEMO_PASSWORD || password === passwordOverride)) {
-    apiAttempts.push({ email: DEMO_API_EMAIL, password: DEMO_API_PASSWORD });
+  const demo = resolveDemoAccount(user, password, passwordOverride);
+  const apiAttempts: Array<{
+    email: string;
+    password: string;
+    alias?: string;
+    rolesHint?: string[];
+  }> = [];
+  if (demo) {
+    apiAttempts.push({
+      email: demo.email,
+      password: demo.password,
+      alias: demo.alias,
+      rolesHint: demo.rolesHint,
+    });
   } else {
     apiAttempts.push({ email: user, password });
   }
@@ -162,16 +251,14 @@ export async function login(username: string, password: string): Promise<Session
         const me = data.access_token ? await fetchMe(data.access_token) : null;
         const roles = me?.roles?.length
           ? me.roles
-          : user === DEMO_USER || attempt.email === DEMO_API_EMAIL
-            ? ["OFFICIER_ETAT_CIVIL", "CIVIL_OFFICER"]
+          : attempt.rolesHint?.length
+            ? attempt.rolesHint
             : ["AGENT_ETAT_CIVIL"];
-        const labels = sessionLabel(
-          user === DEMO_USER ? DEMO_USER : attempt.email,
-          roles,
-        );
+        const sessionUser = attempt.alias || attempt.email;
+        const labels = sessionLabel(sessionUser, roles);
         const session = attachCommune(
           {
-            username: user === DEMO_USER ? DEMO_USER : attempt.email,
+            username: sessionUser,
             accessToken: data.access_token,
             photoDataUrl,
             displayName: me?.full_name || labels.displayName,
@@ -181,7 +268,7 @@ export async function login(username: string, password: string): Promise<Session
             accountStatus: me?.account_status ?? "ACTIVE",
             userId: me?.id,
           },
-          user === DEMO_USER ? DEMO_USER : attempt.email,
+          sessionUser,
         );
         sessionStorage.setItem(KEY, JSON.stringify(session));
         return session;
@@ -198,28 +285,28 @@ export async function login(username: string, password: string): Promise<Session
     }
   }
 
-  const apiDemoOk =
-    (user === DEMO_API_EMAIL || user === DEMO_USER) &&
-    (password === DEMO_API_PASSWORD || password === DEMO_PASSWORD || password === passwordOverride);
-  const demoOk =
-    apiDemoOk || (user === DEMO_USER && (password === DEMO_PASSWORD || password === passwordOverride));
-  if (!demoOk) {
-    throw new Error(lastError || `Identifiants incorrects. Utilisez : ${DEMO_API_EMAIL}`);
+  const offlineDemo = resolveDemoAccount(user, password, passwordOverride);
+  if (!offlineDemo) {
+    throw new Error(
+      lastError ||
+        "Identifiants incorrects. Comptes : officier, agent, responsable, auditeur, admin (voir docs/demo-credentials.md).",
+    );
   }
 
-  const sessionUser = user.includes("@") ? user : DEMO_USER;
-  const roles = ["OFFICIER_ETAT_CIVIL", "CIVIL_OFFICER"];
-  const labels = sessionLabel(sessionUser === DEMO_API_EMAIL ? DEMO_USER : sessionUser, roles);
+  const sessionUser = offlineDemo.alias;
+  const roles = offlineDemo.rolesHint;
+  const labels = sessionLabel(sessionUser, roles);
   const session = attachCommune(
     {
-      username: sessionUser === DEMO_API_EMAIL ? DEMO_USER : sessionUser,
+      username: sessionUser,
       photoDataUrl,
-      ...labels,
+      displayName: labels.displayName,
+      roleTitle: labels.roleTitle,
       roles,
       permissions: [],
       accountStatus: "ACTIVE",
     },
-    sessionUser === DEMO_API_EMAIL ? DEMO_USER : sessionUser,
+    sessionUser,
   );
   sessionStorage.setItem(KEY, JSON.stringify(session));
   return session;
@@ -238,12 +325,24 @@ export async function ensureAccessToken(): Promise<string | null> {
     if (me) return current.accessToken;
   }
 
-  // Tentative de reconnexion API (compte démo / email de session)
-  const attempts: Array<{ email: string; password: string }> = [
-    { email: DEMO_API_EMAIL, password: DEMO_API_PASSWORD },
-  ];
-  if (current?.username?.includes("@")) {
-    attempts.unshift({ email: current.username, password: DEMO_API_PASSWORD });
+  const known = demoAccountBySessionUser(current?.username);
+  const attempts: Array<{ email: string; password: string; alias: string; rolesHint: string[] }> = [];
+  if (known) {
+    attempts.push({
+      email: known.email,
+      password: known.apiPassword,
+      alias: known.alias,
+      rolesHint: known.rolesHint,
+    });
+  } else if (current?.username?.includes("@")) {
+    // Mot de passe inconnu hors comptes démo — impossible de renouveler automatiquement.
+  } else {
+    attempts.push({
+      email: DEMO_API_EMAIL,
+      password: DEMO_API_PASSWORD,
+      alias: DEMO_USER,
+      rolesHint: ["OFFICIER_ETAT_CIVIL", "CIVIL_OFFICER"],
+    });
   }
 
   for (const attempt of attempts) {
@@ -251,18 +350,19 @@ export async function ensureAccessToken(): Promise<string | null> {
       const res = await fetch(`${base}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify(attempt),
+        body: JSON.stringify({ email: attempt.email, password: attempt.password }),
       });
       if (!res.ok) continue;
       const data = (await res.json()) as { access_token?: string };
       if (!data.access_token) continue;
       const me = await fetchMe(data.access_token);
-      const roles = me?.roles?.length ? me.roles : ["OFFICIER_ETAT_CIVIL", "CIVIL_OFFICER"];
-      const labels = sessionLabel(current?.username || DEMO_USER, roles);
+      const sessionUser = current?.username || attempt.alias;
+      const roles = me?.roles?.length ? me.roles : attempt.rolesHint;
+      const labels = sessionLabel(sessionUser, roles);
       const next = attachCommune(
         {
-          ...(current ?? { username: DEMO_USER }),
-          username: current?.username || DEMO_USER,
+          ...(current ?? { username: attempt.alias }),
+          username: sessionUser,
           accessToken: data.access_token,
           displayName: me?.full_name || current?.displayName || labels.displayName,
           roleTitle: labels.roleTitle,
@@ -271,7 +371,7 @@ export async function ensureAccessToken(): Promise<string | null> {
           accountStatus: me?.account_status ?? "ACTIVE",
           userId: me?.id,
         },
-        current?.username || DEMO_USER,
+        sessionUser,
       );
       sessionStorage.setItem(KEY, JSON.stringify(next));
       return data.access_token;

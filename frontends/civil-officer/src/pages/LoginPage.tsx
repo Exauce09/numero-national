@@ -1,10 +1,9 @@
 import { FormEvent, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import {
+  CIVIL_DEMO_ACCOUNTS,
   DEMO_API_EMAIL,
   DEMO_API_PASSWORD,
-  DEMO_PASSWORD,
-  DEMO_USER,
   getSession,
   login,
 } from "../auth";
@@ -43,7 +42,7 @@ export default function LoginPage() {
         <img className="login-logo" src="/logo-rdc.jpg" alt="République Démocratique du Congo" />
         <h1 className="login-title">SIGPOP-RDC</h1>
         <p className="login-subtitle">
-          Système intégré de gouvernance de la population — Officier de l&apos;état civil
+          Système intégré de gouvernance de la population — État civil
         </p>
         <form onSubmit={(e) => void onSubmit(e)} method="post" action="#" autoComplete="off">
           {error ? <div className="login-error" role="alert">{error}</div> : null}
@@ -72,25 +71,36 @@ export default function LoginPage() {
             autoComplete="current-password"
             disabled={busy}
           />
-          <button
-            type="button"
-            className="login-forgot"
-            onClick={() => {
-              setUsername(DEMO_API_EMAIL);
-              setPassword(DEMO_API_PASSWORD);
-              setError(null);
-            }}
-          >
-            Remplir le compte officier de démonstration
-          </button>
+          <div className="login-demo-roles" style={{ display: "grid", gap: "0.35rem", margin: "0.75rem 0" }}>
+            {CIVIL_DEMO_ACCOUNTS.map((acc) => (
+              <button
+                key={acc.alias}
+                type="button"
+                className="login-forgot"
+                style={{ textAlign: "left" }}
+                onClick={() => {
+                  setUsername(acc.alias);
+                  setPassword(acc.uiPassword);
+                  setError(null);
+                }}
+                disabled={busy}
+              >
+                Remplir : {acc.label} ({acc.alias})
+              </button>
+            ))}
+          </div>
           <button className="btn-primary" type="submit" disabled={busy}>
             {busy ? "Connexion…" : "Se connecter"}
           </button>
         </form>
         <p className="login-subtitle" style={{ marginTop: "1.25rem", marginBottom: 0 }}>
-          Aide : compte démo <strong>{DEMO_API_EMAIL}</strong>
+          Comptes démo par rôle (alias / mot de passe UI) :
           <br />
-          <span className="muted">Alias local : {DEMO_USER} / {DEMO_PASSWORD}</span>
+          {CIVIL_DEMO_ACCOUNTS.map((acc) => (
+            <span key={acc.alias} className="muted" style={{ display: "block" }}>
+              {acc.alias} / {acc.uiPassword} — {acc.label}
+            </span>
+          ))}
           <br />
           <span className="muted">Mot de passe oublié — contactez votre administrateur territorial.</span>
         </p>

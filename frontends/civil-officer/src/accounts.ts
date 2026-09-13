@@ -54,10 +54,26 @@ export function resolveCommuneForUsername(username: string): OfficerCommune {
   const hit = loadAccounts().find((a) => a.username === user);
   if (hit) return { ...hit.commune };
 
-  if (user === "officier") {
+  const demoAliases = new Set([
+    "officier",
+    "agent",
+    "responsable",
+    "auditeur",
+    "admin",
+  ]);
+  if (demoAliases.has(user)) {
     const demo = assignOfficerAccount({
-      username: "officier",
-      displayName: "Officier de l'état civil",
+      username: user,
+      displayName:
+        user === "officier"
+          ? "Officier de l'état civil"
+          : user === "agent"
+            ? "Agent de l'état civil"
+            : user === "responsable"
+              ? "Responsable de bureau"
+              : user === "auditeur"
+                ? "Auditeur"
+                : "Administrateur provincial",
       commune: DEFAULT_OFFICER_COMMUNE,
     });
     return { ...demo.commune };
