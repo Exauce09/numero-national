@@ -52,7 +52,7 @@ function sexForRegistry(sexe: string): "MALE" | "FEMALE" | "UNKNOWN" {
 
 /**
  * Après recensement état civil : file d'attente + citoyen registre (+ NIC)
- * pour que ONIP puisse rechercher, générer et livrer la carte.
+ * pour que SIGPOP-RDC puisse rechercher, générer et livrer la carte.
  */
 export async function pushCensusToOnip(input: {
   person: Person;
@@ -90,7 +90,7 @@ export async function pushCensusToOnip(input: {
     return {
       queueId: item.id,
       message:
-        "Recensement local OK — reconnectez-vous (officier / DemoCivil2026!) pour envoyer le dossier à ONIP.",
+        "Recensement local OK — reconnectez-vous (officier / DemoCivil2026!) pour envoyer le dossier à SIGPOP-RDC.",
     };
   }
 
@@ -142,14 +142,14 @@ export async function pushCensusToOnip(input: {
       citizenId: citizen.id,
       nic: registryNic ?? undefined,
       message: registryNic
-        ? `Dossier envoyé à ONIP — NIC ${registryNic}. Sur ONIP → Cartes, recherchez « ${input.person.nom} ${input.person.prenom} ».`
-        : `Citoyen créé dans le registre (brouillon). Sur ONIP → Cartes, recherchez « ${input.person.nom} » puis validez/générez la carte.`,
+        ? `Dossier envoyé à SIGPOP-RDC — NIC ${registryNic}. Sur SIGPOP-RDC → Cartes, recherchez « ${input.person.nom} ${input.person.prenom} ».`
+        : `Citoyen créé dans le registre (brouillon). Sur SIGPOP-RDC → Cartes, recherchez « ${input.person.nom} » puis validez/générez la carte.`,
     };
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     return {
       queueId: item.id,
-      message: `File locale OK — sync ONIP échouée : ${detail.slice(0, 160)}`,
+      message: `File locale OK — sync SIGPOP-RDC échouée : ${detail.slice(0, 160)}`,
     };
   }
 }

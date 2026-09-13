@@ -37,7 +37,7 @@ export async function reverseGeocode(lat: number, lng: number): Promise<ReverseG
       `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}` +
       `&addressdetails=1&accept-language=fr`;
     const res = await fetch(url, {
-      headers: { Accept: "application/json", "User-Agent": "NumeroNational-ONIP/1.0" },
+      headers: { Accept: "application/json", "User-Agent": "NumeroNational-SIGPOP-RDC/1.0" },
     });
     if (!res.ok) return { latitude: lat, longitude: lng };
     const data = (await res.json()) as {

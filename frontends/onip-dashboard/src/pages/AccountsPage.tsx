@@ -6,7 +6,7 @@ import { getSession, hasPermission } from "../auth";
 const ROLE_OPTIONS: Array<{ code: string; label: string }> = [
   { code: "CENSUS_AGENT", label: "Agent de recensement (téléphone)" },
   { code: "CENSUS_SUPERVISOR", label: "Superviseur recensement (contrôle)" },
-  { code: "ONIP_OPS", label: "Opérations ONIP" },
+  { code: "ONIP_OPS", label: "Opérations SIGPOP-RDC" },
   { code: "CENTRAL_ADMIN", label: "Administrateur central" },
 ];
 

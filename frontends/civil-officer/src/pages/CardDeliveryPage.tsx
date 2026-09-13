@@ -71,7 +71,7 @@ export default function CardDeliveryPage() {
       <div className="hero-banner">
         <h1>Impression / livraison des cartes d&apos;identité</h1>
         <p>
-          Après génération ONIP, chaque carte revient à votre commune (
+          Après génération SIGPOP-RDC, chaque carte revient à votre commune (
           <strong>
             {commune.name}
             {commune.ville ? ` · ${commune.ville}` : ""}
@@ -84,7 +84,7 @@ export default function CardDeliveryPage() {
         <div className="panel">
           <p className="muted">
             Connectez-vous avec le compte API ({`officier.etatcivil@example.gov`}) pour recevoir
-            les cartes envoyées par l&apos;ONIP.
+            les cartes envoyées par SIGPOP-RDC.
           </p>
         </div>
       ) : null}

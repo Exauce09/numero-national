@@ -310,7 +310,7 @@ export default function IdCardRdc({ card, fallback }: Props) {
 
         <div className="rdc-stripe-bar">
           <span className="rdc-stripe-flag" aria-hidden />
-          <span>ONIP · Identité nationale · Justice · Paix · Travail</span>
+          <span>SIGPOP-RDC · Identité nationale · Justice · Paix · Travail</span>
         </div>
       </article>
 

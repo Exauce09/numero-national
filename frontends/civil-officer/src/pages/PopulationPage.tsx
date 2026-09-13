@@ -339,7 +339,7 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
               <>
                 Registre national — {total} fiche(s) promues. Les enregistrements tablette/Tecno
                 apparaissent d&apos;abord ci-dessous (file terrain SYNCED), puis ici après promotion
-                NIC sur ONIP.
+                NIC sur SIGPOP-RDC.
               </>
             ) : (
               <>Mode local (navigateur). Connectez-vous avec un compte API pour le registre national.</>
@@ -393,7 +393,7 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
             Les fiches <strong>PROMOTED</strong> apparaissent aussi dans la liste Population ci-dessous.
             Contrôle restant :{" "}
             <a href="http://127.0.0.1:5183/campaigns" target="_blank" rel="noreferrer">
-              ONIP → Campagnes
+              SIGPOP-RDC → Campagnes
             </a>{" "}
             (superviseur <code>supervisor.recensement@example.gov</code>).
           </p>

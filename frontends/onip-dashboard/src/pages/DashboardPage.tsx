@@ -34,7 +34,7 @@ export default function DashboardPage() {
     return (
       <div>
         <div className="hero-banner">
-          <h1>Vue nationale ONIP</h1>
+          <h1>Vue nationale SIGPOP-RDC</h1>
           <p>Pilotage identité · recensement · cartes — République Démocratique du Congo</p>
         </div>
         <p className="error">Impossible de charger le tableau de bord ({error}).</p>

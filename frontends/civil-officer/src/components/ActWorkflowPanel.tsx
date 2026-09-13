@@ -196,7 +196,7 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
     }
     if (!supportsCivilWorkflow) {
       setError(
-        "Le recensement n'est pas un acte d'état civil à valider ici — utilisez le flux ONIP / fiche citoyen.",
+        "Le recensement n'est pas un acte d'état civil à valider ici — utilisez le flux SIGPOP-RDC / fiche citoyen.",
       );
       return;
     }
@@ -359,7 +359,7 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
             <li>
               Ouvrir{" "}
               <a href="http://127.0.0.1:5183/campaigns" target="_blank" rel="noreferrer">
-                ONIP → Campagnes
+                SIGPOP-RDC → Campagnes
               </a>
             </li>
             <li>

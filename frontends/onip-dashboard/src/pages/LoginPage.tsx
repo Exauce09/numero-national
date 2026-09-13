@@ -30,9 +30,9 @@ export default function LoginPage() {
     <div className="login-page">
       <div className="login-card">
         <img className="login-logo" src="/logo-rdc.jpg" alt="République Démocratique du Congo" />
-        <h1 className="login-title">ONIP</h1>
+        <h1 className="login-title">SIGPOP-RDC</h1>
         <p className="login-subtitle">
-          Office National d&apos;Identification de la Population
+          Système Intégré de Gouvernance de la Population
           <br />
           Plateforme E-GOUV — République Démocratique du Congo
         </p>

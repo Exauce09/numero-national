@@ -12,14 +12,14 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: string |
   }
 
   componentDidCatch(err: Error, info: ErrorInfo) {
-    console.error("ONIP render error", err, info);
+    console.error("SIGPOP-RDC render error", err, info);
   }
 
   render() {
     if (this.state.error) {
       return (
         <div style={{ padding: 24, fontFamily: "Segoe UI, sans-serif", maxWidth: 520 }}>
-          <h1 style={{ color: "#ce1126" }}>ONIP — erreur d’affichage</h1>
+          <h1 style={{ color: "#ce1126" }}>SIGPOP-RDC — erreur d’affichage</h1>
           <p>{this.state.error}</p>
           <p style={{ color: "#5a6a85" }}>
             Sur Edge : Ctrl+Shift+R pour forcer le rechargement, ou ouvrez une fenêtre InPrivate.

@@ -31,7 +31,7 @@ function Shell() {
   const location = useLocation();
   const session = getSession();
   const [navOpen, setNavOpen] = useState(false);
-  const pageTitle = PAGE_TITLES[location.pathname] ?? "ONIP";
+  const pageTitle = PAGE_TITLES[location.pathname] ?? "SIGPOP-RDC";
 
   useEffect(() => {
     setNavOpen(false);
@@ -57,13 +57,13 @@ function Shell() {
       <aside className="sidebar" id="app-sidebar">
         <div className="sidebar-brand">
           <img src="/logo-rdc.jpg" alt="République Démocratique du Congo" />
-          <strong>ONIP</strong>
+          <strong>SIGPOP-RDC</strong>
           <span>E-GOUV · RDC · menu v2</span>
           <button type="button" className="sidebar-close" aria-label="Fermer le menu" onClick={() => setNavOpen(false)}>
             ×
           </button>
         </div>
-        <nav className="sidebar-nav" aria-label="Menu principal ONIP">
+        <nav className="sidebar-nav" aria-label="Menu principal SIGPOP-RDC">
           <div className="nav-group-label">Vue d’ensemble</div>
           <NavLink to="/" end>
             Tableau de bord
