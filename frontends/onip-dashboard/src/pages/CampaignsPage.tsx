@@ -364,6 +364,10 @@ function ReviewTab({
       <p className="muted" style={{ marginTop: 0 }}>
         Chaque étape a son propre menu. Les fiches <strong>promues</strong> n’apparaissent plus dans
         « À contrôler ».
+        <br />
+        <strong>Note :</strong> seules les fiches synchronisées depuis la <em>tablette APK</em>{" "}
+        apparaissent ici. Un recensement fait dans l’état civil (n° <code>CEN-…</code>) se cherche
+        dans <strong>Population</strong> / <strong>Cartes</strong>, pas dans cet onglet.
       </p>
       <div className="status-menu" role="tablist" aria-label="Étape des fiches">
         {STATUS_MENU.map((s) => (
@@ -417,6 +421,15 @@ function ReviewTab({
           </tr>
         </thead>
         <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={6} className="muted">
+                Aucune fiche dans cette étape. Si vous cherchez un recensement{" "}
+                <code>CEN-…</code> fait dans l’état civil (navigateur), ouvrez Population / Cartes —
+                pas « À contrôler » (réservé à la sync tablette APK).
+              </td>
+            </tr>
+          ) : null}
           {rows.map((r) => (
             <tr key={r.id}>
               <td>

@@ -352,31 +352,64 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
       {!supportsCivilWorkflow ? (
         <div className="panel" style={{ marginBottom: "1rem", padding: "0.85rem 1rem" }}>
           <p style={{ marginTop: 0 }}>
-            Ceci est une fiche <strong>recensement</strong>, pas un acte d&apos;état civil (naissance,
-            mariage…). Il n&apos;y a rien à « Soumettre / Valider » ici.
+            Ceci est une fiche <strong>recensement</strong> (<code>{current.act_number}</code>), pas un
+            acte de naissance/mariage. Il n&apos;y a <strong>pas</strong> de bouton « Soumettre /
+            Valider » ici — c&apos;est normal.
           </p>
-          <ol className="muted small" style={{ margin: "0.5rem 0", paddingLeft: "1.2rem", lineHeight: 1.55 }}>
+          <p className="muted small">
+            <strong>Important :</strong> « À contrôler » dans SIGPOP-RDC ne liste que les fiches
+            synchronisées depuis la <strong>tablette APK</strong>. Une fiche créée dans l&apos;état
+            civil (navigateur) n&apos;y apparaît en général <strong>pas</strong>.
+          </p>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "0.5rem",
+              marginTop: "0.75rem",
+              marginBottom: "0.75rem",
+            }}
+          >
+            <a
+              className="btn-primary"
+              style={{ width: "auto", textDecoration: "none" }}
+              href={`/population?q=${encodeURIComponent(String(current.national_id || current.payload?.nom || ""))}`}
+            >
+              Ouvrir Population
+            </a>
+            <a
+              className="btn-secondary"
+              style={{ width: "auto", textDecoration: "none" }}
+              href="http://127.0.0.1:5183/cards"
+              target="_blank"
+              rel="noreferrer"
+            >
+              SIGPOP-RDC → Cartes
+            </a>
+            <a
+              className="btn-secondary"
+              style={{ width: "auto", textDecoration: "none" }}
+              href="http://127.0.0.1:5183/campaigns"
+              target="_blank"
+              rel="noreferrer"
+            >
+              SIGPOP-RDC → Campagnes (APK)
+            </a>
+          </div>
+          <ol className="muted small" style={{ margin: "0.5rem 0 0", paddingLeft: "1.2rem", lineHeight: 1.55 }}>
             <li>
-              Ouvrir{" "}
-              <a href="http://127.0.0.1:5183/campaigns" target="_blank" rel="noreferrer">
-                SIGPOP-RDC → Campagnes
-              </a>
+              <strong>Recensement navigateur (votre cas)</strong> : cherchez la personne dans{" "}
+              <strong>Population</strong> avec le NIC{" "}
+              <code>{current.national_id || "—"}</code>. Pour la carte : SIGPOP-RDC → Cartes.
             </li>
             <li>
-              Connexion superviseur :{" "}
-              <code>supervisor.recensement@example.gov</code> / <code>CensusSupervisor123!</code>
-            </li>
-            <li>
-              Onglet <strong>1. À contrôler</strong> → Approuver → <strong>2. Approuvées</strong> →
-              Promouvoir NIC
-            </li>
-            <li>
-              La personne apparaît ensuite dans <strong>Population</strong> (registre national)
+              <strong>Recensement tablette APK</strong> seulement : Campagnes → onglet{" "}
+              <strong>1. À contrôler</strong> → Approuver → Promouvoir NIC
+              <br />
+              Compte : <code>supervisor.recensement@example.gov</code> /{" "}
+              <code>CensusSupervisor123!</code>
             </li>
           </ol>
-          <p className="muted small" style={{ marginBottom: 0 }}>
-            Ou allez dans Population → Fiches terrain (APK) pour voir le statut SYNCED / PROMOTED.
-          </p>
         </div>
       ) : null}
 
