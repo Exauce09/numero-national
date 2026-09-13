@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { clearSession, getSession } from "./auth";
+import { clearSession, getSession, hasPermission } from "./auth";
 import AccountsPage from "./pages/AccountsPage";
 import AnomaliesPage from "./pages/AnomaliesPage";
 import CampaignsPage from "./pages/CampaignsPage";
@@ -69,8 +69,12 @@ function Shell() {
             Tableau de bord
           </NavLink>
 
-          <div className="nav-group-label">Agents</div>
-          <NavLink to="/accounts">Comptes agents</NavLink>
+          {hasPermission("users:manage", session) ? (
+            <>
+              <div className="nav-group-label">Agents</div>
+              <NavLink to="/accounts">Comptes agents</NavLink>
+            </>
+          ) : null}
 
           <div className="nav-group-label">Recensement</div>
           <NavLink to="/campaigns">Campagnes &amp; contrôle</NavLink>
@@ -103,7 +107,10 @@ function Shell() {
             </button>
             <h1 className="topbar-title">{pageTitle}</h1>
           </div>
-          <span className="topbar-user">{session?.username}</span>
+          <span className="topbar-user">
+            {session?.displayName || session?.username}
+            {session?.roles?.length ? ` · ${session.roles[0]}` : ""}
+          </span>
         </header>
         <main className="shell">
           <Routes>

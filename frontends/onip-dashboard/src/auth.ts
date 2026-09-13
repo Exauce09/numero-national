@@ -2,6 +2,9 @@ export type Session = {
   username: string;
   accessToken?: string;
   refreshToken?: string;
+  roles?: string[];
+  permissions?: string[];
+  displayName?: string;
 };
 
 const KEY = "nn_session_onip";
@@ -25,6 +28,40 @@ export function updateAccessToken(accessToken: string): void {
   if (!s) return;
   const next = { ...s, accessToken };
   sessionStorage.setItem(KEY, JSON.stringify(next));
+}
+
+export function hasPermission(code: string, session?: Session | null): boolean {
+  const s = session ?? getSession();
+  return Boolean(s?.permissions?.includes(code));
+}
+
+/** Page d’accueil selon les droits (superviseur → campagnes, admin → comptes). */
+export function homePathForSession(session?: Session | null): string {
+  const s = session ?? getSession();
+  if (hasPermission("users:manage", s)) return "/accounts";
+  if (hasPermission("census:manage", s) || hasPermission("census:sync", s)) return "/campaigns";
+  return "/";
+}
+
+async function fetchMe(accessToken: string): Promise<{
+  full_name?: string;
+  roles?: string[];
+  permissions?: string[];
+} | null> {
+  const base = import.meta.env.VITE_API_BASE ?? "/api/v1";
+  try {
+    const res = await fetch(`${base}/auth/me`, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as {
+      full_name?: string;
+      roles?: string[];
+      permissions?: string[];
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Connexion API uniquement — JWT obligatoire. */
@@ -57,10 +94,14 @@ export async function login(username: string, password: string): Promise<Session
     if (!data.access_token) {
       throw new Error("Réponse API sans jeton d’accès.");
     }
+    const me = await fetchMe(data.access_token);
     const session: Session = {
       username: user,
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
+      roles: me?.roles ?? [],
+      permissions: me?.permissions ?? [],
+      displayName: me?.full_name,
     };
     sessionStorage.setItem(KEY, JSON.stringify(session));
     return session;

@@ -1,7 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { accountsApi, geoApi, type DirectoryUser, type GeoItem } from "../api";
-import { getSession } from "../auth";
+import { getSession, hasPermission } from "../auth";
 
 const ROLE_OPTIONS: Array<{ code: string; label: string }> = [
   { code: "CENSUS_AGENT", label: "Agent de recensement (téléphone)" },
@@ -15,7 +15,9 @@ const ROLE_OPTIONS: Array<{ code: string; label: string }> = [
  * province → ville, puis rôle.
  */
 export default function AccountsPage() {
-  const hasToken = Boolean(getSession()?.accessToken);
+  const session = getSession();
+  const hasToken = Boolean(session?.accessToken);
+  const canManageUsers = hasPermission("users:manage", session);
   const [users, setUsers] = useState<DirectoryUser[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -44,7 +46,7 @@ export default function AccountsPage() {
   const [villeNames, setVilleNames] = useState<Record<string, string>>({});
 
   const reload = useCallback(async () => {
-    if (!hasToken) return;
+    if (!hasToken || !canManageUsers) return;
     setLoading(true);
     setError(null);
     try {
@@ -73,19 +75,19 @@ export default function AccountsPage() {
     } finally {
       setLoading(false);
     }
-  }, [hasToken]);
+  }, [hasToken, canManageUsers]);
 
   useEffect(() => {
     void reload();
   }, [reload]);
 
   useEffect(() => {
-    if (!hasToken) return;
+    if (!hasToken || !canManageUsers) return;
     void geoApi
       .provinces()
       .then(setProvinces)
       .catch(() => setProvinces([]));
-  }, [hasToken]);
+  }, [hasToken, canManageUsers]);
 
   useEffect(() => {
     setVilleId("");
@@ -230,6 +232,10 @@ export default function AccountsPage() {
         </div>
       </div>
     );
+  }
+
+  if (!canManageUsers) {
+    return <Navigate to="/campaigns" replace />;
   }
 
   return (

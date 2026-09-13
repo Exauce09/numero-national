@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getSession } from "../auth";
+import { getSession, hasPermission } from "../auth";
 
 type Dashboard = {
   generated_at: string;
@@ -149,11 +149,13 @@ export default function DashboardPage() {
 
       <div className="panel" style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         <strong>Parcours</strong>
-        <Link className="btn-primary" to="/accounts">
-          Comptes agents
-        </Link>
-        <Link className="btn-secondary" to="/campaigns">
-          Campagnes
+        {hasPermission("users:manage", session) ? (
+          <Link className="btn-secondary" to="/accounts">
+            Comptes agents
+          </Link>
+        ) : null}
+        <Link className="btn-primary" to="/campaigns">
+          Campagnes &amp; contrôle
         </Link>
         <Link className="btn-secondary" to="/cards">
           Cartes d&apos;identité

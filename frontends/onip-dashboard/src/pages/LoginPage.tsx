@@ -1,24 +1,24 @@
 import { FormEvent, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { getSession, login } from "../auth";
+import { getSession, homePathForSession, login } from "../auth";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const existing = getSession();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("supervisor.recensement@example.gov");
+  const [password, setPassword] = useState("CensusSupervisor123!");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (existing) return <Navigate to="/accounts" replace />;
+  if (existing) return <Navigate to={homePathForSession(existing)} replace />;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setBusy(true);
     try {
-      await login(username, password);
-      navigate("/accounts", { replace: true });
+      const session = await login(username, password);
+      navigate(homePathForSession(session), { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Connexion impossible.");
     } finally {
