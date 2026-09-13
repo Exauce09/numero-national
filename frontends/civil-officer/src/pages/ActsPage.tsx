@@ -35,6 +35,23 @@ const API_KINDS = ["births", "deaths", "marriages", "divorces", "adoptions", "re
 const PAGE_SIZE = 10;
 const COLORS = ["#5d87ff", "#13deb9", "#fa896b", "#ffae1f", "#539bff", "#763ebd", "#49beff", "#fdd835"];
 
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Brouillon",
+  SUBMITTED: "Soumis",
+  UNDER_REVIEW: "En révision",
+  VALIDATED: "Validé",
+  REJECTED: "Rejeté",
+  ARCHIVED: "Archivé",
+};
+
+function displayActStatus(a: Act): string {
+  const raw = (a.status || "").toUpperCase();
+  if (raw && STATUS_LABEL[raw]) return STATUS_LABEL[raw];
+  if (a.type === "CENSUS") return "Hors workflow civil";
+  // Actes locaux / non sync : traités comme brouillon à valider
+  return "Brouillon";
+}
+
 export default function ActsPage({ showAnalytics = false }: { showAnalytics?: boolean }) {
   const navigate = useNavigate();
   const session = getSession();
@@ -284,7 +301,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
                       <td>
                         <code>{a.national_id || "—"}</code>
                       </td>
-                      <td>{a.status ?? "—"}</td>
+                      <td>{displayActStatus(a)}</td>
                       <td>{new Date(a.created_at).toLocaleString("fr-CD")}</td>
                       <td className="table-actions">
                         <button
