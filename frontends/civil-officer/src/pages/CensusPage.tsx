@@ -34,7 +34,7 @@ import { listFacilityAccounts } from "../healthAuth";
 import { HOPITAUX_KEY, PROFESSIONS_KEY, loadNamedList, rememberNamed } from "../namedLists";
 import GpsLocatePanel from "../components/GpsLocatePanel";
 import { captureGpsOnSave, captureGpsWithAddress, type ReverseGeo } from "../gpsCapture";
-import { captureZkFingerprint, fingerprintDisplayCode } from "../zkBridge";
+import { captureZkFingerprint, fingerprintDisplayCode, templatesLookSame } from "../zkBridge";
 import { pushCensusToOnip } from "../onipSync";
 import { enrollCapturedFingers, type CapturedFinger } from "../biometricEnrollFromCensus";
 import {
@@ -458,11 +458,20 @@ export default function CensusPage() {
     also?: (v: string) => void,
   ) {
     setError(null);
-    setFpNotice(`Capture ZK9500 — posez le doigt ${n} sur le lecteur…`);
+    setFpNotice(
+      `Capture ZK9500 — placez le doigt ${n} à plat 1–2 secondes sur le lecteur…`,
+    );
     try {
       const position: CapturedFinger["position"] =
         n === 1 ? "POUCE_DROIT" : n === 2 ? "INDEX_DROIT" : "INDEX_GAUCHE";
       const cap = await captureZkFingerprint(position);
+      for (const prev of Object.values(fpTemplates)) {
+        if (prev && templatesLookSame(prev.template_b64, cap.template_b64)) {
+          throw new Error(
+            "Cette empreinte existe déjà dans la session. Scannez un doigt différent (comme au système frontière).",
+          );
+        }
+      }
       const code = fingerprintDisplayCode(cap, n);
       setter(code);
       also?.(code);

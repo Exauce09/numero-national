@@ -39,6 +39,11 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_autoLogin && widget.allowAutoLogin) {
       _email.text = _demoEmail;
       _password.text = _demoPassword;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_busy) {
+          _submit();
+        }
+      });
     }
   }
 
