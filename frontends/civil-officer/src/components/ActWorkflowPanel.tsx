@@ -350,10 +350,34 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
       </div>
 
       {!supportsCivilWorkflow ? (
-        <p className="muted small" style={{ marginBottom: "0.75rem" }}>
-          Le recensement est enregistré localement / ONIP — pas de validation d&apos;acte civil
-          (`/civil/acts/...`).
-        </p>
+        <div className="panel" style={{ marginBottom: "1rem", padding: "0.85rem 1rem" }}>
+          <p style={{ marginTop: 0 }}>
+            Ceci est une fiche <strong>recensement</strong>, pas un acte d&apos;état civil (naissance,
+            mariage…). Il n&apos;y a rien à « Soumettre / Valider » ici.
+          </p>
+          <ol className="muted small" style={{ margin: "0.5rem 0", paddingLeft: "1.2rem", lineHeight: 1.55 }}>
+            <li>
+              Ouvrir{" "}
+              <a href="http://127.0.0.1:5183/campaigns" target="_blank" rel="noreferrer">
+                ONIP → Campagnes
+              </a>
+            </li>
+            <li>
+              Connexion superviseur :{" "}
+              <code>supervisor.recensement@example.gov</code> / <code>CensusSupervisor123!</code>
+            </li>
+            <li>
+              Onglet <strong>1. À contrôler</strong> → Approuver → <strong>2. Approuvées</strong> →
+              Promouvoir NIC
+            </li>
+            <li>
+              La personne apparaît ensuite dans <strong>Population</strong> (registre national)
+            </li>
+          </ol>
+          <p className="muted small" style={{ marginBottom: 0 }}>
+            Ou allez dans Population → Fiches terrain (APK) pour voir le statut SYNCED / PROMOTED.
+          </p>
+        </div>
       ) : null}
 
       {error ? <div className="login-error">{error}</div> : null}
@@ -370,7 +394,7 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
         </dl>
       ) : null}
 
-      {visibleSteps.length > 0 || canSubmitAndValidate ? (
+      {supportsCivilWorkflow && (visibleSteps.length > 0 || canSubmitAndValidate) ? (
         <div className="toolbar" style={{ marginBottom: "1rem", gap: "0.5rem", flexWrap: "wrap" }}>
           {visibleSteps.map((s) => (
             <button
@@ -405,20 +429,23 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
         </div>
       ) : null}
 
-      {!canValidate && status === "SUBMITTED" ? (
+      {supportsCivilWorkflow && !canValidate && status === "SUBMITTED" ? (
         <p className="muted small">
           Acte soumis — validation réservée à l&apos;officier (`officier` / DemoCivil2026!).
         </p>
       ) : null}
-      {!canSubmit && nextSteps.length > 0 ? (
+      {supportsCivilWorkflow && !canSubmit && nextSteps.length > 0 ? (
         <p className="muted small">Vous n&apos;avez pas le droit de modifier le workflow de cet acte.</p>
       ) : null}
 
-      <p className="muted small" style={{ marginBottom: "0.75rem" }}>
-        Circuit : <strong>Agent</strong> saisit / soumet → <strong>Officier</strong> valide. Impossible
-        de passer directement de Brouillon à Validé sans soumission.
-      </p>
+      {supportsCivilWorkflow ? (
+        <p className="muted small" style={{ marginBottom: "0.75rem" }}>
+          Circuit : <strong>Agent</strong> saisit / soumet → <strong>Officier</strong> valide. Impossible
+          de passer directement de Brouillon à Validé sans soumission.
+        </p>
+      ) : null}
 
+      {supportsCivilWorkflow ? (
       <div className="toolbar" style={{ marginBottom: "1rem" }}>
         <button
           type="button"
@@ -433,6 +460,7 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
           <span className="muted small">Impression officielle bloquée jusqu&apos;à validation.</span>
         ) : null}
       </div>
+      ) : null}
 
       {isValidated ? (
         <div className="panel" style={{ marginBottom: "1rem" }}>
