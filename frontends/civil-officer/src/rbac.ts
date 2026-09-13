@@ -83,19 +83,18 @@ export function can(permission: string, permissions: string[] | undefined | null
   return set.has(permission);
 }
 
-/** Officier / lead roles that may validate acts in UI (server still enforces). */
+/** Officier / lead : validation actes — la permission serveur prime sur le rôle UI. */
 export function canValidateActs(
   roles: string[] | undefined | null,
   permissions?: string[] | null,
 ): boolean {
-  if (can("civil:act:validate", permissions) || can("*", permissions)) return true;
+  const perms = permissions ?? [];
+  if (perms.length > 0) {
+    return can("civil:act:validate", perms) || can("*", perms);
+  }
+  // Session sans permissions (mode démo offline) : fallback rôles.
   const r = normalizeRoles(roles);
-  return r.some((x) =>
-    OFFICIER.has(x) ||
-    BUREAU_LEAD.has(x) ||
-    NATIONAL.has(x) ||
-    PROVINCIAL.has(x),
-  );
+  return r.some((x) => OFFICIER.has(x) || BUREAU_LEAD.has(x) || NATIONAL.has(x));
 }
 
 export function canAny(keys: string[], permissions: string[] | undefined | null): boolean {
