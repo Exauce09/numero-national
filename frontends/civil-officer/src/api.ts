@@ -120,6 +120,27 @@ function authHeaders(): HeadersInit {
   return headers;
 }
 
+function formatApiErrorBody(raw: string, status: number): string {
+  const text = (raw || "").trim();
+  if (!text) return `Erreur HTTP ${status}`;
+  try {
+    const parsed = JSON.parse(text) as { detail?: unknown };
+    if (typeof parsed.detail === "string") return parsed.detail;
+    if (Array.isArray(parsed.detail)) {
+      return parsed.detail
+        .map((d) =>
+          typeof d === "object" && d && "msg" in d
+            ? String((d as { msg: unknown }).msg)
+            : JSON.stringify(d),
+        )
+        .join("; ");
+    }
+  } catch {
+    /* plain text */
+  }
+  return text;
+}
+
 async function request<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
@@ -130,10 +151,15 @@ async function request<T>(path: string, init?: RequestInit, retried = false): Pr
     if (token) return request<T>(path, init, true);
   }
   if (!res.ok) {
-    const detail = await res.text();
+    const detail = formatApiErrorBody(await res.text(), res.status);
     if (res.status === 401 || /Could not validate credentials/i.test(detail)) {
       throw new Error(
         "Session API expirée. Déconnectez-vous puis reconnectez-vous (officier / DemoCivil2026!).",
+      );
+    }
+    if (res.status === 404 && /Act not found/i.test(detail)) {
+      throw new Error(
+        "Acte introuvable sur le serveur (non synchronisé, recensement hors workflow civil, ou base réinitialisée).",
       );
     }
     throw new Error(detail || `Erreur HTTP ${res.status}`);

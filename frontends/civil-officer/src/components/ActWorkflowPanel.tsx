@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api, type CivilAct } from "../api";
 import { getSession } from "../auth";
 import { canValidateActs } from "../rbac";
-import { actTypeLabel, type Act, type ActType } from "../registry";
+import { actTypeLabel, replaceAct, type Act, type ActType } from "../registry";
 import ActPrintCard from "./ActPrintCard";
 
 const NEXT: Record<string, string[]> = {
@@ -14,6 +14,17 @@ const NEXT: Record<string, string[]> = {
   VALIDATED: [],
   REJECTED: ["DRAFT"],
   ARCHIVED: [],
+};
+
+/** Types écrits / validés via /civil/* (pas CENSUS / displacement / document). */
+const CIVIL_API_KIND: Partial<Record<ActType, string>> = {
+  BIRTH: "births",
+  MARRIAGE: "marriages",
+  DIVORCE: "divorces",
+  DEATH: "deaths",
+  ADOPTION: "adoptions",
+  RECOGNITION: "recognitions",
+  RECTIFICATION: "rectifications",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -85,26 +96,33 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
 
   const status = current.status || "DRAFT";
   const isValidated = status === "VALIDATED" || status === "ARCHIVED";
-  const nextSteps = NEXT[status] ?? [];
+  const civilKind = CIVIL_API_KIND[current.type];
+  const supportsCivilWorkflow = Boolean(civilKind);
+  const nextSteps = supportsCivilWorkflow ? (NEXT[status] ?? []) : [];
+  const serverActId =
+    (typeof current.payload?.server_act_id === "string" && current.payload.server_act_id) ||
+    null;
 
   useEffect(() => {
     setCurrent(act);
     setVerificationCode(
       typeof act.payload?.verification_code === "string" ? act.payload.verification_code : null,
     );
+    setError(null);
   }, [act]);
 
   useEffect(() => {
-    if (!session?.accessToken) return;
+    if (!session?.accessToken || !supportsCivilWorkflow) return;
+    const id = serverActId || current.id;
     void (async () => {
       try {
-        const rows = await api.listActMentions(current.id);
+        const rows = await api.listActMentions(id);
         setMentions(rows as MentionRow[]);
       } catch {
-        /* ignore offline */
+        /* acte local / offline */
       }
     })();
-  }, [current.id, session?.accessToken]);
+  }, [current.id, serverActId, session?.accessToken, supportsCivilWorkflow]);
 
   const summary = useMemo(() => {
     if (!summaryFields?.length) return [];
@@ -114,17 +132,56 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
     }));
   }, [current.payload, summaryFields]);
 
+  /** Pousse l'acte local vers l'API si besoin, puis renvoie l'id serveur. */
+  async function ensureServerActId(act: Act): Promise<{ act: Act; id: string }> {
+    if (!civilKind) {
+      throw new Error(
+        "Ce type d'acte (ex. recensement) n'utilise pas le workflow de validation état civil.",
+      );
+    }
+    const existing =
+      (typeof act.payload?.server_act_id === "string" && act.payload.server_act_id) || null;
+    if (existing) return { act, id: existing };
+
+    const commune =
+      (typeof act.payload?.commune_code === "string" && act.payload.commune_code) || "KIN-GOMBE";
+    const created = await api.createAct(civilKind, {
+      commune_code: commune,
+      status: "DRAFT",
+      payload: {
+        ...act.payload,
+        act_number: act.act_number,
+        national_id: act.national_id,
+        commune_code: commune,
+      },
+    });
+    const local = toLocalAct(created, act);
+    local.payload = { ...local.payload, server_act_id: created.id };
+    const synced: Act = { ...local, id: created.id };
+    replaceAct(act.id, synced);
+    return { act: synced, id: created.id };
+  }
+
   async function transition(target: string) {
     if (!session?.accessToken) {
       setError("Connexion API requise pour le workflow de validation.");
+      return;
+    }
+    if (!supportsCivilWorkflow) {
+      setError(
+        "Le recensement n'est pas un acte d'état civil à valider ici — utilisez le flux ONIP / fiche citoyen.",
+      );
       return;
     }
     setBusy(true);
     setError(null);
     setMessage(null);
     try {
-      const updated = await api.transitionAct(current.id, { status: target });
-      const local = toLocalAct(updated, current);
+      const { act: synced, id } = await ensureServerActId(current);
+      setCurrent(synced);
+      onUpdated?.(synced);
+      const updated = await api.transitionAct(id, { status: target });
+      const local = toLocalAct(updated, synced);
       setCurrent(local);
       onUpdated?.(local);
       setMessage(`Statut passé à ${STATUS_LABEL[target] ?? target}.`);
@@ -140,6 +197,10 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
       setError("Connexion API requise pour l'extrait officiel.");
       return;
     }
+    if (!supportsCivilWorkflow) {
+      setError("Pas d'extrait officiel état civil pour un recensement.");
+      return;
+    }
     if (!isValidated) {
       setError("L'impression officielle n'est disponible qu'après validation.");
       return;
@@ -147,7 +208,8 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
     setBusy(true);
     setError(null);
     try {
-      const extract = await api.getOfficialExtract(current.id);
+      const id = serverActId || current.id;
+      const extract = await api.getOfficialExtract(id);
       const local = toLocalAct(extract.act, current);
       if (extract.authentication) {
         local.payload = { ...local.payload, authentication: extract.authentication };
@@ -169,17 +231,18 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
 
   async function onMention(e: FormEvent) {
     e.preventDefault();
-    if (!session?.accessToken || !isValidated) return;
+    if (!session?.accessToken || !isValidated || !supportsCivilWorkflow) return;
     setBusy(true);
     setError(null);
     try {
+      const id = serverActId || current.id;
       await api.createMention({
-        target_act_id: current.id,
+        target_act_id: id,
         mention_type: mentionType,
         reference: mentionRef || undefined,
         authority: mentionAuth || undefined,
       });
-      const rows = await api.listActMentions(current.id);
+      const rows = await api.listActMentions(id);
       setMentions(rows as MentionRow[]);
       setMentionRef("");
       setMessage("Mention marginale enregistrée.");
@@ -198,7 +261,7 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
           </h3>
           <p className="muted small" style={{ margin: "0.25rem 0 0" }}>
             Statut : <strong>{STATUS_LABEL[status] ?? status}</strong>
-            {current.payload?.server_act_id ? " · sync API" : ""}
+            {serverActId ? " · sync API" : supportsCivilWorkflow ? " · local" : " · hors workflow civil"}
           </p>
         </div>
         {onClose ? (
@@ -207,6 +270,13 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
           </button>
         ) : null}
       </div>
+
+      {!supportsCivilWorkflow ? (
+        <p className="muted small" style={{ marginBottom: "0.75rem" }}>
+          Le recensement est enregistré localement / ONIP — pas de validation d&apos;acte civil
+          (`/civil/acts/...`).
+        </p>
+      ) : null}
 
       {error ? <div className="login-error">{error}</div> : null}
       {message ? <div className="success-banner">{message}</div> : null}

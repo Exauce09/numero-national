@@ -858,6 +858,16 @@ export function updateAct(id: string, patch: { payload?: Record<string, unknown>
   return next;
 }
 
+/** Remplace un acte local par sa version serveur (nouvel id). */
+export function replaceAct(oldId: string, next: Act): Act | undefined {
+  const registry = load();
+  const idx = registry.acts.findIndex((a) => a.id === oldId);
+  if (idx < 0) return undefined;
+  registry.acts[idx] = { ...next, updated_at: new Date().toISOString() };
+  save(registry);
+  return registry.acts[idx];
+}
+
 export function listMarriages(): MarriageLink[] {
   return [...load().marriages];
 }
