@@ -3,7 +3,7 @@
 import { api, type FormDraft } from "./api";
 import { getSession } from "./auth";
 import {
-  addPerson,
+  getCivilStatusOverride,
   getPerson,
   searchPersons,
   updatePerson,
@@ -12,6 +12,9 @@ import {
 } from "./registry";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "/api/v1";
+
+/** Limite haute pour la page Recherche ; le sélecteur peut demander moins. */
+export const SEARCH_PAGE_SIZE = 100;
 
 function authHeaders(): HeadersInit {
   const session = getSession();
@@ -43,7 +46,7 @@ export function splitFamilyName(family: string): { nom: string; postnom: string 
   return { nom: parts[0], postnom: parts.slice(1).join(" ") };
 }
 
-/** Prénoms « Prénom Autre » → { prenom, postnom } (postnom seulement si famille vide). */
+/** Prénoms « Prénom Autre » → { prenom, postnom }. */
 export function splitGivenNames(given: string): { prenom: string; postnom: string } {
   const parts = given.trim().split(/\s+/).filter(Boolean);
   if (parts.length <= 1) return { prenom: given.trim(), postnom: "" };
@@ -65,28 +68,33 @@ export function displayNic(nic?: string | null, status?: string | null): string 
   return "Sans NIC";
 }
 
-/** Convertit un hit national en Person locale (pour autofill + liaison). */
-export function nationalHitToPerson(hit: NationalCitizenHit): Person {
+/** Hit API → Person sans écrire dans le registre local (évite plantages / doublons). */
+export function hitToPersonView(hit: NationalCitizenHit): Person {
   const existing = getPerson(hit.id);
   const { nom, postnom: postFromFam } = splitFamilyName(hit.family_name || "");
   const { prenom, postnom: postFromGiven } = splitGivenNames(hit.given_names || "");
   const postnom = postFromFam || postFromGiven;
   const realNic = (hit.nic || "").trim();
   const nic = realNic && !realNic.toUpperCase().startsWith("REG-") ? realNic : "";
+  const override = getCivilStatusOverride(hit.id);
+  const etat =
+    override ||
+    (existing?.etat_civil && existing.etat_civil !== "UNKNOWN" ? existing.etat_civil : "UNKNOWN");
 
   if (existing) {
-    const patch: Partial<Person> = {};
-    if (nic && (existing.nic?.startsWith("REG-") || !existing.nic)) patch.nic = nic;
-    if (!existing.nom && nom) patch.nom = nom;
-    if (!existing.postnom && postnom) patch.postnom = postnom;
-    if (!existing.prenom && prenom) patch.prenom = prenom;
-    if (Object.keys(patch).length) {
-      return updatePerson(existing.id, patch) ?? { ...existing, ...patch };
-    }
-    return existing;
+    return {
+      ...existing,
+      nom: existing.nom || nom,
+      postnom: existing.postnom || postnom,
+      prenom: existing.prenom || prenom,
+      nic: nic || existing.nic,
+      etat_civil: etat,
+      date_naissance: existing.date_naissance || hit.date_of_birth?.slice(0, 10) || "",
+      lieu_naissance: existing.lieu_naissance || hit.place_of_birth || hit.ville || "",
+    };
   }
 
-  return addPerson({
+  return {
     id: hit.id,
     nom,
     postnom,
@@ -94,31 +102,71 @@ export function nationalHitToPerson(hit: NationalCitizenHit): Person {
     sexe: mapSex(hit.sex),
     date_naissance: hit.date_of_birth?.slice(0, 10) || "",
     lieu_naissance: hit.place_of_birth || hit.ville || "",
-    etat_civil: "UNKNOWN",
-    nic,
-  });
+    etat_civil: etat,
+    nic: nic || "",
+    handicap_type: "NORMAL",
+    created_at: new Date().toISOString(),
+  };
+}
+
+/**
+ * Convertit un hit national en Person locale (liaison / autofill).
+ * Pour la recherche seule, préférer hitToPersonView (sans side-effect).
+ */
+export function nationalHitToPerson(hit: NationalCitizenHit): Person {
+  const view = hitToPersonView(hit);
+  const existing = getPerson(hit.id);
+  if (existing) {
+    const patch: Partial<Person> = {};
+    if (view.nic && (existing.nic?.startsWith("REG-") || !existing.nic)) patch.nic = view.nic;
+    if (!existing.nom && view.nom) patch.nom = view.nom;
+    if (!existing.postnom && view.postnom) patch.postnom = view.postnom;
+    if (!existing.prenom && view.prenom) patch.prenom = view.prenom;
+    if (Object.keys(patch).length) {
+      return updatePerson(existing.id, patch) ?? { ...existing, ...patch };
+    }
+    return existing;
+  }
+  return view;
 }
 
 /**
  * Recherche nationale (registre serveur) + fusion locale.
- * Utilisée par PersonPicker et tous les formulaires.
+ * @param limit max résultats (défaut 100 — anciennement plafonné à 12).
  */
-export async function searchEveryone(query: string): Promise<Person[]> {
+export async function searchEveryone(query: string, limit = SEARCH_PAGE_SIZE): Promise<Person[]> {
   const q = query.trim();
-  const local = searchPersons(q).slice(0, 12);
+  const cap = Math.min(Math.max(limit, 1), SEARCH_PAGE_SIZE);
+  const local = searchPersons(q).slice(0, cap);
   if (q.length < 1) return local;
 
   const session = getSession();
   if (!session?.accessToken) return local;
 
   try {
-    const params = new URLSearchParams({ q, page: "1", page_size: "12" });
-    const res = await fetch(`${API_BASE}/registry/citizens?${params}`, {
-      headers: authHeaders(),
-    });
-    if (!res.ok) return local;
-    const data = (await res.json()) as { items?: NationalCitizenHit[] };
-    const national = (data.items ?? []).map(nationalHitToPerson);
+    const all: NationalCitizenHit[] = [];
+    let page = 1;
+    let total = 0;
+    const pageSize = Math.min(cap, 100);
+    for (;;) {
+      const params = new URLSearchParams({
+        q,
+        page: String(page),
+        page_size: String(pageSize),
+      });
+      const res = await fetch(`${API_BASE}/registry/citizens?${params}`, {
+        headers: authHeaders(),
+      });
+      if (!res.ok) break;
+      const data = (await res.json()) as { items?: NationalCitizenHit[]; total?: number };
+      total = data.total ?? 0;
+      all.push(...(data.items ?? []));
+      if (all.length >= cap || all.length >= total || !(data.items?.length)) break;
+      page += 1;
+      if (page > 5) break;
+    }
+
+    const national = all.slice(0, cap).map(hitToPersonView);
     const seen = new Set(national.map((p) => p.id));
     for (const p of local) {
       if (!seen.has(p.id)) {
@@ -126,7 +174,7 @@ export async function searchEveryone(query: string): Promise<Person[]> {
         seen.add(p.id);
       }
     }
-    return national.slice(0, 12);
+    return national.slice(0, cap);
   } catch {
     return local;
   }
@@ -140,7 +188,7 @@ export async function searchFormDrafts(query: string): Promise<DraftSearchHit[]>
     const params = new URLSearchParams({
       status: "DRAFT",
       q,
-      limit: "20",
+      limit: "50",
     });
     const rows = await api.listFormDrafts(params);
     return rows.map((r) => ({ ...r, kind: "draft" as const }));

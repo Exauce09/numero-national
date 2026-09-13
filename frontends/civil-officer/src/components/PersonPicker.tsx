@@ -89,7 +89,7 @@ export default function PersonPicker({
         .then((hits) => {
           if (cancelled) return;
           const filtered = sexFilter ? hits.filter((p) => p.sexe === sexFilter) : hits;
-          setResults(filtered.slice(0, 20));
+          setResults(filtered.slice(0, 50));
         })
         .finally(() => {
           if (!cancelled) setSearching(false);

@@ -24,7 +24,7 @@ export default function SearchPage() {
     setHint(null);
     try {
       const [rows, draftRows] = await Promise.all([
-        searchEveryone(needle),
+        searchEveryone(needle, 100),
         searchFormDrafts(needle),
       ]);
       setHits(rows);
@@ -37,6 +37,8 @@ export default function SearchPage() {
         );
       } else if (!rows.length && !draftRows.length) {
         setHint("Aucun résultat (personnes ni brouillons) pour cette recherche.");
+      } else if (rows.length >= 100) {
+        setHint("Affichage des 100 premiers résultats — affinez la recherche (nom + prénom ou NIC).");
       }
     } finally {
       setBusy(false);

@@ -28,9 +28,9 @@ export default function TopbarSearch() {
     }
     let cancelled = false;
     const t = window.setTimeout(() => {
-      void Promise.all([searchEveryone(needle), searchFormDrafts(needle)]).then(([rows, draftRows]) => {
+      void Promise.all([searchEveryone(needle, 30), searchFormDrafts(needle)]).then(([rows, draftRows]) => {
         if (!cancelled) {
-          setHits(rows.slice(0, 6));
+          setHits(rows.slice(0, 12));
           setDrafts(draftRows.slice(0, 4));
         }
       });
