@@ -29,16 +29,16 @@ class _LoginScreenState extends State<LoginScreen> {
   final _auth = AuthService();
   bool _busy = false;
   bool _obscure = true;
-  bool _showApi = false;
+  bool _showApi = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    _email.text = _demoEmail;
+    _password.text = _demoPassword;
     _prefill();
     if (_autoLogin && widget.allowAutoLogin) {
-      _email.text = _demoEmail;
-      _password.text = _demoPassword;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_busy) {
           _submit();
@@ -53,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     setState(() {
       if (email != null && email.isNotEmpty) _email.text = email;
-      _apiUrl.text = api;
+      _apiUrl.text = api.isNotEmpty ? api : AppConfig.compileTimeApiBaseUrl;
     });
   }
 
@@ -70,31 +70,25 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
       var api = _apiUrl.text.trim();
-      if (api.isNotEmpty) {
-        if (!api.startsWith('http://') && !api.startsWith('https://')) {
-          api = 'http://$api';
-        }
-        if (!api.contains('/api/')) {
-          api = api.replaceAll(RegExp(r'/+$'), '') + '/api/v1';
-        }
-        await SecureStore.instance.saveApiBaseUrl(api);
+      if (api.isEmpty) {
+        api = AppConfig.compileTimeApiBaseUrl;
         _apiUrl.text = api;
       }
+      if (!api.startsWith('http://') && !api.startsWith('https://')) {
+        api = 'http://$api';
+      }
+      if (!api.contains('/api/')) {
+        api = api.replaceAll(RegExp(r'/+$'), '') + '/api/v1';
+      }
+      await SecureStore.instance.saveApiBaseUrl(api);
+      _apiUrl.text = api;
       await _auth.login(email, password);
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed('/home');
     } on ApiException catch (e) {
-      if (await _policy.mayCollect() && mounted) {
-        Navigator.of(context).pushReplacementNamed('/home');
-        return;
-      }
       setState(() => _error = e.message);
     } catch (e) {
-      if (await _policy.mayCollect() && mounted) {
-        Navigator.of(context).pushReplacementNamed('/home');
-        return;
-      }
-      setState(() => _error = 'Connexion impossible');
+      setState(() => _error = 'Connexion impossible : $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -174,10 +168,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              const Text(
-                                'Recensement national · RDC',
+                              Text(
+                                'Recensement national · RDC · v${AppConfig.appVersion}',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   color: NnColors.muted,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 13,
