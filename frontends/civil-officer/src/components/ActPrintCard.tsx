@@ -1,4 +1,6 @@
 import { QRCodeSVG } from "qrcode.react";
+import { getSession } from "../auth";
+import { getOfficerCommune } from "../commune";
 import { actTypeLabel, type Act } from "../registry";
 import BirthCertificatePrint from "./BirthCertificatePrint";
 
@@ -66,10 +68,26 @@ export default function ActPrintCard({
   mentions,
 }: Props) {
   if (act.type === "BIRTH") {
+    const session = getSession();
+    const commune = getOfficerCommune();
+    const auth =
+      act.payload?.authentication && typeof act.payload.authentication === "object"
+        ? (act.payload.authentication as Record<string, unknown>)
+        : null;
+    const officerName =
+      (typeof auth?.officer_name === "string" && auth.officer_name.trim()) ||
+      session?.displayName ||
+      (typeof act.payload.officer_name === "string" ? act.payload.officer_name : undefined);
+    const bureauLabel =
+      (typeof act.payload.bureau === "string" && act.payload.bureau.trim()) ||
+      (typeof act.payload.bureau_etat_civil === "string" && act.payload.bureau_etat_civil.trim()) ||
+      `Commune de ${commune.name}`;
     return (
       <BirthCertificatePrint
         act={act}
         verificationCode={verificationCode}
+        officerName={officerName}
+        bureauLabel={bureauLabel}
       />
     );
   }

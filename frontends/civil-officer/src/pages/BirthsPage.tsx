@@ -1,5 +1,7 @@
 import { FormEvent, useMemo, useState } from "react";
+import ActPrintActions from "../components/ActPrintActions";
 import ActPrintCard from "../components/ActPrintCard";
+import { getSession } from "../auth";
 import DataToolbar from "../components/DataToolbar";
 import GeoCascade, {
   ADDRESS_FIELD_LABELS,
@@ -173,7 +175,11 @@ export default function BirthsPage() {
         nationalite: personNationalite(father ?? mother),
       });
       const commune = getOfficerCommune();
+      const session = getSession();
+      const officerDisplay = session?.displayName?.trim() || "Officier de l'État civil";
       const modeLabel = MODES_NAISSANCE.find((m) => m.value === modeNaissance)?.label ?? modeNaissance;
+      const motherFull = [mother.nom, mother.postnom, mother.prenom].filter(Boolean).join(" ");
+      const fatherFull = father ? [father.nom, father.postnom, father.prenom].filter(Boolean).join(" ") : null;
       const payload = {
         child_id: child.id,
         nom: child.nom,
@@ -194,11 +200,21 @@ export default function BirthsPage() {
         province_naissance: geoNaissance.province_name || null,
         commune_code: geoNaissance.commune_code || commune.code,
         mother_id: mother.id,
-        mother_name: `${mother.nom} ${mother.prenom}`,
+        mother_name: motherFull,
+        mere_nom: motherFull,
+        declarant: motherFull,
+        declarant_qualite: "mère de l'enfant",
         mother_nic: mother.nic,
         mother_snapshot: link.mother_snapshot,
         father_id: father?.id ?? null,
-        father_name: father ? `${father.nom} ${father.prenom}` : null,
+        father_name: fatherFull,
+        pere_nom: fatherFull,
+        province: geoNaissance.province_name || commune.province,
+        ville: geoNaissance.ville_name || commune.ville,
+        commune: geoNaissance.commune_name || commune.name,
+        district: geoNaissance.district_name || null,
+        bureau: `Commune de ${geoNaissance.commune_name || commune.name}`,
+        officer_name: officerDisplay,
         father_nic: father?.nic ?? null,
         father_snapshot: link.father_snapshot,
         inherited_from: link.source,
@@ -469,8 +485,9 @@ export default function BirthsPage() {
 
       {created ? (
         <div className="panel" style={{ marginTop: "1rem" }}>
-          <div className="success-banner">Acte de naissance créé — NIC {created.national_id}</div>
+          <div className="success-banner no-print">Acte de naissance créé — NIC {created.national_id}</div>
           <ActPrintCard act={created} />
+          <ActPrintActions label="Imprimer l'acte de naissance" />
         </div>
       ) : null}
 
@@ -538,10 +555,11 @@ export default function BirthsPage() {
 
       {viewAct ? (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
-          <div className="modal-panel" style={{ maxWidth: 640 }}>
-            <h3>Acte {viewAct.act_number}</h3>
+          <div className="modal-panel modal-panel-act">
+            <h3 className="no-print">Acte {viewAct.act_number}</h3>
             <ActPrintCard act={viewAct} />
             <div className="modal-actions">
+              <ActPrintActions label="Imprimer" />
               <button type="button" className="btn-secondary" onClick={() => setViewAct(null)}>
                 Fermer
               </button>

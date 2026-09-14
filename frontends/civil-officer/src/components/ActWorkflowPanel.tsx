@@ -5,6 +5,7 @@ import { api, type CivilAct } from "../api";
 import { getSession } from "../auth";
 import { can, canValidateActs } from "../rbac";
 import { actTypeLabel, replaceAct, updateAct, type Act, type ActType } from "../registry";
+import ActPrintActions from "./ActPrintActions";
 import ActPrintCard from "./ActPrintCard";
 
 const NEXT: Record<string, string[]> = {
@@ -582,14 +583,21 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
       ) : null}
 
       {showPrint && isValidated ? (
-        <ActPrintCard
-          act={current}
-          verificationCode={verificationCode}
-          mentions={mentions.map((m) => ({
-            label: m.mention_type,
-            value: [m.reference, m.authority].filter(Boolean).join(" — ") || "—",
-          }))}
-        />
+        <>
+          <ActPrintCard
+            act={current}
+            verificationCode={verificationCode}
+            mentions={mentions.map((m) => ({
+              label: m.mention_type,
+              value: [m.reference, m.authority].filter(Boolean).join(" — ") || "—",
+            }))}
+          />
+          <ActPrintActions
+            label={
+              current.type === "BIRTH" ? "Imprimer l'acte de naissance" : "Imprimer l'extrait"
+            }
+          />
+        </>
       ) : null}
     </div>
   );

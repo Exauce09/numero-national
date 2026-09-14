@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import ActPrintActions from "../components/ActPrintActions";
 import ActPrintCard from "../components/ActPrintCard";
 import DataToolbar from "../components/DataToolbar";
 import { actTypeLabel, ageDays, getAct, listActs, type Act } from "../registry";
@@ -153,8 +154,8 @@ export default function NewbornsPage() {
 
       {viewAct ? (
         <div className="modal-backdrop" onClick={() => setViewAct(null)}>
-          <div className="modal-panel modal-wide" onClick={(e) => e.stopPropagation()}>
-            <div className="panel-head">
+          <div className="modal-panel modal-panel-act modal-wide" onClick={(e) => e.stopPropagation()}>
+            <div className="panel-head no-print">
               <h3 className="panel-title" style={{ margin: 0 }}>
                 {actTypeLabel(viewAct.type)} — {viewAct.act_number}
               </h3>
@@ -163,6 +164,7 @@ export default function NewbornsPage() {
               </button>
             </div>
             <ActPrintCard act={viewAct} />
+            <ActPrintActions label="Imprimer l'acte de naissance" />
           </div>
         </div>
       ) : null}

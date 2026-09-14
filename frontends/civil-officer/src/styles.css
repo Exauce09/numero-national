@@ -1666,10 +1666,31 @@
 
 .birth-acte-foot {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr minmax(100px, 120px);
   gap: 1.5rem;
   margin-top: 1.4rem;
   text-align: center;
+  align-items: end;
+}
+
+.birth-acte-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.act-print-actions {
+  margin-top: 0.75rem;
+}
+
+.modal-panel-act {
+  max-width: min(920px, 96vw) !important;
+}
+
+.modal-panel-act .birth-acte {
+  max-height: min(78vh, 900px);
+  overflow-y: auto;
 }
 
 .birth-acte-sign {
@@ -1686,6 +1707,13 @@
 @media print {
   .birth-acte {
     border-color: #000;
+    max-height: none !important;
+    overflow: visible !important;
+    page-break-inside: avoid;
+  }
+
+  .birth-acte-foot {
+    grid-template-columns: 1fr 1fr 100px;
   }
 }
 
@@ -1807,5 +1835,30 @@
 
   .act-print-card {
     border: 0;
+  }
+
+  body.print-act * {
+    visibility: hidden;
+  }
+
+  body.print-act .print-area,
+  body.print-act .print-area * {
+    visibility: visible;
+  }
+
+  body.print-act .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  body.print-act .success-banner,
+  body.print-act .panel-head,
+  body.print-act .page-title,
+  body.print-act .page-lead,
+  body.print-act .data-table,
+  body.print-act form {
+    display: none !important;
   }
 }
