@@ -116,7 +116,7 @@ class _CouponPrintScreenState extends State<CouponPrintScreen> {
             'nic': widget.nationalId,
         });
         await PosPrinter.printCoupon(
-          title: 'ONIP - Recensement',
+          title: 'SIGPOP-RDC - Recensement',
           subtitle: 'Coupon + N national',
           name: _ascii(name.isEmpty ? '-' : name),
           sex: sexLabel == 'Féminin' ? 'Feminin' : 'Masculin',
@@ -149,7 +149,7 @@ class _CouponPrintScreenState extends State<CouponPrintScreen> {
           build: (ctx) => pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
-              pw.Text('ONIP — Recensement national', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+              pw.Text('SIGPOP-RDC — Recensement national', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 4),
               pw.Text('Coupon provisoire', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
               pw.SizedBox(height: 10),
@@ -169,7 +169,7 @@ class _CouponPrintScreenState extends State<CouponPrintScreen> {
               pw.Text('Réf. : ${widget.localId}', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
               pw.SizedBox(height: 8),
               pw.Text(
-                'N° attribué à l\'enregistrement. Carte officielle = ONIP après validation.',
+                'N° attribué à l\'enregistrement. Carte officielle = SIGPOP-RDC après validation.',
                 textAlign: pw.TextAlign.center,
                 style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
               ),
@@ -216,7 +216,7 @@ class _CouponPrintScreenState extends State<CouponPrintScreen> {
           build: (ctx) => pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
-              pw.Text('ONIP — Recensement national', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+              pw.Text('SIGPOP-RDC — Recensement national', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 4),
               pw.Text('Coupon provisoire', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
               pw.SizedBox(height: 10),
@@ -323,7 +323,7 @@ class _CouponPrintScreenState extends State<CouponPrintScreen> {
                   child: Column(
                     children: [
                       const Text(
-                        'ONIP · Recensement national',
+                        'SIGPOP-RDC · Recensement national',
                         style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                       ),
                       const SizedBox(height: 4),
@@ -366,7 +366,7 @@ class _CouponPrintScreenState extends State<CouponPrintScreen> {
                       const SizedBox(height: 12),
                       const Text(
                         'Ce coupon n’est pas une carte d’identité. '
-                        'La carte officielle est délivrée par l’ONIP après validation.',
+                        'La carte officielle est délivrée par SIGPOP-RDC après validation.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: NnColors.muted, fontSize: 12, height: 1.3),
                       ),

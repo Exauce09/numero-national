@@ -26,7 +26,7 @@ class RecensementApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'ONIP Recensement',
+      title: 'SIGPOP-RDC Recensement',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       home: const LoginScreen(),

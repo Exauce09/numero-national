@@ -90,7 +90,7 @@ object PosThermalPrinter {
       svc.printText("Ref : $safeLocalId\n", emptyCb())
       svc.printBlankLines(1, 10, emptyCb())
       svc.printText("Pas une carte d'identite.\n", emptyCb())
-      svc.printText("Carte officielle = ONIP.\n", emptyCb())
+      svc.printText("Carte officielle = SIGPOP-RDC.\n", emptyCb())
 
       // Le callback onRunResult arrive souvent après la fin réelle ; ne pas échouer trop tôt.
       val (perfCb, waitPerf) = awaitCb(15000)
@@ -153,7 +153,7 @@ object PosThermalPrinter {
     val id = "TEST-${System.currentTimeMillis() % 100000}"
     printCoupon(
       context = context,
-      title = "ONIP - Recensement",
+      title = "SIGPOP-RDC - Recensement",
       subtitle = "Coupon provisoire",
       name = "TESTPRINT Auto",
       sex = "Masculin",

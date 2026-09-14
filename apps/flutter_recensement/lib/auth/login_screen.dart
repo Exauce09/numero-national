@@ -164,10 +164,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               const SizedBox(height: 16),
                               const Text(
-                                'ONIP',
+                                'SIGPOP-RDC',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: 28,
+                                  fontSize: 26,
                                   fontWeight: FontWeight.w900,
                                   color: NnColors.ink,
                                   letterSpacing: -0.4,

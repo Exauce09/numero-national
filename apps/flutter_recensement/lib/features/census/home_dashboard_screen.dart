@@ -98,7 +98,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     final id = 'TEST-${DateTime.now().millisecondsSinceEpoch % 100000}';
     try {
       await PosPrinter.printCoupon(
-        title: 'ONIP - Recensement',
+        title: 'SIGPOP-RDC - Recensement',
         subtitle: 'Test imprimante',
         name: _shortName,
         sex: 'Masculin',
@@ -179,7 +179,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'ONIP · Recensement',
+                              'SIGPOP-RDC · Recensement',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,

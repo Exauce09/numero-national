@@ -10,7 +10,7 @@
     <uses-feature android:name="android.hardware.fingerprint" android:required="false"/>
     <uses-feature android:name="android.hardware.usb.host" android:required="false"/>
     <application
-        android:label="ONIP Recensement"
+        android:label="SIGPOP-RDC Recensement"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">

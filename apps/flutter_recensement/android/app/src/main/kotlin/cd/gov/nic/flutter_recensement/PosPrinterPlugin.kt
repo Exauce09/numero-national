@@ -87,7 +87,7 @@ class PosPrinterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         }.start()
       }
       "printCoupon" -> {
-        val title = call.argument<String>("title") ?: "ONIP"
+        val title = call.argument<String>("title") ?: "SIGPOP-RDC"
         val subtitle = call.argument<String>("subtitle") ?: "Coupon provisoire"
         val name = call.argument<String>("name") ?: "—"
         val sex = call.argument<String>("sex") ?: ""

@@ -39,7 +39,7 @@ class _NewPersonFlowScreenState extends State<NewPersonFlowScreen> {
         _loading = false;
         if (list.isEmpty) {
           _error =
-              'Aucune zone affectée. Demandez à l’ONIP de vous assigner, puis synchronisez.';
+              'Aucune zone affectée. Demandez à SIGPOP-RDC de vous assigner, puis synchronisez.';
         }
       });
     } catch (e) {
