@@ -248,13 +248,25 @@ export function listPersons(): Person[] {
   return [...load().persons].sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
-/** Personne marquée décédée via un acte DEATH. */
+/** Personne marquée décédée (acte DEATH, recensement décédé, ou statut API). */
 export function isDeceased(personId: string, nic?: string): boolean {
-  return load().acts.some(
-    (a) =>
-      a.type === "DEATH" &&
-      (String(a.payload.deceased_id ?? "") === personId || (nic ? a.national_id === nic : false)),
-  );
+  const acts = load().acts;
+  for (const a of acts) {
+    if (a.type === "DEATH") {
+      if (String(a.payload.deceased_id ?? "") === personId) return true;
+      if (nic && a.national_id === nic) return true;
+    }
+    if (a.type === "CENSUS") {
+      const kind = String(a.payload.fiche_kind ?? "").toLowerCase();
+      const pid = String(a.payload.person_id ?? a.payload.citizen_id ?? "");
+      if (kind === "decede" || kind === "décédé" || kind === "deceased") {
+        if (pid === personId) return true;
+        if (nic && a.national_id === nic) return true;
+      }
+      if (a.payload.date_deces && pid === personId) return true;
+    }
+  }
+  return false;
 }
 
 /** Nouveau-né : âge ≤ 90 jours. */
@@ -263,11 +275,17 @@ export function isNewbornPerson(p: Person): boolean {
 }
 
 /**
- * Population « carte-grid » : vivants, hors nouveaux-nés (≤ 90 j).
+ * Population « carte-grid » : vivants uniquement, hors nouveaux-nés (≤ 90 j).
+ * Toute déclaration de décès (acte ou recensement) retire la personne.
  * Au-delà de 90 jours, l'enfant entre dans la population.
  */
 export function listPopulationPersons(): Person[] {
   return listPersons().filter((p) => !isDeceased(p.id, p.nic) && !isNewbornPerson(p));
+}
+
+/** Vivants uniquement (y compris nouveau-nés) — pour totaux population. */
+export function listLivingPersons(): Person[] {
+  return listPersons().filter((p) => !isDeceased(p.id, p.nic));
 }
 
 export type ParentOrigin = {

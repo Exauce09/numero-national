@@ -3,6 +3,7 @@ import {
   ETAT_CIVIL_OPTIONS,
   addPerson,
   displayName,
+  isDeceased,
   personOrigin,
   type EtatCivil,
   type Person,
@@ -32,6 +33,8 @@ type Props = {
   sexFilter?: Sexe;
   /** Placeholders axés sur le N° d'état civil (NIC). */
   nicSearchHint?: boolean;
+  /** Exclut les personnes déjà déclarées décédées (défaut: true). */
+  excludeDeceased?: boolean;
 };
 
 const emptyForm = {
@@ -56,6 +59,7 @@ export default function PersonPicker({
   originGeoFilter = false,
   sexFilter,
   nicSearchHint = false,
+  excludeDeceased = true,
 }: Props) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -88,7 +92,11 @@ export default function PersonPicker({
       void searchEveryone(q)
         .then((hits) => {
           if (cancelled) return;
-          const filtered = sexFilter ? hits.filter((p) => p.sexe === sexFilter) : hits;
+          const filtered = hits.filter((p) => {
+            if (sexFilter && p.sexe !== sexFilter) return false;
+            if (excludeDeceased && isDeceased(p.id, p.nic)) return false;
+            return true;
+          });
           setResults(filtered.slice(0, 50));
         })
         .finally(() => {
@@ -99,7 +107,7 @@ export default function PersonPicker({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [query, open, value, sexFilter]);
+  }, [query, open, value, sexFilter, excludeDeceased]);
 
   function select(person: Person) {
     onChange(person);

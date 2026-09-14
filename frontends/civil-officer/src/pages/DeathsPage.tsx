@@ -38,6 +38,7 @@ export default function DeathsPage() {
       const commune = getOfficerCommune();
       const payload = {
         deceased_id: deceased.id,
+        citizen_id: deceased.id,
         deceased_name: displayName(deceased),
         cause_deces: cause.trim(),
         lieu_deces: geoDeces.label || "",

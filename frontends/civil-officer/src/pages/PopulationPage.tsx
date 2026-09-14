@@ -17,6 +17,7 @@ import {
   getPerson,
   listActs,
   listPopulationPersons,
+  isDeceased,
   personNationalite,
   populationBreakdown,
   upsertLocalPersonFromApi,
@@ -187,18 +188,28 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
     return () => window.clearTimeout(t);
   }, [load, q]);
 
-  const stats = useMemo(() => populationBreakdown(persons), [persons]);
+  function personIsDead(p: PopRow): boolean {
+    const st = (p.registryStatus || "").toUpperCase();
+    return st === "DECEASED" || isDeceased(p.id, p.nic);
+  }
+
+  const livingPersons = useMemo(() => persons.filter((p) => !personIsDead(p)), [persons]);
+
+  const stats = useMemo(() => populationBreakdown(livingPersons), [livingPersons]);
 
   const rows = useMemo(() => {
     return persons.filter((p) => {
+      const dead = personIsDead(p);
+      if (civilStatus === "DECEDE") {
+        if (!dead) return false;
+      } else {
+        // Population courante = vivants uniquement
+        if (dead) return false;
+        if (civilStatus && p.etat_civil !== (civilStatus as EtatCivil)) return false;
+      }
       if (view === "recenses" && !p.hasCensus) return false;
       if (sexe && p.sexe !== sexe) return false;
       if (nat && personNationalite(p) !== nat) return false;
-      if (civilStatus === "DECEDE") {
-        if ((p.registryStatus || "").toUpperCase() !== "DECEASED") return false;
-      } else if (civilStatus) {
-        if (p.etat_civil !== (civilStatus as EtatCivil)) return false;
-      }
       return true;
     });
   }, [persons, sexe, nat, civilStatus, view]);

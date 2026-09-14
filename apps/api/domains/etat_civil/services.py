@@ -275,6 +275,42 @@ async def create_act(
         act.payload = payload
     except Exception as exc:  # noqa: BLE001
         logger.info("qr attach skipped: %s", exc)
+
+    # Déclaration de décès : retirer immédiatement du registre population (sans attendre VALIDATED).
+    if data.act_type == ActType.DEATH:
+        citizen_id = data.citizen_id or act.citizen_id
+        if citizen_id is None:
+            for key in ("citizen_id", "deceased_id"):
+                raw = payload.get(key)
+                if isinstance(raw, str) and raw.strip():
+                    try:
+                        citizen_id = uuid.UUID(raw.strip())
+                        break
+                    except ValueError:
+                        continue
+        if citizen_id is None:
+            nic = _payload_str(payload, "national_id", "nic")
+            if nic:
+                try:
+                    from apps.api.domains.core_registry.models import Citizen
+
+                    found = (
+                        await db.execute(select(Citizen).where(Citizen.nic == nic.strip()).limit(1))
+                    ).scalar_one_or_none()
+                    if found is not None:
+                        citizen_id = found.id
+                except Exception as exc:  # noqa: BLE001
+                    logger.info("death citizen lookup by nic skipped: %s", exc)
+        if citizen_id is not None:
+            act.citizen_id = citizen_id
+            await signal_registry_status_change(
+                db,
+                citizen_id=citizen_id,
+                event="DEATH",
+                payload={"act_id": str(act.id), "act_number": act.act_number, "at": "create"},
+                actor_id=actor_id,
+            )
+
     await db.commit()
     await db.refresh(act)
     return act
@@ -1031,12 +1067,28 @@ async def apply_registry_on_validation(
     if act.act_type == ActType.DEATH.value:
         citizen_id = act.citizen_id
         if citizen_id is None:
-            raw = _payload_str(payload, "citizen_id")
-            if raw:
+            for key in ("citizen_id", "deceased_id"):
+                raw = _payload_str(payload, key)
+                if raw:
+                    try:
+                        citizen_id = uuid.UUID(raw)
+                        break
+                    except ValueError:
+                        continue
+        if citizen_id is None:
+            nic = _payload_str(payload, "national_id", "nic")
+            if nic:
                 try:
-                    citizen_id = uuid.UUID(raw)
-                except ValueError:
-                    citizen_id = None
+                    from apps.api.domains.core_registry.models import Citizen
+
+                    found = (
+                        await db.execute(select(Citizen).where(Citizen.nic == nic.strip()).limit(1))
+                    ).scalar_one_or_none()
+                    if found is not None:
+                        citizen_id = found.id
+                        act.citizen_id = citizen_id
+                except Exception as exc:  # noqa: BLE001
+                    logger.info("death citizen nic resolve skipped: %s", exc)
         signal = await signal_registry_status_change(
             db,
             citizen_id=citizen_id,

@@ -661,6 +661,8 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
       'delai_enregistrement_label':
           _ficheKind == FicheKind.bebe ? delaiEnregistrementLabel(_delaiEnregistrement) : null,
       'date_deces': _dateDeces.text.trim(),
+      'is_deceased': _ficheKind == FicheKind.decede,
+      'retirer_population': _ficheKind == FicheKind.decede,
       'nom': _nom.text.trim(),
       'postnom': _postnom.text.trim(),
       'prenom': _prenom.text.trim(),

@@ -172,6 +172,8 @@ async def search_citizens(
                 )
             )
 
+    # Population courante : exclure décédés et fusionnés (les décès réduisent le total).
+    filters.append(Citizen.status.notin_([CitizenStatus.DECEASED.value, CitizenStatus.MERGED.value]))
     where_clause = and_(*filters) if filters else True
     total = await session.scalar(select(func.count()).select_from(Citizen).where(where_clause))
     stmt = (

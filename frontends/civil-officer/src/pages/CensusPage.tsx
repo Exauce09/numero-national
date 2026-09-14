@@ -860,6 +860,25 @@ export default function CensusPage() {
         gps_address: gps && "display_name" in gps ? (gps as ReverseGeo).display_name ?? null : null,
       };
       const act = await addAct("CENSUS", payload, person.nic);
+      if (ficheKind === "decede") {
+        await addAct(
+          "DEATH",
+          {
+            deceased_id: person.id,
+            citizen_id: person.id,
+            deceased_name: displayName(person),
+            cause_deces: "Déclaré au recensement",
+            date_deces: dateDeces || null,
+            lieu_deces: lieuNaissance || geoActuelle.label || "",
+            geo_deces: geoActuelle,
+            commune_code: geoActuelle.commune_code || commune.code,
+            from_census: true,
+            census_act_id: act.id,
+            note: "Décès enregistré via fiche recensement — retire de la population",
+          },
+          person.nic,
+        );
+      }
       const onip = await pushCensusToOnip({
         person,
         adresse,

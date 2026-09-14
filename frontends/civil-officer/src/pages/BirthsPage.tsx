@@ -32,11 +32,10 @@ import { getOfficerCommune } from "../commune";
 import { listFacilityAccounts } from "../healthAuth";
 import { HOPITAUX_KEY, loadNamedList, rememberNamed } from "../namedLists";
 
-const MODES_NAISSANCE = [
+const MODES_ENREGISTREMENT = [
   { value: "sans_procuration", label: "Sans procuration" },
-  { value: "avec_procuration", label: "Par procuration" },
+  { value: "avec_procuration", label: "Avec procuration" },
   { value: "jugement_suppletif", label: "Par jugement supplétif" },
-  { value: "declaration_tardive", label: "Déclaration tardive" },
 ] as const;
 
 /** Lieu de naissance : jusqu'au quartier (Gombe → Batetela, etc.). */
@@ -66,11 +65,14 @@ export default function BirthsPage() {
     ville_name: officer.ville,
     province_name: officer.province,
   });
-  const [modeNaissance, setModeNaissance] = useState<(typeof MODES_NAISSANCE)[number]["value"]>(
-    "sans_procuration",
-  );
+  const [modeEnregistrement, setModeEnregistrement] = useState<
+    (typeof MODES_ENREGISTREMENT)[number]["value"]
+  >("sans_procuration");
   const [delaiEnregistrement, setDelaiEnregistrement] =
     useState<DelaiEnregistrement>("DANS_DELAI");
+  const [mandataireNom, setMandataireNom] = useState("");
+  const [mandataireQualite, setMandataireQualite] = useState("");
+  const [mandatairePiece, setMandatairePiece] = useState("");
   const [hopitalNaissance, setHopitalNaissance] = useState("");
   const [hopitalAutre, setHopitalAutre] = useState("");
   const [mother, setMother] = useState<Person | null>(null);
@@ -123,6 +125,10 @@ export default function BirthsPage() {
       setError(
         "Choisissez le quartier de naissance (ex. Batetela, Golf…) ou précisez le lieu manuellement.",
       );
+      return;
+    }
+    if (modeEnregistrement === "avec_procuration" && !mandataireNom.trim()) {
+      setError("Avec procuration : indiquez le nom du mandataire.");
       return;
     }
 
@@ -183,7 +189,9 @@ export default function BirthsPage() {
       const commune = getOfficerCommune();
       const session = getSession();
       const officerDisplay = session?.displayName?.trim() || "Officier de l'État civil";
-      const modeLabel = MODES_NAISSANCE.find((m) => m.value === modeNaissance)?.label ?? modeNaissance;
+      const modeLabel =
+        MODES_ENREGISTREMENT.find((m) => m.value === modeEnregistrement)?.label ??
+        modeEnregistrement;
       const motherFull = [mother.nom, mother.postnom, mother.prenom].filter(Boolean).join(" ");
       const fatherFull = father ? [father.nom, father.postnom, father.prenom].filter(Boolean).join(" ") : null;
       const payload = {
@@ -194,12 +202,19 @@ export default function BirthsPage() {
         sexe: child.sexe,
         date_naissance: child.date_naissance,
         lieu_naissance: child.lieu_naissance,
-        mode_naissance: modeNaissance,
+        mode_enregistrement: modeEnregistrement,
+        mode_naissance: modeEnregistrement,
         mode: modeLabel,
         type_naissance: modeLabel,
         delai_enregistrement: delaiEnregistrement,
         delai_enregistrement_label: delaiEnregistrementLabel(delaiEnregistrement),
-        avec_procuration: modeNaissance === "avec_procuration",
+        avec_procuration: modeEnregistrement === "avec_procuration",
+        mandataire_nom:
+          modeEnregistrement === "avec_procuration" ? mandataireNom.trim() || null : null,
+        mandataire_qualite:
+          modeEnregistrement === "avec_procuration" ? mandataireQualite.trim() || null : null,
+        mandataire_piece:
+          modeEnregistrement === "avec_procuration" ? mandatairePiece.trim() || null : null,
         hopital_naissance: hopitalResolved || null,
         geo_naissance: geoPayload,
         quartier_naissance: geoNaissance.quartier_name || null,
@@ -252,8 +267,11 @@ export default function BirthsPage() {
         ville_name: officer.ville,
         province_name: officer.province,
       });
-      setModeNaissance("sans_procuration");
+      setModeEnregistrement("sans_procuration");
       setDelaiEnregistrement("DANS_DELAI");
+      setMandataireNom("");
+      setMandataireQualite("");
+      setMandatairePiece("");
       setHopitalNaissance("");
       setHopitalAutre("");
       setMother(null);
@@ -291,7 +309,9 @@ export default function BirthsPage() {
         (a.payload.geo_naissance as { quartier_name?: string } | undefined)?.quartier_name ??
         "",
     ),
-    mode: String(a.payload.mode ?? a.payload.mode_naissance ?? ""),
+    mode: String(
+      a.payload.mode ?? a.payload.mode_enregistrement ?? a.payload.mode_naissance ?? "",
+    ),
   }));
 
   return (
@@ -376,21 +396,55 @@ export default function BirthsPage() {
             </select>
           </div>
           <div>
-            <label className="form-label">Mode de naissance</label>
+            <label className="form-label">Mode d&apos;enregistrement</label>
             <select
               className="form-control"
-              value={modeNaissance}
+              value={modeEnregistrement}
               onChange={(e) =>
-                setModeNaissance(e.target.value as (typeof MODES_NAISSANCE)[number]["value"])
+                setModeEnregistrement(
+                  e.target.value as (typeof MODES_ENREGISTREMENT)[number]["value"],
+                )
               }
             >
-              {MODES_NAISSANCE.map((m) => (
+              {MODES_ENREGISTREMENT.map((m) => (
                 <option key={m.value} value={m.value}>
                   {m.label}
                 </option>
               ))}
             </select>
           </div>
+          {modeEnregistrement === "avec_procuration" ? (
+            <>
+              <div>
+                <label className="form-label">Nom du mandataire *</label>
+                <input
+                  className="form-control"
+                  value={mandataireNom}
+                  onChange={(e) => setMandataireNom(e.target.value)}
+                  placeholder="Personne munie de la procuration"
+                  required
+                />
+              </div>
+              <div>
+                <label className="form-label">Qualité du mandataire</label>
+                <input
+                  className="form-control"
+                  value={mandataireQualite}
+                  onChange={(e) => setMandataireQualite(e.target.value)}
+                  placeholder="Ex. oncle, tuteur, avocat…"
+                />
+              </div>
+              <div>
+                <label className="form-label">Réf. / pièce de la procuration</label>
+                <input
+                  className="form-control"
+                  value={mandatairePiece}
+                  onChange={(e) => setMandatairePiece(e.target.value)}
+                  placeholder="N° acte notarié, date…"
+                />
+              </div>
+            </>
+          ) : null}
           <div className="full">
             <GeoCascade
               embedded
@@ -529,7 +583,7 @@ export default function BirthsPage() {
               <th>Sexe</th>
               <th>Naissance</th>
               <th>Quartier</th>
-              <th>Mode</th>
+              <th>Enregistrement</th>
               <th />
             </tr>
           </thead>
