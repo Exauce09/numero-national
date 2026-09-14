@@ -13,14 +13,18 @@ import PersonPicker from "../components/PersonPicker";
 import {
   addAct,
   addPerson,
+  delaiEnregistrementLabel,
   findDuplicateBirthAct,
   findDuplicatePerson,
   getAct,
   inheritParentOrigin,
   listActs,
+  NEWBORN_DELAI_JOURS,
   personNationalite,
+  suggestDelaiEnregistrement,
   updateAct,
   type Act,
+  type DelaiEnregistrement,
   type Person,
   type Sexe,
 } from "../registry";
@@ -65,6 +69,8 @@ export default function BirthsPage() {
   const [modeNaissance, setModeNaissance] = useState<(typeof MODES_NAISSANCE)[number]["value"]>(
     "sans_procuration",
   );
+  const [delaiEnregistrement, setDelaiEnregistrement] =
+    useState<DelaiEnregistrement>("DANS_DELAI");
   const [hopitalNaissance, setHopitalNaissance] = useState("");
   const [hopitalAutre, setHopitalAutre] = useState("");
   const [mother, setMother] = useState<Person | null>(null);
@@ -191,6 +197,8 @@ export default function BirthsPage() {
         mode_naissance: modeNaissance,
         mode: modeLabel,
         type_naissance: modeLabel,
+        delai_enregistrement: delaiEnregistrement,
+        delai_enregistrement_label: delaiEnregistrementLabel(delaiEnregistrement),
         avec_procuration: modeNaissance === "avec_procuration",
         hopital_naissance: hopitalResolved || null,
         geo_naissance: geoPayload,
@@ -245,6 +253,7 @@ export default function BirthsPage() {
         province_name: officer.province,
       });
       setModeNaissance("sans_procuration");
+      setDelaiEnregistrement("DANS_DELAI");
       setHopitalNaissance("");
       setHopitalAutre("");
       setMother(null);
@@ -347,9 +356,24 @@ export default function BirthsPage() {
               className="form-control"
               type="date"
               value={dateNaissance}
-              onChange={(e) => setDateNaissance(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setDateNaissance(v);
+                setDelaiEnregistrement(suggestDelaiEnregistrement(v));
+              }}
               required
             />
+          </div>
+          <div>
+            <label className="form-label">Type d&apos;enregistrement *</label>
+            <select
+              className="form-control"
+              value={delaiEnregistrement}
+              onChange={(e) => setDelaiEnregistrement(e.target.value as DelaiEnregistrement)}
+            >
+              <option value="DANS_DELAI">Dans le délai (≤ {NEWBORN_DELAI_JOURS} jours)</option>
+              <option value="HORS_DELAI">Hors délai (&gt; {NEWBORN_DELAI_JOURS} jours)</option>
+            </select>
           </div>
           <div>
             <label className="form-label">Mode de naissance</label>

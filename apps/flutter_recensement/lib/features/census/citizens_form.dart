@@ -21,6 +21,36 @@ import 'etudes_et_admin.dart';
 /// Type de fiche terrain — l’identité obligatoire dépend de ce choix.
 enum FicheKind { personne, bebe, decede, marie }
 
+/// Délai légal d’enregistrement d’un nouveau-né (jours depuis la naissance).
+const int kNewbornDelaiJours = 90;
+
+enum DelaiEnregistrement { dansDelai, horsDelai }
+
+DelaiEnregistrement suggestDelaiEnregistrement(String dobIso) {
+  final raw = dobIso.trim();
+  if (raw.isEmpty) return DelaiEnregistrement.dansDelai;
+  final birth = DateTime.tryParse(raw.split('T').first);
+  if (birth == null) return DelaiEnregistrement.dansDelai;
+  final days = DateTime.now().difference(birth).inDays;
+  return days <= kNewbornDelaiJours
+      ? DelaiEnregistrement.dansDelai
+      : DelaiEnregistrement.horsDelai;
+}
+
+String delaiEnregistrementCode(DelaiEnregistrement v) =>
+    v == DelaiEnregistrement.dansDelai ? 'DANS_DELAI' : 'HORS_DELAI';
+
+String delaiEnregistrementLabel(DelaiEnregistrement v) =>
+    v == DelaiEnregistrement.dansDelai ? 'Dans le délai' : 'Hors délai';
+
+DelaiEnregistrement parseDelaiEnregistrement(Object? raw) {
+  final s = raw?.toString().toUpperCase() ?? '';
+  if (s.contains('HORS') || s == 'LATE' || s == 'TARDIF') {
+    return DelaiEnregistrement.horsDelai;
+  }
+  return DelaiEnregistrement.dansDelai;
+}
+
 /// Fiche personne — wizard 7 étapes aligné sur le site civil-officer.
 class CitizensFormScreen extends StatefulWidget {
   const CitizensFormScreen({
@@ -80,6 +110,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
 
   String _sex = 'M';
   FicheKind _ficheKind = FicheKind.personne;
+  DelaiEnregistrement _delaiEnregistrement = DelaiEnregistrement.dansDelai;
   String _etatCivil = 'CELIBATAIRE';
   String _handicap = 'NORMAL';
   String _relation = 'AUTRE';
@@ -259,6 +290,14 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
 
     _sex = e?['sex']?.toString() ?? payload['sex']?.toString() ?? 'M';
     _ficheKind = _parseFicheKind(payload['fiche_kind'] ?? e?['fiche_kind']);
+    _delaiEnregistrement = parseDelaiEnregistrement(
+      payload['delai_enregistrement'] ?? payload['delai_enregistrement_label'],
+    );
+    if (payload['delai_enregistrement'] == null &&
+        _ficheKind == FicheKind.bebe &&
+        _dob.text.trim().isNotEmpty) {
+      _delaiEnregistrement = suggestDelaiEnregistrement(_dob.text);
+    }
     _etatCivil = payload['etat_civil']?.toString() ?? 'CELIBATAIRE';
     _handicap = payload['handicap']?.toString() ?? 'NORMAL';
     _relation = payload['relationship_to_head']?.toString() ?? 'AUTRE';
@@ -443,7 +482,12 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     final y = picked.year.toString().padLeft(4, '0');
     final m = picked.month.toString().padLeft(2, '0');
     final d = picked.day.toString().padLeft(2, '0');
-    setState(() => _dob.text = '$y-$m-$d');
+    setState(() {
+      _dob.text = '$y-$m-$d';
+      if (_ficheKind == FicheKind.bebe) {
+        _delaiEnregistrement = suggestDelaiEnregistrement(_dob.text);
+      }
+    });
   }
 
   bool _validateStep1({bool showMessage = true}) {
@@ -452,13 +496,9 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     final postnom = _postnom.text.trim();
     final prenom = _prenom.text.trim();
     final dob = _dob.text.trim();
-    final mere = _mere.text.trim();
-    final pere = _pere.text.trim();
-    final dod = _dateDeces.text.trim();
     final lieu = (_geoNaissance['label'] ?? _lieuNaissance.text).toString().trim();
     final nationalite = _nationalite.text.trim();
     final pays = _paysResidence.text.trim();
-    final tel = _telephone.text.trim();
     final adresseOk = (_geoActuelle['province_name'] ?? '').toString().trim().isNotEmpty ||
         (_geoActuelle['label'] ?? '').toString().trim().isNotEmpty;
 
@@ -469,21 +509,23 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             prenom.isEmpty ||
             !_validDate(dob) ||
             lieu.isEmpty ||
-            pere.isEmpty ||
-            mere.isEmpty ||
             nationalite.isEmpty ||
             pays.isEmpty ||
-            !adresseOk ||
-            tel.isEmpty) {
+            !adresseOk) {
           err =
               'Identité incomplète : nom, post-nom, prénom, sexe, naissance, lieu de naissance, '
-              'père, mère, nationalité, pays, adresse actuelle et téléphone sont obligatoires '
-              '(e-mail facultatif).';
+              'nationalité, pays et adresse actuelle sont obligatoires '
+              '(père, mère, téléphone et e-mail facultatifs — comme sur le site).';
+        } else if ((_geoActuelle['commune_name'] ?? '').toString().trim().isEmpty) {
+          err = 'Identité : choisissez la commune dans l’adresse actuelle.';
+        } else if ((_geoActuelle['quartier_name'] ?? '').toString().trim().isEmpty) {
+          err = 'Identité : choisissez le quartier dans l’adresse actuelle.';
         }
       case FicheKind.bebe:
-        if (nom.isEmpty || !_validDate(dob) || (mere.isEmpty && pere.isEmpty) || lieu.isEmpty) {
+        if (nom.isEmpty || !_validDate(dob) || lieu.isEmpty) {
           err =
-              'Identité bébé incomplète : nom, date et lieu de naissance, et mère ou père requis';
+              'Identité bébé incomplète : nom, date et lieu de naissance requis '
+              '(parents facultatifs — comme sur le site)';
         }
       case FicheKind.decede:
         if (nom.isEmpty ||
@@ -492,13 +534,11 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             !_validDate(dob) ||
             !_validDate(dod) ||
             lieu.isEmpty ||
-            pere.isEmpty ||
-            mere.isEmpty ||
             nationalite.isEmpty ||
             !adresseOk) {
           err =
               'Identité décédé incomplète : nom, post-nom, prénom, naissance, décès, lieu, '
-              'père, mère, nationalité et adresse requis (e-mail facultatif).';
+              'nationalité et adresse requis (père, mère et e-mail facultatifs — comme sur le site).';
         } else if (_validDate(dob) && _validDate(dod)) {
           final b = DateTime.parse(dob);
           final d = DateTime.parse(dod);
@@ -512,15 +552,16 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             prenom.isEmpty ||
             !_validDate(dob) ||
             lieu.isEmpty ||
-            pere.isEmpty ||
-            mere.isEmpty ||
             nationalite.isEmpty ||
             pays.isEmpty ||
-            !adresseOk ||
-            tel.isEmpty) {
+            !adresseOk) {
           err =
-              'Identité marié(e) incomplète : nom, post-nom, prénom, naissance, lieu, père, mère, '
-              'nationalité, pays, adresse et téléphone requis (e-mail facultatif).';
+              'Identité marié(e) incomplète : nom, post-nom, prénom, naissance, lieu, '
+              'nationalité, pays et adresse requis (père, mère, téléphone facultatifs — comme sur le site).';
+        } else if ((_geoActuelle['commune_name'] ?? '').toString().trim().isEmpty) {
+          err = 'Identité : choisissez la commune dans l’adresse actuelle.';
+        } else if ((_geoActuelle['quartier_name'] ?? '').toString().trim().isEmpty) {
+          err = 'Identité : choisissez le quartier dans l’adresse actuelle.';
         } else {
           final cNom = _conjoint.nom.text.trim();
           final cPrenom = _conjoint.prenom.text.trim();
@@ -615,6 +656,10 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
         : _lieuNaissance.text.trim();
     return {
       'fiche_kind': _ficheKindCode,
+      'delai_enregistrement':
+          _ficheKind == FicheKind.bebe ? delaiEnregistrementCode(_delaiEnregistrement) : null,
+      'delai_enregistrement_label':
+          _ficheKind == FicheKind.bebe ? delaiEnregistrementLabel(_delaiEnregistrement) : null,
       'date_deces': _dateDeces.text.trim(),
       'nom': _nom.text.trim(),
       'postnom': _postnom.text.trim(),
@@ -1114,6 +1159,10 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
                         _etatCivil = 'MARIE';
                         _aConjoint = true;
                       }
+                      if (kind == FicheKind.bebe) {
+                        _delaiEnregistrement =
+                            suggestDelaiEnregistrement(_dob.text);
+                      }
                     });
                   },
                 ),
@@ -1209,7 +1258,38 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
                 onPressed: _pickDob,
               ),
             ),
+            onChanged: (v) {
+              if (_ficheKind == FicheKind.bebe) {
+                setState(() => _delaiEnregistrement = suggestDelaiEnregistrement(v));
+              }
+            },
           ),
+          if (isBebe) ...[
+            const SizedBox(height: 10),
+            DropdownButtonFormField<DelaiEnregistrement>(
+              value: _delaiEnregistrement,
+              decoration: _dec('Type d’enregistrement *'),
+              items: [
+                DropdownMenuItem(
+                  value: DelaiEnregistrement.dansDelai,
+                  child: Text('Dans le délai (≤ $kNewbornDelaiJours jours)'),
+                ),
+                DropdownMenuItem(
+                  value: DelaiEnregistrement.horsDelai,
+                  child: Text('Hors délai (> $kNewbornDelaiJours jours)'),
+                ),
+              ],
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() => _delaiEnregistrement = v);
+              },
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Proposé automatiquement selon la date de naissance — vous pouvez corriger.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF5A6A85), height: 1.3),
+            ),
+          ],
           if (isDecede) ...[
             const SizedBox(height: 10),
             TextFormField(
@@ -1226,7 +1306,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
           const SizedBox(height: 10),
           TextFormField(
             controller: _hopitalNaissance,
-            decoration: _dec(isBebe ? 'Lieu / hôpital de naissance' : 'Hôpital de naissance'),
+            decoration: _dec(isBebe ? 'Hôpital / maternité de naissance' : 'Hôpital de naissance'),
           ),
           if (!isBebe) ...[
             const SizedBox(height: 10),
@@ -1238,12 +1318,12 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
           const SizedBox(height: 10),
           TextFormField(
             controller: _pere,
-            decoration: _dec(isBebe ? 'Nom du père * (si pas de mère)' : 'Nom du père *'),
+            decoration: _dec(isBebe ? 'Nom du père (facultatif)' : 'Nom du père'),
           ),
           const SizedBox(height: 10),
           TextFormField(
             controller: _mere,
-            decoration: _dec(isBebe ? 'Nom de la mère * (si pas de père)' : 'Nom de la mère *'),
+            decoration: _dec(isBebe ? 'Nom de la mère (facultatif)' : 'Nom de la mère'),
           ),
           if (!isBebe) ...[
             const SizedBox(height: 10),

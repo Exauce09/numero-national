@@ -68,8 +68,17 @@ function actBelongsToFacility(payload: Record<string, unknown>, scope: HealthSco
 }
 
 function birthMode(payload: Record<string, unknown>): "sans" | "avec" | "jugement" {
+  const delai = String(payload.delai_enregistrement ?? "").toUpperCase();
+  if (delai === "HORS_DELAI") return "jugement";
+  if (delai === "DANS_DELAI") {
+    const blob = `${payload.note ?? ""} ${payload.mode ?? ""} ${payload.type_naissance ?? ""}`.toLowerCase();
+    if (blob.includes("procuration") || payload.avec_procuration === true) return "avec";
+    return "sans";
+  }
   const blob = `${payload.note ?? ""} ${payload.mode ?? ""} ${payload.type_naissance ?? ""}`.toLowerCase();
-  if (blob.includes("jugement") || blob.includes("supplétif") || blob.includes("suppletif")) return "jugement";
+  if (blob.includes("jugement") || blob.includes("supplétif") || blob.includes("suppletif") || blob.includes("tardive")) {
+    return "jugement";
+  }
   if (blob.includes("procuration") || payload.avec_procuration === true) return "avec";
   return "sans";
 }

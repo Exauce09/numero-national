@@ -14,13 +14,17 @@ import IdentiteAdministrativeForm from "../components/IdentiteAdministrativeForm
 import {
   ETAT_CIVIL_OPTIONS,
   HANDICAP_OPTIONS,
+  NEWBORN_DELAI_JOURS,
   addAct,
   addPerson,
+  delaiEnregistrementLabel,
   displayName,
   getPerson,
   getSpouseOf,
   listPopulationPersons,
+  suggestDelaiEnregistrement,
   type Act,
+  type DelaiEnregistrement,
   type EtatCivil,
   type HandicapType,
   type Person,
@@ -89,6 +93,7 @@ type CensusDraft = {
   step: StepId;
   ficheKind?: FicheKind;
   dateDeces?: string;
+  delaiEnregistrement?: DelaiEnregistrement;
   handicap: HandicapType;
   nom: string;
   postnom: string;
@@ -139,6 +144,7 @@ export default function CensusPage() {
   const [step, setStep] = useState<StepId>(1);
   const [ficheKind, setFicheKind] = useState<FicheKind>("personne");
   const [dateDeces, setDateDeces] = useState("");
+  const [delaiEnregistrement, setDelaiEnregistrement] = useState<DelaiEnregistrement>("DANS_DELAI");
   const [handicap, setHandicap] = useState<HandicapType>("NORMAL");
   const [nom, setNom] = useState("");
   const [postnom, setPostnom] = useState("");
@@ -212,6 +218,9 @@ export default function CensusPage() {
       setStep(Math.min(6, Math.max(1, Number(d.step) || 1)) as StepId);
       setFicheKind(d.ficheKind ?? "personne");
       setDateDeces(d.dateDeces ?? "");
+      setDelaiEnregistrement(
+        d.delaiEnregistrement ?? suggestDelaiEnregistrement(d.dateNaissance ?? ""),
+      );
       setHandicap(d.handicap ?? "NORMAL");
       setNom(d.nom ?? "");
       setPostnom(d.postnom ?? "");
@@ -379,6 +388,10 @@ export default function CensusPage() {
     if (ficheKind === "bebe") {
       if (!lieuOk) {
         setError("Identité bébé : le lieu de naissance est requis.");
+        return false;
+      }
+      if (!delaiEnregistrement) {
+        setError("Identité bébé : choisissez le type d'enregistrement (dans le délai / hors délai).");
         return false;
       }
       return true;
@@ -569,6 +582,7 @@ export default function CensusPage() {
       step,
       ficheKind,
       dateDeces,
+      delaiEnregistrement,
       handicap,
       nom,
       postnom,
@@ -651,6 +665,7 @@ export default function CensusPage() {
     setStep(1);
     setFicheKind("personne");
     setDateDeces("");
+    setDelaiEnregistrement("DANS_DELAI");
     setHandicap("NORMAL");
     setNom("");
     setPostnom("");
@@ -785,6 +800,9 @@ export default function CensusPage() {
         person_id: person.id,
         formulaire: "IDENTIFICATION_PERSONNE",
         fiche_kind: ficheKind,
+        delai_enregistrement: ficheKind === "bebe" ? delaiEnregistrement : null,
+        delai_enregistrement_label:
+          ficheKind === "bebe" ? delaiEnregistrementLabel(delaiEnregistrement) : null,
         date_deces: ficheKind === "decede" ? dateDeces || null : null,
         nom: person.nom,
         postnom: person.postnom,
@@ -972,8 +990,28 @@ export default function CensusPage() {
                       className="form-control"
                       type="date"
                       value={dateNaissance}
-                      onChange={(e) => setDateNaissance(e.target.value)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setDateNaissance(v);
+                        setDelaiEnregistrement(suggestDelaiEnregistrement(v));
+                      }}
                     />
+                  </div>
+                  <div>
+                    <label className="form-label">Type d&apos;enregistrement *</label>
+                    <select
+                      className="form-control"
+                      value={delaiEnregistrement}
+                      onChange={(e) =>
+                        setDelaiEnregistrement(e.target.value as DelaiEnregistrement)
+                      }
+                    >
+                      <option value="DANS_DELAI">Dans le délai (≤ {NEWBORN_DELAI_JOURS} jours)</option>
+                      <option value="HORS_DELAI">Hors délai (&gt; {NEWBORN_DELAI_JOURS} jours)</option>
+                    </select>
+                    <p className="muted small" style={{ marginTop: "0.25rem" }}>
+                      Proposé automatiquement selon la date de naissance — vous pouvez corriger.
+                    </p>
                   </div>
                   <div className="full">
                     <label className="form-label">Lieu de naissance *</label>

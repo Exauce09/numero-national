@@ -155,6 +155,22 @@ export function ageDays(dob: string): number {
   return Math.floor(ms / (1000 * 60 * 60 * 24));
 }
 
+/** Délai légal d’enregistrement d’un nouveau-né (jours depuis la naissance). */
+export const NEWBORN_DELAI_JOURS = 90;
+
+export type DelaiEnregistrement = "DANS_DELAI" | "HORS_DELAI";
+
+export function suggestDelaiEnregistrement(dateNaissance: string): DelaiEnregistrement {
+  if (!dateNaissance) return "DANS_DELAI";
+  const days = ageDays(dateNaissance);
+  if (!Number.isFinite(days)) return "DANS_DELAI";
+  return days <= NEWBORN_DELAI_JOURS ? "DANS_DELAI" : "HORS_DELAI";
+}
+
+export function delaiEnregistrementLabel(v: DelaiEnregistrement): string {
+  return v === "DANS_DELAI" ? "Dans le délai" : "Hors délai";
+}
+
 export function displayName(p: Person): string {
   return [p.nom, p.postnom, p.prenom].filter(Boolean).join(" ").trim() || p.nic;
 }
