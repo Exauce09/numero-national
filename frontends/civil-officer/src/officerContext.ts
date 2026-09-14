@@ -19,7 +19,7 @@ export function getLoggedOfficer(): LoggedOfficer | null {
     userId: session.userId,
     username: session.username,
     displayName: session.displayName || session.username,
-    roleTitle: session.roleTitle || "Officier de l'état civil",
+    roleTitle: session.roleTitle || "Officier de l'état civil — Hervé Kinkete",
     commune: {
       code: session.commune_code || commune.code,
       name: session.commune_name || commune.name,

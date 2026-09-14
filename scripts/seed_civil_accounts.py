@@ -22,7 +22,7 @@ CIVIL_ACCOUNTS: list[dict[str, object]] = [
         "email": "admin.provincial@example.gov",
         "password": "AdminProvincial123!",
         "roles": ["ADMIN_PROVINCIAL"],
-        "full_name": "Administrateur Provincial Kinshasa",
+        "full_name": "Directrice de l'État civil général de la RDC",
     },
     {
         "alias": "responsable",
@@ -36,7 +36,7 @@ CIVIL_ACCOUNTS: list[dict[str, object]] = [
         "email": "officier.etatcivil@example.gov",
         "password": "CivilOfficer123!",
         "roles": ["OFFICIER_ETAT_CIVIL", "CIVIL_OFFICER"],
-        "full_name": "Officier État Civil Gombe",
+        "full_name": "Hervé Kinkete",
     },
     {
         "alias": "agent",
@@ -136,6 +136,24 @@ def ensure_account(
         assign_roles(client, admin_token, str(profile["id"]), roles)
         tokens = login(client, email, password)
         profile = me(client, tokens["access_token"])
+    # Met à jour le nom affiché si l'utilisateur existe déjà (register 409).
+    if str(profile.get("full_name") or "") != full_name:
+        try:
+            import psycopg
+
+            dsn = os.getenv(
+                "DATABASE_URL",
+                "postgresql://nic_admin:change-me-strong-db-password@127.0.0.1:5432/nic_core",
+            )
+            with psycopg.connect(dsn) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "UPDATE identity.users SET full_name = %s WHERE email = %s",
+                        (full_name, email),
+                    )
+                conn.commit()
+        except Exception as exc:  # noqa: BLE001
+            print(f"  (warn) full_name DB update {email}: {exc}")
     return profile
 
 

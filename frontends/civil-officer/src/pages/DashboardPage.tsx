@@ -263,11 +263,14 @@ export default function DashboardPage() {
   const demoDeath = demoTemporal ? [1, 1, 2, 1, 2, 1] : deathSeries;
   const demoAll = demoTemporal ? [4, 5, 7, 6, 9, 8] : allActsSeries;
 
-  const helloName =
-    variant === "officier"
-      ? "Officier de l'état civil"
-      : session?.displayName || session?.username || "utilisateur";
-  const roleTitle = "Officier de l'état civil";
+  const helloName = session?.displayName || session?.username || "utilisateur";
+  const roleTitle =
+    session?.roleTitle ||
+    (variant === "officier"
+      ? "Officier de l'état civil — Hervé Kinkete"
+      : variant === "provincial"
+        ? "Directrice de l'État civil général de la RDC"
+        : "Officier de l'état civil");
   const territory = [session?.commune_province, session?.commune_ville, session?.commune_name]
     .filter(Boolean)
     .join(" · ");

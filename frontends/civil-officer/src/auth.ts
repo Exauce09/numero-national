@@ -33,6 +33,9 @@ export const CIVIL_DEMO_ACCOUNTS: Array<{
   uiPassword: string;
   email: string;
   apiPassword: string;
+  /** Nom affiché (bonjour, actes, session). */
+  displayName: string;
+  /** Libellé court (écran de connexion). */
   label: string;
   rolesHint: string[];
 }> = [
@@ -41,7 +44,8 @@ export const CIVIL_DEMO_ACCOUNTS: Array<{
     uiPassword: DEMO_PASSWORD,
     email: DEMO_API_EMAIL,
     apiPassword: DEMO_API_PASSWORD,
-    label: "Officier (validation)",
+    displayName: "Hervé Kinkete",
+    label: "Officier — Hervé Kinkete",
     rolesHint: ["OFFICIER_ETAT_CIVIL", "CIVIL_OFFICER"],
   },
   {
@@ -49,6 +53,7 @@ export const CIVIL_DEMO_ACCOUNTS: Array<{
     uiPassword: "DemoAgentCivil2026!",
     email: "agent.etatcivil@example.gov",
     apiPassword: "AgentCivil123!",
+    displayName: "Agent de l'état civil",
     label: "Agent (saisie)",
     rolesHint: ["AGENT_ETAT_CIVIL"],
   },
@@ -57,6 +62,7 @@ export const CIVIL_DEMO_ACCOUNTS: Array<{
     uiPassword: "DemoResponsable2026!",
     email: "responsable.bureau@example.gov",
     apiPassword: "ResponsableBureau123!",
+    displayName: "Responsable de bureau",
     label: "Responsable de bureau",
     rolesHint: ["RESPONSABLE_BUREAU"],
   },
@@ -65,6 +71,7 @@ export const CIVIL_DEMO_ACCOUNTS: Array<{
     uiPassword: "DemoAuditeur2026!",
     email: "auditeur.etatcivil@example.gov",
     apiPassword: "AuditeurCivil123!",
+    displayName: "Auditeur",
     label: "Auditeur",
     rolesHint: ["AUDITEUR"],
   },
@@ -73,7 +80,8 @@ export const CIVIL_DEMO_ACCOUNTS: Array<{
     uiPassword: "DemoAdminProv2026!",
     email: "admin.provincial@example.gov",
     apiPassword: "AdminProvincial123!",
-    label: "Admin provincial",
+    displayName: "Directrice de l'État civil général de la RDC",
+    label: "Directrice État civil général RDC",
     rolesHint: ["ADMIN_PROVINCIAL"],
   },
 ];
@@ -109,9 +117,13 @@ function demoAccountBySessionUser(username?: string | null) {
 
 function sessionLabel(username: string, roles?: string[]): { displayName: string; roleTitle: string } {
   const demo = CIVIL_DEMO_ACCOUNTS.find((a) => a.alias === username || a.email === username);
-  const pretty = demo
-    ? demo.label
-    : username.replace(/[._@]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  if (demo) {
+    return {
+      displayName: demo.displayName,
+      roleTitle: roles?.length ? roleTitleFor(roles) : demo.displayName,
+    };
+  }
+  const pretty = username.replace(/[._@]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   return {
     displayName: pretty,
     roleTitle: roles?.length ? roleTitleFor(roles) : MODULE_ROLE_TITLE,
@@ -261,7 +273,7 @@ export async function login(username: string, password: string): Promise<Session
             username: sessionUser,
             accessToken: data.access_token,
             photoDataUrl,
-            displayName: me?.full_name || labels.displayName,
+            displayName: labels.displayName || me?.full_name,
             roleTitle: labels.roleTitle,
             roles,
             permissions: me?.permissions ?? [],
@@ -364,7 +376,7 @@ export async function ensureAccessToken(): Promise<string | null> {
           ...(current ?? { username: attempt.alias }),
           username: sessionUser,
           accessToken: data.access_token,
-          displayName: me?.full_name || current?.displayName || labels.displayName,
+          displayName: labels.displayName || me?.full_name || current?.displayName,
           roleTitle: labels.roleTitle,
           roles,
           permissions: me?.permissions ?? [],

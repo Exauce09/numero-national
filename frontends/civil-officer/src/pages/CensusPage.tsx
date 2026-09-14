@@ -415,7 +415,7 @@ export default function CensusPage() {
     }
     if (!geoActuelle.quartier_name) {
       setError(
-        "Identité : choisissez le quartier (ex. Batetela, Golf, Lemera…) — sinon le synoptique affiche « Non précisé ».",
+        "Identité : choisissez le quartier (ex. Batetela, Golf, Lemera…).",
       );
       return false;
     }

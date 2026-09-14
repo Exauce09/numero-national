@@ -123,7 +123,9 @@ export function synopticQuartiersForCommune(commune: OfficerCommune | FlatCommun
   for (const name of names) map.set(name, emptyGft());
 
   for (const act of [...acts, ...census]) {
-    const q = extractQuartier(act.payload) || "Non précisé";
+    const q = extractQuartier(act.payload);
+    // Ne pas afficher de ligne « Non précisé » : seuls les quartiers renseignés comptent.
+    if (!q) continue;
     if (!map.has(q)) map.set(q, emptyGft());
     addGft(map.get(q)!, birthSexe(act));
   }

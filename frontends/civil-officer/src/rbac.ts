@@ -62,12 +62,12 @@ export function roleTitleFor(roles: string[]): string {
     case "CENTRAL_ADMIN":
       return "Administrateur national";
     case "ADMIN_PROVINCIAL":
-      return "Administrateur provincial";
+      return "Directrice de l'État civil général de la RDC";
     case "RESPONSABLE_BUREAU":
       return "Responsable de bureau";
     case "OFFICIER_ETAT_CIVIL":
     case "CIVIL_OFFICER":
-      return "Officier de l'état civil";
+      return "Officier de l'état civil — Hervé Kinkete";
     case "AGENT_ETAT_CIVIL":
       return "Agent de l'état civil";
     case "AUDITEUR":

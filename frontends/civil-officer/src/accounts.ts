@@ -66,14 +66,14 @@ export function resolveCommuneForUsername(username: string): OfficerCommune {
       username: user,
       displayName:
         user === "officier"
-          ? "Officier de l'état civil"
+          ? "Hervé Kinkete"
           : user === "agent"
             ? "Agent de l'état civil"
             : user === "responsable"
               ? "Responsable de bureau"
               : user === "auditeur"
                 ? "Auditeur"
-                : "Administrateur provincial",
+                : "Directrice de l'État civil général de la RDC",
       commune: DEFAULT_OFFICER_COMMUNE,
     });
     return { ...demo.commune };
