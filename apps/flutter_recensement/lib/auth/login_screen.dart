@@ -219,13 +219,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                   controller: _apiUrl,
                                   keyboardType: TextInputType.url,
                                   autocorrect: false,
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     labelText: 'URL API',
-                                    hintText: 'http://127.0.0.1:8000/api/v1',
-                                    prefixIcon: Icon(Icons.dns_outlined),
+                                    hintText: AppConfig.compileTimeApiBaseUrl,
+                                    prefixIcon: const Icon(Icons.dns_outlined),
                                     helperText:
-                                        'USB: http://127.0.0.1:8000/api/v1 (+ adb reverse). '
-                                        'Wi‑Fi: http://IP-du-PC:8000/api/v1 (même réseau).',
+                                        'Même Wi‑Fi que le PC serveur. '
+                                        'Exemple : ${AppConfig.compileTimeApiBaseUrl}',
                                   ),
                                 ),
                                 const SizedBox(height: 8),
