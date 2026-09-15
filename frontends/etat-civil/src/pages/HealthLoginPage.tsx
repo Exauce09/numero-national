@@ -39,8 +39,10 @@ export default function HealthLoginPage() {
     <div className="login-page">
       <div className="login-card" style={{ maxWidth: 520 }}>
         <img className="login-logo" src="/logo-rdc.jpg" alt="République Démocratique du Congo" />
-        <h1 className="login-title">SIGPOP-RDC — Structure sanitaire</h1>
-        <p className="login-subtitle">Hôpital · Clinique · Centre de santé · Maternité</p>
+        <h1 className="login-title">État civil — Maternité</h1>
+        <p className="login-subtitle">
+          Structure sanitaire : déclaration de naissance / décès → validation par l&apos;officier
+        </p>
 
         <form onSubmit={onLogin} autoComplete="off">
           {error ? <div className="login-error">{error}</div> : null}

@@ -18,6 +18,8 @@ import {
 import { api } from "./api";
 import { listPendingOfficerDeclarations } from "./civilDeclarations";
 import LoginPage from "./pages/LoginPage";
+import HealthLoginPage from "./pages/HealthLoginPage";
+import HealthShell, { RequireHealth } from "./HealthShell";
 import DashboardPage from "./pages/DashboardPage";
 import BirthsPage from "./pages/BirthsPage";
 import DeathsPage from "./pages/DeathsPage";
@@ -274,6 +276,9 @@ function Shell() {
           </NavLink>
           <NavLink to="/missions">
             <IconClipboard size={18} /> Missions EC
+          </NavLink>
+          <NavLink to="/declarations">
+            <IconClipboard size={18} /> Déclarations (santé)
           </NavLink>
           <NavLink
             to="/synoptique/naissances"
@@ -623,6 +628,15 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/sante/login" element={<HealthLoginPage />} />
+      <Route
+        path="/sante/*"
+        element={
+          <RequireHealth>
+            <HealthShell />
+          </RequireHealth>
+        }
+      />
       <Route
         path="/*"
         element={

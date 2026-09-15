@@ -131,6 +131,13 @@ export function generateNic(opts?: {
   return `${pp}${territory}${sex}${year}${seq}`;
 }
 
+/** Identifiant dossier naissance (cahier EC) — pas un numéro national. */
+export function generateBirthDossierId(dateOfBirth?: string): string {
+  const year = (dateOfBirth || "").slice(0, 4) || String(new Date().getFullYear());
+  const seq = String(Math.abs(hashSeed()) % 100000).padStart(5, "0");
+  return `NAIS-${year}-${seq}`;
+}
+
 function hashSeed(): number {
   const hex = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
   return Number.parseInt(hex, 16);

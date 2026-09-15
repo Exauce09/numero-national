@@ -16,9 +16,9 @@ export const EC_RDC_MISSIONS: EcMission[] = [
     id: "naissance",
     title: "Acte de naissance",
     summary:
-      "Déclaration et enregistrement de naissance dans le délai légal, hors délai (jugement supplétif), avec ou sans procuration. Délivrance de copies et extraits.",
+      "Enregistrement au bureau EC ou via maternité (compte structure sanitaire). Sync → validation officier → registre. ID naissance (pas de numéro national). Adresse de la mère + originaire (province → territoire → secteur → village).",
     href: "/manage/naissance",
-    legalNote: "Registre des naissances du bureau d'état civil territorialement compétent.",
+    legalNote: "Deux canaux : structure sanitaire et bureau d'état civil de la commune.",
   },
   {
     id: "mariage",

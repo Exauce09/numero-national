@@ -41,6 +41,11 @@ export const GEO_PRESETS = {
   address: ["province", "ville", "commune", "quartier", "avenue"] as GeoLevel[],
   /** Origine / territoire rural. */
   origin: ["province", "ville", "district", "commune", "localite"] as GeoLevel[],
+  /**
+   * Originaire EC RDC (cahier projets) :
+   * Province → Territoire → Secteur/Chefferie → Village (sans groupement).
+   */
+  originRural: ["province", "district", "commune", "localite"] as GeoLevel[],
   /** Lieu simple (naissance, décès, enregistrement…). */
   place: ["province", "ville", "commune"] as GeoLevel[],
 } as const;

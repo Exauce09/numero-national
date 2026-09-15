@@ -100,6 +100,9 @@ export default function LoginPage() {
           <br />
           <span className="muted">Mot de passe oublié — contactez votre administrateur territorial.</span>
         </p>
+        <p className="login-subtitle" style={{ marginTop: "1rem" }}>
+          <a href="/sante/login">Accès maternité / structure sanitaire →</a>
+        </p>
       </div>
     </div>
   );

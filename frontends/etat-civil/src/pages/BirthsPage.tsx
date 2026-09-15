@@ -5,6 +5,8 @@ import { getSession } from "../auth";
 import DataToolbar from "../components/DataToolbar";
 import GeoCascade, {
   ADDRESS_FIELD_LABELS,
+  GEO_PRESETS,
+  ORIGIN_FIELD_LABELS,
   type GeoLevel,
   type GeoSelection,
 } from "../components/GeoCascade";
@@ -16,6 +18,7 @@ import {
   delaiEnregistrementLabel,
   findDuplicateBirthAct,
   findDuplicatePerson,
+  generateBirthDossierId,
   getAct,
   inheritParentOrigin,
   listActs,
@@ -77,6 +80,9 @@ export default function BirthsPage() {
   const [hopitalAutre, setHopitalAutre] = useState("");
   const [mother, setMother] = useState<Person | null>(null);
   const [father, setFather] = useState<Person | null>(null);
+  const [adresseMere, setAdresseMere] = useState("");
+  const [geoAdresseMere, setGeoAdresseMere] = useState<GeoSelection>({});
+  const [geoOrigine, setGeoOrigine] = useState<GeoSelection>({});
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [created, setCreated] = useState<Act | null>(null);
@@ -150,7 +156,7 @@ export default function BirthsPage() {
     });
     if (existingAct) {
       setError(
-        `Naissance déjà enregistrée — acte ${existingAct.act_number} (NIC ${existingAct.national_id}). Doublon refusé.`,
+        `Naissance déjà enregistrée — acte ${existingAct.act_number} (ID ${existingAct.payload.id_naissance ?? existingAct.national_id}). Doublon refusé.`,
       );
       setViewAct(existingAct);
       setCreated(existingAct);
@@ -160,7 +166,7 @@ export default function BirthsPage() {
     const existingPerson = findDuplicatePerson(identity);
     if (existingPerson) {
       setError(
-        `Enfant déjà au registre : ${existingPerson.nom} ${existingPerson.prenom} (NIC ${existingPerson.nic}). Doublon refusé.`,
+        `Enfant déjà au registre : ${existingPerson.nom} ${existingPerson.prenom} (ID ${existingPerson.nic}). Doublon refusé.`,
       );
       return;
     }
@@ -185,6 +191,7 @@ export default function BirthsPage() {
         mother_id: mother.id,
         father_id: father?.id,
         nationalite: personNationalite(father ?? mother),
+        nic: generateBirthDossierId(dateNaissance),
       });
       const commune = getOfficerCommune();
       const session = getSession();
@@ -194,6 +201,28 @@ export default function BirthsPage() {
         modeEnregistrement;
       const motherFull = [mother.nom, mother.postnom, mother.prenom].filter(Boolean).join(" ");
       const fatherFull = father ? [father.nom, father.postnom, father.prenom].filter(Boolean).join(" ") : null;
+      const adresseMereLabel =
+        adresseMere.trim() ||
+        geoAdresseMere.label ||
+        [
+          geoAdresseMere.avenue_name,
+          geoAdresseMere.quartier_name,
+          geoAdresseMere.commune_name,
+          geoAdresseMere.ville_name,
+          geoAdresseMere.province_name,
+        ]
+          .filter(Boolean)
+          .join(", ");
+      const origineLabel =
+        geoOrigine.label ||
+        [
+          geoOrigine.localite_name,
+          geoOrigine.commune_name,
+          geoOrigine.district_name,
+          geoOrigine.province_name,
+        ]
+          .filter(Boolean)
+          .join(", ");
       const payload = {
         child_id: child.id,
         nom: child.nom,
@@ -202,6 +231,8 @@ export default function BirthsPage() {
         sexe: child.sexe,
         date_naissance: child.date_naissance,
         lieu_naissance: child.lieu_naissance,
+        id_naissance: child.nic,
+        code_dossier: child.nic,
         mode_enregistrement: modeEnregistrement,
         mode_naissance: modeEnregistrement,
         mode: modeLabel,
@@ -227,8 +258,10 @@ export default function BirthsPage() {
         mere_nom: motherFull,
         declarant: motherFull,
         declarant_qualite: "mère de l'enfant",
-        mother_nic: mother.nic,
+        mother_dossier: mother.nic,
         mother_snapshot: link.mother_snapshot,
+        adresse_mere: adresseMereLabel || null,
+        geo_adresse_mere: geoAdresseMere,
         father_id: father?.id ?? null,
         father_name: fatherFull,
         pere_nom: fatherFull,
@@ -238,15 +271,16 @@ export default function BirthsPage() {
         district: geoNaissance.district_name || null,
         bureau: `Commune de ${geoNaissance.commune_name || commune.name}`,
         officer_name: officerDisplay,
-        father_nic: father?.nic ?? null,
+        father_dossier: father?.nic ?? null,
         father_snapshot: link.father_snapshot,
         inherited_from: link.source,
         inherited_geo: link.geo,
-        province_origine: link.geo.province || null,
-        ville_origine: link.geo.ville || null,
-        territoire_origine: link.geo.territoire || null,
-        secteur_chefferie_commune: link.geo.secteur || null,
-        village_origine: link.geo.village || null,
+        geo_origine: geoOrigine,
+        originaire: origineLabel || null,
+        province_origine: geoOrigine.province_name || link.geo.province || null,
+        territoire_origine: geoOrigine.district_name || link.geo.territoire || null,
+        secteur_chefferie_commune: geoOrigine.commune_name || link.geo.secteur || null,
+        village_origine: geoOrigine.localite_name || link.geo.village || null,
         note: `Nouveau-né — ${modeLabel}`,
         latitude: gpsLat,
         longitude: gpsLng,
@@ -276,6 +310,9 @@ export default function BirthsPage() {
       setHopitalAutre("");
       setMother(null);
       setFather(null);
+      setAdresseMere("");
+      setGeoAdresseMere({});
+      setGeoOrigine({});
       setGpsLat(null);
       setGpsLng(null);
       bump((n) => n + 1);
@@ -524,12 +561,41 @@ export default function BirthsPage() {
             <PersonPicker label="Mère" value={mother} onChange={setMother} required sexFilter="F" />
           </div>
           <div className="full">
+            <label className="form-label">Adresse de la mère *</label>
+            <GeoCascade
+              embedded
+              levels={GEO_PRESETS.address}
+              fieldLabels={ADDRESS_FIELD_LABELS}
+              value={geoAdresseMere}
+              onChange={setGeoAdresseMere}
+              label="Adresse de la mère"
+            />
+            <input
+              className="form-control"
+              style={{ marginTop: 8 }}
+              value={adresseMere}
+              onChange={(e) => setAdresseMere(e.target.value)}
+              placeholder="Complément d'adresse (n°, parcelle, référence…)"
+            />
+          </div>
+          <div className="full">
             <PersonPicker
               label="Père (optionnel)"
               value={father}
               onChange={setFather}
               originGeoFilter
               sexFilter="M"
+            />
+          </div>
+          <div className="full">
+            <label className="form-label">Originaire (Province → Territoire → Secteur → Village)</label>
+            <GeoCascade
+              embedded
+              levels={[...GEO_PRESETS.originRural]}
+              fieldLabels={ORIGIN_FIELD_LABELS}
+              value={geoOrigine}
+              onChange={setGeoOrigine}
+              label="Originaire"
             />
           </div>
           {inherited.source && inherited.parent ? (
@@ -539,13 +605,8 @@ export default function BirthsPage() {
               {inherited.parent.geo_label ? (
                 <> — {inherited.parent.geo_label}</>
               ) : (
-                " (province / ville non renseignées)"
+                " (non renseignée — complétez le bloc Originaire ci-dessus)"
               )}
-            </div>
-          ) : mother || father ? (
-            <div className="full muted small">
-              Aucune province/ville trouvée chez les parents — enregistrez d&apos;abord leur recensement
-              (origine / adresse).
             </div>
           ) : null}
           <div className="full">
@@ -563,7 +624,10 @@ export default function BirthsPage() {
 
       {created ? (
         <div className="panel" style={{ marginTop: "1rem" }}>
-          <div className="success-banner no-print">Acte de naissance créé — NIC {created.national_id}</div>
+          <div className="success-banner no-print">
+            Acte de naissance créé — ID naissance{" "}
+            {String(created.payload.id_naissance ?? created.act_number ?? created.national_id)}
+          </div>
           <ActPrintCard act={created} />
           <ActPrintActions label="Imprimer l'acte de naissance" />
         </div>
@@ -578,7 +642,7 @@ export default function BirthsPage() {
           <thead>
             <tr>
               <th>N° acte</th>
-              <th>NIC</th>
+              <th>ID naissance</th>
               <th>Nom</th>
               <th>Sexe</th>
               <th>Naissance</th>
@@ -591,7 +655,9 @@ export default function BirthsPage() {
             {acts.map((a) => (
               <tr key={a.id}>
                 <td>{a.act_number}</td>
-                <td>{a.national_id}</td>
+                <td>
+                  {String(a.payload.id_naissance ?? a.payload.code_dossier ?? a.national_id ?? "—")}
+                </td>
                 <td>
                   {String(a.payload.nom ?? "")} {String(a.payload.prenom ?? "")}
                 </td>
