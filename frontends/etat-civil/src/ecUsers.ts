@@ -360,11 +360,40 @@ export function canManageEcUsers(roles: string[] | undefined | null): boolean {
   );
 }
 
-export function setEcUserActive(email: string, active: boolean): void {
+/** Compte plateforme protégé (Hervé / SUPER_ADMIN) — hors autorité du responsable de bureau. */
+export function isProtectedPlatformAdmin(user: Pick<EcUser, "email" | "roles">): boolean {
+  const email = user.email.trim().toLowerCase();
+  if (email === CANONICAL_EC_ACCOUNTS[0].email.toLowerCase()) return true;
+  return user.roles.some((r) => r.toUpperCase() === "SUPER_ADMIN_NATIONAL");
+}
+
+/** Le responsable de bureau ne peut ni voir en gestion ni modifier le super admin. */
+export function canActorManageUser(
+  actor: Pick<EcUser, "email" | "roles">,
+  target: Pick<EcUser, "email" | "roles">,
+): boolean {
+  if (actor.email.trim().toLowerCase() === target.email.trim().toLowerCase()) return false;
+  if (isProtectedPlatformAdmin(target) && !isSuperAdminNational(actor.roles)) return false;
+  return canManageEcUsers(actor.roles);
+}
+
+export function setEcUserActive(
+  email: string,
+  active: boolean,
+  actor?: Pick<EcUser, "email" | "roles"> | null,
+): void {
   const rows = listEcUsers();
   const i = rows.findIndex((u) => u.email === email.trim().toLowerCase());
   if (i < 0) return;
-  rows[i] = { ...rows[i], active };
+  const target = rows[i];
+  if (actor && !canActorManageUser(actor, target)) {
+    throw new Error("Vous n'avez pas le droit de modifier ce compte (super administrateur).");
+  }
+  if (!actor && isProtectedPlatformAdmin(target) && !active) {
+    // Sécurité : ne jamais désactiver le super admin sans acteur habilité.
+    throw new Error("Le compte super administrateur ne peut pas être désactivé ainsi.");
+  }
+  rows[i] = { ...target, active };
   saveEcUsers(rows);
 }
 

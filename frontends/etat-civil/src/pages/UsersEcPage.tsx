@@ -4,10 +4,12 @@ import { FormEvent, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { getSession } from "../auth";
 import {
+  canActorManageUser,
   canManageEcUsers,
   createEcUser,
   EC_ROLE_CATALOG,
   getEcUserByEmail,
+  isProtectedPlatformAdmin,
   isSuperAdminNational,
   listEcUsers,
   setEcUserActive,
@@ -24,7 +26,12 @@ export default function UsersEcPage() {
     (r) => isSuper || r.code !== "SUPER_ADMIN_NATIONAL",
   );
   const [bump, setBump] = useState(0);
-  const users = useMemo(() => listEcUsers(), [bump]);
+  const users = useMemo(() => {
+    const all = listEcUsers();
+    // Responsable : ne voit pas le super admin (Hervé) dans sa liste de gestion.
+    if (!isSuper) return all.filter((u) => !isProtectedPlatformAdmin(u));
+    return all;
+  }, [bump, isSuper]);
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -180,19 +187,26 @@ export default function UsersEcPage() {
                 <td>{u.roles.join(", ")}</td>
                 <td>{u.active ? "Actif" : "Désactivé"}</td>
                 <td>
-                  {u.email !== session?.username ? (
+                  {actor && canActorManageUser(actor, u) ? (
                     <button
                       type="button"
                       className="btn-secondary btn-sm"
                       onClick={() => {
-                        setEcUserActive(u.email, !u.active);
-                        setBump((n) => n + 1);
+                        try {
+                          setEcUserActive(u.email, !u.active, actor);
+                          setError(null);
+                          setBump((n) => n + 1);
+                        } catch (err) {
+                          setError(err instanceof Error ? err.message : "Action refusée.");
+                        }
                       }}
                     >
                       {u.active ? "Désactiver" : "Réactiver"}
                     </button>
-                  ) : (
+                  ) : u.email === session?.username ? (
                     <span className="muted small">Vous</span>
+                  ) : (
+                    <span className="muted small">Protégé</span>
                   )}
                 </td>
               </tr>
