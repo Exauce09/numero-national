@@ -1,6 +1,7 @@
 import { applyAccountCommune, assignOfficerAccount } from "./accounts";
 import { mapLoginError, roleTitleFor } from "./rbac";
 import {
+  ensureBootstrapSuperAdmin,
   permissionsForRoles,
   verifyEcUser,
   type EcUser,
@@ -117,6 +118,8 @@ export async function login(username: string, password: string): Promise<Session
   if (!user || !password) {
     throw new Error("Identifiant et mot de passe requis.");
   }
+
+  ensureBootstrapSuperAdmin();
 
   let photoDataUrl: string | undefined;
   try {

@@ -1,5 +1,5 @@
 /**
- * Création de compte — Plateforme Nationale Numérique de Gestion de l'État Civil (RDC).
+ * Création de compte — réservé au SUPER_ADMIN_NATIONAL.
  * Crée l'identité ; n'attribue jamais un rôle privilégié automatiquement.
  */
 
@@ -19,11 +19,14 @@ import {
 } from "../accountRegistration";
 import { getSession } from "../auth";
 import PasswordField from "../components/PasswordField";
+import { isSuperAdminNational } from "../ecUsers";
 
 type Step = "form" | "otp" | "done";
 
 export default function RegisterAccountPage() {
   const session = getSession();
+  const allowed = isSuperAdminNational(session?.roles);
+
   const [step, setStep] = useState<Step>("form");
   const [accountType, setAccountType] = useState<AccountRequestType>("CITOYEN");
   const typeOpt = getAccountTypeOption(accountType);
@@ -63,7 +66,23 @@ export default function RegisterAccountPage() {
   const strength = useMemo(() => checkPasswordStrength(password), [password]);
   const canSubmit = acceptTerms && acceptPrivacy && !busy;
 
-  if (session) return <Navigate to="/" replace />;
+  if (!session) return <Navigate to="/login" replace />;
+  if (!allowed) {
+    return (
+      <div className="register-page">
+        <div className="register-shell">
+          <h2 className="register-title">Accès réservé</h2>
+          <p className="register-subtitle">
+            Seul le <strong>super administrateur national</strong> (SUPER_ADMIN_NATIONAL) peut créer
+            des comptes via cet écran.
+          </p>
+          <Link className="btn-primary register-submit" to="/" style={{ display: "block", textAlign: "center" }}>
+            Retour au tableau de bord
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   async function onSubmitForm(e: FormEvent) {
     e.preventDefault();
@@ -103,12 +122,13 @@ export default function RegisterAccountPage() {
         juridiction,
         tribunal,
         idJudiciaire,
+        createdBySuperAdminEmail: session!.username,
       });
       setResult(request);
       setLocalOtp(localOtpCode);
       setStep("otp");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Inscription impossible.");
+      setError(err instanceof Error ? err.message : "Création impossible.");
     } finally {
       setBusy(false);
     }
@@ -188,12 +208,12 @@ export default function RegisterAccountPage() {
           <>
             <h2 className="register-title">Créer un compte</h2>
             <p className="register-subtitle">
-              Créez votre compte pour accéder à la plateforme nationale de l&apos;état civil.
+              Créez un compte pour un utilisateur de la plateforme nationale de l&apos;état civil.
             </p>
             <p className="register-note muted small">
-              Le type de compte demandé ne confère <strong>aucun rôle ni permission</strong>{" "}
-              automatiquement. Les comptes institutionnels sont validés par une autorité habilitée ;
-              l&apos;attribution des rôles se fait séparément.
+              Réservé au <strong>SUPER_ADMIN_NATIONAL</strong> ({session.username}). Le type de
+              compte demandé <strong>n&apos;attribue aucun rôle</strong> automatiquement —
+              l&apos;habilitation se fait séparément.
             </p>
 
             <form className="register-form" onSubmit={(e) => void onSubmitForm(e)} autoComplete="off">
@@ -485,7 +505,7 @@ export default function RegisterAccountPage() {
               </section>
 
               <button className="btn-primary register-submit" type="submit" disabled={!canSubmit}>
-                {busy ? "Envoi…" : "Créer mon compte"}
+                {busy ? "Envoi…" : "Créer le compte"}
               </button>
             </form>
           </>
@@ -535,8 +555,17 @@ export default function RegisterAccountPage() {
 
         {step === "done" && result ? (
           <div className="register-done">
-            <h2 className="register-title">Demande enregistrée</h2>
-            {getAccountTypeOption(result.accountType).institutional ? (
+            <h2 className="register-title">Compte enregistré</h2>
+            {result.created_by_super_admin ? (
+              <>
+                <div className="success-banner">Identité créée par le super administrateur</div>
+                <p className="muted">
+                  Téléphone vérifié. Attribuez ensuite le rôle via{" "}
+                  <Link to="/users">Utilisateurs</Link> ou le module d&apos;habilitation — aucun rôle
+                  n&apos;a été accordé automatiquement.
+                </p>
+              </>
+            ) : getAccountTypeOption(result.accountType).institutional ? (
               <>
                 <div className="success-banner">Compte en attente de validation</div>
                 <ol className="register-flow muted">
@@ -547,31 +576,54 @@ export default function RegisterAccountPage() {
                   <li>Attribution du rôle (séparée)</li>
                   <li>Activation du compte</li>
                 </ol>
-                <p className="muted">
-                  Aucun rôle n&apos;a été attribué. Un responsable habilité traitera votre demande.
-                </p>
               </>
             ) : (
               <>
                 <div className="success-banner">Identité citoyenne créée</div>
                 <p className="muted">
-                  Votre numéro est vérifié. Les accès métier restent soumis aux procédures de la
-                  plateforme.
+                  Numéro vérifié. Les accès métier restent soumis aux procédures de la plateforme.
                 </p>
               </>
             )}
             <p className="muted small">
-              Réf. demande : <code>{result.id.slice(0, 8)}</code>
+              Réf. : <code>{result.id.slice(0, 8)}</code> — {result.email}
             </p>
-            <Link className="btn-primary register-submit" to="/login" style={{ display: "block", textAlign: "center" }}>
-              Se connecter
+            <button
+              type="button"
+              className="btn-primary register-submit"
+              onClick={() => {
+                setStep("form");
+                setResult(null);
+                setNom("");
+                setPostnom("");
+                setPrenom("");
+                setDateNaissance("");
+                setTelephone("");
+                setEmail("");
+                setPassword("");
+                setConfirm("");
+                setOtpDigits(["", "", "", "", "", ""]);
+                setAcceptTerms(false);
+                setAcceptPrivacy(false);
+              }}
+            >
+              Créer un autre compte
+            </button>
+            <Link
+              className="btn-secondary register-submit"
+              to="/"
+              style={{ display: "block", textAlign: "center", marginTop: "0.5rem" }}
+            >
+              Tableau de bord
             </Link>
           </div>
         ) : null}
 
         {step !== "done" ? (
           <p className="register-footer muted">
-            Déjà un compte ? <Link to="/login">Se connecter</Link>
+            <Link to="/">← Retour au tableau de bord</Link>
+            {" · "}
+            <Link to="/account-requests">Demandes de compte</Link>
           </p>
         ) : null}
       </div>

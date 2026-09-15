@@ -2,8 +2,16 @@ import type { FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { clearSession, getSession, updateSession } from "./auth";
-import { canManageEcUsers, changeEcUserPassword, hasAnyEcUser } from "./ecUsers";
-import { canSeeNav } from "./rbac";
+import {
+  canManageEcUsers,
+  changeEcUserPassword,
+  ensureBootstrapSuperAdmin,
+  getEcUserByEmail,
+  hasAnyEcUser,
+  isSuperAdminNational,
+  permissionsForRoles,
+} from "./ecUsers";
+import { canSeeNav, roleTitleFor } from "./rbac";
 import {
   applyTheme,
   getPrefs,
@@ -129,7 +137,24 @@ function NavCollapsibleGroup({
 function Shell() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [, bumpSession] = useState(0);
   const session = getSession();
+  void bumpSession;
+
+  useEffect(() => {
+    ensureBootstrapSuperAdmin();
+    const s = getSession();
+    if (!s?.username || isSuperAdminNational(s.roles)) return;
+    const local = getEcUserByEmail(s.username);
+    if (!local || !isSuperAdminNational(local.roles)) return;
+    updateSession({
+      roles: local.roles,
+      permissions: permissionsForRoles(local.roles),
+      roleTitle: roleTitleFor(local.roles),
+    });
+    bumpSession((n) => n + 1);
+  }, []);
+
   const [navOpen, setNavOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -380,6 +405,11 @@ function Shell() {
           <NavLink to="/search">
             <IconFile size={18} /> Recherche
           </NavLink>
+          {isSuperAdminNational(roles) ? (
+            <NavLink to="/register">
+              <IconUsers size={18} /> Créer un compte
+            </NavLink>
+          ) : null}
           {canManageEcUsers(roles) ? (
             <NavLink to="/users">
               <IconUsers size={18} /> Utilisateurs
@@ -522,6 +552,7 @@ function Shell() {
             <Route path="/admin/account-requests" element={<AccountRequestsPage />} />
             <Route path="/territory" element={<TerritoryPage />} />
             <Route path="/search" element={<SearchPage />} />
+            <Route path="/register" element={<RegisterAccountPage />} />
             <Route path="/users" element={<UsersEcPage />} />
             <Route path="/account-requests" element={<AccountRequestsReviewPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
@@ -693,7 +724,6 @@ export default function App() {
   return (
     <Routes>
       <Route path="/setup" element={<SetupFirstUserPage />} />
-      <Route path="/register" element={<RegisterAccountPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/sante/login" element={<HealthLoginPage />} />
       <Route

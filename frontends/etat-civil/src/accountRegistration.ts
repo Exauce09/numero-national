@@ -116,6 +116,8 @@ export type AccountRegistrationInput = {
   juridiction?: string;
   tribunal?: string;
   idJudiciaire?: string;
+  /** Création par SUPER_ADMIN_NATIONAL (pas d'auto-inscription publique). */
+  createdBySuperAdminEmail?: string;
 };
 
 export type AccountRegistrationRequest = {
@@ -145,6 +147,7 @@ export type AccountRegistrationRequest = {
   created_at: string;
   updated_at: string;
   audit: Array<{ at: string; action: string; detail?: string }>;
+  created_by_super_admin?: string | null;
 };
 
 const KEY = "nn_account_registration_requests_v1";
@@ -332,11 +335,16 @@ export async function submitAccountRegistration(
     phone_verified: false,
     created_at: now,
     updated_at: now,
+    created_by_super_admin: input.createdBySuperAdminEmail?.trim().toLowerCase() || null,
     audit: [
       {
         at: now,
-        action: "REGISTRATION_SUBMITTED",
-        detail: `Type demandé : ${type.label} — aucun rôle attribué`,
+        action: input.createdBySuperAdminEmail
+          ? "REGISTRATION_BY_SUPER_ADMIN"
+          : "REGISTRATION_SUBMITTED",
+        detail: input.createdBySuperAdminEmail
+          ? `Créé par SUPER_ADMIN ${input.createdBySuperAdminEmail} — type demandé : ${type.label} — aucun rôle attribué`
+          : `Type demandé : ${type.label} — aucun rôle attribué`,
       },
     ],
   };
@@ -412,21 +420,31 @@ export async function verifyRegistrationOtp(code: string): Promise<AccountRegist
 
   const type = getAccountTypeOption(rows[idx].accountType);
   const now = new Date().toISOString();
-  // Citoyen : identité après OTP. Institutionnel : attente validation autorité (sans rôle).
+  // Super admin a déjà créé le compte : après OTP → identité ACTIVE (rôle toujours séparé).
+  // Sinon institutionnel → attente validation autorité.
+  const bySuperAdmin = Boolean(rows[idx].created_by_super_admin);
+  const nextStatus: AccountRequestStatus =
+    bySuperAdmin || !type.institutional ? "ACTIVE" : "PENDING_VALIDATION";
   rows[idx] = {
     ...rows[idx],
     phone_verified: true,
-    status: type.institutional ? "PENDING_VALIDATION" : "ACTIVE",
+    status: nextStatus,
     updated_at: now,
     audit: [
       ...rows[idx].audit,
       { at: now, action: "OTP_VERIFIED" },
       {
         at: now,
-        action: type.institutional ? "AWAITING_AUTHORITY_VALIDATION" : "CITIZEN_IDENTITY_CREATED",
-        detail: type.institutional
-          ? "Compte en attente de validation — aucun rôle attribué"
-          : "Identité citoyenne créée — pas de rôle institutionnel",
+        action: bySuperAdmin
+          ? "IDENTITY_ACTIVATED_BY_SUPER_ADMIN"
+          : type.institutional
+            ? "AWAITING_AUTHORITY_VALIDATION"
+            : "CITIZEN_IDENTITY_CREATED",
+        detail: bySuperAdmin
+          ? "Identité activée par super admin — attribuer le rôle séparément (habilitation)"
+          : type.institutional
+            ? "Compte en attente de validation — aucun rôle attribué"
+            : "Identité citoyenne créée — pas de rôle institutionnel",
       },
     ],
   };

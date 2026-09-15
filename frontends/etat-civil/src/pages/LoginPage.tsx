@@ -67,9 +67,6 @@ export default function LoginPage() {
           Mot de passe oublié — contactez le responsable de bureau.
         </p>
         <p className="login-subtitle" style={{ marginTop: "0.75rem" }}>
-          Pas encore de compte ? <Link to="/register">Créer un compte</Link>
-        </p>
-        <p className="login-subtitle" style={{ marginTop: "0.75rem" }}>
           <Link to="/sante/login">Accès maternité / structure sanitaire →</Link>
         </p>
       </div>

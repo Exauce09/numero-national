@@ -58,8 +58,9 @@ export default function SetupFirstUserPage() {
         <img className="login-logo" src="/logo-rdc.jpg" alt="RDC" />
         <h1 className="login-title">Premier utilisateur</h1>
         <p className="login-subtitle">
-          Aucun compte n&apos;existe encore. Créez le <strong>responsable de bureau</strong> (1er
-          compte). Il pourra ensuite créer officier, agent, auditeur.
+          Aucun compte n&apos;existe encore. Créez le <strong>super administrateur national</strong>{" "}
+          (1er compte). Il pourra ensuite créer les autres comptes via{" "}
+          <strong>Créer un compte</strong>.
         </p>
 
         <div className="panel" style={{ marginBottom: "1rem", textAlign: "left" }}>
@@ -68,10 +69,13 @@ export default function SetupFirstUserPage() {
           </h3>
           <ul className="muted" style={{ margin: 0, paddingLeft: "1.2rem", fontSize: "0.9rem" }}>
             <li>
-              <strong>Responsable de bureau</strong> — crée et gère les comptes du bureau
+              <strong>Super administrateur national</strong> — crée les comptes plateforme
             </li>
             <li>
-              <strong>Officier d&apos;état civil</strong> — valide les actes (cumulé sur ce 1er compte)
+              <strong>Responsable de bureau</strong> — gère les utilisateurs du bureau
+            </li>
+            <li>
+              <strong>Officier d&apos;état civil</strong> — valide les actes (cumulé)
             </li>
             <li>Rôles attribués : {FIRST_USER_ROLES.join(" + ")}</li>
           </ul>
@@ -124,13 +128,11 @@ export default function SetupFirstUserPage() {
             onChange={(e) => setCommuneName(e.target.value)}
           />
           <button className="btn-primary" type="submit" disabled={busy} style={{ marginTop: "0.75rem" }}>
-            {busy ? "Création…" : "Créer le responsable de bureau"}
+            {busy ? "Création…" : "Créer le super administrateur"}
           </button>
         </form>
         <p className="muted small" style={{ marginTop: "1rem" }}>
           <Link to="/login">Déjà un compte ? Se connecter</Link>
-          {" · "}
-          <Link to="/register">Créer un compte (demande)</Link>
         </p>
       </div>
     </div>

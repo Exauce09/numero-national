@@ -1,11 +1,12 @@
 /**
  * Comptes bureau d'état civil (local) — pas de comptes démo.
- * 1er utilisateur = Responsable de bureau (+ officier) ; ensuite il crée les autres.
+ * 1er utilisateur = Super admin national (+ responsable / officier) ; création comptes plateforme via /register.
  */
 
 import { DEFAULT_OFFICER_COMMUNE, type OfficerCommune } from "./commune";
 
 export type EcUserRole =
+  | "SUPER_ADMIN_NATIONAL"
   | "RESPONSABLE_BUREAU"
   | "OFFICIER_ETAT_CIVIL"
   | "AGENT_ETAT_CIVIL"
@@ -33,6 +34,14 @@ export const EC_ROLE_CATALOG: Array<{
   canCreateUsers: boolean;
   canValidateActs: boolean;
 }> = [
+  {
+    code: "SUPER_ADMIN_NATIONAL",
+    label: "Super administrateur national",
+    summary:
+      "Administration de la plateforme : crée les comptes (/register), ne s'attribue pas d'autorité juridique.",
+    canCreateUsers: true,
+    canValidateActs: false,
+  },
   {
     code: "RESPONSABLE_BUREAU",
     label: "Responsable de bureau",
@@ -64,8 +73,12 @@ export const EC_ROLE_CATALOG: Array<{
   },
 ];
 
-/** Rôles du tout premier compte (bootstrap). */
-export const FIRST_USER_ROLES: EcUserRole[] = ["RESPONSABLE_BUREAU", "OFFICIER_ETAT_CIVIL"];
+/** Rôles du tout premier compte (bootstrap national). */
+export const FIRST_USER_ROLES: EcUserRole[] = [
+  "SUPER_ADMIN_NATIONAL",
+  "RESPONSABLE_BUREAU",
+  "OFFICIER_ETAT_CIVIL",
+];
 
 export async function hashPassword(password: string): Promise<string> {
   const data = new TextEncoder().encode(password);
@@ -136,8 +149,8 @@ export async function createEcUser(
     commune?: OfficerCommune;
   },
 ): Promise<EcUser> {
-  if (!actor.roles.includes("RESPONSABLE_BUREAU")) {
-    throw new Error("Seul le responsable de bureau peut créer des utilisateurs.");
+  if (!actor.roles.includes("RESPONSABLE_BUREAU") && !actor.roles.includes("SUPER_ADMIN_NATIONAL")) {
+    throw new Error("Seul le super administrateur national ou le responsable de bureau peut créer des utilisateurs.");
   }
   const email = input.email.trim().toLowerCase();
   if (getEcUserByEmail(email)) throw new Error("Cet e-mail est déjà utilisé.");
@@ -198,11 +211,41 @@ export function permissionsForRoles(roles: string[]): string[] {
     perms.add("users:manage");
     perms.add("admin:*");
   }
+  if (r.has("SUPER_ADMIN_NATIONAL")) {
+    perms.add("users:manage");
+    perms.add("admin:*");
+    perms.add("account_request:manage");
+    perms.add("account_request:create");
+    perms.add("civil:stats:read");
+    perms.add("bureau:read");
+  }
   return [...perms];
 }
 
+export function isSuperAdminNational(roles: string[] | undefined | null): boolean {
+  return (roles ?? []).some((x) => x.toUpperCase() === "SUPER_ADMIN_NATIONAL");
+}
+
+/**
+ * Si aucun SUPER_ADMIN n'existe encore (comptes créés avant cette évolution),
+ * promeut le premier compte actif pour débloquer /register.
+ */
+export function ensureBootstrapSuperAdmin(): void {
+  const rows = listEcUsers();
+  if (!rows.length) return;
+  if (rows.some((u) => u.roles.includes("SUPER_ADMIN_NATIONAL"))) return;
+  const i = rows.findIndex((u) => u.active);
+  if (i < 0) return;
+  const roles = Array.from(new Set([...rows[i].roles, "SUPER_ADMIN_NATIONAL"])) as EcUserRole[];
+  rows[i] = { ...rows[i], roles };
+  saveEcUsers(rows);
+}
+
 export function canManageEcUsers(roles: string[] | undefined | null): boolean {
-  return (roles ?? []).some((x) => x.toUpperCase() === "RESPONSABLE_BUREAU");
+  return (roles ?? []).some(
+    (x) =>
+      x.toUpperCase() === "RESPONSABLE_BUREAU" || x.toUpperCase() === "SUPER_ADMIN_NATIONAL",
+  );
 }
 
 export function setEcUserActive(email: string, active: boolean): void {
