@@ -400,41 +400,26 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
             <a
               className="btn-primary"
               style={{ width: "auto", textDecoration: "none" }}
-              href={`/population?q=${encodeURIComponent(String(current.national_id || current.payload?.nom || ""))}`}
+              href={`/search?q=${encodeURIComponent(String(current.national_id || current.payload?.nom || ""))}`}
             >
-              Ouvrir Population
+              Rechercher l&apos;acte / personne
             </a>
             <a
               className="btn-secondary"
               style={{ width: "auto", textDecoration: "none" }}
-              href="http://127.0.0.1:5183/cards"
-              target="_blank"
-              rel="noreferrer"
+              href="/acts"
             >
-              SIGPOP-RDC → Cartes
-            </a>
-            <a
-              className="btn-secondary"
-              style={{ width: "auto", textDecoration: "none" }}
-              href="http://127.0.0.1:5183/campaigns"
-              target="_blank"
-              rel="noreferrer"
-            >
-              SIGPOP-RDC → Campagnes (APK)
+              Registre des actes
             </a>
           </div>
           <ol className="muted small" style={{ margin: "0.5rem 0 0", paddingLeft: "1.2rem", lineHeight: 1.55 }}>
             <li>
-              <strong>Recensement navigateur (votre cas)</strong> : cherchez la personne dans{" "}
-              <strong>Population</strong> avec le NIC{" "}
-              <code>{current.national_id || "—"}</code>. Pour la carte : SIGPOP-RDC → Cartes.
+              <strong>État civil</strong> : recherchez par NIC{" "}
+              <code>{current.national_id || "—"}</code> dans le registre des actes du bureau.
             </li>
             <li>
-              <strong>Recensement tablette APK</strong> seulement : Campagnes → onglet{" "}
-              <strong>1. À contrôler</strong> → Approuver → Promouvoir NIC
-              <br />
-              Compte : <code>supervisor.recensement@example.gov</code> /{" "}
-              <code>CensusSupervisor123!</code>
+              Population, recensement et cartes restent sur SIGPOP (
+              <code>:5176</code> / <code>:5183</code>), hors de ce portail.
             </li>
           </ol>
         </div>
