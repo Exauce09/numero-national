@@ -293,20 +293,31 @@ export const EC_ACT_FORMS: ActFormSchema[] = [
   {
     id: "notif_naissance",
     title: "Notification de naissance (structure sanitaire)",
-    subtitle: "Constat médical transmis au bureau EC — ne constitue pas l'acte officiel.",
+    subtitle:
+      "Même identité enfant / mère / père que l'acte EC — transmis au bureau pour validation. Ce n'est pas l'acte officiel.",
     href: "/sante/births",
     sections: [
       {
         id: "enfant",
-        title: "Nouveau-né",
+        title: "Enfant",
         fields: [
           { key: "nom", label: "Nom", required: true },
           { key: "postnom", label: "Postnom" },
-          { key: "prenom", label: "Prénom(s)" },
+          { key: "prenom", label: "Prénom(s)", required: true },
           { key: "sexe", label: "Sexe", required: true },
           { key: "date_naissance", label: "Date de naissance", required: true },
-          { key: "mere", label: "Nom de la mère", required: true },
-          { key: "pere", label: "Nom du père (le cas échéant)" },
+          { key: "heure_naissance", label: "Heure de naissance" },
+          { key: "jumeaux", label: "Naissance multiple (jumeaux…)" },
+          { key: "lieu_naissance", label: "Lieu (structure)", required: true },
+        ],
+      },
+      {
+        id: "filiation",
+        title: "Filiation",
+        fields: [
+          { key: "mere", label: "Mère", required: true },
+          { key: "adresse_mere", label: "Adresse de la mère" },
+          { key: "pere", label: "Père (le cas échéant)" },
         ],
       },
     ],

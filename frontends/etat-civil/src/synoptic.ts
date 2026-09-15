@@ -254,3 +254,141 @@ export function synopticDocuments(communeOverride?: OfficerCommune | FlatCommune
     byType: [...byType.entries()].map(([type, count]) => ({ type, count })),
   };
 }
+
+export type SynopticTerritoryRow = {
+  province: string;
+  ville: string;
+  commune: string;
+  code: string;
+  naissances: number;
+  mariages: number;
+  divorces: number;
+  deces: number;
+  documents: number;
+  total: number;
+};
+
+/** Vue nationale : une ligne par commune (province → ville → commune). */
+export function synopticNationalTerritory(): SynopticTerritoryRow[] {
+  const communes = listSynopticCommunes();
+  return communes
+    .map((c) => {
+      const naissances = synopticBirths(c).totalNaissances.t;
+      const mat = synopticMarriagesDivorces(c);
+      const deces = synopticDeaths(c).totalAB;
+      const documents = synopticDocuments(c).total;
+      const mariages = mat.mariage.total;
+      const divorces = mat.divorce.total;
+      return {
+        province: c.province,
+        ville: c.ville,
+        commune: c.name,
+        code: c.code,
+        naissances,
+        mariages,
+        divorces,
+        deces,
+        documents,
+        total: naissances + mariages + divorces + deces + documents,
+      };
+    })
+    .sort((a, b) =>
+      a.province.localeCompare(b.province, "fr") ||
+      a.ville.localeCompare(b.ville, "fr") ||
+      a.commune.localeCompare(b.commune, "fr"),
+    );
+}
+
+export type SynopticProvinceRollup = {
+  province: string;
+  villes: number;
+  communes: number;
+  naissances: number;
+  mariages: number;
+  divorces: number;
+  deces: number;
+  documents: number;
+  total: number;
+};
+
+export function synopticNationalByProvince(): SynopticProvinceRollup[] {
+  const rows = synopticNationalTerritory();
+  const map = new Map<string, SynopticProvinceRollup & { villeSet: Set<string> }>();
+  for (const r of rows) {
+    let hit = map.get(r.province);
+    if (!hit) {
+      hit = {
+        province: r.province,
+        villes: 0,
+        communes: 0,
+        naissances: 0,
+        mariages: 0,
+        divorces: 0,
+        deces: 0,
+        documents: 0,
+        total: 0,
+        villeSet: new Set(),
+      };
+      map.set(r.province, hit);
+    }
+    hit.communes += 1;
+    hit.villeSet.add(r.ville);
+    hit.naissances += r.naissances;
+    hit.mariages += r.mariages;
+    hit.divorces += r.divorces;
+    hit.deces += r.deces;
+    hit.documents += r.documents;
+    hit.total += r.total;
+  }
+  return [...map.values()]
+    .map(({ villeSet, ...rest }) => ({ ...rest, villes: villeSet.size }))
+    .sort((a, b) => a.province.localeCompare(b.province, "fr"));
+}
+
+export type SynopticVilleRollup = {
+  province: string;
+  ville: string;
+  communes: number;
+  naissances: number;
+  mariages: number;
+  divorces: number;
+  deces: number;
+  documents: number;
+  total: number;
+};
+
+export function synopticNationalByVille(province?: string | null): SynopticVilleRollup[] {
+  const rows = synopticNationalTerritory().filter((r) =>
+    province ? r.province === province : true,
+  );
+  const map = new Map<string, SynopticVilleRollup>();
+  for (const r of rows) {
+    const key = `${r.province}||${r.ville}`;
+    let hit = map.get(key);
+    if (!hit) {
+      hit = {
+        province: r.province,
+        ville: r.ville,
+        communes: 0,
+        naissances: 0,
+        mariages: 0,
+        divorces: 0,
+        deces: 0,
+        documents: 0,
+        total: 0,
+      };
+      map.set(key, hit);
+    }
+    hit.communes += 1;
+    hit.naissances += r.naissances;
+    hit.mariages += r.mariages;
+    hit.divorces += r.divorces;
+    hit.deces += r.deces;
+    hit.documents += r.documents;
+    hit.total += r.total;
+  }
+  return [...map.values()].sort(
+    (a, b) =>
+      a.province.localeCompare(b.province, "fr") || a.ville.localeCompare(b.ville, "fr"),
+  );
+}

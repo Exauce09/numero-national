@@ -28,6 +28,9 @@ export default function HealthBirthsPage() {
   const [prenom, setPrenom] = useState("");
   const [sexe, setSexe] = useState<"M" | "F">("M");
   const [dateNaissance, setDateNaissance] = useState("");
+  const [heureNaissance, setHeureNaissance] = useState("");
+  const [naissanceMultiple, setNaissanceMultiple] = useState(false);
+  const [adresseMere, setAdresseMere] = useState("");
   const [mother, setMother] = useState(emptyParent);
   const [father, setFather] = useState(emptyParent);
   const [message, setMessage] = useState<string | null>(null);
@@ -120,13 +123,18 @@ export default function HealthBirthsPage() {
           child_prenom: childPrenom,
           sexe,
           date_naissance: dateNaissance,
+          heure_naissance: heureNaissance || null,
+          naissance_multiple: naissanceMultiple,
           mother_id: motherPerson.id,
           mother_nic: motherPerson.nic,
           mother_name: displayName(motherPerson),
+          adresse_mere: adresseMere.trim() || null,
           father_id: fatherPerson?.id ?? null,
           father_nic: fatherPerson?.nic ?? null,
           father_name: fatherPerson ? displayName(fatherPerson) : null,
           lieu_naissance: session.facilityName,
+          declarant_qualite: "MERE",
+          declarant_name: displayName(motherPerson),
         },
       });
       const birthCoupon: BirthCoupon = {
@@ -153,6 +161,9 @@ export default function HealthBirthsPage() {
       setPostnom("");
       setPrenom("");
       setDateNaissance("");
+      setHeureNaissance("");
+      setNaissanceMultiple(false);
+      setAdresseMere("");
       setMother(emptyParent);
       setFather(emptyParent);
       bump((n) => n + 1);
@@ -183,6 +194,11 @@ export default function HealthBirthsPage() {
           {message ? <div className="success-banner full">{message}</div> : null}
 
           <div className="full">
+            <div className="success-banner" style={{ marginBottom: "0.75rem" }}>
+              Même structure que l&apos;acte EC (enfant + filiation). Ici ={" "}
+              <strong>notification</strong> vers le bureau ; l&apos;officier établit l&apos;acte
+              officiel.
+            </div>
             <h3 className="panel-title" style={{ marginTop: 0 }}>
               Enfant
             </h3>
@@ -220,6 +236,30 @@ export default function HealthBirthsPage() {
               onChange={(e) => setDateNaissance(e.target.value)}
               required
             />
+          </div>
+          <div>
+            <label className="form-label">Heure de naissance</label>
+            <input
+              className="form-control"
+              type="time"
+              value={heureNaissance}
+              onChange={(e) => setHeureNaissance(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="form-label">Naissance multiple</label>
+            <select
+              className="form-control"
+              value={naissanceMultiple ? "oui" : "non"}
+              onChange={(e) => setNaissanceMultiple(e.target.value === "oui")}
+            >
+              <option value="non">Non</option>
+              <option value="oui">Oui (jumeaux…)</option>
+            </select>
+          </div>
+          <div className="full">
+            <label className="form-label">Lieu de naissance</label>
+            <input className="form-control" value={session.facilityName} disabled readOnly />
           </div>
 
           <div className="full">
@@ -262,6 +302,15 @@ export default function HealthBirthsPage() {
               type="date"
               value={mother.date_naissance}
               onChange={(e) => setMother({ ...mother, date_naissance: e.target.value })}
+            />
+          </div>
+          <div className="full">
+            <label className="form-label">Adresse de la mère</label>
+            <input
+              className="form-control"
+              value={adresseMere}
+              onChange={(e) => setAdresseMere(e.target.value)}
+              placeholder="Commune, quartier, avenue…"
             />
           </div>
 

@@ -1,9 +1,13 @@
-/** Tableaux synoptiques — forme officielle (Justicia), toutes communes + quartiers. */
+/** Tableaux synoptiques — forme officielle (Justicia), toutes communes + quartiers.
+ *  SUPER_ADMIN_NATIONAL : vue nationale Province → Ville → Commune.
+ */
 
 import { useMemo, useState } from "react";
 import { Link, NavLink, Navigate, useParams } from "react-router-dom";
 import DataToolbar from "../components/DataToolbar";
+import { getSession } from "../auth";
 import { getOfficerCommune, type OfficerCommune } from "../commune";
+import { isSuperAdminNational } from "../ecUsers";
 import type { FlatCommune } from "../geoFallback";
 import {
   listSynopticCommunes,
@@ -11,6 +15,9 @@ import {
   synopticDeaths,
   synopticDocuments,
   synopticMarriagesDivorces,
+  synopticNationalByProvince,
+  synopticNationalByVille,
+  synopticNationalTerritory,
   synopticQuartiersForCommune,
   type Gft,
 } from "../synoptic";
@@ -80,11 +87,22 @@ function GftCells({ v }: { v: Gft }) {
 function CommunesPicker({
   selected,
   onSelect,
+  filterProvince,
+  filterVille,
+  nationalMode,
 }: {
   selected: CommuneSel | null;
   onSelect: (c: FlatCommune | null) => void;
+  filterProvince?: string;
+  filterVille?: string;
+  nationalMode?: boolean;
 }) {
-  const communes = useMemo(() => listSynopticCommunes(), []);
+  const communes = useMemo(() => {
+    let rows = listSynopticCommunes();
+    if (filterProvince) rows = rows.filter((c) => c.province === filterProvince);
+    if (filterVille) rows = rows.filter((c) => c.ville === filterVille);
+    return rows;
+  }, [filterProvince, filterVille]);
   const value = selected
     ? communes.find(
         (c) =>
@@ -97,12 +115,12 @@ function CommunesPicker({
     <div className="panel no-print" style={{ marginBottom: "1rem" }}>
       <div className="panel-head">
         <h3 className="panel-title" style={{ margin: 0 }}>
-          Communes ({communes.length})
+          {nationalMode ? "Communes du territoire sélectionné" : "Communes"} ({communes.length})
         </h3>
       </div>
       <div className="form-grid">
         <div className="full">
-          <label className="form-label">Sélectionner une commune</label>
+          <label className="form-label">Sélectionner une commune (détail)</label>
           <select
             className="form-control"
             value={value}
@@ -111,7 +129,7 @@ function CommunesPicker({
               onSelect(hit);
             }}
           >
-            <option value="">— Choisir une commune —</option>
+            <option value="">— Vue agrégée (sans détail commune) —</option>
             {communes.map((c) => (
               <option key={c.code} value={c.code}>
                 {c.name} — {c.ville} ({c.province})
@@ -157,6 +175,227 @@ function CommunesPicker({
     </div>
   );
 }
+
+function NationalTerritoryPanel({
+  province,
+  ville,
+  onProvince,
+  onVille,
+}: {
+  province: string;
+  ville: string;
+  onProvince: (p: string) => void;
+  onVille: (v: string) => void;
+}) {
+  const byProvince = useMemo(() => synopticNationalByProvince(), []);
+  const byVille = useMemo(() => synopticNationalByVille(province || null), [province]);
+  const territory = useMemo(() => {
+    let rows = synopticNationalTerritory();
+    if (province) rows = rows.filter((r) => r.province === province);
+    if (ville) rows = rows.filter((r) => r.ville === ville);
+    return rows;
+  }, [province, ville]);
+
+  const provinces = useMemo(
+    () => [...new Set(listSynopticCommunes().map((c) => c.province))].sort((a, b) => a.localeCompare(b, "fr")),
+    [],
+  );
+  const villes = useMemo(() => {
+    const rows = listSynopticCommunes().filter((c) => !province || c.province === province);
+    return [...new Set(rows.map((c) => c.ville))].sort((a, b) => a.localeCompare(b, "fr"));
+  }, [province]);
+
+  return (
+    <div className="panel no-print" style={{ marginBottom: "1rem" }}>
+      <div className="panel-head">
+        <h3 className="panel-title" style={{ margin: 0 }}>
+          Synoptique national — Province → Ville → Commune
+        </h3>
+      </div>
+      <p className="muted small">
+        Réservé au <strong>super administrateur national</strong> : vue de toutes les provinces,
+        villes et communes du référentiel.
+      </p>
+      <div className="form-grid">
+        <div>
+          <label className="form-label">Province</label>
+          <select
+            className="form-control"
+            value={province}
+            onChange={(e) => {
+              onProvince(e.target.value);
+              onVille("");
+            }}
+          >
+            <option value="">— Toutes les provinces —</option>
+            {provinces.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="form-label">Ville</label>
+          <select
+            className="form-control"
+            value={ville}
+            onChange={(e) => onVille(e.target.value)}
+            disabled={!province}
+          >
+            <option value="">— Toutes les villes —</option>
+            {villes.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <h4 style={{ marginTop: "1rem" }}>Par province</h4>
+      <div className="table-scroll">
+        <DataToolbar filename="synoptique_national_provinces" rows={byProvince} />
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Province</th>
+              <th>Villes</th>
+              <th>Communes</th>
+              <th>Naissances</th>
+              <th>Mariages</th>
+              <th>Divorces</th>
+              <th>Décès</th>
+              <th>Documents</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {byProvince.map((r) => (
+              <tr
+                key={r.province}
+                style={{
+                  cursor: "pointer",
+                  background:
+                    province === r.province ? "rgba(0,127,255,0.08)" : undefined,
+                }}
+                onClick={() => {
+                  onProvince(r.province);
+                  onVille("");
+                }}
+              >
+                <td>
+                  <strong>{r.province}</strong>
+                </td>
+                <td>{r.villes}</td>
+                <td>{r.communes}</td>
+                <td>{r.naissances}</td>
+                <td>{r.mariages}</td>
+                <td>{r.divorces}</td>
+                <td>{r.deces}</td>
+                <td>{r.documents}</td>
+                <td>
+                  <strong>{r.total}</strong>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {province ? (
+        <>
+          <h4 style={{ marginTop: "1rem" }}>Villes — {province}</h4>
+          <div className="table-scroll">
+            <DataToolbar filename={`synoptique_villes_${province}`} rows={byVille} />
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Ville</th>
+                  <th>Communes</th>
+                  <th>Naissances</th>
+                  <th>Mariages</th>
+                  <th>Divorces</th>
+                  <th>Décès</th>
+                  <th>Documents</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {byVille.map((r) => (
+                  <tr
+                    key={`${r.province}-${r.ville}`}
+                    style={{
+                      cursor: "pointer",
+                      background: ville === r.ville ? "rgba(0,127,255,0.08)" : undefined,
+                    }}
+                    onClick={() => onVille(r.ville)}
+                  >
+                    <td>
+                      <strong>{r.ville}</strong>
+                    </td>
+                    <td>{r.communes}</td>
+                    <td>{r.naissances}</td>
+                    <td>{r.mariages}</td>
+                    <td>{r.divorces}</td>
+                    <td>{r.deces}</td>
+                    <td>{r.documents}</td>
+                    <td>
+                      <strong>{r.total}</strong>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : null}
+
+      <h4 style={{ marginTop: "1rem" }}>
+        Communes{province ? ` — ${province}` : ""}
+        {ville ? ` / ${ville}` : ""}
+      </h4>
+      <div className="table-scroll" style={{ maxHeight: 360 }}>
+        <DataToolbar filename="synoptique_national_communes" rows={territory} />
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Province</th>
+              <th>Ville</th>
+              <th>Commune</th>
+              <th>Naissances</th>
+              <th>Mariages</th>
+              <th>Divorces</th>
+              <th>Décès</th>
+              <th>Documents</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {territory.map((r) => (
+              <tr key={r.code}>
+                <td>{r.province}</td>
+                <td>{r.ville}</td>
+                <td>
+                  <strong>{r.commune}</strong>
+                </td>
+                <td>{r.naissances}</td>
+                <td>{r.mariages}</td>
+                <td>{r.divorces}</td>
+                <td>{r.deces}</td>
+                <td>{r.documents}</td>
+                <td>
+                  <strong>{r.total}</strong>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 
 function QuartiersPanel({ commune }: { commune: CommuneSel }) {
   const q = synopticQuartiersForCommune(commune);
@@ -470,15 +709,20 @@ function DocumentsTable({ commune }: { commune: CommuneSel }) {
 
 export default function SynopticPage() {
   const { section } = useParams<{ section?: string }>();
+  const session = getSession();
+  const isNational = isSuperAdminNational(session?.roles);
   const officer = getOfficerCommune();
+  const [filterProvince, setFilterProvince] = useState("");
+  const [filterVille, setFilterVille] = useState("");
   const [selected, setSelected] = useState<FlatCommune | null>(() => {
+    if (isSuperAdminNational(getSession()?.roles)) return null;
     const all = listSynopticCommunes();
     return all.find((c) => c.code === officer.code || c.name === officer.name) ?? null;
   });
 
   if (!section) return <Navigate to="/synoptique/naissances" replace />;
   const tab = (TABS.some((t) => t.slug === section) ? section : "naissances") as TabSlug;
-  const commune: CommuneSel = selected ?? officer;
+  const commune: CommuneSel | null = selected ?? (isNational ? null : officer);
 
   return (
     <div className="syn-page">
@@ -487,15 +731,49 @@ export default function SynopticPage() {
           <p className="eg-breadcrumb">
             <Link to="/">Accueil</Link> / Tableau synoptique
           </p>
-          <h2 className="page-title">Tableau synoptique</h2>
+          <h2 className="page-title">
+            {isNational ? "Tableau synoptique national" : "Tableau synoptique"}
+          </h2>
           <p className="page-lead">
-            Ces onglets sont des <strong>statistiques</strong> (lecture seule) — on ne remplit pas ici.
-            Pour ajouter un acte, utilisez le bouton ci-dessous ou le menu Mariages / Décès / Documents.
+            {isNational ? (
+              <>
+                Vue <strong>Province → Ville → Commune</strong> pour tout le territoire. Choisissez
+                une commune pour le détail officiel (forme Justicia).
+              </>
+            ) : (
+              <>
+                Ces onglets sont des <strong>statistiques</strong> (lecture seule) — on ne remplit pas
+                ici. Pour ajouter un acte, utilisez le bouton ci-dessous ou le menu Mariages / Décès /
+                Documents.
+              </>
+            )}
           </p>
         </div>
       </div>
 
-      <CommunesPicker selected={selected ?? commune} onSelect={setSelected} />
+      {isNational ? (
+        <NationalTerritoryPanel
+          province={filterProvince}
+          ville={filterVille}
+          onProvince={(p) => {
+            setFilterProvince(p);
+            setFilterVille("");
+            setSelected(null);
+          }}
+          onVille={(v) => {
+            setFilterVille(v);
+            setSelected(null);
+          }}
+        />
+      ) : null}
+
+      <CommunesPicker
+        selected={selected}
+        onSelect={setSelected}
+        filterProvince={isNational ? filterProvince || undefined : undefined}
+        filterVille={isNational ? filterVille || undefined : undefined}
+        nationalMode={isNational}
+      />
 
       <div className="syn-tabs no-print">
         {TABS.map((t) => (
@@ -542,10 +820,22 @@ export default function SynopticPage() {
       })()}
 
       <div className="syn-official-wrap">
-        {tab === "naissances" ? <BirthsTable commune={commune} /> : null}
-        {tab === "matrimonial" ? <MatrimonialTable commune={commune} /> : null}
-        {tab === "deces" ? <DeathsTable commune={commune} /> : null}
-        {tab === "documents" ? <DocumentsTable commune={commune} /> : null}
+        {commune ? (
+          <>
+            {tab === "naissances" ? <BirthsTable commune={commune} /> : null}
+            {tab === "matrimonial" ? <MatrimonialTable commune={commune} /> : null}
+            {tab === "deces" ? <DeathsTable commune={commune} /> : null}
+            {tab === "documents" ? <DocumentsTable commune={commune} /> : null}
+          </>
+        ) : (
+          <div className="panel">
+            <p className="muted">
+              {isNational
+                ? "Sélectionnez une commune ci-dessus pour afficher le détail synoptique officiel (G/F/T)."
+                : "Sélectionnez une commune."}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
