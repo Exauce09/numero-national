@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { getSession, login } from "../auth";
+import PasswordField from "../components/PasswordField";
 import { hasAnyEcUser } from "../ecUsers";
 
 export default function LoginPage() {
@@ -49,13 +50,9 @@ export default function LoginPage() {
             disabled={busy}
             required
           />
-          <label className="form-label" htmlFor="password">
-            Mot de passe
-          </label>
-          <input
+          <PasswordField
             id="password"
-            className="form-control"
-            type="password"
+            label="Mot de passe"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"

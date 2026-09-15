@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { login } from "../auth";
+import PasswordField from "../components/PasswordField";
 import { DEFAULT_OFFICER_COMMUNE } from "../commune";
 import { createFirstEcUser, FIRST_USER_ROLES, hasAnyEcUser } from "../ecUsers";
 
@@ -95,24 +96,22 @@ export default function SetupFirstUserPage() {
             required
             disabled={busy}
           />
-          <label className="form-label">Mot de passe * (min. 8)</label>
-          <input
-            className="form-control"
-            type="password"
+          <PasswordField
+            label="Mot de passe * (min. 8)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
             disabled={busy}
+            autoComplete="new-password"
           />
-          <label className="form-label">Confirmer *</label>
-          <input
-            className="form-control"
-            type="password"
+          <PasswordField
+            label="Confirmer *"
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             required
             disabled={busy}
+            autoComplete="new-password"
           />
           <label className="form-label">Province du bureau</label>
           <input className="form-control" value={province} onChange={(e) => setProvince(e.target.value)} />

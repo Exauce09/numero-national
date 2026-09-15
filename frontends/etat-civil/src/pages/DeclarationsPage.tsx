@@ -20,6 +20,7 @@ import {
   type FacilityAccountPublic,
 } from "../healthAuth";
 import GpsLocatePanel from "../components/GpsLocatePanel";
+import PasswordField from "../components/PasswordField";
 
 const FACILITY_TYPES: { value: FacilityAccount["facilityType"]; label: string }[] = [
   { value: "HOPITAL", label: "Hôpital" },

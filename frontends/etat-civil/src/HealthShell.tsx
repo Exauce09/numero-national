@@ -21,6 +21,7 @@ import {
   type HealthPrefs,
 } from "./healthPrefs";
 import { IconBaby, IconCross, IconDashboard, IconTable } from "./components/Icons";
+import PasswordField from "./components/PasswordField";
 import HealthDashboardPage from "./pages/HealthDashboardPage";
 import HealthBirthsPage from "./pages/HealthBirthsPage";
 import HealthDeathsPage from "./pages/HealthDeathsPage";
@@ -246,29 +247,26 @@ export default function HealthShell() {
             <form onSubmit={onChangePassword}>
               {pwdError ? <div className="login-error">{pwdError}</div> : null}
               {pwdMsg ? <div className="success-banner">{pwdMsg}</div> : null}
-              <label className="form-label">Mot de passe actuel</label>
-              <input
-                className="form-control"
-                type="password"
+              <PasswordField
+                label="Mot de passe actuel"
                 value={currentPwd}
                 onChange={(e) => setCurrentPwd(e.target.value)}
                 required
+                autoComplete="current-password"
               />
-              <label className="form-label">Nouveau</label>
-              <input
-                className="form-control"
-                type="password"
+              <PasswordField
+                label="Nouveau"
                 value={newPwd}
                 onChange={(e) => setNewPwd(e.target.value)}
                 required
+                autoComplete="new-password"
               />
-              <label className="form-label">Confirmer</label>
-              <input
-                className="form-control"
-                type="password"
+              <PasswordField
+                label="Confirmer"
                 value={confirmPwd}
                 onChange={(e) => setConfirmPwd(e.target.value)}
                 required
+                autoComplete="new-password"
               />
               <button type="submit" className="btn-primary" style={{ width: "auto" }}>
                 Enregistrer

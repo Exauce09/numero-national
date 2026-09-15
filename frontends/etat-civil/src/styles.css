@@ -1862,3 +1862,36 @@
     display: none !important;
   }
 }
+
+/* Champ mot de passe — Afficher / Masquer */
+.password-field-wrap {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.password-field-wrap .form-control {
+  padding-right: 5.5rem;
+  width: 100%;
+}
+
+.password-field-toggle {
+  position: absolute;
+  right: 0.35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--egouv-muted, #5a6570);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+
+.password-field-toggle:hover {
+  color: var(--egouv-ink, #1a2330);
+  background: rgba(0, 0, 0, 0.05);
+}

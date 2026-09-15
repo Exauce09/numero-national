@@ -12,6 +12,7 @@ import {
   setEcUserActive,
   type EcUserRole,
 } from "../ecUsers";
+import PasswordField from "../components/PasswordField";
 
 export default function UsersEcPage() {
   const session = getSession();
@@ -121,15 +122,14 @@ export default function UsersEcPage() {
           />
         </div>
         <div>
-          <label className="form-label">Mot de passe temporaire *</label>
-          <input
-            className="form-control"
-            type="password"
+          <PasswordField
+            label="Mot de passe temporaire *"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
             disabled={busy}
+            autoComplete="new-password"
           />
         </div>
         <div>

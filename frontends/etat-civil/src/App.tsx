@@ -57,6 +57,7 @@ import SynopticPage from "./pages/SynopticPage";
 import ManageActsPage, { MANAGE_CONFIGS } from "./components/ManageActsPage";
 import TerritoryPage from "./pages/TerritoryPage";
 import TopbarSearch from "./components/TopbarSearch";
+import PasswordField from "./components/PasswordField";
 import {
   IconBaby,
   IconClipboard,
@@ -640,29 +641,26 @@ function Shell() {
               <h4 className="panel-title">Changer le mot de passe</h4>
               {pwdError ? <div className="login-error">{pwdError}</div> : null}
               {pwdMsg ? <div className="success-banner">{pwdMsg}</div> : null}
-              <label className="form-label">Mot de passe actuel</label>
-              <input
-                className="form-control"
-                type="password"
+              <PasswordField
+                label="Mot de passe actuel"
                 value={currentPwd}
                 onChange={(e) => setCurrentPwd(e.target.value)}
                 required
+                autoComplete="current-password"
               />
-              <label className="form-label">Nouveau mot de passe</label>
-              <input
-                className="form-control"
-                type="password"
+              <PasswordField
+                label="Nouveau mot de passe"
                 value={newPwd}
                 onChange={(e) => setNewPwd(e.target.value)}
                 required
+                autoComplete="new-password"
               />
-              <label className="form-label">Confirmer</label>
-              <input
-                className="form-control"
-                type="password"
+              <PasswordField
+                label="Confirmer"
                 value={confirmPwd}
                 onChange={(e) => setConfirmPwd(e.target.value)}
                 required
+                autoComplete="new-password"
               />
               <button type="submit" className="btn-primary" style={{ width: "auto", minWidth: 160 }}>
                 Enregistrer

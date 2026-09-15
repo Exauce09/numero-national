@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { clearSession, getSession } from "../auth";
+import PasswordField from "../components/PasswordField";
 import { getHealthSession, loginHealth } from "../healthAuth";
 
 export default function HealthLoginPage() {
@@ -49,14 +50,13 @@ export default function HealthLoginPage() {
             required
             disabled={busy}
           />
-          <label className="form-label">Mot de passe</label>
-          <input
-            className="form-control"
-            type="password"
+          <PasswordField
+            label="Mot de passe"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             disabled={busy}
+            autoComplete="current-password"
           />
           <button className="btn-primary" type="submit" disabled={busy} style={{ marginTop: "0.75rem" }}>
             {busy ? "Connexion…" : "Se connecter"}
