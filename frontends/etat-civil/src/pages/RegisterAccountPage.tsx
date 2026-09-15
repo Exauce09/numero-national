@@ -556,7 +556,17 @@ export default function RegisterAccountPage() {
         {step === "done" && result ? (
           <div className="register-done">
             <h2 className="register-title">Compte enregistré</h2>
-            {result.created_by_super_admin ? (
+            {result.accountType === "HOPITAL_MATERNITE" && result.status === "ACTIVE" ? (
+              <>
+                <div className="success-banner">Compte hôpital / maternité créé</div>
+                <p className="muted">
+                  La structure est disponible dans{" "}
+                  <Link to="/declarations">Déclarations → Structures sanitaires</Link>. Connexion
+                  maternité : <Link to="/sante/login">/sante/login</Link> avec l&apos;identifiant{" "}
+                  <code>{result.login_id}</code> et le mot de passe saisi.
+                </p>
+              </>
+            ) : result.created_by_super_admin ? (
               <>
                 <div className="success-banner">Identité créée par le super administrateur</div>
                 <p className="muted">
@@ -609,13 +619,23 @@ export default function RegisterAccountPage() {
             >
               Créer un autre compte
             </button>
-            <Link
-              className="btn-secondary register-submit"
-              to="/"
-              style={{ display: "block", textAlign: "center", marginTop: "0.5rem" }}
-            >
-              Tableau de bord
-            </Link>
+            {result.accountType === "HOPITAL_MATERNITE" ? (
+              <Link
+                className="btn-secondary register-submit"
+                to="/declarations"
+                style={{ display: "block", textAlign: "center", marginTop: "0.5rem" }}
+              >
+                Voir les structures sanitaires
+              </Link>
+            ) : (
+              <Link
+                className="btn-secondary register-submit"
+                to="/"
+                style={{ display: "block", textAlign: "center", marginTop: "0.5rem" }}
+              >
+                Tableau de bord
+              </Link>
+            )}
           </div>
         ) : null}
 

@@ -65,7 +65,7 @@ export default function HealthShell() {
     navigate("/sante/login", { replace: true });
   }
 
-  function onChangePassword(e: FormEvent) {
+  async function onChangePassword(e: FormEvent) {
     e.preventDefault();
     setPwdMsg(null);
     setPwdError(null);
@@ -74,7 +74,7 @@ export default function HealthShell() {
       return;
     }
     try {
-      updateHealthPassword(session.username, currentPwd, newPwd);
+      await updateHealthPassword(session.username, currentPwd, newPwd);
       setCurrentPwd("");
       setNewPwd("");
       setConfirmPwd("");
@@ -244,7 +244,7 @@ export default function HealthShell() {
                 Sombre
               </button>
             </div>
-            <form onSubmit={onChangePassword}>
+            <form onSubmit={(e) => void onChangePassword(e)}>
               {pwdError ? <div className="login-error">{pwdError}</div> : null}
               {pwdMsg ? <div className="success-banner">{pwdMsg}</div> : null}
               <PasswordField

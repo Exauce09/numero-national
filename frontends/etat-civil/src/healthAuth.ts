@@ -1,9 +1,14 @@
 /** Comptes & session structure sanitaire (même SPA que l'état civil). */
 
+import { hashPassword } from "./ecUsers";
+
 export type FacilityAccount = {
   id: string;
   username: string;
-  password: string;
+  /** Ancien format (texte clair) — conservé pour compat. */
+  password?: string;
+  /** Hash SHA-256 (préféré). */
+  passwordHash?: string;
   facilityName: string;
   facilityType: "HOPITAL" | "CLINIQUE" | "CS" | "MATERNITE";
   commune_code: string;
@@ -23,6 +28,8 @@ export type FacilityAccount = {
   active: boolean;
   created_at: string;
   updated_at?: string;
+  /** Lien vers une demande d'inscription plateforme. */
+  registration_request_id?: string;
 };
 
 export type HealthSession = {
@@ -41,16 +48,23 @@ const SESSION_KEY = "nn_session_health_facility";
 
 export const HEALTH_ROLE_TITLE = "Responsable — Structure sanitaire";
 
-function normalizeAccount(raw: Partial<FacilityAccount> & {
-  id?: string;
-  username?: string;
-  password?: string;
-}): FacilityAccount | null {
-  if (!raw.id || !raw.username || !raw.password) return null;
+function normalizeAccount(
+  raw: Partial<FacilityAccount> & {
+    id?: string;
+    username?: string;
+    password?: string;
+    passwordHash?: string;
+  },
+): FacilityAccount | null {
+  if (!raw.id || !raw.username) return null;
+  const password = raw.password ? String(raw.password) : undefined;
+  const passwordHash = raw.passwordHash ? String(raw.passwordHash) : undefined;
+  if (!password && !passwordHash) return null;
   return {
     id: String(raw.id),
     username: String(raw.username).trim().toLowerCase(),
-    password: String(raw.password),
+    password,
+    passwordHash,
     facilityName: String(raw.facilityName ?? "").trim() || "Structure sanitaire",
     facilityType: (["HOPITAL", "CLINIQUE", "CS", "MATERNITE"] as const).includes(
       raw.facilityType as FacilityAccount["facilityType"],
@@ -69,6 +83,9 @@ function normalizeAccount(raw: Partial<FacilityAccount> & {
     active: raw.active !== false,
     created_at: String(raw.created_at ?? new Date().toISOString()),
     updated_at: raw.updated_at ? String(raw.updated_at) : undefined,
+    registration_request_id: raw.registration_request_id
+      ? String(raw.registration_request_id)
+      : undefined,
   };
 }
 
@@ -101,20 +118,83 @@ function ensureAccountsReady(): FacilityAccount[] {
   return loadAccounts();
 }
 
-export type FacilityAccountPublic = Omit<FacilityAccount, "password">;
+export type FacilityAccountPublic = Omit<FacilityAccount, "password" | "passwordHash">;
+
+function toPublic(account: FacilityAccount): FacilityAccountPublic {
+  const { password: _p, passwordHash: _h, ...rest } = account;
+  return rest;
+}
 
 export function listFacilityAccounts(): FacilityAccountPublic[] {
-  return ensureAccountsReady().map(({ password: _pw, ...rest }) => rest);
+  return ensureAccountsReady().map(toPublic);
 }
 
 export function getFacilityAccount(id: string): FacilityAccountPublic | null {
   const hit = ensureAccountsReady().find((a) => a.id === id);
-  if (!hit) return null;
-  const { password: _pw, ...rest } = hit;
-  return rest;
+  return hit ? toPublic(hit) : null;
 }
 
-export function createFacilityAccount(input: {
+export function findFacilityByUsername(username: string): FacilityAccountPublic | null {
+  const hit = ensureAccountsReady().find((a) => a.username === username.trim().toLowerCase());
+  return hit ? toPublic(hit) : null;
+}
+
+async function passwordMatches(account: FacilityAccount, password: string): Promise<boolean> {
+  if (account.passwordHash) {
+    const hash = await hashPassword(password);
+    return hash === account.passwordHash;
+  }
+  return Boolean(account.password && account.password === password);
+}
+
+type FacilityGeoInput = {
+  commune_code: string;
+  commune_name: string;
+  province: string;
+  ville: string;
+  quartier_name?: string;
+  district_name?: string;
+  localite_name?: string;
+  geo_label?: string;
+  geo_mode?: "kinshasa" | "province";
+};
+
+function buildFacilityBase(
+  input: {
+    username: string;
+    facilityName: string;
+    facilityType: FacilityAccount["facilityType"];
+    registration_request_id?: string;
+  } & FacilityGeoInput,
+  secrets: { password?: string; passwordHash?: string },
+  prev?: FacilityAccount,
+): FacilityAccount {
+  const username = input.username.trim().toLowerCase();
+  return {
+    id: prev?.id ?? crypto.randomUUID(),
+    username,
+    password: secrets.password,
+    passwordHash: secrets.passwordHash,
+    facilityName: input.facilityName.trim(),
+    facilityType: input.facilityType,
+    commune_code:
+      input.commune_code.trim() || input.commune_name.trim().toUpperCase().replace(/\s+/g, "-"),
+    commune_name: input.commune_name.trim(),
+    province: input.province.trim(),
+    ville: input.ville.trim() || input.province.trim(),
+    quartier_name: input.quartier_name?.trim() || undefined,
+    district_name: input.district_name?.trim() || undefined,
+    localite_name: input.localite_name?.trim() || undefined,
+    geo_label: input.geo_label?.trim() || undefined,
+    geo_mode: input.geo_mode,
+    active: prev?.active !== false,
+    created_at: prev?.created_at ?? new Date().toISOString(),
+    updated_at: prev ? new Date().toISOString() : undefined,
+    registration_request_id: input.registration_request_id ?? prev?.registration_request_id,
+  };
+}
+
+export async function createFacilityAccount(input: {
   username: string;
   password: string;
   facilityName: string;
@@ -128,7 +208,8 @@ export function createFacilityAccount(input: {
   localite_name?: string;
   geo_label?: string;
   geo_mode?: "kinshasa" | "province";
-}): FacilityAccount {
+  registration_request_id?: string;
+}): Promise<FacilityAccount> {
   const username = input.username.trim().toLowerCase();
   if (!username || !input.password || !input.facilityName.trim()) {
     throw new Error("Identifiant, mot de passe et nom de structure sont requis.");
@@ -147,29 +228,44 @@ export function createFacilityAccount(input: {
   if (list.some((a) => a.username === username)) {
     throw new Error("Cet identifiant existe déjà.");
   }
-  const account: FacilityAccount = {
-    id: crypto.randomUUID(),
-    username,
-    password: input.password,
-    facilityName: input.facilityName.trim(),
-    facilityType: input.facilityType,
-    commune_code: input.commune_code.trim() || input.commune_name.trim().toUpperCase().replace(/\s+/g, "-"),
-    commune_name: input.commune_name.trim(),
-    province: input.province.trim(),
-    ville: input.ville.trim() || input.province.trim(),
-    quartier_name: input.quartier_name?.trim() || undefined,
-    district_name: input.district_name?.trim() || undefined,
-    localite_name: input.localite_name?.trim() || undefined,
-    geo_label: input.geo_label?.trim() || undefined,
-    geo_mode: input.geo_mode,
-    active: true,
-    created_at: new Date().toISOString(),
-  };
+  const account = buildFacilityBase(input, {
+    passwordHash: await hashPassword(input.password),
+  });
   saveAccounts([account, ...list]);
   return account;
 }
 
-export function updateFacilityAccount(
+/** Provisionne un compte santé depuis une inscription (hash déjà calculé). */
+export function createFacilityAccountFromHash(input: {
+  username: string;
+  passwordHash: string;
+  facilityName: string;
+  facilityType: FacilityAccount["facilityType"];
+  commune_code: string;
+  commune_name: string;
+  province: string;
+  ville: string;
+  quartier_name?: string;
+  district_name?: string;
+  localite_name?: string;
+  geo_label?: string;
+  geo_mode?: "kinshasa" | "province";
+  registration_request_id?: string;
+}): FacilityAccount {
+  const username = input.username.trim().toLowerCase();
+  if (!username || !input.passwordHash || !input.facilityName.trim()) {
+    throw new Error("Identifiant, mot de passe et nom de structure sont requis.");
+  }
+  ensureAccountsReady();
+  const list = loadAccounts();
+  const existing = list.find((a) => a.username === username);
+  if (existing) return existing;
+  const account = buildFacilityBase(input, { passwordHash: input.passwordHash });
+  saveAccounts([account, ...list]);
+  return account;
+}
+
+export async function updateFacilityAccount(
   id: string,
   input: {
     username: string;
@@ -186,7 +282,7 @@ export function updateFacilityAccount(
     geo_label?: string;
     geo_mode?: "kinshasa" | "province";
   },
-): FacilityAccount {
+): Promise<FacilityAccount> {
   ensureAccountsReady();
   const list = loadAccounts();
   const idx = list.findIndex((a) => a.id === id);
@@ -207,23 +303,14 @@ export function updateFacilityAccount(
   }
 
   const prev = list[idx];
-  const next: FacilityAccount = {
-    ...prev,
-    username,
-    password: input.password ? input.password : prev.password,
-    facilityName: input.facilityName.trim(),
-    facilityType: input.facilityType,
-    commune_code: input.commune_code.trim() || input.commune_name.trim().toUpperCase().replace(/\s+/g, "-"),
-    commune_name: input.commune_name.trim(),
-    province: input.province.trim(),
-    ville: input.ville.trim() || input.province.trim(),
-    quartier_name: input.quartier_name?.trim() || undefined,
-    district_name: input.district_name?.trim() || undefined,
-    localite_name: input.localite_name?.trim() || undefined,
-    geo_label: input.geo_label?.trim() || undefined,
-    geo_mode: input.geo_mode,
-    updated_at: new Date().toISOString(),
-  };
+  const secrets = input.password
+    ? { passwordHash: await hashPassword(input.password), password: undefined }
+    : { passwordHash: prev.passwordHash, password: prev.password };
+  const next = buildFacilityBase(
+    { ...input, registration_request_id: prev.registration_request_id },
+    secrets,
+    prev,
+  );
   list[idx] = next;
   saveAccounts(list);
 
@@ -306,13 +393,13 @@ export function clearHealthSession() {
   sessionStorage.removeItem(SESSION_KEY);
 }
 
-export function loginHealth(username: string, password: string): HealthSession {
+export async function loginHealth(username: string, password: string): Promise<HealthSession> {
   ensureAccountsReady();
   const user = username.trim().toLowerCase();
   const account = loadAccounts().find((a) => a.username === user);
-  if (!account || account.password !== password) {
+  if (!account || !(await passwordMatches(account, password))) {
     throw new Error(
-      "Identifiants incorrects. Demandez un compte à l'officier d'état civil (Déclarations).",
+      "Identifiants incorrects. Demandez un compte à l'officier d'état civil (Déclarations) ou au super admin.",
     );
   }
   if (!account.active) {
@@ -332,15 +419,28 @@ export function loginHealth(username: string, password: string): HealthSession {
   return session;
 }
 
-export function updateHealthPassword(username: string, currentPassword: string, nextPassword: string): void {
+export async function updateHealthPassword(
+  username: string,
+  currentPassword: string,
+  nextPassword: string,
+): Promise<void> {
   ensureAccountsReady();
   const user = username.trim().toLowerCase();
   const list = loadAccounts();
   const idx = list.findIndex((a) => a.username === user);
   if (idx < 0) throw new Error("Compte introuvable.");
   if (!list[idx].active) throw new Error("Compte désactivé.");
-  if (list[idx].password !== currentPassword) throw new Error("Mot de passe actuel incorrect.");
-  if (nextPassword.length < 8) throw new Error("Le nouveau mot de passe doit contenir au moins 8 caractères.");
-  list[idx] = { ...list[idx], password: nextPassword, updated_at: new Date().toISOString() };
+  if (!(await passwordMatches(list[idx], currentPassword))) {
+    throw new Error("Mot de passe actuel incorrect.");
+  }
+  if (nextPassword.length < 8) {
+    throw new Error("Le nouveau mot de passe doit contenir au moins 8 caractères.");
+  }
+  list[idx] = {
+    ...list[idx],
+    password: undefined,
+    passwordHash: await hashPassword(nextPassword),
+    updated_at: new Date().toISOString(),
+  };
   saveAccounts(list);
 }

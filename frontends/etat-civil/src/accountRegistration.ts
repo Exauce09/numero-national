@@ -1,9 +1,15 @@
 /**
  * Demandes de création de compte — identité seulement, pas d'attribution de rôle.
  * Les comptes institutionnels restent en attente jusqu'à validation par une autorité.
+ * Exception : HOPITAL_MATERNITE → provisionne aussi le portail /sante.
  */
 
 import { hashPassword } from "./ecUsers";
+import {
+  createFacilityAccountFromHash,
+  findFacilityByUsername,
+  type FacilityAccountPublic,
+} from "./healthAuth";
 
 export type AccountRequestType =
   | "CITOYEN"
@@ -450,6 +456,9 @@ export async function verifyRegistrationOtp(code: string): Promise<AccountRegist
   };
   saveRequests(rows);
   saveOtp(null);
+  if (rows[idx].status === "ACTIVE") {
+    provisionHospitalFacilityFromRequest(rows[idx]);
+  }
   return rows[idx];
 }
 
@@ -480,6 +489,9 @@ export function decideAccountRequest(
     ],
   };
   saveRequests(rows);
+  if (rows[idx].status === "ACTIVE") {
+    provisionHospitalFacilityFromRequest(rows[idx]);
+  }
   return rows[idx];
 }
 
@@ -487,4 +499,52 @@ export function maskPhone(phone: string): string {
   const n = normalizePhone(phone);
   if (n.length < 8) return n;
   return `${n.slice(0, 4)} XXX XXX ${n.slice(-3)}`;
+}
+
+/** Crée le compte structure sanitaire lié à une inscription hôpital activée. */
+export function provisionHospitalFacilityFromRequest(
+  req: AccountRegistrationRequest,
+): FacilityAccountPublic | null {
+  if (req.accountType !== "HOPITAL_MATERNITE") return null;
+  if (req.status !== "ACTIVE") return null;
+  if (!req.password_hash) return null;
+
+  const existing = findFacilityByUsername(req.login_id);
+  if (existing) return existing;
+
+  const province = (req.province || "Kinshasa").trim();
+  const commune = (req.commune_secteur || req.ville_territoire || "Gombe").trim();
+  const ville = (req.ville_territoire || province).trim();
+  const facilityName =
+    (req.institution || "").trim() ||
+    `Hôpital ${req.prenom} ${req.nom}`.trim() ||
+    "Structure sanitaire";
+
+  const account = createFacilityAccountFromHash({
+    username: req.login_id,
+    passwordHash: req.password_hash,
+    facilityName,
+    facilityType: "HOPITAL",
+    commune_code: commune.toUpperCase().replace(/\s+/g, "-"),
+    commune_name: commune,
+    province,
+    ville,
+    geo_label: [commune, ville, province].filter(Boolean).join(" · "),
+    geo_mode: /kinshasa/i.test(province) ? "kinshasa" : "province",
+    registration_request_id: req.id,
+  });
+  const { password: _p, passwordHash: _h, ...pub } = account;
+  return pub;
+}
+
+/** Répare les inscriptions hôpital ACTIVE sans compte /sante (créations antérieures). */
+export function syncHospitalFacilitiesFromRequests(): FacilityAccountPublic[] {
+  const created: FacilityAccountPublic[] = [];
+  for (const req of loadRequests()) {
+    if (req.accountType !== "HOPITAL_MATERNITE" || req.status !== "ACTIVE") continue;
+    const before = findFacilityByUsername(req.login_id);
+    const after = provisionHospitalFacilityFromRequest(req);
+    if (after && !before) created.push(after);
+  }
+  return created;
 }

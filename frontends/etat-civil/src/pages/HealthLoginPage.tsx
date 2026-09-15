@@ -1,7 +1,8 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { clearSession, getSession } from "../auth";
 import PasswordField from "../components/PasswordField";
+import { syncHospitalFacilitiesFromRequests } from "../accountRegistration";
 import { getHealthSession, loginHealth } from "../healthAuth";
 
 export default function HealthLoginPage() {
@@ -13,16 +14,19 @@ export default function HealthLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (health) return <Navigate to="/sante" replace />;
-  if (civil) return <Navigate to="/" replace />;
+  useEffect(() => {
+    syncHospitalFacilitiesFromRequests();
+  }, []);
 
-  function onLogin(e: FormEvent) {
+  if (health) return <Navigate to="/sante" replace />;
+
+  async function onLogin(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setBusy(true);
     try {
       clearSession();
-      loginHealth(username, password);
+      await loginHealth(username, password);
       navigate("/sante", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Connexion impossible.");
@@ -40,7 +44,27 @@ export default function HealthLoginPage() {
           Structure sanitaire : déclaration de naissance / décès → validation par l&apos;officier
         </p>
 
-        <form onSubmit={onLogin} autoComplete="off">
+        {civil ? (
+          <div className="panel" style={{ marginBottom: "1rem", textAlign: "left" }}>
+            <p className="muted small" style={{ margin: 0 }}>
+              Session bureau EC active ({civil.displayName || civil.username}). La connexion santé
+              déconnectera le bureau.
+            </p>
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              style={{ marginTop: "0.5rem" }}
+              onClick={() => {
+                clearSession();
+                window.location.reload();
+              }}
+            >
+              Déconnecter le bureau EC
+            </button>
+          </div>
+        ) : null}
+
+        <form onSubmit={(e) => void onLogin(e)} autoComplete="off">
           {error ? <div className="login-error">{error}</div> : null}
           <label className="form-label">Identifiant</label>
           <input
@@ -62,7 +86,8 @@ export default function HealthLoginPage() {
             {busy ? "Connexion…" : "Se connecter"}
           </button>
           <p className="muted small" style={{ marginTop: "0.85rem" }}>
-            Compte créé par l&apos;officier d&apos;état civil (Déclarations → Créer un compte structure).
+            Compte créé via <strong>Créer un compte</strong> (hôpital) ou{" "}
+            <strong>Déclarations → Créer une structure</strong>.
           </p>
           <p className="muted small" style={{ marginTop: "0.65rem" }}>
             <Link to="/login">← Retour bureau état civil</Link>

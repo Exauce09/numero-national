@@ -10,6 +10,7 @@ import {
 import { addAct, addPerson, getPersonByNic, listActs, type Sexe } from "../registry";
 import { pushNotification } from "../prefs";
 import { listFacilityDeclarations, setDeclarationStatus } from "../civilDeclarations";
+import { syncHospitalFacilitiesFromRequests } from "../accountRegistration";
 import {
   createFacilityAccount,
   deleteFacilityAccount,
@@ -127,6 +128,7 @@ export default function DeclarationsPage() {
   }
 
   function refreshAccounts() {
+    syncHospitalFacilitiesFromRequests();
     setAccounts(listFacilityAccounts());
   }
 
@@ -273,7 +275,7 @@ export default function DeclarationsPage() {
     setFormOk(null);
   }
 
-  function onSaveAccount(e: FormEvent) {
+  async function onSaveAccount(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
     setFormOk(null);
@@ -336,7 +338,7 @@ export default function DeclarationsPage() {
 
     try {
       if (editingId) {
-        const account = updateFacilityAccount(editingId, {
+        const account = await updateFacilityAccount(editingId, {
           username: form.username,
           password: pwd || undefined,
           facilityName: form.facilityName,
@@ -356,7 +358,7 @@ export default function DeclarationsPage() {
           setFormError("Le mot de passe est requis pour un nouveau compte.");
           return;
         }
-        const account = createFacilityAccount({
+        const account = await createFacilityAccount({
           username: form.username,
           password: pwd,
           facilityName: form.facilityName,
@@ -677,7 +679,7 @@ export default function DeclarationsPage() {
               </p>
             </div>
 
-            <form className="form-grid" onSubmit={onSaveAccount} autoComplete="off">
+            <form className="form-grid" onSubmit={(e) => void onSaveAccount(e)} autoComplete="off">
               {formError ? <div className="login-error full">{formError}</div> : null}
               {formOk ? <div className="success-banner full">{formOk}</div> : null}
 

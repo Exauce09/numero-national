@@ -46,7 +46,9 @@ export default function AccountRequestsReviewPage() {
       setMessage(
         decision === "reject"
           ? `Demande rejetée (${row.email}).`
-          : `Identité validée pour ${row.email} — attribuez le rôle séparément (Utilisateurs).`,
+          : row.accountType === "HOPITAL_MATERNITE"
+            ? `Hôpital activé — structure visible dans Déclarations ; connexion /sante/login (${row.login_id}).`
+            : `Identité validée pour ${row.email} — attribuez le rôle séparément (Utilisateurs).`,
       );
       setBump((n) => n + 1);
     } catch (err) {
