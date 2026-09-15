@@ -400,16 +400,15 @@ export default function SynopticPage() {
   }
   const isNational = isSuperAdminNational(session?.roles);
   const officer = getOfficerCommune();
-  const [filterProvince, setFilterProvince] = useState(() =>
-    isNational ? "" : officer.province || "",
-  );
-  const [filterVille, setFilterVille] = useState(() =>
-    isNational ? "" : officer.ville || "",
-  );
+  const [filterProvince, setFilterProvince] = useState(() => officer.province || "Kinshasa");
+  const [filterVille, setFilterVille] = useState(() => officer.ville || "Kinshasa");
   const [selected, setSelected] = useState<FlatCommune | null>(() => {
-    if (isNational) return null;
     const all = listSynopticCommunes();
-    return all.find((c) => c.code === officer.code || c.name === officer.name) ?? null;
+    return (
+      all.find((c) => c.code === officer.code || c.name === officer.name) ??
+      all.find((c) => c.name === "Gombe" && c.ville === "Kinshasa") ??
+      null
+    );
   });
 
   if (!section) return <Navigate to="/synoptique/naissances" replace />;
@@ -425,7 +424,7 @@ export default function SynopticPage() {
     }
   }
 
-  function resetFilters() {
+  function resetToGeneral() {
     setSelected(null);
     setFilterProvince(isNational ? "" : officer.province || "");
     setFilterVille(isNational ? "" : officer.ville || "");
@@ -433,14 +432,10 @@ export default function SynopticPage() {
 
   const provinces = useMemo(
     () =>
-      [
-        ...new Set(
-          listSynopticCommunes()
-            .filter((c) => isNational || !officer.province || c.province === officer.province)
-            .map((c) => c.province),
-        ),
-      ].sort((a, b) => a.localeCompare(b, "fr")),
-    [isNational, officer.province],
+      [...new Set(listSynopticCommunes().map((c) => c.province))].sort((a, b) =>
+        a.localeCompare(b, "fr"),
+      ),
+    [],
   );
 
   const villes = useMemo(
@@ -473,8 +468,7 @@ export default function SynopticPage() {
           </p>
           <h2 className="page-title">Tableau synoptique</h2>
           <p className="page-lead">
-            Choisissez <strong>province → ville → commune</strong>, puis consultez le détail
-            officiel (G / F / T).
+            Filtrez par province, ville puis commune pour afficher le tableau synoptique détaillé.
           </p>
         </div>
       </div>
@@ -484,13 +478,13 @@ export default function SynopticPage() {
           <h3 className="panel-title" style={{ margin: 0 }}>
             Filtres
           </h3>
-          <button type="button" className="btn-secondary btn-sm" onClick={resetFilters}>
-            Réinitialiser
+          <button type="button" className="btn-secondary btn-sm" onClick={resetToGeneral}>
+            Vue générale
           </button>
         </div>
         <div className="form-grid">
           <div>
-            <label className="form-label">1. Province</label>
+            <label className="form-label">Province</label>
             <select
               className="form-control"
               value={filterProvince}
@@ -500,7 +494,7 @@ export default function SynopticPage() {
                 setSelected(null);
               }}
             >
-              <option value="">— Choisir la province —</option>
+              <option value="">— Toutes les provinces —</option>
               {provinces.map((p) => (
                 <option key={p} value={p}>
                   {p}
@@ -509,7 +503,7 @@ export default function SynopticPage() {
             </select>
           </div>
           <div>
-            <label className="form-label">2. Ville</label>
+            <label className="form-label">Ville</label>
             <select
               className="form-control"
               value={filterVille}
@@ -519,7 +513,7 @@ export default function SynopticPage() {
               }}
               disabled={!filterProvince}
             >
-              <option value="">— Choisir la ville —</option>
+              <option value="">— Toutes les villes —</option>
               {villes.map((v) => (
                 <option key={v} value={v}>
                   {v}
@@ -528,7 +522,7 @@ export default function SynopticPage() {
             </select>
           </div>
           <div>
-            <label className="form-label">3. Commune</label>
+            <label className="form-label">Commune (détail)</label>
             <select
               className="form-control"
               value={selected?.code ?? ""}
@@ -544,7 +538,7 @@ export default function SynopticPage() {
               <option value="">— Choisir la commune —</option>
               {communesOpts.map((c) => (
                 <option key={c.code} value={c.code}>
-                  {c.name}
+                  {c.name} — {c.ville}
                 </option>
               ))}
             </select>
@@ -581,10 +575,10 @@ export default function SynopticPage() {
             <p className="muted small" style={{ margin: 0, flex: "1 1 220px" }}>
               {selected ? (
                 <>
-                  Commune <strong>{selected.name}</strong> ({selected.ville}) — {active.label}
+                  Détail commune <strong>{selected.name}</strong> — onglet {active.label}
                 </>
               ) : (
-                <>Sélectionnez une commune pour afficher le tableau synoptique.</>
+                <>Choisissez une commune (détail) pour afficher le tableau synoptique.</>
               )}
             </p>
             <Link className="btn-primary" style={{ width: "auto" }} to={active.createPath}>
@@ -593,6 +587,16 @@ export default function SynopticPage() {
             <Link className="btn-secondary" style={{ width: "auto" }} to={active.managePath}>
               Voir la liste gérable
             </Link>
+            {selected ? (
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ width: "auto" }}
+                onClick={resetToGeneral}
+              >
+                Retour vue générale
+              </button>
+            ) : null}
           </div>
         );
       })()}
@@ -608,8 +612,7 @@ export default function SynopticPage() {
         ) : (
           <div className="panel">
             <p className="muted" style={{ margin: 0 }}>
-              Aucun tableau national ici. Utilisez les filtres ci-dessus (province → ville → commune)
-              pour afficher le détail.
+              Sélectionnez Province → Ville → Commune (détail) pour afficher le tableau.
             </p>
           </div>
         )}
