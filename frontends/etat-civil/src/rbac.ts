@@ -67,7 +67,7 @@ export function roleTitleFor(roles: string[]): string {
       return "Responsable de bureau";
     case "OFFICIER_ETAT_CIVIL":
     case "CIVIL_OFFICER":
-      return "Officier de l'état civil — Hervé Kinkete";
+      return "Officier de l'état civil";
     case "AGENT_ETAT_CIVIL":
       return "Agent de l'état civil";
     case "AUDITEUR":

@@ -29,8 +29,6 @@ export type HealthSession = {
 const ACCOUNTS_KEY = "nn_health_facility_accounts";
 const SESSION_KEY = "nn_session_health_facility";
 
-export const HEALTH_DEMO_USER = "hopital";
-export const HEALTH_DEMO_PASSWORD = "DemoSante2026!";
 export const HEALTH_ROLE_TITLE = "Responsable — Structure sanitaire";
 
 function normalizeAccount(raw: Partial<FacilityAccount> & {
@@ -80,47 +78,22 @@ function saveAccounts(list: FacilityAccount[]) {
   localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(normalized));
 }
 
-/** Migre / réécrit le store pour garantir le champ `active` et des ids valides. */
-function persistNormalizedAccounts(list: FacilityAccount[]): FacilityAccount[] {
+/** Normalise le store (ex. comptes anciens sans `active`) — aucun compte démo. */
+function ensureAccountsReady(): FacilityAccount[] {
+  const list = loadAccounts();
+  if (list.length === 0) return list;
   saveAccounts(list);
   return loadAccounts();
-}
-
-function ensureDemoAccount(): FacilityAccount {
-  let list = loadAccounts();
-  // Persiste la normalisation (ex. comptes anciens sans `active`).
-  if (list.length > 0) {
-    list = persistNormalizedAccounts(list);
-  }
-  const hit = list.find((a) => a.username === HEALTH_DEMO_USER);
-  if (hit) return hit;
-  const demo: FacilityAccount = {
-    id: "fac-demo-kin-gombe",
-    username: HEALTH_DEMO_USER,
-    password: HEALTH_DEMO_PASSWORD,
-    facilityName: "Hôpital Général de Référence — Gombe",
-    facilityType: "HOPITAL",
-    commune_code: "KIN-GOMBE",
-    commune_name: "Gombe",
-    province: "Kinshasa",
-    ville: "Kinshasa",
-    active: true,
-    created_at: new Date().toISOString(),
-  };
-  saveAccounts([demo, ...list]);
-  return demo;
 }
 
 export type FacilityAccountPublic = Omit<FacilityAccount, "password">;
 
 export function listFacilityAccounts(): FacilityAccountPublic[] {
-  ensureDemoAccount();
-  return loadAccounts().map(({ password: _pw, ...rest }) => rest);
+  return ensureAccountsReady().map(({ password: _pw, ...rest }) => rest);
 }
 
 export function getFacilityAccount(id: string): FacilityAccountPublic | null {
-  ensureDemoAccount();
-  const hit = loadAccounts().find((a) => a.id === id);
+  const hit = ensureAccountsReady().find((a) => a.id === id);
   if (!hit) return null;
   const { password: _pw, ...rest } = hit;
   return rest;
@@ -143,7 +116,7 @@ export function createFacilityAccount(input: {
   if (input.password.length < 8) {
     throw new Error("Le mot de passe doit contenir au moins 8 caractères.");
   }
-  ensureDemoAccount();
+  ensureAccountsReady();
   const list = loadAccounts();
   if (list.some((a) => a.username === username)) {
     throw new Error("Cet identifiant existe déjà.");
@@ -178,7 +151,7 @@ export function updateFacilityAccount(
     ville: string;
   },
 ): FacilityAccount {
-  ensureDemoAccount();
+  ensureAccountsReady();
   const list = loadAccounts();
   const idx = list.findIndex((a) => a.id === id);
   if (idx < 0) throw new Error("Compte introuvable.");
@@ -229,7 +202,7 @@ export function updateFacilityAccount(
 }
 
 export function setFacilityAccountActive(id: string, active: boolean): FacilityAccount {
-  ensureDemoAccount();
+  ensureAccountsReady();
   const list = loadAccounts();
   const idx = list.findIndex((a) => a.id === id);
   if (idx < 0) throw new Error("Compte introuvable.");
@@ -254,13 +227,10 @@ export function setFacilityAccountActive(id: string, active: boolean): FacilityA
 }
 
 export function deleteFacilityAccount(id: string): void {
-  ensureDemoAccount();
+  ensureAccountsReady();
   const list = loadAccounts();
   const hit = list.find((a) => a.id === id);
   if (!hit) throw new Error("Compte introuvable.");
-  if (hit.username === HEALTH_DEMO_USER) {
-    throw new Error("Le compte démo ne peut pas être supprimé (vous pouvez le désactiver).");
-  }
   const remaining = list.filter((a) => a.id !== id);
   saveAccounts(remaining);
   if (loadAccounts().some((a) => a.id === id)) {
@@ -274,8 +244,7 @@ export function deleteFacilityAccount(id: string): void {
 
 /** Vérifie qu'un compte santé existe encore et est actif (garde de session). */
 export function isHealthAccountActive(facilityId: string): boolean {
-  ensureDemoAccount();
-  const hit = loadAccounts().find((a) => a.id === facilityId);
+  const hit = ensureAccountsReady().find((a) => a.id === facilityId);
   return Boolean(hit?.active);
 }
 
@@ -294,11 +263,13 @@ export function clearHealthSession() {
 }
 
 export function loginHealth(username: string, password: string): HealthSession {
-  ensureDemoAccount();
+  ensureAccountsReady();
   const user = username.trim().toLowerCase();
   const account = loadAccounts().find((a) => a.username === user);
   if (!account || account.password !== password) {
-    throw new Error(`Identifiants incorrects. Démo : ${HEALTH_DEMO_USER} / ${HEALTH_DEMO_PASSWORD}`);
+    throw new Error(
+      "Identifiants incorrects. Demandez un compte à l'officier d'état civil (Déclarations).",
+    );
   }
   if (!account.active) {
     throw new Error("Ce compte est désactivé. Contactez l'officier d'état civil.");
@@ -318,7 +289,7 @@ export function loginHealth(username: string, password: string): HealthSession {
 }
 
 export function updateHealthPassword(username: string, currentPassword: string, nextPassword: string): void {
-  ensureDemoAccount();
+  ensureAccountsReady();
   const user = username.trim().toLowerCase();
   const list = loadAccounts();
   const idx = list.findIndex((a) => a.username === user);

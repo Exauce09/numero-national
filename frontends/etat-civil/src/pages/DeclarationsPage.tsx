@@ -11,7 +11,6 @@ import { addAct, addPerson, getPersonByNic, listActs, type Sexe } from "../regis
 import { pushNotification } from "../prefs";
 import { listFacilityDeclarations, setDeclarationStatus } from "../civilDeclarations";
 import {
-  HEALTH_DEMO_USER,
   createFacilityAccount,
   deleteFacilityAccount,
   listFacilityAccounts,
@@ -304,10 +303,6 @@ export default function DeclarationsPage() {
   function requestAction(type: "activate" | "deactivate" | "delete", account: FacilityAccountPublic) {
     setError(null);
     setMessage(null);
-    if (type === "delete" && account.username === HEALTH_DEMO_USER) {
-      setError("Le compte démo ne peut pas être supprimé (désactivez-le si besoin).");
-      return;
-    }
     setPending({ type, account });
   }
 
@@ -452,12 +447,6 @@ export default function DeclarationsPage() {
                       <button
                         type="button"
                         className="btn-secondary btn-sm"
-                        disabled={a.username === HEALTH_DEMO_USER}
-                        title={
-                          a.username === HEALTH_DEMO_USER
-                            ? "Le compte démo ne peut pas être supprimé"
-                            : "Supprimer"
-                        }
                         onClick={() => requestAction("delete", a)}
                       >
                         Supprimer

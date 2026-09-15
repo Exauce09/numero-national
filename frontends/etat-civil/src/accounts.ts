@@ -48,37 +48,11 @@ export function assignOfficerAccount(input: {
   return account;
 }
 
-/** Commune liée au compte ; démo « officier » → Gombe si non encore attribué. */
+/** Commune liée au compte ; sinon commune bureau par défaut. */
 export function resolveCommuneForUsername(username: string): OfficerCommune {
   const user = username.trim().toLowerCase();
   const hit = loadAccounts().find((a) => a.username === user);
   if (hit) return { ...hit.commune };
-
-  const demoAliases = new Set([
-    "officier",
-    "agent",
-    "responsable",
-    "auditeur",
-    "admin",
-  ]);
-  if (demoAliases.has(user)) {
-    const demo = assignOfficerAccount({
-      username: user,
-      displayName:
-        user === "officier"
-          ? "Hervé Kinkete"
-          : user === "agent"
-            ? "Agent de l'état civil"
-            : user === "responsable"
-              ? "Responsable de bureau"
-              : user === "auditeur"
-                ? "Auditeur"
-                : "Directrice de l'État civil général de la RDC",
-      commune: DEFAULT_OFFICER_COMMUNE,
-    });
-    return { ...demo.commune };
-  }
-
   return { ...DEFAULT_OFFICER_COMMUNE };
 }
 

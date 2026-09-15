@@ -63,6 +63,9 @@ export default function RolesEcPage() {
       </div>
 
       <p>
+        <Link className="btn-add btn-sm" to="/users">
+          Créer des utilisateurs
+        </Link>{" "}
         <Link className="btn-add btn-sm" to="/juge">
           Cas où le juge intervient
         </Link>{" "}

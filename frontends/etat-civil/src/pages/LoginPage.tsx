@@ -1,22 +1,18 @@
 import { FormEvent, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
-import {
-  CIVIL_DEMO_ACCOUNTS,
-  DEMO_API_EMAIL,
-  DEMO_API_PASSWORD,
-  getSession,
-  login,
-} from "../auth";
+import { Link, Navigate, useNavigate } from "react-router-dom";
+import { getSession, login } from "../auth";
+import { hasAnyEcUser } from "../ecUsers";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const civil = getSession();
-  const [username, setUsername] = useState(DEMO_API_EMAIL);
-  const [password, setPassword] = useState(DEMO_API_PASSWORD);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   if (civil) return <Navigate to="/" replace />;
+  if (!hasAnyEcUser()) return <Navigate to="/setup" replace />;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -37,23 +33,21 @@ export default function LoginPage() {
       <div className="login-card">
         <img className="login-logo" src="/logo-rdc.jpg" alt="République Démocratique du Congo" />
         <h1 className="login-title">État civil — RDC</h1>
-        <p className="login-subtitle">
-          Bureau d&apos;état civil — registres, actes, mentions et copies
-        </p>
+        <p className="login-subtitle">Connexion bureau d&apos;état civil — aucun compte démo</p>
         <form onSubmit={(e) => void onSubmit(e)} method="post" action="#" autoComplete="off">
           {error ? <div className="login-error" role="alert">{error}</div> : null}
           <label className="form-label" htmlFor="username">
-            Identifiant / email
+            E-mail
           </label>
           <input
             id="username"
             className="form-control"
-            type="text"
-            inputMode="email"
+            type="email"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoComplete="username"
             disabled={busy}
+            required
           />
           <label className="form-label" htmlFor="password">
             Mot de passe
@@ -66,42 +60,17 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
             disabled={busy}
+            required
           />
-          <div className="login-demo-roles" style={{ display: "grid", gap: "0.35rem", margin: "0.75rem 0" }}>
-            {CIVIL_DEMO_ACCOUNTS.map((acc) => (
-              <button
-                key={acc.alias}
-                type="button"
-                className="login-forgot"
-                style={{ textAlign: "left" }}
-                onClick={() => {
-                  setUsername(acc.alias);
-                  setPassword(acc.uiPassword);
-                  setError(null);
-                }}
-                disabled={busy}
-              >
-                Remplir : {acc.label} ({acc.alias})
-              </button>
-            ))}
-          </div>
           <button className="btn-primary" type="submit" disabled={busy}>
             {busy ? "Connexion…" : "Se connecter"}
           </button>
         </form>
-        <p className="login-subtitle" style={{ marginTop: "1.25rem", marginBottom: 0 }}>
-          Comptes démo par rôle (alias / mot de passe UI) :
-          <br />
-          {CIVIL_DEMO_ACCOUNTS.map((acc) => (
-            <span key={acc.alias} className="muted" style={{ display: "block" }}>
-              {acc.alias} / {acc.uiPassword} — {acc.label}
-            </span>
-          ))}
-          <br />
-          <span className="muted">Mot de passe oublié — contactez votre administrateur territorial.</span>
+        <p className="muted small" style={{ marginTop: "1rem" }}>
+          Mot de passe oublié — contactez le responsable de bureau.
         </p>
-        <p className="login-subtitle" style={{ marginTop: "1rem" }}>
-          <a href="/sante/login">Accès maternité / structure sanitaire →</a>
+        <p className="login-subtitle" style={{ marginTop: "0.75rem" }}>
+          <Link to="/sante/login">Accès maternité / structure sanitaire →</Link>
         </p>
       </div>
     </div>

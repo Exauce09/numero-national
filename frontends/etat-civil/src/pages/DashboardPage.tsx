@@ -213,11 +213,9 @@ export default function DashboardPage() {
   const helloName = session?.displayName || session?.username || "utilisateur";
   const roleTitle =
     session?.roleTitle ||
-    (variant === "officier"
-      ? "Officier de l'état civil — Hervé Kinkete"
-      : variant === "provincial"
-        ? "Directrice de l'État civil général de la RDC"
-        : "Officier de l'état civil");
+    (variant === "provincial"
+      ? "Directrice de l'État civil général de la RDC"
+      : "Officier de l'état civil");
   const territory = [session?.commune_province, session?.commune_ville, session?.commune_name]
     .filter(Boolean)
     .join(" · ");

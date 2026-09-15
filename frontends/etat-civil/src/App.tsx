@@ -1,7 +1,8 @@
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { clearSession, DEMO_PASSWORD, getSession, updateSession } from "./auth";
+import { clearSession, getSession, updateSession } from "./auth";
+import { canManageEcUsers, changeEcUserPassword, hasAnyEcUser } from "./ecUsers";
 import { canSeeNav } from "./rbac";
 import {
   applyTheme,
@@ -18,6 +19,8 @@ import {
 import { api } from "./api";
 import { listPendingOfficerDeclarations } from "./civilDeclarations";
 import LoginPage from "./pages/LoginPage";
+import SetupFirstUserPage from "./pages/SetupFirstUserPage";
+import UsersEcPage from "./pages/UsersEcPage";
 import HealthLoginPage from "./pages/HealthLoginPage";
 import HealthShell, { RequireHealth } from "./HealthShell";
 import DashboardPage from "./pages/DashboardPage";
@@ -65,6 +68,7 @@ import {
 } from "./components/Icons";
 
 function RequireCivil({ children }: { children: ReactNode }) {
+  if (!hasAnyEcUser()) return <Navigate to="/setup" replace />;
   if (!getSession()) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
@@ -207,13 +211,12 @@ function Shell() {
     reader.readAsDataURL(file);
   }
 
-  function onChangePassword(e: FormEvent) {
+  async function onChangePassword(e: FormEvent) {
     e.preventDefault();
     setPwdMsg(null);
     setPwdError(null);
-    const expected = prefs.passwordOverride || DEMO_PASSWORD;
-    if (currentPwd !== expected) {
-      setPwdError("Mot de passe actuel incorrect.");
+    if (!session?.username) {
+      setPwdError("Session invalide.");
       return;
     }
     if (newPwd.length < 8) {
@@ -224,15 +227,20 @@ function Shell() {
       setPwdError("La confirmation ne correspond pas.");
       return;
     }
-    persistPrefs({ ...prefs, passwordOverride: newPwd });
-    setCurrentPwd("");
-    setNewPwd("");
-    setConfirmPwd("");
-    setPwdMsg("Mot de passe mis à jour.");
+    try {
+      await changeEcUserPassword(session.username, currentPwd, newPwd);
+      persistPrefs({ ...prefs, passwordOverride: undefined });
+      setCurrentPwd("");
+      setNewPwd("");
+      setConfirmPwd("");
+      setPwdMsg("Mot de passe mis à jour.");
+    } catch (err) {
+      setPwdError(err instanceof Error ? err.message : "Impossible de changer le mot de passe.");
+    }
   }
 
   const responsableLabel = session?.displayName ?? session?.username ?? "—";
-  const roleTitle = "Officier de l'état civil";
+  const roleTitle = session?.roleTitle || "Officier de l'état civil";
   const communeLabel = session?.commune_name
     ? `Commune de ${session.commune_name}`
     : null;
@@ -361,6 +369,11 @@ function Shell() {
           <NavLink to="/search">
             <IconFile size={18} /> Recherche
           </NavLink>
+          {canManageEcUsers(roles) ? (
+            <NavLink to="/users">
+              <IconUsers size={18} /> Utilisateurs
+            </NavLink>
+          ) : null}
           {canSeeNav("admin_bureaux", roles, permissions) ? (
             <NavLink to="/admin/bureaux">
               <IconHome size={18} /> Bureaux EC
@@ -491,6 +504,7 @@ function Shell() {
             <Route path="/admin/account-requests" element={<AccountRequestsPage />} />
             <Route path="/territory" element={<TerritoryPage />} />
             <Route path="/search" element={<SearchPage />} />
+            <Route path="/users" element={<UsersEcPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
@@ -612,7 +626,7 @@ function Shell() {
               </div>
             </div>
 
-            <form className="panel" onSubmit={onChangePassword}>
+            <form className="panel" onSubmit={(e) => void onChangePassword(e)}>
               <h4 className="panel-title">Changer le mot de passe</h4>
               {pwdError ? <div className="login-error">{pwdError}</div> : null}
               {pwdMsg ? <div className="success-banner">{pwdMsg}</div> : null}
@@ -662,6 +676,7 @@ export default function App() {
 
   return (
     <Routes>
+      <Route path="/setup" element={<SetupFirstUserPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/sante/login" element={<HealthLoginPage />} />
       <Route
