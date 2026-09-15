@@ -26,6 +26,7 @@ import {
   getAct,
   inheritParentOrigin,
   listActs,
+  listPersons,
   NEWBORN_DELAI_JOURS,
   personNationalite,
   suggestDelaiEnregistrement,
@@ -39,6 +40,53 @@ import { getOfficerCommune } from "../commune";
 import { listFacilityAccounts } from "../healthAuth";
 import { HOPITAUX_KEY, loadNamedList, rememberNamed } from "../namedLists";
 
+const emptyMotherForm = { nom: "", postnom: "", prenom: "", date_naissance: "" };
+
+function resolveMotherPerson(
+  data: typeof emptyMotherForm,
+  facilityHint: string,
+): Person {
+  const nomP = data.nom.trim();
+  const postnomP = data.postnom.trim();
+  const prenomP = data.prenom.trim();
+  const dob = data.date_naissance.trim();
+  if (dob) {
+    const dup = findDuplicatePerson({
+      nom: nomP,
+      postnom: postnomP,
+      prenom: prenomP,
+      date_naissance: dob,
+      sexe: "F",
+    });
+    if (dup) return dup;
+    return addPerson({
+      nom: nomP,
+      postnom: postnomP,
+      prenom: prenomP,
+      sexe: "F",
+      date_naissance: dob,
+      lieu_naissance: facilityHint,
+      etat_civil: "MARIE",
+    });
+  }
+  const existing = listPersons().find(
+    (p) =>
+      p.sexe === "F" &&
+      p.nom.trim().toLowerCase() === nomP.toLowerCase() &&
+      p.postnom.trim().toLowerCase() === postnomP.toLowerCase() &&
+      p.prenom.trim().toLowerCase() === prenomP.toLowerCase(),
+  );
+  if (existing) return existing;
+  return addPerson({
+    nom: nomP,
+    postnom: postnomP,
+    prenom: prenomP,
+    sexe: "F",
+    date_naissance: "1900-01-01",
+    lieu_naissance: facilityHint,
+    etat_civil: "MARIE",
+  });
+}
 const MODES_ENREGISTREMENT = [
   { value: "sans_procuration", label: "Sans procuration" },
   { value: "avec_procuration", label: "Avec procuration" },
@@ -89,7 +137,7 @@ export default function BirthsPage() {
   const [refJugement, setRefJugement] = useState("");
   const [hopitalNaissance, setHopitalNaissance] = useState("");
   const [hopitalAutre, setHopitalAutre] = useState("");
-  const [mother, setMother] = useState<Person | null>(null);
+  const [motherForm, setMotherForm] = useState(emptyMotherForm);
   const [father, setFather] = useState<Person | null>(null);
   const [adresseMere, setAdresseMere] = useState("");
   const [geoAdresseMere, setGeoAdresseMere] = useState<GeoSelection>({});
@@ -106,7 +154,6 @@ export default function BirthsPage() {
   const [, bump] = useState(0);
 
   const acts = listActs("BIRTH");
-  const inherited = inheritParentOrigin(father, mother);
   const hospitals = useMemo(() => {
     const facilities = listFacilityAccounts().filter((a) => a.active);
     const extra = loadNamedList(HOPITAUX_KEY);
@@ -126,8 +173,8 @@ export default function BirthsPage() {
     if (submitting) return;
     setError(null);
     setWarning(null);
-    if (!mother) {
-      setError("La mère est obligatoire.");
+    if (!motherForm.nom.trim() || !motherForm.prenom.trim()) {
+      setError("Nom et prénom de la mère sont obligatoires.");
       return;
     }
     if (!nom.trim() || !prenom.trim() || !dateNaissance) {
@@ -156,42 +203,59 @@ export default function BirthsPage() {
       );
       return;
     }
-
-    const identity = {
-      nom: nom.trim(),
-      postnom: postnom.trim() || mother.postnom || father?.postnom || "",
-      prenom: prenom.trim(),
-      date_naissance: dateNaissance,
-      sexe,
-      mother_id: mother.id,
-    };
-
-    const existingAct = findDuplicateBirthAct({
-      nom: identity.nom,
-      prenom: identity.prenom,
-      postnom: identity.postnom,
-      date_naissance: identity.date_naissance,
-      mother_id: mother.id,
-    });
-    if (existingAct) {
-      setError(
-        `Naissance déjà enregistrée — acte ${existingAct.act_number} (ID ${existingAct.payload.id_naissance ?? existingAct.national_id}). Doublon refusé.`,
-      );
-      setViewAct(existingAct);
-      setCreated(existingAct);
-      return;
-    }
-
-    const existingPerson = findDuplicatePerson(identity);
-    if (existingPerson) {
-      setError(
-        `Enfant déjà au registre : ${existingPerson.nom} ${existingPerson.prenom} (ID ${existingPerson.nic}). Doublon refusé.`,
-      );
+    if (qualiteDeclarant !== "MERE" && !declarant) {
+      setError("Indiquez le déclarant (ou choisissez la qualité « Mère »).");
       return;
     }
 
     setSubmitting(true);
     try {
+      const mother = resolveMotherPerson(
+        motherForm,
+        hopitalResolved || geoNaissance.commune_name || officer.name,
+      );
+      const effectiveDeclarant = qualiteDeclarant === "MERE" ? mother : declarant;
+      if (!effectiveDeclarant) {
+        setError("Le déclarant est obligatoire.");
+        setSubmitting(false);
+        return;
+      }
+
+      const identity = {
+        nom: nom.trim(),
+        postnom: postnom.trim() || mother.postnom || father?.postnom || "",
+        prenom: prenom.trim(),
+        date_naissance: dateNaissance,
+        sexe,
+        mother_id: mother.id,
+      };
+
+      const existingAct = findDuplicateBirthAct({
+        nom: identity.nom,
+        prenom: identity.prenom,
+        postnom: identity.postnom,
+        date_naissance: identity.date_naissance,
+        mother_id: mother.id,
+      });
+      if (existingAct) {
+        setError(
+          `Naissance déjà enregistrée — acte ${existingAct.act_number} (ID ${existingAct.payload.id_naissance ?? existingAct.national_id}). Doublon refusé.`,
+        );
+        setViewAct(existingAct);
+        setCreated(existingAct);
+        setSubmitting(false);
+        return;
+      }
+
+      const existingPerson = findDuplicatePerson(identity);
+      if (existingPerson) {
+        setError(
+          `Enfant déjà au registre : ${existingPerson.nom} ${existingPerson.prenom} (ID ${existingPerson.nic}). Doublon refusé.`,
+        );
+        setSubmitting(false);
+        return;
+      }
+
       const lieu = geoBirthLabel(geoNaissance, lieuNaissance);
       const geoPayload: GeoSelection = {
         ...geoNaissance,
@@ -281,8 +345,8 @@ export default function BirthsPage() {
         mother_id: mother.id,
         mother_name: motherFull,
         mere_nom: motherFull,
-        declarant: declarant ? displayName(declarant) : motherFull,
-        declarant_id: declarant?.id ?? mother.id,
+        declarant: displayName(effectiveDeclarant),
+        declarant_id: effectiveDeclarant.id,
         declarant_qualite: qualiteDeclarant,
         mother_dossier: mother.nic,
         mother_snapshot: link.mother_snapshot,
@@ -341,7 +405,7 @@ export default function BirthsPage() {
       setRefJugement("");
       setHopitalNaissance("");
       setHopitalAutre("");
-      setMother(null);
+      setMotherForm(emptyMotherForm);
       setFather(null);
       setAdresseMere("");
       setGeoAdresseMere({});
@@ -661,19 +725,53 @@ export default function BirthsPage() {
           </div>
           <div className="full">
             <h3 className="panel-title">Filiation & déclaration</h3>
+            <p className="muted small" style={{ marginTop: 0 }}>
+              <strong>Mère</strong> = filiation de l&apos;enfant (identité parentale).{" "}
+              <strong>Déclarant</strong> = personne qui se présente au bureau pour déclarer la
+              naissance (souvent la mère, sinon le père ou un mandataire).
+            </p>
           </div>
           <div className="full">
-            <PersonPicker label="Mère *" value={mother} onChange={setMother} required sexFilter="F" />
+            <h3 className="panel-title" style={{ fontSize: "1rem" }}>
+              Mère *
+            </h3>
+            <p className="muted small" style={{ marginTop: 0 }}>
+              Saisissez directement l&apos;identité de la mère (pas de recherche registre).
+            </p>
           </div>
-          <div className="full">
-            <PersonPicker
-              label="Déclarant *"
-              value={declarant}
-              onChange={(p) => {
-                setDeclarant(p);
-                if (p && mother && p.id === mother.id) setQualiteDeclarant("MERE");
-                if (p && father && p.id === father.id) setQualiteDeclarant("PERE");
-              }}
+          <div>
+            <label className="form-label">Nom *</label>
+            <input
+              className="form-control"
+              value={motherForm.nom}
+              onChange={(e) => setMotherForm({ ...motherForm, nom: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="form-label">Postnom</label>
+            <input
+              className="form-control"
+              value={motherForm.postnom}
+              onChange={(e) => setMotherForm({ ...motherForm, postnom: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="form-label">Prénom(s) *</label>
+            <input
+              className="form-control"
+              value={motherForm.prenom}
+              onChange={(e) => setMotherForm({ ...motherForm, prenom: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="form-label">Date de naissance (si connue)</label>
+            <input
+              className="form-control"
+              type="date"
+              value={motherForm.date_naissance}
+              onChange={(e) => setMotherForm({ ...motherForm, date_naissance: e.target.value })}
             />
           </div>
           <div>
@@ -683,12 +781,29 @@ export default function BirthsPage() {
               value={qualiteDeclarant}
               onChange={(e) => setQualiteDeclarant(e.target.value)}
             >
-              <option value="MERE">Mère</option>
+              <option value="MERE">Mère (elle-même déclare)</option>
               <option value="PERE">Père</option>
               <option value="MANDATAIRE">Mandataire</option>
               <option value="AUTRE">Autre</option>
             </select>
           </div>
+          {qualiteDeclarant !== "MERE" ? (
+            <div className="full">
+              <PersonPicker
+                label="Déclarant *"
+                value={declarant}
+                onChange={(p) => {
+                  setDeclarant(p);
+                  if (p && father && p.id === father.id) setQualiteDeclarant("PERE");
+                }}
+                addButtonLabel="Saisir / Ajouter"
+              />
+            </div>
+          ) : (
+            <div className="full muted small">
+              Qualité « Mère » : la mère saisie ci-dessus est automatiquement le déclarant.
+            </div>
+          )}
           <div className="full">
             <label className="form-label">Adresse de la mère *</label>
             <GeoCascade
@@ -727,15 +842,10 @@ export default function BirthsPage() {
               label="Originaire"
             />
           </div>
-          {inherited.source && inherited.parent ? (
+          {father ? (
             <div className="full success-banner" style={{ margin: 0 }}>
-              Origine liée au {inherited.source === "father" ? "père" : "mère"}{" "}
-              <strong>{inherited.parent.name}</strong>
-              {inherited.parent.geo_label ? (
-                <> — {inherited.parent.geo_label}</>
-              ) : (
-                " (non renseignée — complétez le bloc Originaire ci-dessus)"
-              )}
+              Père renseigné : <strong>{displayName(father)}</strong> — l&apos;origine peut être
+              liée au père via le bloc Originaire ci-dessus.
             </div>
           ) : null}
           <div className="full">
