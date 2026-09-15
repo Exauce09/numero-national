@@ -12,7 +12,7 @@ import {
   IconRing,
   IconSplit,
 } from "../components/Icons";
-import { dashboardVariant } from "../rbac";
+import { dashboardVariant, primaryRole } from "../rbac";
 import { RDC } from "../rdcColors";
 import { listActs } from "../registry";
 
@@ -209,18 +209,22 @@ export default function DashboardPage() {
   const demoAll = demoTemporal ? [4, 5, 7, 6, 9, 8] : allActsSeries;
 
   const helloName = session?.displayName || session?.username || "utilisateur";
+  const rolePrimary = primaryRole(session?.roles ?? []);
   const roleTitle =
     session?.roleTitle ||
     (variant === "provincial"
       ? "Directrice de l'État civil général de la RDC"
       : variant === "judiciaire"
-        ? "Greffier"
+        ? rolePrimary === "JUGE"
+          ? "Juge"
+          : "Greffier"
         : "Officier de l'état civil");
   const territory = [session?.commune_province, session?.commune_ville, session?.commune_name]
     .filter(Boolean)
     .join(" · ");
 
   if (variant === "judiciaire") {
+    const isJuge = rolePrimary === "JUGE";
     const judicialActs = [...divorces, ...adoptions];
     const judicialSeries = countByMonth(judicialActs, months);
     return (
@@ -231,35 +235,38 @@ export default function DashboardPage() {
             <p className="page-lead">
               {roleTitle}
               {territory ? ` · ${territory}` : ""}
-              {" · "}Module judiciaire (greffe) — uniquement vos dossiers de jugement
+              {" · "}
+              {isJuge
+                ? "Module judiciaire (tribunal) — décisions et dossiers de votre juridiction"
+                : "Module judiciaire (greffe) — uniquement vos dossiers de jugement"}
             </p>
           </div>
         </div>
 
         <div className="dash-action-row" style={{ marginBottom: "1.25rem" }}>
+          <button type="button" className="dash-action-card" onClick={() => navigate("/juge")}>
+            <span className="dash-action-label">{isJuge ? "Cas du juge" : "Cadre juge"}</span>
+            <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
+              Supplétif…
+            </strong>
+            <span className="btn-add btn-sm">Voir</span>
+          </button>
           <button type="button" className="dash-action-card" onClick={() => navigate("/transcriptions")}>
-            <span className="dash-action-label">Transcriptions</span>
+            <span className="dash-action-label">{isJuge ? "Dossiers" : "Transcriptions"}</span>
             <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
               Jugements
             </strong>
-            <span className="btn-add btn-sm">Ouvrir</span>
+            <span className="btn-secondary btn-sm">Ouvrir</span>
           </button>
           <button type="button" className="dash-action-card" onClick={() => navigate("/divorces")}>
             <span className="dash-action-label">Divorces</span>
             <strong className="dash-action-value">{divorces.length}</strong>
-            <span className="btn-secondary btn-sm">Transcrire</span>
+            <span className="btn-secondary btn-sm">{isJuge ? "Consulter" : "Transcrire"}</span>
           </button>
           <button type="button" className="dash-action-card" onClick={() => navigate("/adoptions")}>
             <span className="dash-action-label">Adoptions</span>
             <strong className="dash-action-value">{adoptions.length}</strong>
-            <span className="btn-secondary btn-sm">Transcrire</span>
-          </button>
-          <button type="button" className="dash-action-card" onClick={() => navigate("/juge")}>
-            <span className="dash-action-label">Cadre juge</span>
-            <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
-              Supplétif…
-            </strong>
-            <span className="btn-secondary btn-sm">Voir</span>
+            <span className="btn-secondary btn-sm">{isJuge ? "Consulter" : "Transcrire"}</span>
           </button>
         </div>
 
@@ -267,7 +274,7 @@ export default function DashboardPage() {
           <StatCard
             title="Divorces"
             value={divorces.length}
-            subtitle="Transcriptions greffe"
+            subtitle={isJuge ? "Dossiers juridiction" : "Transcriptions greffe"}
             icon={<IconSplit size={22} />}
             color={RDC.redDeep}
             href="/lists/divorce"
@@ -302,7 +309,9 @@ export default function DashboardPage() {
           />
         </div>
 
-        <h3 className="dash-section-title">Activité du greffe</h3>
+        <h3 className="dash-section-title">
+          {isJuge ? "Activité de la juridiction" : "Activité du greffe"}
+        </h3>
         <div className="eg-charts-row dash-charts-main">
           <BarChart
             title="Dossiers judiciaires par type"
@@ -313,7 +322,7 @@ export default function DashboardPage() {
             ]}
           />
           <LineChart
-            title="Transcriptions (6 mois)"
+            title="Dossiers (6 mois)"
             labels={months.map((m) => m.label)}
             series={[{ name: "Dossiers", color: RDC.blue, values: judicialSeries }]}
             height={240}

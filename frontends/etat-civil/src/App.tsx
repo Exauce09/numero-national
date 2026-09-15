@@ -12,7 +12,7 @@ import {
   isSuperAdminNational,
   permissionsForRoles,
 } from "./ecUsers";
-import { isJudicialRole, roleTitleFor } from "./rbac";
+import { isJudicialRole, primaryRole, roleTitleFor } from "./rbac";
 import {
   applyTheme,
   getPrefs,
@@ -309,6 +309,7 @@ function Shell() {
     .join(" · ");
   const roles = session?.roles ?? ["OFFICIER_ETAT_CIVIL"];
   const judicialOnly = isJudicialRole(roles);
+  const judicialKind = primaryRole(roles); // GREFFIER | JUGE when judicial
   const badge = unreadCount();
   const photo = prefs.photoDataUrl || session?.photoDataUrl;
 
@@ -327,7 +328,11 @@ function Shell() {
           <img src="/logo-rdc.jpg" alt="République démocratique du Congo" />
           <strong>État civil — RDC</strong>
           <span>
-            {judicialOnly ? "Module judiciaire · greffe" : "Bureau d'état civil · registres & actes"}
+            {judicialOnly
+              ? judicialKind === "JUGE"
+                ? "Module judiciaire · tribunal"
+                : "Module judiciaire · greffe"
+              : "Bureau d'état civil · registres & actes"}
           </span>
           <button
             type="button"
@@ -351,12 +356,14 @@ function Shell() {
             {!judicialOnly ? <NavLink to="/missions">Missions EC</NavLink> : null}
             <NavLink to="/roles">Qui fait quoi</NavLink>
             {!judicialOnly ? <NavLink to="/matrice">Matrice acteurs & permissions</NavLink> : null}
-            <NavLink to="/juge">Quand le juge intervient</NavLink>
+            <NavLink to="/juge">
+              {judicialKind === "JUGE" ? "Cas relevant du juge" : "Quand le juge intervient"}
+            </NavLink>
           </NavCollapsibleGroup>
           {judicialOnly ? (
             <>
               <NavCollapsibleGroup
-                label="Greffe / jugements"
+                label={judicialKind === "JUGE" ? "Décisions / jugements" : "Greffe / jugements"}
                 icon={<IconUsers size={18} />}
                 activePrefixes={[
                   "/manage/adoption",
@@ -367,11 +374,17 @@ function Shell() {
                   "/mentions",
                 ]}
               >
-                <NavLink to="/transcriptions">Transcriptions de jugements</NavLink>
+                <NavLink to="/transcriptions">
+                  {judicialKind === "JUGE" ? "Dossiers & transcriptions" : "Transcriptions de jugements"}
+                </NavLink>
                 <NavLink to="/manage/adoption">Adoption (après jugement)</NavLink>
-                <NavLink to="/adoptions">+ Enregistrer une adoption</NavLink>
+                {judicialKind !== "JUGE" ? (
+                  <NavLink to="/adoptions">+ Enregistrer une adoption</NavLink>
+                ) : null}
                 <NavLink to="/manage/divorce">Divorce (transcription)</NavLink>
-                <NavLink to="/divorces">+ Enregistrer un divorce</NavLink>
+                {judicialKind !== "JUGE" ? (
+                  <NavLink to="/divorces">+ Enregistrer un divorce</NavLink>
+                ) : null}
                 <NavLink to="/mentions">Mentions & rectifications</NavLink>
               </NavCollapsibleGroup>
               <NavLink to="/documents">
