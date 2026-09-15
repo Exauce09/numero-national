@@ -676,28 +676,24 @@ export default function DeclarationsPage() {
                 />
               </div>
               <div>
-                <label className="form-label">
-                  {editingId ? "Nouveau mot de passe (optionnel)" : "Mot de passe"}
-                </label>
-                <input
-                  className="form-control"
-                  type="password"
+                <PasswordField
+                  label={editingId ? "Nouveau mot de passe (optionnel)" : "Mot de passe"}
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   required={!editingId}
                   placeholder={editingId ? "Laisser vide pour conserver" : undefined}
+                  autoComplete="new-password"
                 />
               </div>
               <div>
-                <label className="form-label">
-                  {editingId ? "Confirmer le nouveau mot de passe" : "Confirmer le mot de passe"}
-                </label>
-                <input
-                  className="form-control"
-                  type="password"
+                <PasswordField
+                  label={
+                    editingId ? "Confirmer le nouveau mot de passe" : "Confirmer le mot de passe"
+                  }
                   value={form.confirmPassword}
                   onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
                   required={!editingId || Boolean(form.password.trim())}
+                  autoComplete="new-password"
                 />
               </div>
               <div className="full" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
