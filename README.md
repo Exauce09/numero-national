@@ -65,7 +65,8 @@ copy .githooks\post-commit .git\hooks\post-commit   # Windows
 │   ├── onip-dashboard/           # ONIP (port 5183)
 │   ├── web-institutional/        # Présidence (port 5174)
 │   ├── citizen-portal/           # Citoyen (port 5175)
-│   ├── civil-officer/            # État civil commune (port 5176)
+│   ├── civil-officer/            # SIGPOP état civil + population (port 5176)
+│   ├── etat-civil/               # Bureau EC RDC pur (port 5180)
 │   ├── gov-modules/              # Hub Santé / Admin (port 5177)
 │   ├── web-interior/             # Intérieur (port 5178)
 │   ├── web-primature/            # Primature (port 5179)
@@ -129,7 +130,8 @@ curl http://localhost:8000/health
 | **ONIP** | `frontends/onip-dashboard` | **5183** | http://127.0.0.1:5183/login |
 | Présidence | `frontends/web-institutional` | 5174 | http://localhost:5174/ |
 | Citoyen | `frontends/citizen-portal` | 5175 | http://localhost:5175/ |
-| État civil | `frontends/civil-officer` | 5176 | http://localhost:5176/ |
+| État civil (SIGPOP) | `frontends/civil-officer` | 5176 | http://localhost:5176/ |
+| **Bureau état civil RDC** | `frontends/etat-civil` | **5180** | http://localhost:5180/ |
 | **Gov / Santé** | `frontends/gov-modules` | **5177** | http://localhost:5177/ |
 | Intérieur | `frontends/web-interior` | 5178 | http://localhost:5178/ |
 | Primature | `frontends/web-primature` | 5179 | http://localhost:5179/ |

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200" role="img" aria-label="Drapeau RDC">
+  <rect width="300" height="200" fill="#007fff"/>
+  <polygon points="0,200 300,0 300,40 40,200" fill="#f7d618"/>
+  <polygon points="0,200 300,0 300,28 28,200" fill="#ce1021"/>
+  <polygon points="36,18 42,36 61,36 46,48 51,66 36,54 21,66 26,48 11,36 30,36" fill="#f7d618"/>
+</svg>
