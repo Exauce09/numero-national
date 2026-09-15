@@ -135,11 +135,12 @@ export function canSeeNav(key: NavKey, roles: string[], permissions?: string[] |
     case "census":
       return isLead || isProvincial || isNational || isOfficier;
     case "admin_personnel":
-      return (isLead || isProvincial || isNational) && (hasPersonnel || hasUserManage || perms.length === 0);
+      // Super admin / national : personnel national. Responsable = utilisateurs bureau via /users.
+      return isNational && (hasPersonnel || hasUserManage || perms.length === 0);
     case "admin_bureaux":
-      return isLead || isProvincial || isNational;
+      return isNational;
     case "admin_accounts":
-      return (isLead || isProvincial || isNational) && (hasAccountReq || hasUserManage || perms.length === 0);
+      return isNational && (hasAccountReq || hasUserManage || perms.length === 0);
     case "cartes":
       return isOfficier || isLead || isProvincial || isNational;
     case "biometrie":

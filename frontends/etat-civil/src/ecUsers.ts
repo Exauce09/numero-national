@@ -248,6 +248,9 @@ export async function createEcUser(
   if (!actor.roles.includes("RESPONSABLE_BUREAU") && !actor.roles.includes("SUPER_ADMIN_NATIONAL")) {
     throw new Error("Seul le super administrateur national ou le responsable de bureau peut créer des utilisateurs.");
   }
+  if (input.roles.includes("SUPER_ADMIN_NATIONAL") && !actor.roles.includes("SUPER_ADMIN_NATIONAL")) {
+    throw new Error("Seul le super administrateur national peut attribuer ce rôle.");
+  }
   const email = input.email.trim().toLowerCase();
   if (getEcUserByEmail(email)) throw new Error("Cet e-mail est déjà utilisé.");
   if (!input.roles.length) throw new Error("Choisissez au moins un rôle.");
@@ -304,14 +307,17 @@ export function permissionsForRoles(roles: string[]): string[] {
     perms.add("documents:write");
   }
   if (r.has("RESPONSABLE_BUREAU")) {
+    // Bureau : gestion locale des utilisateurs du bureau — pas d'admin plateforme.
     perms.add("users:manage");
-    perms.add("admin:*");
+    perms.add("personnel:read");
   }
   if (r.has("SUPER_ADMIN_NATIONAL")) {
     perms.add("users:manage");
     perms.add("admin:*");
     perms.add("account_request:manage");
     perms.add("account_request:create");
+    perms.add("personnel:read");
+    perms.add("personnel:manage");
     perms.add("civil:stats:read");
     perms.add("bureau:read");
   }

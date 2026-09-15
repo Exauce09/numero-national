@@ -75,7 +75,6 @@ import {
   IconCross,
   IconDashboard,
   IconFile,
-  IconHome,
   IconRing,
   IconTable,
   IconUsers,
@@ -150,15 +149,27 @@ function Shell() {
       if (!s?.username) return;
       const local = getEcUserByEmail(s.username);
       if (!local) return;
+      const nextPerms = permissionsForRoles(local.roles);
       const rolesChanged =
         JSON.stringify([...(s.roles ?? [])].sort()) !==
         JSON.stringify([...local.roles].sort());
-      if (!rolesChanged && s.displayName === local.fullName) return;
+      const permsChanged =
+        JSON.stringify([...(s.permissions ?? [])].sort()) !==
+        JSON.stringify([...nextPerms].sort());
+      const title = roleTitleFor(local.roles);
+      if (
+        !rolesChanged &&
+        !permsChanged &&
+        s.displayName === local.fullName &&
+        s.roleTitle === title
+      ) {
+        return;
+      }
       updateSession({
         displayName: local.fullName,
         roles: local.roles,
-        permissions: permissionsForRoles(local.roles),
-        roleTitle: roleTitleFor(local.roles),
+        permissions: nextPerms,
+        roleTitle: title,
       });
       bumpSession((n) => n + 1);
     })();
@@ -415,28 +426,25 @@ function Shell() {
             <IconFile size={18} /> Recherche
           </NavLink>
           {isSuperAdminNational(roles) ? (
-            <NavLink to="/register">
-              <IconUsers size={18} /> Créer un compte
-            </NavLink>
+            <NavCollapsibleGroup
+              label="Administration plateforme"
+              icon={<IconUsers size={18} />}
+              activePrefixes={["/register", "/account-requests", "/admin", "/users"]}
+            >
+              <NavLink to="/register">Créer un compte</NavLink>
+              <NavLink to="/account-requests">Demandes de compte</NavLink>
+              <NavLink to="/users">Utilisateurs</NavLink>
+              {canSeeNav("admin_bureaux", roles, permissions) ? (
+                <NavLink to="/admin/bureaux">Bureaux EC</NavLink>
+              ) : null}
+              {canSeeNav("admin_personnel", roles, permissions) ? (
+                <NavLink to="/admin/personnel">Personnel</NavLink>
+              ) : null}
+            </NavCollapsibleGroup>
           ) : null}
-          {canManageEcUsers(roles) ? (
+          {!isSuperAdminNational(roles) && canManageEcUsers(roles) ? (
             <NavLink to="/users">
-              <IconUsers size={18} /> Utilisateurs
-            </NavLink>
-          ) : null}
-          {canManageEcUsers(roles) ? (
-            <NavLink to="/account-requests">
-              <IconClipboard size={18} /> Demandes de compte
-            </NavLink>
-          ) : null}
-          {canSeeNav("admin_bureaux", roles, permissions) ? (
-            <NavLink to="/admin/bureaux">
-              <IconHome size={18} /> Bureaux EC
-            </NavLink>
-          ) : null}
-          {canSeeNav("admin_personnel", roles, permissions) ? (
-            <NavLink to="/admin/personnel">
-              <IconUsers size={18} /> Personnel
+              <IconUsers size={18} /> Utilisateurs du bureau
             </NavLink>
           ) : null}
         </nav>

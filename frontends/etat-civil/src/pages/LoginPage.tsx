@@ -2,16 +2,12 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { getSession, login } from "../auth";
 import PasswordField from "../components/PasswordField";
-import {
-  CANONICAL_EC_ACCOUNTS,
-  ensureCanonicalAccounts,
-  hasAnyEcUser,
-} from "../ecUsers";
+import { ensureCanonicalAccounts, hasAnyEcUser } from "../ecUsers";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const civil = getSession();
-  const [username, setUsername] = useState(CANONICAL_EC_ACCOUNTS[0].email);
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -36,9 +32,6 @@ export default function LoginPage() {
       setBusy(false);
     }
   }
-
-  const herve = CANONICAL_EC_ACCOUNTS[0];
-  const tshidibi = CANONICAL_EC_ACCOUNTS[1];
 
   return (
     <div className="login-page">
@@ -74,18 +67,6 @@ export default function LoginPage() {
             {busy ? "Connexion…" : "Se connecter"}
           </button>
         </form>
-        <div className="panel" style={{ marginTop: "1rem", textAlign: "left" }}>
-          <p className="muted small" style={{ margin: "0 0 0.5rem" }}>
-            <strong>Hervé</strong> — super admin · <code>{herve.email}</code>
-            <br />
-            MDP initial : <code>{herve.initialPassword}</code>
-          </p>
-          <p className="muted small" style={{ margin: 0 }}>
-            <strong>Tshidibi</strong> — responsable bureau · <code>{tshidibi.email}</code>
-            <br />
-            MDP initial : <code>{tshidibi.initialPassword}</code>
-          </p>
-        </div>
         <p className="login-subtitle" style={{ marginTop: "0.75rem" }}>
           <Link to="/sante/login">Accès maternité / structure sanitaire →</Link>
         </p>

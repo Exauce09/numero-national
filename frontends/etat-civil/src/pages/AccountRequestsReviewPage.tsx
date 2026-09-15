@@ -9,11 +9,11 @@ import {
   listAccountRequests,
 } from "../accountRegistration";
 import { getSession } from "../auth";
-import { canManageEcUsers } from "../ecUsers";
+import { isSuperAdminNational } from "../ecUsers";
 
 export default function AccountRequestsReviewPage() {
   const session = getSession();
-  const canReview = canManageEcUsers(session?.roles);
+  const canReview = isSuperAdminNational(session?.roles);
   const [bump, setBump] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -27,8 +27,8 @@ export default function AccountRequestsReviewPage() {
         <h2 className="page-title">Demandes de compte</h2>
         <div className="panel">
           <p className="muted">
-            Seul le <strong>responsable de bureau</strong> (ou autorité habilitée) peut valider les
-            demandes institutionnelles.
+            Seul le <strong>super administrateur national</strong> peut valider les demandes de
+            compte.
           </p>
           <Link className="btn-secondary btn-sm" to="/matrice">
             Voir la matrice des acteurs

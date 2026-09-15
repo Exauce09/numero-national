@@ -8,6 +8,7 @@ import {
   createEcUser,
   EC_ROLE_CATALOG,
   getEcUserByEmail,
+  isSuperAdminNational,
   listEcUsers,
   setEcUserActive,
   type EcUserRole,
@@ -18,6 +19,10 @@ export default function UsersEcPage() {
   const session = getSession();
   const actor = session?.username ? getEcUserByEmail(session.username) : undefined;
   const canManage = canManageEcUsers(session?.roles);
+  const isSuper = isSuperAdminNational(session?.roles);
+  const roleOptions = EC_ROLE_CATALOG.filter(
+    (r) => isSuper || r.code !== "SUPER_ADMIN_NATIONAL",
+  );
   const [bump, setBump] = useState(0);
   const users = useMemo(() => listEcUsers(), [bump]);
 
@@ -64,7 +69,8 @@ export default function UsersEcPage() {
         <h2 className="page-title">Utilisateurs</h2>
         <div className="panel">
           <p className="muted">
-            Seul le <strong>responsable de bureau</strong> peut créer des comptes. Votre rôle :{" "}
+            Seul le <strong>responsable de bureau</strong> ou le{" "}
+            <strong>super administrateur</strong> peut gérer les comptes bureau. Votre rôle :{" "}
             {(session?.roles ?? []).join(", ") || "—"}.
           </p>
           <Link className="btn-secondary btn-sm" to="/roles">
@@ -85,7 +91,7 @@ export default function UsersEcPage() {
       <div className="panel" style={{ marginBottom: "1.25rem" }}>
         <h3 className="panel-title">Rôles disponibles</h3>
         <ul style={{ margin: 0, paddingLeft: "1.2rem", lineHeight: 1.55 }}>
-          {EC_ROLE_CATALOG.map((r) => (
+          {roleOptions.map((r) => (
             <li key={r.code}>
               <strong>{r.label}</strong> — {r.summary}
             </li>
@@ -140,7 +146,7 @@ export default function UsersEcPage() {
             onChange={(e) => setRole(e.target.value as EcUserRole)}
             disabled={busy}
           >
-            {EC_ROLE_CATALOG.map((r) => (
+            {roleOptions.map((r) => (
               <option key={r.code} value={r.code}>
                 {r.label}
               </option>

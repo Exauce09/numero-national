@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type CivilAct } from "../api";
 import { ensureAccessToken, getSession } from "../auth";
-import { BarChart, LineChart, PieChart, Sparkline } from "../components/Charts";
+import { BarChart, LineChart, PieChart } from "../components/Charts";
+import { isSuperAdminNational } from "../ecUsers";
 import {
   IconBaby,
   IconClipboard,
@@ -47,7 +48,6 @@ function StatCard({
   subtitle,
   icon,
   color,
-  spark,
   href,
 }: {
   title: string;
@@ -55,7 +55,6 @@ function StatCard({
   subtitle: string;
   icon: ReactNode;
   color: string;
-  spark: number[];
   href: string;
 }) {
   const shown = useCountUp(value);
@@ -71,7 +70,6 @@ function StatCard({
       <div className="dash-kpi-value">{shown.toLocaleString("fr-CD")}</div>
       <div className="dash-kpi-foot">
         <span className="dash-kpi-sub">{subtitle}</span>
-        <Sparkline values={spark} color={color} />
       </div>
     </button>
   );
@@ -234,6 +232,15 @@ export default function DashboardPage() {
       </div>
 
       <div className="dash-action-row" style={{ marginBottom: "1.25rem" }}>
+        {isSuperAdminNational(session?.roles) ? (
+          <button type="button" className="dash-action-card" onClick={() => navigate("/register")}>
+            <span className="dash-action-label">Créer un compte</span>
+            <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
+              Plateforme
+            </strong>
+            <span className="btn-add btn-sm">Formulaire</span>
+          </button>
+        ) : null}
         <button type="button" className="dash-action-card" onClick={() => navigate("/procedure")}>
           <span className="dash-action-label">1. Procédure</span>
           <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
@@ -281,7 +288,6 @@ export default function DashboardPage() {
           subtitle="Registre du bureau"
           icon={<IconFile size={22} />}
           color={RDC.blue}
-          spark={demoAll}
           href="/acts"
         />
         <StatCard
@@ -290,7 +296,6 @@ export default function DashboardPage() {
           subtitle="Actes enregistrés"
           icon={<IconBaby size={22} />}
           color={RDC.yellowDeep}
-          spark={demoBirth}
           href="/lists/naissance"
         />
         <StatCard
@@ -299,7 +304,6 @@ export default function DashboardPage() {
           subtitle="Unions civiles"
           icon={<IconRing size={22} />}
           color={RDC.yellow}
-          spark={marriageSeries.some((v) => v > 0) ? marriageSeries : demoAll}
           href="/lists/mariage"
         />
         <StatCard
@@ -308,7 +312,6 @@ export default function DashboardPage() {
           subtitle="Actes de décès"
           icon={<IconCross size={22} />}
           color={RDC.red}
-          spark={demoDeath}
           href="/lists/deces"
         />
         <StatCard
@@ -317,7 +320,6 @@ export default function DashboardPage() {
           subtitle="Dissolutions"
           icon={<IconSplit size={22} />}
           color={RDC.redDeep}
-          spark={demoAll}
           href="/lists/divorce"
         />
         <StatCard
@@ -326,7 +328,6 @@ export default function DashboardPage() {
           subtitle={`${drafts} brouillons · ${submitted} soumis`}
           icon={<IconClipboard size={22} />}
           color={RDC.blueDeep}
-          spark={demoAll}
           href="/declarations"
         />
       </div>
