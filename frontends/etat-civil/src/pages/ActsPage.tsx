@@ -281,7 +281,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
                 <th>Photo</th>
                 <th>N° acte</th>
                 <th>Type</th>
-                <th>Num. national</th>
+                <th>ID naissance</th>
                 <th>Statut</th>
                 <th>Enregistré le</th>
                 <th>Action</th>

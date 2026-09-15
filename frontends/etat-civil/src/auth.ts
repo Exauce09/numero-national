@@ -138,7 +138,7 @@ export async function login(username: string, password: string): Promise<Session
   const local = await verifyEcUser(user, password);
   if (!local) {
     throw new Error(
-      "Identifiants incorrects pour le bureau d'état civil. Compte hôpital ? Utilisez /sante/login.",
+      "Identifiants incorrects. Compte hôpital / maternité ? Utilisez /sante/login. Greffier : le compte doit être créé puis activé par le super admin (Inscription).",
     );
   }
 

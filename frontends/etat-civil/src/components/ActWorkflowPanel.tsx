@@ -511,7 +511,7 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
           </div>
           <ol className="muted small" style={{ margin: "0.5rem 0 0", paddingLeft: "1.2rem", lineHeight: 1.55 }}>
             <li>
-              <strong>État civil</strong> : recherchez par NIC{" "}
+              <strong>État civil</strong> : recherchez par ID naissance{" "}
               <code>{current.national_id || "—"}</code> dans le registre des actes du bureau.
             </li>
             <li>

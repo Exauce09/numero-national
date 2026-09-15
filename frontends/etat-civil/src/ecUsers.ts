@@ -17,6 +17,8 @@ export type EcUserRole =
 export type EcUser = {
   id: string;
   email: string;
+  /** Identifiant de connexion alternatif (login_id sans @). */
+  username?: string;
   fullName: string;
   /** SHA-256 hex du mot de passe. */
   passwordHash: string;
@@ -69,14 +71,14 @@ export const EC_ROLE_CATALOG: Array<{
   {
     code: "GREFFIER",
     label: "Greffier",
-    summary: "Greffe judiciaire : missions, transmissions et dossiers liés au tribunal.",
+    summary: "Greffe judiciaire — consultation et transcriptions liées aux jugements.",
     canCreateUsers: false,
     canValidateActs: false,
   },
   {
     code: "JUGE",
     label: "Juge",
-    summary: "Décisions judiciaires transmises à l'état civil pour transcription.",
+    summary: "Décisions judiciaires (supplétif, etc.) — consultation et références.",
     canCreateUsers: false,
     canValidateActs: false,
   },
@@ -219,7 +221,11 @@ export function hasAnyEcUser(): boolean {
 
 export function getEcUserByEmail(email: string): EcUser | undefined {
   const e = email.trim().toLowerCase();
-  return listEcUsers().find((u) => u.email === e);
+  return listEcUsers().find((u) => u.email === e || (u.username && u.username === e));
+}
+
+export function getEcUserByLogin(login: string): EcUser | undefined {
+  return getEcUserByEmail(login);
 }
 
 export async function createFirstEcUser(input: {
@@ -311,14 +317,9 @@ export function permissionsForRoles(roles: string[]): string[] {
     perms.add("civil:declaration:create");
     perms.add("bureau:read");
   }
-  if (r.has("GREFFIER")) {
+  if (r.has("GREFFIER") || r.has("JUGE")) {
     perms.add("civil:act:read");
-    perms.add("civil:act:write");
-    perms.add("bureau:read");
-    perms.add("documents:read");
-  }
-  if (r.has("JUGE")) {
-    perms.add("civil:act:read");
+    perms.add("civil:stats:read");
     perms.add("bureau:read");
     perms.add("documents:read");
   }
@@ -390,6 +391,7 @@ export function canManageEcUsers(roles: string[] | undefined | null): boolean {
 /** Crée un utilisateur EC à partir d'un hash déjà calculé (inscription plateforme). */
 export function createEcUserFromHash(input: {
   email: string;
+  username?: string;
   fullName: string;
   passwordHash: string;
   roles: EcUserRole[];
@@ -397,7 +399,8 @@ export function createEcUserFromHash(input: {
   createdBy?: string;
 }): EcUser {
   const email = input.email.trim().toLowerCase();
-  const existing = getEcUserByEmail(email);
+  const username = input.username?.trim().toLowerCase() || undefined;
+  const existing = getEcUserByEmail(email) || (username ? getEcUserByLogin(username) : undefined);
   if (existing) return existing;
   if (!input.roles.length) throw new Error("Choisissez au moins un rôle.");
   if (!input.fullName.trim()) throw new Error("Le nom complet est obligatoire.");
@@ -407,6 +410,7 @@ export function createEcUserFromHash(input: {
   const user: EcUser = {
     id: crypto.randomUUID(),
     email,
+    username,
     fullName: input.fullName.trim(),
     passwordHash: input.passwordHash,
     roles: input.roles,

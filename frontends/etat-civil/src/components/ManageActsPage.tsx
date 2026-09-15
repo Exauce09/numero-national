@@ -416,7 +416,7 @@ export default function ManageActsPage({
                 <th>#</th>
                 <th>Photo</th>
                 <th>N° acte</th>
-                <th>Num. national</th>
+                <th>ID naissance</th>
                 {primary ? <th>{primary.label}</th> : null}
                 {secondary ? <th>{secondary.label}</th> : null}
                 {tertiary ? <th>{tertiary.label}</th> : null}

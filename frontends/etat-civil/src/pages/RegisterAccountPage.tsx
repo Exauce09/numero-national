@@ -10,9 +10,11 @@ import {
   checkPasswordStrength,
   getAccountTypeOption,
   getLocalOtpHint,
+  JURIDICTION_OPTIONS,
   maskPhone,
   resendRegistrationOtp,
   submitAccountRegistration,
+  TRIBUNAUX_BY_JURIDICTION,
   verifyRegistrationOtp,
   type AccountRegistrationRequest,
   type AccountRequestType,
@@ -66,6 +68,7 @@ export default function RegisterAccountPage() {
   const [juridiction, setJuridiction] = useState("");
   const [tribunal, setTribunal] = useState("");
   const [idJudiciaire, setIdJudiciaire] = useState("");
+  const tribunalOptions = juridiction ? TRIBUNAUX_BY_JURIDICTION[juridiction] ?? [] : [];
 
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
@@ -145,8 +148,15 @@ export default function RegisterAccountPage() {
       setError("Sélectionnez le lieu d'affectation (province et commune / secteur).");
       return;
     }
+    if (typeOpt.needsJudgeFields && (!juridiction.trim() || !tribunal.trim())) {
+      setError("Sélectionnez d'abord la juridiction, puis le tribunal.");
+      return;
+    }
     setBusy(true);
     try {
+      const institutionValue = typeOpt.needsJudgeFields
+        ? tribunal.trim() || juridiction.trim()
+        : institution;
       const { request, localOtpCode } = await submitAccountRegistration({
         accountType,
         nom,
@@ -159,8 +169,8 @@ export default function RegisterAccountPage() {
         loginId: loginId.trim() || email,
         password,
         matricule,
-        fonction,
-        institution,
+        fonction: typeOpt.showFonction === false ? typeOpt.label : fonction,
+        institution: institutionValue,
         province,
         villeTerritoire,
         communeSecteur,
@@ -257,9 +267,9 @@ export default function RegisterAccountPage() {
               Créez un compte pour un utilisateur de la plateforme nationale de l&apos;état civil.
             </p>
             <p className="register-note muted small">
-              Réservé au <strong>SUPER_ADMIN_NATIONAL</strong> ({session.username}). Le type de
-              compte demandé <strong>n&apos;attribue aucun rôle</strong> automatiquement —
-              l&apos;habilitation se fait séparément.
+              Réservé au <strong>SUPER_ADMIN_NATIONAL</strong> ({session.username}). Après
+              vérification du téléphone, le compte est activé avec le rôle correspondant au type
+              choisi (greffier, officier, hôpital → /sante, etc.).
             </p>
 
             <form className="register-form" onSubmit={(e) => void onSubmitForm(e)} autoComplete="off">
@@ -408,21 +418,23 @@ export default function RegisterAccountPage() {
                         />
                       </div>
                     ) : null}
-                    <div className="full">
-                      <label className="form-label">{typeOpt.institutionLabel || "Institution"} *</label>
-                      <input
-                        className="form-control"
-                        value={institution}
-                        onChange={(e) => setInstitution(e.target.value)}
-                        required
-                        disabled={busy}
-                        placeholder={
-                          accountType === "HOPITAL_MATERNITE"
-                            ? "ex. Hôpital Général de Référence de …"
-                            : undefined
-                        }
-                      />
-                    </div>
+                    {!typeOpt.needsJudgeFields ? (
+                      <div className="full">
+                        <label className="form-label">{typeOpt.institutionLabel || "Institution"} *</label>
+                        <input
+                          className="form-control"
+                          value={institution}
+                          onChange={(e) => setInstitution(e.target.value)}
+                          required
+                          disabled={busy}
+                          placeholder={
+                            accountType === "HOPITAL_MATERNITE"
+                              ? "ex. Hôpital Général de Référence de …"
+                              : undefined
+                          }
+                        />
+                      </div>
+                    ) : null}
                     <div className="full">
                       <label className="form-label">Lieu d&apos;affectation *</label>
                       <GeoCascade
@@ -441,7 +453,11 @@ export default function RegisterAccountPage() {
                       />
                       {!province || !communeSecteur ? (
                         <p className="muted small">
-                          Sélectionnez province puis commune / secteur (obligatoire).
+                          Sélectionnez province puis{" "}
+                          {isKinshasa(geo.province_name)
+                            ? "commune"
+                            : "territoire puis secteur / commune"}{" "}
+                          (obligatoire).
                         </p>
                       ) : null}
                     </div>
@@ -467,23 +483,44 @@ export default function RegisterAccountPage() {
                       <>
                         <div>
                           <label className="form-label">Juridiction *</label>
-                          <input
+                          <select
                             className="form-control"
                             value={juridiction}
-                            onChange={(e) => setJuridiction(e.target.value)}
+                            onChange={(e) => {
+                              setJuridiction(e.target.value);
+                              setTribunal("");
+                            }}
                             required
                             disabled={busy}
-                          />
+                          >
+                            <option value="">— Choisir la juridiction —</option>
+                            {JURIDICTION_OPTIONS.map((j) => (
+                              <option key={j} value={j}>
+                                {j}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                         <div>
                           <label className="form-label">Tribunal *</label>
-                          <input
+                          <select
                             className="form-control"
                             value={tribunal}
                             onChange={(e) => setTribunal(e.target.value)}
                             required
-                            disabled={busy}
-                          />
+                            disabled={busy || !juridiction}
+                          >
+                            <option value="">
+                              {juridiction
+                                ? "— Choisir le tribunal —"
+                                : "— D'abord la juridiction —"}
+                            </option>
+                            {tribunalOptions.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                         <div className="full">
                           <label className="form-label">N° / identifiant professionnel judiciaire</label>

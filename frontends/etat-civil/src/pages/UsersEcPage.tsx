@@ -1,7 +1,8 @@
 /** Gestion des utilisateurs du bureau — après le 1er responsable. */
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { syncHospitalFacilitiesFromRequests } from "../accountRegistration";
 import { getSession } from "../auth";
 import {
   canActorManageUser,
@@ -15,6 +16,11 @@ import {
   setEcUserActive,
   type EcUserRole,
 } from "../ecUsers";
+import {
+  listFacilityAccounts,
+  setFacilityAccountActive,
+  type FacilityAccountPublic,
+} from "../healthAuth";
 import PasswordField from "../components/PasswordField";
 
 export default function UsersEcPage() {
@@ -32,6 +38,16 @@ export default function UsersEcPage() {
     if (!isSuper) return all.filter((u) => !isProtectedPlatformAdmin(u));
     return all;
   }, [bump, isSuper]);
+
+  const facilities = useMemo((): FacilityAccountPublic[] => {
+    if (!isSuper) return [];
+    return listFacilityAccounts();
+  }, [bump, isSuper]);
+
+  useEffect(() => {
+    syncHospitalFacilitiesFromRequests();
+    setBump((n) => n + 1);
+  }, []);
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -93,6 +109,7 @@ export default function UsersEcPage() {
       <h2 className="page-title">Utilisateurs du bureau</h2>
       <p className="page-lead">
         Créez les comptes suivants. Choisissez le rôle selon la fonction réelle.
+        {isSuper ? " Les structures sanitaires (/sante) apparaissent aussi ci-dessous." : null}
       </p>
 
       <div className="panel" style={{ marginBottom: "1.25rem" }}>
@@ -168,12 +185,12 @@ export default function UsersEcPage() {
       </form>
 
       <div className="panel" style={{ marginTop: "1rem" }}>
-        <h3 className="panel-title">Comptes existants</h3>
+        <h3 className="panel-title">Comptes bureau (état civil)</h3>
         <table className="data-table">
           <thead>
             <tr>
               <th>Nom</th>
-              <th>E-mail</th>
+              <th>E-mail / login</th>
               <th>Rôles</th>
               <th>Statut</th>
               <th />
@@ -183,7 +200,15 @@ export default function UsersEcPage() {
             {users.map((u) => (
               <tr key={u.id}>
                 <td>{u.fullName}</td>
-                <td>{u.email}</td>
+                <td>
+                  {u.email}
+                  {u.username ? (
+                    <>
+                      <br />
+                      <span className="muted small">@{u.username}</span>
+                    </>
+                  ) : null}
+                </td>
                 <td>{u.roles.join(", ")}</td>
                 <td>{u.active ? "Actif" : "Désactivé"}</td>
                 <td>
@@ -221,6 +246,66 @@ export default function UsersEcPage() {
           </tbody>
         </table>
       </div>
+
+      {isSuper ? (
+        <div className="panel" style={{ marginTop: "1rem" }}>
+          <h3 className="panel-title">Structures sanitaires (portail /sante)</h3>
+          <p className="muted small" style={{ marginTop: 0 }}>
+            Les hôpitaux / maternités ne se connectent pas ici : utilisez{" "}
+            <Link to="/sante/login">/sante/login</Link>. Ils sont listés pour le suivi national.
+          </p>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Structure</th>
+                <th>Identifiant</th>
+                <th>Type</th>
+                <th>Lieu</th>
+                <th>Statut</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {facilities.map((f) => (
+                <tr key={f.id}>
+                  <td>{f.facilityName}</td>
+                  <td>
+                    <code>@{f.username}</code>
+                  </td>
+                  <td>{f.facilityType}</td>
+                  <td>{f.geo_label || [f.commune_name, f.ville, f.province].filter(Boolean).join(" · ")}</td>
+                  <td>{f.active ? "Actif" : "Désactivé"}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn-secondary btn-sm"
+                      onClick={() => {
+                        try {
+                          setFacilityAccountActive(f.id, !f.active);
+                          setError(null);
+                          setBump((n) => n + 1);
+                        } catch (err) {
+                          setError(err instanceof Error ? err.message : "Action refusée.");
+                        }
+                      }}
+                    >
+                      {f.active ? "Désactiver" : "Réactiver"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!facilities.length ? (
+                <tr>
+                  <td colSpan={6} className="muted">
+                    Aucune structure sanitaire — créez-en via Inscription (type Hôpital) ou
+                    Déclarations.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -138,6 +138,59 @@ const KIN_DISTRICTS: Record<string, string[]> = {
   Tshangu: ["Ndjili", "Kimbanseke", "Masina", "Nsele", "Maluku"],
 };
 
+/** Territoires (et villes) par province — hors Kinshasa (districts urbains). */
+const PROVINCE_TERRITOIRES: Record<string, string[]> = {
+  "Kongo Central": [
+    "Matadi", "Boma", "Muanda", "Kasangulu", "Madimba", "Songololo", "Mbanza-Ngungu",
+    "Luozi", "Seke-Banza", "Kimvula", "Lukula", "Tshela", "Boma-Bungu",
+  ],
+  Kwango: ["Kenge", "Feshi", "Kahemba", "Kasongo-Lunda", "Popokabaka"],
+  Kwilu: ["Bandundu", "Baganga", "Bulungu", "Gungu", "Idiofa", "Masi-Manimba", "Kikwit"],
+  "Mai-Ndombe": ["Inongo", "Kiri", "Kutu", "Mushie", "Oshwe", "Bolobo", "Yumbi"],
+  Équateur: ["Mbandaka", "Bikoro", "Lukolela", "Basankusu", "Bolomba", "Bomongo", "Ingende"],
+  Mongala: ["Lisala", "Bumba", "Bongandanga"],
+  "Nord-Ubangi": ["Gbadolite", "Bosobolo", "Businga", "Mobayi-Mbongo"],
+  "Sud-Ubangi": ["Gemena", "Budjala", "Kungu", "Libenge", "Zongo"],
+  Tshuapa: ["Boende", "Befale", "Djolu", "Ikela", "Monkoto", "Bokungu"],
+  Tshopo: ["Kisangani", "Bafwasende", "Banalia", "Basoko", "Isangi", "Opala", "Ubundu", "Yahuma"],
+  "Bas-Uélé": ["Buta", "Aketi", "Ango", "Bambesa", "Bondo", "Poko"],
+  "Haut-Uélé": ["Isiro", "Dungu", "Faradje", "Niangara", "Rungu", "Wamba", "Watsa"],
+  Ituri: ["Bunia", "Aru", "Djugu", "Irumu", "Mahagi", "Mambasa"],
+  "Nord-Kivu": [
+    "Goma", "Beni", "Butembo", "Lubero", "Masisi", "Nyiragongo", "Rutshuru", "Walikale",
+  ],
+  "Sud-Kivu": [
+    "Bukavu", "Uvira", "Baraka", "Fizi", "Idjwi", "Kabare", "Kalehe", "Mwenga", "Shabunda",
+    "Walungu",
+  ],
+  Maniema: [
+    "Kindu", "Kasongo", "Kabambare", "Kailo", "Kibombo", "Lubutu", "Pangi", "Punia",
+  ],
+  "Haut-Katanga": [
+    "Lubumbashi", "Likasi", "Kipushi", "Kambove", "Kasenga", "Mitwaba", "Pweto", "Sakania",
+  ],
+  Lualaba: ["Kolwezi", "Dilala", "Fungurume", "Kapanga", "Lubudi", "Mutshatsha", "Sandoa"],
+  "Haut-Lomami": ["Kamina", "Bukama", "Kabongo", "Kaniama", "Malemba-Nkulu"],
+  Tanganyika: ["Kalemie", "Kongolo", "Kabalo", "Manono", "Moba", "Nyunzu"],
+  Kasaï: ["Tshikapa", "Ilebo", "Kamonia", "Luebo", "Mweka", "Dekese"],
+  "Kasaï Central": ["Kananga", "Demba", "Dibaya", "Dimbelenge", "Kazumba", "Luiza"],
+  "Kasaï Oriental": ["Mbuji-Mayi", "Miabi", "Kabeya-Kamwanga", "Katanda", "Lupatapata", "Tshilenge"],
+  Lomami: ["Kabinda", "Mwene-Ditu", "Ngandajika", "Kamiji", "Lubao", "Luilu"],
+  Sankuru: [
+    "Lusambo", "Lodja", "Lubefu", "Katako-Kombe", "Kole", "Lomela", "Ototo", "Tshumbe",
+  ],
+};
+
+function secteursForTerritoire(territoireName: string): string[] {
+  return [
+    `${territoireName} Centre`,
+    `Secteur ${territoireName}`,
+    `Groupement Nord — ${territoireName}`,
+    `Groupement Sud — ${territoireName}`,
+    `Chefferie — ${territoireName}`,
+  ];
+}
+
 function provId(code: string) {
   return `prov-${code}`;
 }
@@ -147,8 +200,8 @@ function villeId(provinceName: string, villeName: string) {
 function communeId(villeName: string, communeName: string) {
   return `com-${slug(villeName)}-${slug(communeName)}`;
 }
-function districtId(name: string) {
-  return `dist-kinshasa-${slug(name)}`;
+function districtId(name: string, provinceName = "Kinshasa") {
+  return `dist-${slug(provinceName)}-${slug(name)}`;
 }
 function quartierId(communeIdValue: string, quartierName: string) {
   return `q-${communeIdValue}-${slug(quartierName)}`;
@@ -239,11 +292,22 @@ export function fallbackVilles(provinceId: string): GeoItem[] {
 
 export function fallbackDistricts(provinceId: string): GeoItem[] {
   const p = provinceById(provinceId);
-  if (!p || p.code !== "KIN") return [];
-  return Object.keys(KIN_DISTRICTS)
+  if (!p) return [];
+  if (p.code === "KIN") {
+    return Object.keys(KIN_DISTRICTS)
+      .sort((a, b) => a.localeCompare(b, "fr"))
+      .map((name) => ({
+        id: districtId(name, "Kinshasa"),
+        code: slug(name).toUpperCase().slice(0, 12),
+        name,
+      }));
+  }
+  const territoires = PROVINCE_TERRITOIRES[p.name] ?? [];
+  return territoires
+    .slice()
     .sort((a, b) => a.localeCompare(b, "fr"))
     .map((name) => ({
-      id: districtId(name),
+      id: districtId(name, p.name),
       code: slug(name).toUpperCase().slice(0, 12),
       name,
     }));
@@ -251,13 +315,30 @@ export function fallbackDistricts(provinceId: string): GeoItem[] {
 
 export function fallbackCommunes(opts: { villeId?: string; districtId?: string }): GeoItem[] {
   if (opts.districtId) {
-    const entry = Object.entries(KIN_DISTRICTS).find(([name]) => districtId(name) === opts.districtId);
-    if (!entry) return [];
-    return entry[1].map((name) => ({
-      id: communeId("Kinshasa", name),
-      code: slug(name).toUpperCase().slice(0, 12),
-      name,
-    }));
+    const kinEntry = Object.entries(KIN_DISTRICTS).find(
+      ([name]) => districtId(name, "Kinshasa") === opts.districtId,
+    );
+    if (kinEntry) {
+      return kinEntry[1].map((name) => ({
+        id: communeId("Kinshasa", name),
+        code: slug(name).toUpperCase().slice(0, 12),
+        name,
+      }));
+    }
+    for (const [provName, territoires] of Object.entries(PROVINCE_TERRITOIRES)) {
+      const hit = territoires.find((name) => districtId(name, provName) === opts.districtId);
+      if (hit) {
+        // Si le territoire est aussi une ville du référentiel, utiliser ses communes urbaines.
+        const urban = CITY_COMMUNES[provName]?.[hit];
+        const secteurs = urban?.length ? urban : secteursForTerritoire(hit);
+        return secteurs.map((name) => ({
+          id: communeId(hit, name),
+          code: slug(name).toUpperCase().slice(0, 12),
+          name,
+        }));
+      }
+    }
+    return [];
   }
   if (opts.villeId) {
     for (const [provName, villes] of Object.entries(CITY_COMMUNES)) {

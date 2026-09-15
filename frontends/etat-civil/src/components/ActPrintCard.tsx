@@ -145,7 +145,7 @@ export default function ActPrintCard({
             <strong>{act.act_number}</strong>
           </div>
           <div>
-            <span className="muted">NIC</span>
+            <span className="muted">ID naissance</span>
             <strong>{act.national_id}</strong>
           </div>
           <div>

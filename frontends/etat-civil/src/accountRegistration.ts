@@ -39,17 +39,90 @@ export type AccountTypeOption = {
   portal: "civil" | "sante" | "none";
   /** Rôles EC attribués à l'activation (super admin). */
   assignRoles?: Array<
-    | "AGENT_ETAT_CIVIL"
-    | "OFFICIER_ETAT_CIVIL"
-    | "RESPONSABLE_BUREAU"
-    | "GREFFIER"
-    | "JUGE"
+    "AGENT_ETAT_CIVIL" | "OFFICIER_ETAT_CIVIL" | "RESPONSABLE_BUREAU" | "GREFFIER" | "JUGE"
   >;
   institutionLabel?: string;
   showMatricule?: boolean;
   showFonction?: boolean;
   showService?: boolean;
   serviceOptions?: string[];
+};
+
+/** Juridictions → tribunaux (sélection en cascade à l'inscription judiciaire). */
+export const JURIDICTION_OPTIONS: string[] = [
+  "Cour de cassation",
+  "Cour d'appel",
+  "Tribunal de grande instance (TGI)",
+  "Tribunal de paix",
+  "Tribunal pour enfants",
+  "Parquet près le TGI",
+  "Parquet près la Cour d'appel",
+];
+
+export const TRIBUNAUX_BY_JURIDICTION: Record<string, string[]> = {
+  "Cour de cassation": ["Cour de cassation — Kinshasa"],
+  "Cour d'appel": [
+    "Cour d'appel de Kinshasa/Gombe",
+    "Cour d'appel de Kinshasa/Matete",
+    "Cour d'appel de Matadi",
+    "Cour d'appel de Kikwit",
+    "Cour d'appel de Mbandaka",
+    "Cour d'appel de Kisangani",
+    "Cour d'appel de Goma",
+    "Cour d'appel de Bukavu",
+    "Cour d'appel de Lubumbashi",
+    "Cour d'appel de Kananga",
+    "Cour d'appel de Mbuji-Mayi",
+  ],
+  "Tribunal de grande instance (TGI)": [
+    "TGI Kinshasa/Gombe",
+    "TGI Kinshasa/Kalamu",
+    "TGI Kinshasa/N'Djili",
+    "TGI Matadi",
+    "TGI Boma",
+    "TGI Kikwit",
+    "TGI Bandundu",
+    "TGI Mbandaka",
+    "TGI Kisangani",
+    "TGI Goma",
+    "TGI Butembo",
+    "TGI Bukavu",
+    "TGI Uvira",
+    "TGI Lubumbashi",
+    "TGI Kolwezi",
+    "TGI Kananga",
+    "TGI Mbuji-Mayi",
+    "TGI Kindu",
+  ],
+  "Tribunal de paix": [
+    "TP Kinshasa/Gombe",
+    "TP Kinshasa/Ngaliema",
+    "TP Kinshasa/Limete",
+    "TP Kinshasa/Nsele",
+    "TP Matadi",
+    "TP Kikwit",
+    "TP Goma",
+    "TP Bukavu",
+    "TP Lubumbashi",
+  ],
+  "Tribunal pour enfants": [
+    "TPE Kinshasa",
+    "TPE Lubumbashi",
+    "TPE Goma",
+    "TPE Bukavu",
+  ],
+  "Parquet près le TGI": [
+    "Parquet TGI Kinshasa/Gombe",
+    "Parquet TGI Lubumbashi",
+    "Parquet TGI Goma",
+    "Parquet TGI Bukavu",
+    "Parquet TGI Kisangani",
+  ],
+  "Parquet près la Cour d'appel": [
+    "Parquet près la Cour d'appel de Kinshasa/Gombe",
+    "Parquet près la Cour d'appel de Lubumbashi",
+    "Parquet près la Cour d'appel de Goma",
+  ],
 };
 
 export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
@@ -136,11 +209,11 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     summary: "Module judiciaire — greffe",
     institutional: true,
     portal: "civil",
-    assignRoles: ["GREFFIER"],
     needsJudgeFields: true,
-    institutionLabel: "Greffe / juridiction",
+    assignRoles: ["GREFFIER"],
+    institutionLabel: "Greffe",
     showMatricule: true,
-    showFonction: true,
+    showFonction: false,
     showService: true,
     serviceOptions: ["Greffe civil", "Greffe du tribunal"],
   },
@@ -150,11 +223,11 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     summary: "Décisions judiciaires — après habilitation",
     institutional: true,
     portal: "civil",
-    assignRoles: ["JUGE"],
     needsJudgeFields: true,
+    assignRoles: ["JUGE"],
     institutionLabel: "Tribunal",
     showMatricule: true,
-    showFonction: true,
+    showFonction: false,
     showService: false,
   },
   {
@@ -164,9 +237,10 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     institutional: true,
     portal: "civil",
     needsJudgeFields: true,
+    assignRoles: ["JUGE"],
     institutionLabel: "Parquet",
     showMatricule: true,
-    showFonction: true,
+    showFonction: false,
     showService: true,
     serviceOptions: ["Parquet près le TGI", "Parquet près la Cour"],
   },
@@ -613,9 +687,11 @@ export function provisionCivilUserFromRequest(req: AccountRegistrationRequest): 
   if (req.status !== "ACTIVE" || !req.password_hash) return;
   const type = getAccountTypeOption(req.accountType);
   if (type.portal !== "civil" || !type.assignRoles?.length) return;
-  const email = (req.login_id.includes("@") ? req.login_id : req.email).toLowerCase();
+  const login = req.login_id.trim().toLowerCase();
+  const email = (login.includes("@") ? login : (req.email || `${login}@ec.local`)).toLowerCase();
   createEcUserFromHash({
     email,
+    username: login.includes("@") ? undefined : login,
     fullName: `${req.prenom} ${req.postnom} ${req.nom}`.replace(/\s+/g, " ").trim(),
     passwordHash: req.password_hash,
     roles: type.assignRoles as EcUserRole[],
@@ -634,7 +710,7 @@ function activateProvisionedAccess(req: AccountRegistrationRequest): void {
   provisionCivilUserFromRequest(req);
 }
 
-/** Répare les inscriptions hôpital ACTIVE sans compte /sante (créations antérieures). */
+/** Répare les inscriptions ACTIVE sans compte EC /sante (créations antérieures). */
 export function syncHospitalFacilitiesFromRequests(): FacilityAccountPublic[] {
   const created: FacilityAccountPublic[] = [];
   for (const req of loadRequests()) {
