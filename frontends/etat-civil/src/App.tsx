@@ -36,6 +36,9 @@ import ActQrScanPage from "./pages/ActQrScanPage";
 import SearchPage from "./pages/SearchPage";
 import DeclarationsPage from "./pages/DeclarationsPage";
 import MissionsEcPage from "./pages/MissionsEcPage";
+import ProcedureEcPage from "./pages/ProcedureEcPage";
+import RolesEcPage from "./pages/RolesEcPage";
+import JugeEcPage from "./pages/JugeEcPage";
 import RecognitionsPage from "./pages/RecognitionsPage";
 import TranscriptionsPage from "./pages/TranscriptionsPage";
 import CorrectionsInboxPage from "./pages/CorrectionsInboxPage";
@@ -57,7 +60,6 @@ import {
   IconFile,
   IconHome,
   IconRing,
-  IconSplit,
   IconTable,
   IconUsers,
 } from "./components/Icons";
@@ -274,12 +276,80 @@ function Shell() {
           <NavLink to="/" end>
             <IconDashboard size={18} /> Tableau de bord
           </NavLink>
-          <NavLink to="/missions">
-            <IconClipboard size={18} /> Missions EC
-          </NavLink>
+          <NavCollapsibleGroup
+            label="Cadre & procédure"
+            icon={<IconClipboard size={18} />}
+            activePrefixes={["/procedure", "/missions", "/roles", "/juge"]}
+          >
+            <NavLink to="/procedure">Procédure d&apos;enregistrement</NavLink>
+            <NavLink to="/missions">Missions EC</NavLink>
+            <NavLink to="/roles">Qui fait quoi</NavLink>
+            <NavLink to="/juge">Quand le juge intervient</NavLink>
+          </NavCollapsibleGroup>
           <NavLink to="/declarations">
-            <IconClipboard size={18} /> Déclarations (santé)
+            <IconClipboard size={18} /> Déclarations à valider
           </NavLink>
+          <NavCollapsibleGroup
+            label="Registres"
+            icon={<IconFile size={18} />}
+            activePrefixes={[
+              "/manage/naissance",
+              "/manage/mariage",
+              "/manage/deces",
+              "/births",
+              "/marriages",
+              "/deaths",
+              "/lists/naissance",
+              "/lists/mariage",
+              "/lists/deces",
+            ]}
+          >
+            <NavLink to="/manage/naissance">
+              <IconBaby size={16} /> Naissances
+            </NavLink>
+            <NavLink to="/births">+ Enregistrer naissance</NavLink>
+            <NavLink to="/manage/mariage">
+              <IconRing size={16} /> Mariages
+            </NavLink>
+            <NavLink to="/marriages">+ Enregistrer mariage</NavLink>
+            <NavLink to="/manage/deces">
+              <IconCross size={16} /> Décès
+            </NavLink>
+            <NavLink to="/deaths">+ Enregistrer décès</NavLink>
+          </NavCollapsibleGroup>
+          <NavCollapsibleGroup
+            label="Actes liés"
+            icon={<IconUsers size={18} />}
+            activePrefixes={[
+              "/recognitions",
+              "/manage/adoption",
+              "/manage/divorce",
+              "/adoptions",
+              "/divorces",
+            ]}
+          >
+            <NavLink to="/recognitions">Reconnaissances</NavLink>
+            <NavLink to="/manage/adoption">Adoptions (après juge)</NavLink>
+            <NavLink to="/manage/divorce">Divorces (transcription)</NavLink>
+          </NavCollapsibleGroup>
+          <NavCollapsibleGroup
+            label="Mentions & documents"
+            icon={<IconFile size={18} />}
+            activePrefixes={[
+              "/acts",
+              "/transcriptions",
+              "/corrections",
+              "/documents",
+              "/verify-document",
+            ]}
+          >
+            <NavLink to="/acts">Registre des actes</NavLink>
+            <NavLink to="/transcriptions">Transcriptions</NavLink>
+            <NavLink to="/corrections">Rectifications</NavLink>
+            <NavLink to="/documents">Copies & extraits</NavLink>
+            <NavLink to="/verify-document">Vérifier document</NavLink>
+            <NavLink to="/acts/qrcode">QR code</NavLink>
+          </NavCollapsibleGroup>
           <NavLink
             to="/synoptique/naissances"
             className={({ isActive }) =>
@@ -288,44 +358,6 @@ function Shell() {
           >
             <IconTable size={18} /> Tableau synoptique
           </NavLink>
-          <NavLink to="/manage/naissance">
-            <IconBaby size={18} /> Naissances
-          </NavLink>
-          <NavLink to="/manage/mariage">
-            <IconRing size={18} /> Mariages
-          </NavLink>
-          <NavLink to="/manage/deces">
-            <IconCross size={18} /> Décès
-          </NavLink>
-          <NavLink to="/recognitions">
-            <IconUsers size={18} /> Reconnaissances
-          </NavLink>
-          <NavLink to="/manage/adoption">
-            <IconHome size={18} /> Adoptions
-          </NavLink>
-          <NavLink to="/manage/divorce">
-            <IconSplit size={18} /> Divorces
-          </NavLink>
-          <NavCollapsibleGroup
-            label="Actes & documents"
-            icon={<IconFile size={18} />}
-            activePrefixes={[
-              "/acts",
-              "/declarations",
-              "/transcriptions",
-              "/corrections",
-              "/documents",
-              "/verify-document",
-            ]}
-          >
-            <NavLink to="/acts">Registre des actes</NavLink>
-            <NavLink to="/acts/qrcode">QR code</NavLink>
-            <NavLink to="/declarations">Déclarations</NavLink>
-            <NavLink to="/transcriptions">Transcriptions</NavLink>
-            <NavLink to="/corrections">Rectifications</NavLink>
-            <NavLink to="/documents">Copies & extraits</NavLink>
-            <NavLink to="/verify-document">Vérifier document</NavLink>
-          </NavCollapsibleGroup>
           <NavLink to="/search">
             <IconFile size={18} /> Recherche
           </NavLink>
@@ -423,7 +455,10 @@ function Shell() {
         <main className="shell">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
+            <Route path="/procedure" element={<ProcedureEcPage />} />
             <Route path="/missions" element={<MissionsEcPage />} />
+            <Route path="/roles" element={<RolesEcPage />} />
+            <Route path="/juge" element={<JugeEcPage />} />
             <Route path="/synoptique" element={<SynopticPage />} />
             <Route path="/synoptique/:section" element={<SynopticPage />} />
             <Route path="/manage/deces" element={<ManageDecesPage />} />

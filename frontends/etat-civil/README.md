@@ -1,6 +1,6 @@
 # Bureau d’état civil (RDC)
 
-Application dédiée aux **faits d’état civil** : naissance, mariage, divorce, décès, adoption, reconnaissance, documents — d’après le cahier `projets.docx`.
+Portail dédié aux **faits d’état civil** selon la procédure réelle en RDC.
 
 ## Lancer
 
@@ -10,30 +10,31 @@ npm install
 npm run dev
 ```
 
-- Bureau officier : [http://localhost:5180/login](http://localhost:5180/login) — `officier` / `DemoCivil2026!`
-- Maternité / santé : [http://localhost:5180/sante/login](http://localhost:5180/sante/login) — `hopital` / `DemoSante2026!`
+| Accès | URL | Compte |
+|-------|-----|--------|
+| Officier / agent | http://localhost:5180/login | `officier` / `DemoCivil2026!` |
+| Maternité / santé | http://localhost:5180/sante/login | `hopital` / `DemoSante2026!` |
 
-## Flux naissance (cahier)
+## Ordre à suivre pour enregistrer
 
-1. **Structure sanitaire** (maternité) : login → enregistre naissance (smartphone, offline possible) → sync → déclaration transmise à l’officier de la commune (ex. Quartier Golf → Gombe).
-2. **Officier d’état civil** : valide la déclaration → registre → remontée provinciale / nationale.
-3. **Bureau EC** : l’agent peut aussi enregistrer directement une naissance (même formulaires).
+1. Lire **Procédure** → `/procedure`
+2. **Qui fait quoi** → `/roles` · **Juge** → `/juge`
+3. Canal A : maternité déclare → `/sante` → sync  
+   Canal B : saisie directe → `/births` (ou mariage / décès)
+4. Officier valide les déclarations santé → `/declarations`
+5. Registres : naissances / mariages / décès
+6. Actes liés : reconnaissance · adoption (après juge) · divorce (transcription)
+7. Mentions, transcriptions, copies & extraits
 
-## Aligné sur le cahier
+## Contenu aligné
 
-| Exigence | Statut |
-|----------|--------|
-| Faits EC uniquement (pas recensement / biométrie / N° national) | OK — UI dédiée |
-| ID naissance / code dossier (pas NIC) | OK sur formulaire naissance |
-| Adresse de la mère | OK |
-| Originaire : Province → Territoire → Secteur → Village | OK (`originRural`) |
-| Canal maternité → officier | OK `/sante/*` + `/declarations` |
-| Mariage, divorce, décès, adoption, documents | OK |
+- 3 registres + actes liés + mentions / copies  
+- ID naissance (pas de N° national)  
+- Adresse mère + originaire Province → Territoire → Secteur → Village  
+- Hors délai / jugement supplétif : référence jugement obligatoire  
+- Divorce & adoption : transcription après juge  
+- Canal maternité → file officier  
 
-## Encore à renforcer
+## Hors périmètre
 
-- Sync offline APK/smartphone maternité (stockage local + push) côté app mobile dédiée
-- Remontée automatique province / national après validation (workflow multi-niveaux)
-- Mise à jour temps réel population vivante au décès (déjà côté SIGPOP, pas ici)
-- Langue / tribu sur fiche enfant (optionnels, à brancher si demandé)
-- Nettoyage fichiers legacy non routés (census/biometric pages orphelines)
+Recensement, biométrie, cartes d’identité, registre population national → SIGPOP `:5176` / `:5183`.

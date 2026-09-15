@@ -356,10 +356,11 @@ export default function DeclarationsPage() {
       <p className="eg-breadcrumb">
         <Link to="/">Accueil</Link> / <Link to="/acts">Actes & documents</Link> / Structures sanitaires
       </p>
-      <h2 className="page-title">Structures sanitaires</h2>
+      <h2 className="page-title">Déclarations santé → validation officier</h2>
       <p className="page-lead">
-        Créez et gérez les structures sanitaires. Chaque structure affiche les statistiques garçon / fille /
-        total. Validez aussi la file des déclarations naissances et décès.
+        File d&apos;attente des déclarations maternité / structures sanitaires. L&apos;officier
+        contrôle et valide pour inscription au registre. Comptes structures ci-dessous.{" "}
+        <a href="/procedure">Procédure</a> · <a href="/sante/login">Espace santé</a>
       </p>
       <ActsDocsNav />
 

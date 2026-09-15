@@ -17,6 +17,7 @@ export default function DivorcesPage() {
   const [epoux, setEpoux] = useState<Person | null>(null);
   const [epouse, setEpouse] = useState<Person | null>(null);
   const [numeroMariage, setNumeroMariage] = useState("");
+  const [refJugement, setRefJugement] = useState("");
   const [cause, setCause] = useState("");
   const [temoin1, setTemoin1] = useState<Person | null>(null);
   const [temoin2, setTemoin2] = useState<Person | null>(null);
@@ -41,6 +42,12 @@ export default function DivorcesPage() {
       setError("Aucun mariage actif trouvé pour ces personnes.");
       return;
     }
+    if (!refJugement.trim()) {
+      setError(
+        "Référence du jugement de divorce obligatoire — l'officier transcrit, il ne prononce pas le divorce.",
+      );
+      return;
+    }
     try {
       const officer = getLoggedOfficer();
       const payload = {
@@ -49,6 +56,8 @@ export default function DivorcesPage() {
         epouse_id: epouse.id,
         epouse_name: displayName(epouse),
         numero_mariage: numeroMariage,
+        ref_jugement: refJugement.trim(),
+        transcription_jugement: true,
         cause,
         officier_id: officer?.userId ?? officer?.username ?? null,
         officier_name: officer?.displayName ?? null,
@@ -71,8 +80,11 @@ export default function DivorcesPage() {
 
   return (
     <div>
-      <h2 className="page-title">Divorce</h2>
-      <p className="page-lead">Dissolution d&apos;un mariage actif enregistré.</p>
+      <h2 className="page-title">Divorce — transcription</h2>
+      <p className="page-lead">
+        L&apos;officier <strong>ne prononce pas</strong> le divorce : il transcrit le{" "}
+        <strong>jugement</strong> et porte les mentions. Voir <a href="/juge">cas juge</a>.
+      </p>
 
       <div className="panel">
         <form className="form-grid" onSubmit={onSubmit}>
@@ -88,7 +100,17 @@ export default function DivorcesPage() {
             <input className="form-control" value={numeroMariage} readOnly />
           </div>
           <div>
-            <label className="form-label">Date du divorce</label>
+            <label className="form-label">Réf. jugement de divorce *</label>
+            <input
+              className="form-control"
+              value={refJugement}
+              onChange={(e) => setRefJugement(e.target.value)}
+              placeholder="Jugement n° … / Tribunal …"
+              required
+            />
+          </div>
+          <div>
+            <label className="form-label">Date du divorce (jugement)</label>
             <input
               className="form-control"
               type="date"
@@ -98,7 +120,7 @@ export default function DivorcesPage() {
             />
           </div>
           <div className="full">
-            <label className="form-label">Cause</label>
+            <label className="form-label">Cause / motif (optionnel)</label>
             <input className="form-control" value={cause} onChange={(e) => setCause(e.target.value)} />
           </div>
           <div className="full">
@@ -111,8 +133,8 @@ export default function DivorcesPage() {
             <PersonPicker label="Témoin 2" value={temoin2} onChange={setTemoin2} />
           </div>
           <div className="full">
-            <button className="btn-primary" style={{ width: "auto", minWidth: 180 }} type="submit">
-              Enregistrer le divorce
+            <button className="btn-primary" style={{ width: "auto", minWidth: 220 }} type="submit">
+              Transcrire le jugement de divorce
             </button>
           </div>
         </form>
@@ -120,7 +142,7 @@ export default function DivorcesPage() {
 
       {created ? (
         <div className="panel" style={{ marginTop: "1rem" }}>
-          <div className="success-banner">Acte de divorce créé</div>
+          <div className="success-banner">Transcription de divorce enregistrée</div>
           <ActPrintCard act={created} />
         </div>
       ) : null}

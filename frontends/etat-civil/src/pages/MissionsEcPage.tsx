@@ -1,24 +1,54 @@
 /** Catalogue des missions d'état civil en RDC. */
 
 import { Link } from "react-router-dom";
-import { EC_OUT_OF_SCOPE, EC_RDC_MISSIONS } from "../ecRdc";
+import {
+  EC_OUT_OF_SCOPE,
+  EC_RDC_MISSIONS,
+  EC_REGISTRES,
+} from "../ecRdc";
 
 export default function MissionsEcPage() {
   return (
     <div>
       <h2 className="page-title">Missions de l&apos;état civil</h2>
       <p className="page-lead">
-        Ce portail ne couvre que le service d&apos;état civil tel qu&apos;il est exercé en République
-        démocratique du Congo : registres, actes, mentions, transcriptions et délivrance de copies.
+        Service d&apos;état civil RDC : registres, actes, mentions, transcriptions et copies — hors
+        recensement, biométrie et numéro national.
       </p>
 
+      <div className="dash-action-row" style={{ marginBottom: "1.25rem" }}>
+        <Link className="dash-action-card" to="/procedure" style={{ textDecoration: "none" }}>
+          <span className="dash-action-label">Procédure</span>
+          <strong className="dash-action-value" style={{ fontSize: "1rem" }}>
+            Pas à pas
+          </strong>
+          <span className="btn-add btn-sm">Suivre</span>
+        </Link>
+        <Link className="dash-action-card" to="/roles" style={{ textDecoration: "none" }}>
+          <span className="dash-action-label">Rôles</span>
+          <strong className="dash-action-value" style={{ fontSize: "1rem" }}>
+            Qui fait quoi
+          </strong>
+          <span className="btn-secondary btn-sm">Voir</span>
+        </Link>
+        <Link className="dash-action-card" to="/juge" style={{ textDecoration: "none" }}>
+          <span className="dash-action-label">Juge</span>
+          <strong className="dash-action-value" style={{ fontSize: "1rem" }}>
+            Cas spéciaux
+          </strong>
+          <span className="btn-secondary btn-sm">Ouvrir</span>
+        </Link>
+      </div>
+
       <div className="panel" style={{ marginBottom: "1.25rem" }}>
-        <h3 className="panel-title">Cadre du bureau</h3>
-        <p className="muted" style={{ margin: 0 }}>
-          L&apos;officier d&apos;état civil de la commune (ou du ressort territorial compétent) tient
-          les registres, reçoit les déclarations, établit les actes, porte les mentions marginales et
-          délivre copies et extraits aux personnes habilitées.
-        </p>
+        <h3 className="panel-title">Trois registres principaux</h3>
+        <ul style={{ margin: 0, paddingLeft: "1.2rem" }}>
+          {EC_REGISTRES.map((r) => (
+            <li key={r.id}>
+              <Link to={r.href}>{r.title}</Link> — {r.summary}
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div
@@ -38,6 +68,11 @@ export default function MissionsEcPage() {
           >
             <h3 className="panel-title" style={{ marginTop: 0 }}>
               {m.title}
+              {m.needsJudge ? (
+                <span className="status-badge" style={{ marginLeft: 8, fontSize: "0.7rem" }}>
+                  JUGE
+                </span>
+              ) : null}
             </h3>
             <p className="muted" style={{ margin: "0 0 0.75rem", fontSize: "0.92rem" }}>
               {m.summary}
@@ -55,14 +90,14 @@ export default function MissionsEcPage() {
       </div>
 
       <div className="panel">
-        <h3 className="panel-title">Hors périmètre de ce portail</h3>
+        <h3 className="panel-title">Hors périmètre</h3>
         <ul className="muted" style={{ margin: 0, paddingLeft: "1.2rem" }}>
           {EC_OUT_OF_SCOPE.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
         <p className="muted small" style={{ margin: "0.85rem 0 0" }}>
-          Ces fonctions restent dans SIGPOP / civil-officer (port 5176) ou les modules dédiés.
+          Ces fonctions restent sur SIGPOP (port 5176 / 5183).
         </p>
       </div>
     </div>

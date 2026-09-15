@@ -64,7 +64,10 @@ export default function DeathsPage() {
   return (
     <div>
       <h2 className="page-title">Décès</h2>
-      <p className="page-lead">Enregistrement d&apos;un acte de décès (cause, lieux, dates, responsable).</p>
+      <p className="page-lead">
+        Registre des décès : cause, lieux, dates, responsable. Canal santé possible via{" "}
+        <a href="/sante/login">maternité / structure</a> puis validation officier.
+      </p>
       <GpsLocatePanel
         title="GPS — lieu du décès"
         onResolved={(g) => setGeoDeces((prev) => applyGpsToGeo(prev, g))}

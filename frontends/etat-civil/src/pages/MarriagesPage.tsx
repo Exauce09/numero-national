@@ -94,7 +94,10 @@ export default function MarriagesPage() {
   return (
     <div>
       <h2 className="page-title">Mariages</h2>
-      <p className="page-lead">Célébration et enregistrement d&apos;un mariage civil.</p>
+      <p className="page-lead">
+        Célébration / enregistrement civil devant l&apos;officier (âge ≥ 18, état civil compatible).{" "}
+        <a href="/procedure">Procédure</a>
+      </p>
 
       <div className="panel">
         <form className="form-grid" onSubmit={onSubmit}>

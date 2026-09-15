@@ -230,9 +230,38 @@ export default function DashboardPage() {
           <p className="page-lead">
             {roleTitle}
             {territory ? ` · ${territory}` : ""}
-            {" · "}Bureau d&apos;état civil (actes uniquement)
+            {" · "}Bureau d&apos;état civil
           </p>
         </div>
+      </div>
+
+      <div className="dash-action-row" style={{ marginBottom: "1.25rem" }}>
+        <button type="button" className="dash-action-card" onClick={() => navigate("/procedure")}>
+          <span className="dash-action-label">1. Procédure</span>
+          <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
+            Suivre
+          </strong>
+          <span className="btn-add btn-sm">Pas à pas</span>
+        </button>
+        <button type="button" className="dash-action-card" onClick={() => navigate("/declarations")}>
+          <span className="dash-action-label">2. Déclarations santé</span>
+          <strong className="dash-action-value">{submitted}</strong>
+          <span className="btn-secondary btn-sm">Valider</span>
+        </button>
+        <button type="button" className="dash-action-card" onClick={() => navigate("/births")}>
+          <span className="dash-action-label">3. Naissance bureau</span>
+          <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
+            Enregistrer
+          </strong>
+          <span className="btn-secondary btn-sm">Formulaire</span>
+        </button>
+        <button type="button" className="dash-action-card" onClick={() => navigate("/juge")}>
+          <span className="dash-action-label">Cas juge</span>
+          <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
+            Supplétif…
+          </strong>
+          <span className="btn-secondary btn-sm">Voir</span>
+        </button>
       </div>
 
       {apiError ? (

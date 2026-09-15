@@ -1,4 +1,5 @@
 import { FormEvent, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import ActPrintActions from "../components/ActPrintActions";
 import ActPrintCard from "../components/ActPrintCard";
 import { getSession } from "../auth";
@@ -76,6 +77,7 @@ export default function BirthsPage() {
   const [mandataireNom, setMandataireNom] = useState("");
   const [mandataireQualite, setMandataireQualite] = useState("");
   const [mandatairePiece, setMandatairePiece] = useState("");
+  const [refJugement, setRefJugement] = useState("");
   const [hopitalNaissance, setHopitalNaissance] = useState("");
   const [hopitalAutre, setHopitalAutre] = useState("");
   const [mother, setMother] = useState<Person | null>(null);
@@ -135,6 +137,14 @@ export default function BirthsPage() {
     }
     if (modeEnregistrement === "avec_procuration" && !mandataireNom.trim()) {
       setError("Avec procuration : indiquez le nom du mandataire.");
+      return;
+    }
+    const needsJuge =
+      delaiEnregistrement === "HORS_DELAI" || modeEnregistrement === "jugement_suppletif";
+    if (needsJuge && !refJugement.trim()) {
+      setError(
+        "Hors délai ou jugement supplétif : indiquez la référence du jugement (le juge intervient avant l'inscription).",
+      );
       return;
     }
 
@@ -246,6 +256,8 @@ export default function BirthsPage() {
           modeEnregistrement === "avec_procuration" ? mandataireQualite.trim() || null : null,
         mandataire_piece:
           modeEnregistrement === "avec_procuration" ? mandatairePiece.trim() || null : null,
+        ref_jugement_suppletif: needsJuge ? refJugement.trim() : null,
+        juge_requis: needsJuge,
         hopital_naissance: hopitalResolved || null,
         geo_naissance: geoPayload,
         quartier_naissance: geoNaissance.quartier_name || null,
@@ -306,6 +318,7 @@ export default function BirthsPage() {
       setMandataireNom("");
       setMandataireQualite("");
       setMandatairePiece("");
+      setRefJugement("");
       setHopitalNaissance("");
       setHopitalAutre("");
       setMother(null);
@@ -353,10 +366,20 @@ export default function BirthsPage() {
 
   return (
     <div>
-      <h2 className="page-title">Naissances</h2>
+      <h2 className="page-title">Naissances — enregistrement</h2>
       <p className="page-lead">
-        Enregistrement des nouveau-nés non enregistrés en structure sanitaire.
+        Canal bureau EC. Mère obligatoire · adresse mère · originaire · ID naissance (pas de N°
+        national).{" "}
+        <Link to="/procedure">Procédure</Link> · <Link to="/juge">Juge</Link> ·{" "}
+        <Link to="/declarations">Déclarations santé</Link>
       </p>
+      <div className="panel" style={{ marginBottom: "1rem" }}>
+        <p className="muted" style={{ margin: 0, fontSize: "0.92rem" }}>
+          <strong>Dans le délai (≤ {NEWBORN_DELAI_JOURS} j.)</strong> : enregistrement classique.{" "}
+          <strong>Hors délai</strong> : jugement supplétif + référence du jugement obligatoire.
+          Maternité : déclarer via <Link to="/sante/login">/sante</Link> puis valider ici.
+        </p>
+      </div>
       <GpsLocatePanel
         title="Localisation GPS du lieu"
         onResolved={(g) => {
@@ -481,6 +504,22 @@ export default function BirthsPage() {
                 />
               </div>
             </>
+          ) : null}
+          {delaiEnregistrement === "HORS_DELAI" || modeEnregistrement === "jugement_suppletif" ? (
+            <div className="full">
+              <label className="form-label">Référence du jugement supplétif *</label>
+              <input
+                className="form-control"
+                value={refJugement}
+                onChange={(e) => setRefJugement(e.target.value)}
+                placeholder="Ex. Jugement n° … / Tribunal de … / date …"
+                required
+              />
+              <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
+                Le juge autorise l&apos;inscription ; l&apos;officier enregistre ensuite.{" "}
+                <Link to="/juge">Voir les cas juge</Link>
+              </p>
+            </div>
           ) : null}
           <div className="full">
             <GeoCascade

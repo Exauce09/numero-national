@@ -10,6 +10,7 @@ export default function AdoptionsPage() {
   const [tuteur, setTuteur] = useState<Person | null>(null);
   const [enfant, setEnfant] = useState<Person | null>(null);
   const [motif, setMotif] = useState("");
+  const [refJugement, setRefJugement] = useState("");
   const [dateAdoption, setDateAdoption] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Act | null>(null);
@@ -21,6 +22,12 @@ export default function AdoptionsPage() {
       setError("Tuteur et enfant sont obligatoires.");
       return;
     }
+    if (!refJugement.trim()) {
+      setError(
+        "Référence du jugement d'adoption obligatoire — l'officier enregistre après la décision du juge.",
+      );
+      return;
+    }
     try {
       const officer = getLoggedOfficer();
       const geo = geoFromOfficer();
@@ -30,6 +37,8 @@ export default function AdoptionsPage() {
         enfant_id: enfant.id,
         enfant_name: displayName(enfant),
         motif: motif.trim() || null,
+        ref_jugement: refJugement.trim(),
+        apres_jugement: true,
         officier_id: officer?.userId ?? officer?.username ?? null,
         officier_name: officer?.displayName ?? null,
         officier_username: officer?.username ?? null,
@@ -47,8 +56,11 @@ export default function AdoptionsPage() {
 
   return (
     <div>
-      <h2 className="page-title">Adoption</h2>
-      <p className="page-lead">Enregistrement d&apos;un acte d&apos;adoption.</p>
+      <h2 className="page-title">Adoption — après jugement</h2>
+      <p className="page-lead">
+        L&apos;officier n&apos;adopte pas : il enregistre / mentionne après décision judiciaire.{" "}
+        <a href="/juge">Cas juge</a>.
+      </p>
 
       <div className="panel">
         <form className="form-grid" onSubmit={onSubmit}>
@@ -58,6 +70,16 @@ export default function AdoptionsPage() {
           </div>
           <div className="full">
             <PersonPicker label="Enfant" value={enfant} onChange={setEnfant} required />
+          </div>
+          <div className="full">
+            <label className="form-label">Réf. jugement d&apos;adoption *</label>
+            <input
+              className="form-control"
+              value={refJugement}
+              onChange={(e) => setRefJugement(e.target.value)}
+              placeholder="Jugement n° … / Tribunal …"
+              required
+            />
           </div>
           <div className="full">
             <label className="form-label">Remarque / motif (optionnel)</label>
@@ -85,8 +107,8 @@ export default function AdoptionsPage() {
             />
           </div>
           <div className="full">
-            <button className="btn-primary" style={{ width: "auto", minWidth: 180 }} type="submit">
-              Enregistrer l&apos;adoption
+            <button className="btn-primary" style={{ width: "auto", minWidth: 220 }} type="submit">
+              Enregistrer l&apos;adoption (après juge)
             </button>
           </div>
         </form>
