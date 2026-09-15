@@ -10,6 +10,8 @@ export type EcUserRole =
   | "RESPONSABLE_BUREAU"
   | "OFFICIER_ETAT_CIVIL"
   | "AGENT_ETAT_CIVIL"
+  | "GREFFIER"
+  | "JUGE"
   | "AUDITEUR";
 
 export type EcUser = {
@@ -61,6 +63,20 @@ export const EC_ROLE_CATALOG: Array<{
     code: "AGENT_ETAT_CIVIL",
     label: "Agent de l'état civil",
     summary: "Saisie et préparation des dossiers ; soumet à l'officier pour validation.",
+    canCreateUsers: false,
+    canValidateActs: false,
+  },
+  {
+    code: "GREFFIER",
+    label: "Greffier",
+    summary: "Greffe judiciaire : missions, transmissions et dossiers liés au tribunal.",
+    canCreateUsers: false,
+    canValidateActs: false,
+  },
+  {
+    code: "JUGE",
+    label: "Juge",
+    summary: "Décisions judiciaires transmises à l'état civil pour transcription.",
     canCreateUsers: false,
     canValidateActs: false,
   },
@@ -294,6 +310,17 @@ export function permissionsForRoles(roles: string[]): string[] {
     perms.add("civil:act:write");
     perms.add("civil:declaration:create");
     perms.add("bureau:read");
+  }
+  if (r.has("GREFFIER")) {
+    perms.add("civil:act:read");
+    perms.add("civil:act:write");
+    perms.add("bureau:read");
+    perms.add("documents:read");
+  }
+  if (r.has("JUGE")) {
+    perms.add("civil:act:read");
+    perms.add("bureau:read");
+    perms.add("documents:read");
   }
   if (r.has("OFFICIER_ETAT_CIVIL") || r.has("CIVIL_OFFICER") || r.has("RESPONSABLE_BUREAU")) {
     perms.add("civil:act:read");

@@ -38,7 +38,13 @@ export type AccountTypeOption = {
   /** Portail après activation. */
   portal: "civil" | "sante" | "none";
   /** Rôles EC attribués à l'activation (super admin). */
-  assignRoles?: Array<"AGENT_ETAT_CIVIL" | "OFFICIER_ETAT_CIVIL" | "RESPONSABLE_BUREAU">;
+  assignRoles?: Array<
+    | "AGENT_ETAT_CIVIL"
+    | "OFFICIER_ETAT_CIVIL"
+    | "RESPONSABLE_BUREAU"
+    | "GREFFIER"
+    | "JUGE"
+  >;
   institutionLabel?: string;
   showMatricule?: boolean;
   showFonction?: boolean;
@@ -130,6 +136,7 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     summary: "Module judiciaire — greffe",
     institutional: true,
     portal: "civil",
+    assignRoles: ["GREFFIER"],
     needsJudgeFields: true,
     institutionLabel: "Greffe / juridiction",
     showMatricule: true,
@@ -143,6 +150,7 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     summary: "Décisions judiciaires — après habilitation",
     institutional: true,
     portal: "civil",
+    assignRoles: ["JUGE"],
     needsJudgeFields: true,
     institutionLabel: "Tribunal",
     showMatricule: true,
