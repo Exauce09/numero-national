@@ -1,9 +1,8 @@
 import { FormEvent, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import ActFormShell from "../components/ActFormShell";
-import PersonPicker from "../components/PersonPicker";
 import { getActFormSchema } from "../ecActForms";
-import { displayName, generateBirthDossierId, type Person } from "../registry";
+import { addPerson, displayName, findDuplicatePerson, generateBirthDossierId, listPersons } from "../registry";
 import { getHealthSession } from "../healthAuth";
 import { listFacilityDeclarations, notifyEtatCivil } from "../civilDeclarations";
 import { pushHealthNotification } from "../healthPrefs";
@@ -20,6 +19,8 @@ type BirthCoupon = {
   declaration_id: string;
 };
 
+const emptyParent = { nom: "", postnom: "", prenom: "", date_naissance: "" };
+
 export default function HealthBirthsPage() {
   const session = getHealthSession()!;
   const [nom, setNom] = useState("");
@@ -27,8 +28,8 @@ export default function HealthBirthsPage() {
   const [prenom, setPrenom] = useState("");
   const [sexe, setSexe] = useState<"M" | "F">("M");
   const [dateNaissance, setDateNaissance] = useState("");
-  const [mother, setMother] = useState<Person | null>(null);
-  const [father, setFather] = useState<Person | null>(null);
+  const [mother, setMother] = useState(emptyParent);
+  const [father, setFather] = useState(emptyParent);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [coupon, setCoupon] = useState<BirthCoupon | null>(null);
@@ -44,66 +45,120 @@ export default function HealthBirthsPage() {
       setError("Nom, prénom et date de naissance de l'enfant sont requis.");
       return;
     }
-    if (!mother) {
-      setError("La mère est obligatoire.");
+    if (!mother.nom.trim() || !mother.prenom.trim()) {
+      setError("Nom et prénom de la mère sont obligatoires.");
       return;
     }
-    const idNaissance = generateBirthDossierId(dateNaissance);
-    const childNom = nom.trim();
-    const childPostnom = postnom.trim() || mother.postnom || father?.postnom || "";
-    const childPrenom = prenom.trim();
-    const decl = await notifyEtatCivil({
-      type: "BIRTH",
-      facilityName: session.facilityName,
-      payload: {
-        facility_id: session.facilityId,
-        facility_name: session.facilityName,
-        commune_code: session.commune_code,
-        commune_name: session.commune_name,
-        notification_type: "NAISSANCE",
+    try {
+      const resolveParent = (
+        data: typeof mother,
+        sex: "M" | "F",
+      ) => {
+        const nomP = data.nom.trim();
+        const postnomP = data.postnom.trim();
+        const prenomP = data.prenom.trim();
+        const dob = data.date_naissance.trim();
+        if (dob) {
+          const dup = findDuplicatePerson({
+            nom: nomP,
+            postnom: postnomP,
+            prenom: prenomP,
+            date_naissance: dob,
+            sexe: sex,
+          });
+          if (dup) return dup;
+          return addPerson({
+            nom: nomP,
+            postnom: postnomP,
+            prenom: prenomP,
+            sexe: sex,
+            date_naissance: dob,
+            lieu_naissance: session.facilityName,
+            etat_civil: "MARIE",
+          });
+        }
+        const existing = listPersons().find(
+          (p) =>
+            p.sexe === sex &&
+            p.nom.trim().toLowerCase() === nomP.toLowerCase() &&
+            p.postnom.trim().toLowerCase() === postnomP.toLowerCase() &&
+            p.prenom.trim().toLowerCase() === prenomP.toLowerCase(),
+        );
+        if (existing) return existing;
+        return addPerson({
+          nom: nomP,
+          postnom: postnomP,
+          prenom: prenomP,
+          sexe: sex,
+          date_naissance: "1900-01-01",
+          lieu_naissance: session.facilityName,
+          etat_civil: "MARIE",
+        });
+      };
+
+      const motherPerson = resolveParent(mother, "F");
+      const fatherPerson =
+        father.nom.trim() && father.prenom.trim() ? resolveParent(father, "M") : null;
+
+      const idNaissance = generateBirthDossierId(dateNaissance);
+      const childNom = nom.trim();
+      const childPostnom = postnom.trim() || motherPerson.postnom || fatherPerson?.postnom || "";
+      const childPrenom = prenom.trim();
+      const decl = await notifyEtatCivil({
+        type: "BIRTH",
+        facilityName: session.facilityName,
+        payload: {
+          facility_id: session.facilityId,
+          facility_name: session.facilityName,
+          commune_code: session.commune_code,
+          commune_name: session.commune_name,
+          notification_type: "NAISSANCE",
+          id_naissance: idNaissance,
+          child_nic: idNaissance,
+          child_nom: childNom,
+          child_postnom: childPostnom,
+          child_prenom: childPrenom,
+          sexe,
+          date_naissance: dateNaissance,
+          mother_id: motherPerson.id,
+          mother_nic: motherPerson.nic,
+          mother_name: displayName(motherPerson),
+          father_id: fatherPerson?.id ?? null,
+          father_nic: fatherPerson?.nic ?? null,
+          father_name: fatherPerson ? displayName(fatherPerson) : null,
+          lieu_naissance: session.facilityName,
+        },
+      });
+      const birthCoupon: BirthCoupon = {
         id_naissance: idNaissance,
-        child_nic: idNaissance,
-        child_nom: childNom,
-        child_postnom: childPostnom,
-        child_prenom: childPrenom,
+        nom: childNom,
+        postnom: childPostnom,
+        prenom: childPrenom,
         sexe,
         date_naissance: dateNaissance,
-        mother_id: mother.id,
-        mother_nic: mother.nic,
-        mother_name: displayName(mother),
-        father_id: father?.id ?? null,
-        father_nic: father?.nic ?? null,
-        father_name: father ? displayName(father) : null,
-        lieu_naissance: session.facilityName,
-      },
-    });
-    const birthCoupon: BirthCoupon = {
-      id_naissance: idNaissance,
-      nom: childNom,
-      postnom: childPostnom,
-      prenom: childPrenom,
-      sexe,
-      date_naissance: dateNaissance,
-      mother_name: displayName(mother),
-      facility_name: session.facilityName,
-      declaration_id: decl.id,
-    };
-    setCoupon(birthCoupon);
-    pushHealthNotification({
-      title: "Notification de naissance transmise",
-      body: `${childPrenom} ${childNom} — ID naissance ${idNaissance} (réf. ${decl.id.slice(0, 8)}).`,
-      href: "/sante/births",
-    });
-    setMessage(
-      `Notification transmise à l'état civil — ID naissance provisoire ${idNaissance} (réf. ${decl.id.slice(0, 8)}). L'officier établira l'acte officiel.`,
-    );
-    setNom("");
-    setPostnom("");
-    setPrenom("");
-    setDateNaissance("");
-    setMother(null);
-    setFather(null);
-    bump((n) => n + 1);
+        mother_name: displayName(motherPerson),
+        facility_name: session.facilityName,
+        declaration_id: decl.id,
+      };
+      setCoupon(birthCoupon);
+      pushHealthNotification({
+        title: "Notification de naissance transmise",
+        body: `${childPrenom} ${childNom} — ID naissance ${idNaissance} (réf. ${decl.id.slice(0, 8)}).`,
+        href: "/sante/births",
+      });
+      setMessage(
+        `Notification transmise à l'état civil — ID naissance provisoire ${idNaissance} (réf. ${decl.id.slice(0, 8)}). L'officier établira l'acte officiel.`,
+      );
+      setNom("");
+      setPostnom("");
+      setPrenom("");
+      setDateNaissance("");
+      setMother(emptyParent);
+      setFather(emptyParent);
+      bump((n) => n + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Enregistrement impossible.");
+    }
   }
 
   const qrValue = coupon
@@ -126,6 +181,12 @@ export default function HealthBirthsPage() {
         <form className="form-grid" onSubmit={(e) => void onSubmit(e)}>
           {error ? <div className="login-error full">{error}</div> : null}
           {message ? <div className="success-banner full">{message}</div> : null}
+
+          <div className="full">
+            <h3 className="panel-title" style={{ marginTop: 0 }}>
+              Enfant
+            </h3>
+          </div>
           <div>
             <label className="form-label">Nom *</label>
             <input className="form-control" value={nom} onChange={(e) => setNom(e.target.value)} required />
@@ -135,8 +196,13 @@ export default function HealthBirthsPage() {
             <input className="form-control" value={postnom} onChange={(e) => setPostnom(e.target.value)} />
           </div>
           <div>
-            <label className="form-label">Prénom(s)</label>
-            <input className="form-control" value={prenom} onChange={(e) => setPrenom(e.target.value)} required />
+            <label className="form-label">Prénom(s) *</label>
+            <input
+              className="form-control"
+              value={prenom}
+              onChange={(e) => setPrenom(e.target.value)}
+              required
+            />
           </div>
           <div>
             <label className="form-label">Sexe *</label>
@@ -155,12 +221,87 @@ export default function HealthBirthsPage() {
               required
             />
           </div>
+
           <div className="full">
-            <PersonPicker label="Mère *" value={mother} onChange={setMother} required sexFilter="F" />
+            <h3 className="panel-title">Mère *</h3>
+            <p className="muted small" style={{ marginTop: 0 }}>
+              Saisissez directement l&apos;identité de la mère (pas besoin de la chercher dans le
+              registre).
+            </p>
           </div>
+          <div>
+            <label className="form-label">Nom *</label>
+            <input
+              className="form-control"
+              value={mother.nom}
+              onChange={(e) => setMother({ ...mother, nom: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="form-label">Postnom</label>
+            <input
+              className="form-control"
+              value={mother.postnom}
+              onChange={(e) => setMother({ ...mother, postnom: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="form-label">Prénom(s) *</label>
+            <input
+              className="form-control"
+              value={mother.prenom}
+              onChange={(e) => setMother({ ...mother, prenom: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="form-label">Date de naissance (si connue)</label>
+            <input
+              className="form-control"
+              type="date"
+              value={mother.date_naissance}
+              onChange={(e) => setMother({ ...mother, date_naissance: e.target.value })}
+            />
+          </div>
+
           <div className="full">
-            <PersonPicker label="Père (le cas échéant)" value={father} onChange={setFather} sexFilter="M" />
+            <h3 className="panel-title">Père (le cas échéant)</h3>
           </div>
+          <div>
+            <label className="form-label">Nom</label>
+            <input
+              className="form-control"
+              value={father.nom}
+              onChange={(e) => setFather({ ...father, nom: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="form-label">Postnom</label>
+            <input
+              className="form-control"
+              value={father.postnom}
+              onChange={(e) => setFather({ ...father, postnom: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="form-label">Prénom(s)</label>
+            <input
+              className="form-control"
+              value={father.prenom}
+              onChange={(e) => setFather({ ...father, prenom: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="form-label">Date de naissance</label>
+            <input
+              className="form-control"
+              type="date"
+              value={father.date_naissance}
+              onChange={(e) => setFather({ ...father, date_naissance: e.target.value })}
+            />
+          </div>
+
           <div className="full">
             <button className="btn-primary" type="submit" style={{ width: "auto", minWidth: 280 }}>
               Transmettre la notification à l&apos;état civil
@@ -201,52 +342,50 @@ export default function HealthBirthsPage() {
                   <span className="muted">Mère</span>
                   <strong>{coupon.mother_name}</strong>
                 </div>
+                <div>
+                  <span className="muted">Structure</span>
+                  <strong>{coupon.facility_name}</strong>
+                </div>
               </div>
-              <div className="act-print-qr">
-                <QRCodeSVG value={qrValue} size={128} includeMargin />
-                <span className="muted small">Contrôle QR</span>
+              <div style={{ display: "flex", justifyContent: "center", marginTop: "1rem" }}>
+                <QRCodeSVG value={qrValue} size={128} />
               </div>
             </div>
           </div>
-          <button
-            className="btn-primary"
-            type="button"
-            style={{ marginTop: "0.75rem", width: "auto" }}
-            onClick={() => window.print()}
-          >
+          <button type="button" className="btn-secondary btn-sm" onClick={() => window.print()}>
             Imprimer l&apos;accusé
           </button>
         </div>
       ) : null}
 
       <div className="panel" style={{ marginTop: "1rem" }}>
-        <h3 className="panel-title">Notifications transmises</h3>
+        <h3 className="panel-title">Notifications envoyées ({rows.length})</h3>
         <table className="data-table">
           <thead>
             <tr>
-              <th>ID naissance</th>
               <th>Enfant</th>
-              <th>Mère</th>
-              <th>Père</th>
-              <th>Naissance</th>
-              <th>Statut EC</th>
+              <th>Date</th>
+              <th>Statut</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((d) => (
-              <tr key={d.id}>
-                <td>
-                  <code>{String(d.payload.id_naissance ?? d.payload.child_nic ?? "—")}</code>
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={3} className="muted">
+                  Aucune notification pour le moment.
                 </td>
-                <td>
-                  {String(d.payload.child_nom ?? "")} {String(d.payload.child_prenom ?? "")}
-                </td>
-                <td>{String(d.payload.mother_name ?? "—")}</td>
-                <td>{String(d.payload.father_name ?? "—")}</td>
-                <td>{String(d.payload.date_naissance ?? "—")}</td>
-                <td>{d.status}</td>
               </tr>
-            ))}
+            ) : (
+              rows.map((d) => (
+                <tr key={d.id}>
+                  <td>
+                    {String(d.payload.child_prenom ?? "")} {String(d.payload.child_nom ?? "")}
+                  </td>
+                  <td>{String(d.payload.date_naissance ?? "—")}</td>
+                  <td>{d.status}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

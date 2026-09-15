@@ -4,7 +4,7 @@
  * Exception : HOPITAL_MATERNITE → provisionne aussi le portail /sante.
  */
 
-import { hashPassword } from "./ecUsers";
+import { hashPassword, createEcUserFromHash, type EcUserRole } from "./ecUsers";
 import {
   createFacilityAccountFromHash,
   findFacilityByUsername,
@@ -35,6 +35,15 @@ export type AccountTypeOption = {
   summary: string;
   institutional: boolean;
   needsJudgeFields?: boolean;
+  /** Portail après activation. */
+  portal: "civil" | "sante" | "none";
+  /** Rôles EC attribués à l'activation (super admin). */
+  assignRoles?: Array<"AGENT_ETAT_CIVIL" | "OFFICIER_ETAT_CIVIL" | "RESPONSABLE_BUREAU">;
+  institutionLabel?: string;
+  showMatricule?: boolean;
+  showFonction?: boolean;
+  showService?: boolean;
+  serviceOptions?: string[];
 };
 
 export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
@@ -43,61 +52,115 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     label: "Citoyen",
     summary: "Demandes et consultations personnelles",
     institutional: false,
+    portal: "none",
   },
   {
     code: "AGENT_ETAT_CIVIL",
     label: "Agent d'état civil",
     summary: "Traitement administratif au bureau",
     institutional: true,
+    portal: "civil",
+    assignRoles: ["AGENT_ETAT_CIVIL"],
+    institutionLabel: "Bureau / institution",
+    showMatricule: true,
+    showFonction: true,
+    showService: true,
+    serviceOptions: [
+      "Bureau d'état civil",
+      "Guichet naissances",
+      "Guichet mariages",
+      "Guichet décès",
+      "Accueil / orientation",
+    ],
   },
   {
     code: "OFFICIER_ETAT_CIVIL",
     label: "Officier d'état civil",
     summary: "Validation des actes — après habilitation",
     institutional: true,
+    portal: "civil",
+    assignRoles: ["OFFICIER_ETAT_CIVIL"],
+    institutionLabel: "Bureau d'état civil",
+    showMatricule: true,
+    showFonction: true,
+    showService: true,
+    serviceOptions: ["Bureau d'état civil principal", "Bureau secondaire", "Officier intérimaire"],
   },
   {
     code: "HOPITAL_MATERNITE",
     label: "Hôpital / Maternité",
-    summary: "Notifications de naissance et de décès",
+    summary: "Notifications de naissance et de décès — portail /sante",
     institutional: true,
+    portal: "sante",
+    institutionLabel: "Nom de l'hôpital / maternité",
+    showMatricule: false,
+    showFonction: false,
+    showService: true,
+    serviceOptions: ["Maternité", "Néonatalogie", "Urgences", "Direction médicale"],
   },
   {
     code: "AGENT_DELIVRANCE",
     label: "Agent de délivrance",
     summary: "Copies et extraits",
     institutional: true,
+    portal: "civil",
+    assignRoles: ["AGENT_ETAT_CIVIL"],
+    institutionLabel: "Bureau / service",
+    showMatricule: true,
+    showFonction: true,
+    showService: true,
+    serviceOptions: ["Guichet copies & extraits", "Délivrance documents"],
   },
   {
     code: "AGENT_ARCHIVES",
     label: "Agent d'archives",
     summary: "Conservation documentaire",
     institutional: true,
+    portal: "civil",
+    assignRoles: ["AGENT_ETAT_CIVIL"],
+    institutionLabel: "Service d'archives",
+    showMatricule: true,
+    showFonction: true,
+    showService: true,
+    serviceOptions: ["Archives centrales", "Archives du bureau"],
   },
   {
     code: "GREFFIER",
     label: "Greffier",
     summary: "Module judiciaire — greffe",
     institutional: true,
+    portal: "civil",
+    needsJudgeFields: true,
+    institutionLabel: "Greffe / juridiction",
+    showMatricule: true,
+    showFonction: true,
+    showService: true,
+    serviceOptions: ["Greffe civil", "Greffe du tribunal"],
   },
   {
     code: "JUGE",
     label: "Juge",
     summary: "Décisions judiciaires — après habilitation",
     institutional: true,
+    portal: "civil",
     needsJudgeFields: true,
+    institutionLabel: "Tribunal",
+    showMatricule: true,
+    showFonction: true,
+    showService: false,
   },
   {
     code: "MINISTERE_PUBLIC",
     label: "Ministère public",
     summary: "Interventions selon procédure",
     institutional: true,
-  },
-  {
-    code: "ADMINISTRATEUR",
-    label: "Administrateur",
-    summary: "Administration — jamais auto-attribué",
-    institutional: true,
+    portal: "civil",
+    needsJudgeFields: true,
+    institutionLabel: "Parquet",
+    showMatricule: true,
+    showFonction: true,
+    showService: true,
+    serviceOptions: ["Parquet près le TGI", "Parquet près la Cour"],
   },
 ];
 
@@ -457,7 +520,7 @@ export async function verifyRegistrationOtp(code: string): Promise<AccountRegist
   saveRequests(rows);
   saveOtp(null);
   if (rows[idx].status === "ACTIVE") {
-    provisionHospitalFacilityFromRequest(rows[idx]);
+    activateProvisionedAccess(rows[idx]);
   }
   return rows[idx];
 }
@@ -484,13 +547,13 @@ export function decideAccountRequest(
       {
         at: now,
         action: decision === "reject" ? "REJECTED_BY_AUTHORITY" : "IDENTITY_VALIDATED",
-        detail: `Par ${actorEmail} — rôles à attribuer séparément (habilitation)`,
+        detail: `Par ${actorEmail} — accès provisionné selon le type de compte`,
       },
     ],
   };
   saveRequests(rows);
   if (rows[idx].status === "ACTIVE") {
-    provisionHospitalFacilityFromRequest(rows[idx]);
+    activateProvisionedAccess(rows[idx]);
   }
   return rows[idx];
 }
@@ -537,14 +600,42 @@ export function provisionHospitalFacilityFromRequest(
   return pub;
 }
 
+/** Crée le compte bureau EC avec le rôle du type demandé (hors hôpital / citoyen). */
+export function provisionCivilUserFromRequest(req: AccountRegistrationRequest): void {
+  if (req.status !== "ACTIVE" || !req.password_hash) return;
+  const type = getAccountTypeOption(req.accountType);
+  if (type.portal !== "civil" || !type.assignRoles?.length) return;
+  const email = (req.login_id.includes("@") ? req.login_id : req.email).toLowerCase();
+  createEcUserFromHash({
+    email,
+    fullName: `${req.prenom} ${req.postnom} ${req.nom}`.replace(/\s+/g, " ").trim(),
+    passwordHash: req.password_hash,
+    roles: type.assignRoles as EcUserRole[],
+    commune: {
+      code: (req.commune_secteur || "KIN-GOMBE").toUpperCase().replace(/\s+/g, "-"),
+      name: req.commune_secteur || "Gombe",
+      ville: req.ville_territoire || "Kinshasa",
+      province: req.province || "Kinshasa",
+    },
+    createdBy: req.created_by_super_admin || "system:registration",
+  });
+}
+
+function activateProvisionedAccess(req: AccountRegistrationRequest): void {
+  provisionHospitalFacilityFromRequest(req);
+  provisionCivilUserFromRequest(req);
+}
+
 /** Répare les inscriptions hôpital ACTIVE sans compte /sante (créations antérieures). */
 export function syncHospitalFacilitiesFromRequests(): FacilityAccountPublic[] {
   const created: FacilityAccountPublic[] = [];
   for (const req of loadRequests()) {
-    if (req.accountType !== "HOPITAL_MATERNITE" || req.status !== "ACTIVE") continue;
-    const before = findFacilityByUsername(req.login_id);
-    const after = provisionHospitalFacilityFromRequest(req);
-    if (after && !before) created.push(after);
+    if (req.status !== "ACTIVE") continue;
+    activateProvisionedAccess(req);
+    if (req.accountType === "HOPITAL_MATERNITE") {
+      const after = findFacilityByUsername(req.login_id);
+      if (after) created.push(after);
+    }
   }
   return created;
 }

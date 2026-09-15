@@ -12,7 +12,7 @@ import {
   isSuperAdminNational,
   permissionsForRoles,
 } from "./ecUsers";
-import { canSeeNav, roleTitleFor } from "./rbac";
+import { roleTitleFor } from "./rbac";
 import {
   applyTheme,
   getPrefs,
@@ -302,7 +302,6 @@ function Shell() {
     .filter(Boolean)
     .join(" · ");
   const roles = session?.roles ?? ["OFFICIER_ETAT_CIVIL"];
-  const permissions = session?.permissions ?? [];
   const badge = unreadCount();
   const photo = prefs.photoDataUrl || session?.photoDataUrl;
 
@@ -429,17 +428,11 @@ function Shell() {
             <NavCollapsibleGroup
               label="Administration plateforme"
               icon={<IconUsers size={18} />}
-              activePrefixes={["/register", "/account-requests", "/admin", "/users"]}
+              activePrefixes={["/register", "/account-requests", "/users"]}
             >
               <NavLink to="/register">Créer un compte</NavLink>
               <NavLink to="/account-requests">Demandes de compte</NavLink>
               <NavLink to="/users">Utilisateurs</NavLink>
-              {canSeeNav("admin_bureaux", roles, permissions) ? (
-                <NavLink to="/admin/bureaux">Bureaux EC</NavLink>
-              ) : null}
-              {canSeeNav("admin_personnel", roles, permissions) ? (
-                <NavLink to="/admin/personnel">Personnel</NavLink>
-              ) : null}
             </NavCollapsibleGroup>
           ) : null}
           {!isSuperAdminNational(roles) && canManageEcUsers(roles) ? (

@@ -3,7 +3,7 @@
  * Crée l'identité ; n'attribue jamais un rôle privilégié automatiquement.
  */
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import {
   ACCOUNT_TYPE_OPTIONS,
@@ -19,9 +19,25 @@ import {
 } from "../accountRegistration";
 import { getSession } from "../auth";
 import PasswordField from "../components/PasswordField";
+import GeoCascade, {
+  ADDRESS_FIELD_LABELS,
+  ORIGIN_FIELD_LABELS,
+  type GeoLevel,
+  type GeoSelection,
+} from "../components/GeoCascade";
 import { isSuperAdminNational } from "../ecUsers";
 
 type Step = "form" | "otp" | "done";
+
+function isKinshasa(name?: string | null): boolean {
+  return (name ?? "").toLowerCase().includes("kinshasa");
+}
+
+function registerGeoLevels(provinceName?: string | null): GeoLevel[] {
+  return isKinshasa(provinceName)
+    ? ["province", "ville", "commune", "quartier"]
+    : ["province", "district", "commune", "localite"];
+}
 
 export default function RegisterAccountPage() {
   const session = getSession();
@@ -46,6 +62,7 @@ export default function RegisterAccountPage() {
   const [villeTerritoire, setVilleTerritoire] = useState("");
   const [communeSecteur, setCommuneSecteur] = useState("");
   const [serviceBureau, setServiceBureau] = useState("");
+  const [geo, setGeo] = useState<GeoSelection>({});
   const [juridiction, setJuridiction] = useState("");
   const [tribunal, setTribunal] = useState("");
   const [idJudiciaire, setIdJudiciaire] = useState("");
@@ -65,6 +82,31 @@ export default function RegisterAccountPage() {
 
   const strength = useMemo(() => checkPasswordStrength(password), [password]);
   const canSubmit = acceptTerms && acceptPrivacy && !busy;
+
+  useEffect(() => {
+    setMatricule("");
+    setFonction("");
+    setInstitution("");
+    setServiceBureau("");
+    setJuridiction("");
+    setTribunal("");
+    setIdJudiciaire("");
+    setGeo({});
+    setProvince("");
+    setVilleTerritoire("");
+    setCommuneSecteur("");
+  }, [accountType]);
+
+  function onGeoChange(next: GeoSelection) {
+    setGeo(next);
+    setProvince(next.province_name || "");
+    setVilleTerritoire(
+      isKinshasa(next.province_name)
+        ? next.ville_name || ""
+        : next.district_name || next.ville_name || "",
+    );
+    setCommuneSecteur(next.commune_name || "");
+  }
 
   if (!session) return <Navigate to="/login" replace />;
   if (!allowed) {
@@ -97,6 +139,10 @@ export default function RegisterAccountPage() {
     }
     if (!acceptTerms || !acceptPrivacy) {
       setError("Acceptez les conditions et la politique de confidentialité.");
+      return;
+    }
+    if (typeOpt.institutional && (!province.trim() || !communeSecteur.trim())) {
+      setError("Sélectionnez le lieu d'affectation (province et commune / secteur).");
       return;
     }
     setBusy(true);
@@ -324,73 +370,99 @@ export default function RegisterAccountPage() {
 
               {typeOpt.institutional ? (
                 <section className="register-section">
-                  <h3 className="register-section-title">Informations professionnelles</h3>
+                  <h3 className="register-section-title">
+                    {accountType === "HOPITAL_MATERNITE"
+                      ? "Structure sanitaire"
+                      : typeOpt.needsJudgeFields
+                        ? "Informations judiciaires"
+                        : "Affectation professionnelle"}
+                  </h3>
+                  <p className="muted small" style={{ marginTop: 0 }}>
+                    Formulaire adapté au type <strong>{typeOpt.label}</strong>
+                    {typeOpt.portal === "sante"
+                      ? " — accès portail maternité (/sante)."
+                      : typeOpt.portal === "civil"
+                        ? " — accès bureau d'état civil avec le rôle correspondant."
+                        : "."}
+                  </p>
                   <div className="form-grid">
-                    <div>
-                      <label className="form-label">Matricule professionnel</label>
-                      <input
-                        className="form-control"
-                        value={matricule}
-                        onChange={(e) => setMatricule(e.target.value)}
-                        disabled={busy}
-                      />
-                    </div>
-                    <div>
-                      <label className="form-label">Fonction</label>
-                      <input
-                        className="form-control"
-                        value={fonction}
-                        onChange={(e) => setFonction(e.target.value)}
-                        disabled={busy}
-                      />
-                    </div>
+                    {typeOpt.showMatricule !== false ? (
+                      <div>
+                        <label className="form-label">Matricule professionnel</label>
+                        <input
+                          className="form-control"
+                          value={matricule}
+                          onChange={(e) => setMatricule(e.target.value)}
+                          disabled={busy}
+                        />
+                      </div>
+                    ) : null}
+                    {typeOpt.showFonction !== false ? (
+                      <div>
+                        <label className="form-label">Fonction</label>
+                        <input
+                          className="form-control"
+                          value={fonction}
+                          onChange={(e) => setFonction(e.target.value)}
+                          disabled={busy}
+                        />
+                      </div>
+                    ) : null}
                     <div className="full">
-                      <label className="form-label">Institution *</label>
+                      <label className="form-label">{typeOpt.institutionLabel || "Institution"} *</label>
                       <input
                         className="form-control"
                         value={institution}
                         onChange={(e) => setInstitution(e.target.value)}
                         required
                         disabled={busy}
+                        placeholder={
+                          accountType === "HOPITAL_MATERNITE"
+                            ? "ex. Hôpital Général de Référence de …"
+                            : undefined
+                        }
                       />
                     </div>
-                    <div>
-                      <label className="form-label">Province *</label>
-                      <input
-                        className="form-control"
-                        value={province}
-                        onChange={(e) => setProvince(e.target.value)}
-                        required
-                        disabled={busy}
+                    <div className="full">
+                      <label className="form-label">Lieu d&apos;affectation *</label>
+                      <GeoCascade
+                        value={geo}
+                        onChange={onGeoChange}
+                        levels={registerGeoLevels(geo.province_name)}
+                        fieldLabels={{
+                          ...ADDRESS_FIELD_LABELS,
+                          ...ORIGIN_FIELD_LABELS,
+                          district: "Territoire",
+                          commune: isKinshasa(geo.province_name) ? "Commune" : "Secteur / Commune",
+                          localite: "Village",
+                        }}
+                        embedded
+                        label=""
                       />
+                      {!province || !communeSecteur ? (
+                        <p className="muted small">
+                          Sélectionnez province puis commune / secteur (obligatoire).
+                        </p>
+                      ) : null}
                     </div>
-                    <div>
-                      <label className="form-label">Ville / Territoire</label>
-                      <input
-                        className="form-control"
-                        value={villeTerritoire}
-                        onChange={(e) => setVilleTerritoire(e.target.value)}
-                        disabled={busy}
-                      />
-                    </div>
-                    <div>
-                      <label className="form-label">Commune / Secteur</label>
-                      <input
-                        className="form-control"
-                        value={communeSecteur}
-                        onChange={(e) => setCommuneSecteur(e.target.value)}
-                        disabled={busy}
-                      />
-                    </div>
-                    <div>
-                      <label className="form-label">Service ou bureau</label>
-                      <input
-                        className="form-control"
-                        value={serviceBureau}
-                        onChange={(e) => setServiceBureau(e.target.value)}
-                        disabled={busy}
-                      />
-                    </div>
+                    {typeOpt.showService !== false && (typeOpt.serviceOptions?.length ?? 0) > 0 ? (
+                      <div className="full">
+                        <label className="form-label">Service ou bureau</label>
+                        <select
+                          className="form-control"
+                          value={serviceBureau}
+                          onChange={(e) => setServiceBureau(e.target.value)}
+                          disabled={busy}
+                        >
+                          <option value="">— Sélectionner —</option>
+                          {typeOpt.serviceOptions!.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
                     {typeOpt.needsJudgeFields ? (
                       <>
                         <div>
@@ -426,7 +498,15 @@ export default function RegisterAccountPage() {
                     ) : null}
                   </div>
                 </section>
-              ) : null}
+              ) : (
+                <section className="register-section">
+                  <h3 className="register-section-title">Compte citoyen</h3>
+                  <p className="muted small">
+                    Aucune affectation institutionnelle. Identité personnelle et sécurité du compte
+                    uniquement.
+                  </p>
+                </section>
+              )}
 
               <section className="register-section">
                 <h3 className="register-section-title">Sécurité du compte</h3>
@@ -564,6 +644,15 @@ export default function RegisterAccountPage() {
                   <Link to="/declarations">Déclarations → Structures sanitaires</Link>. Connexion
                   maternité : <Link to="/sante/login">/sante/login</Link> avec l&apos;identifiant{" "}
                   <code>{result.login_id}</code> et le mot de passe saisi.
+                </p>
+              </>
+            ) : result.status === "ACTIVE" && getAccountTypeOption(result.accountType).portal === "civil" ? (
+              <>
+                <div className="success-banner">Compte bureau créé</div>
+                <p className="muted">
+                  L&apos;utilisateur peut se connecter sur <Link to="/login">/login</Link> avec{" "}
+                  <code>{result.login_id}</code> — rôle{" "}
+                  {getAccountTypeOption(result.accountType).assignRoles?.join(", ") || "agent"}.
                 </p>
               </>
             ) : result.created_by_super_admin ? (

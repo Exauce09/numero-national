@@ -138,7 +138,7 @@ export async function login(username: string, password: string): Promise<Session
   const local = await verifyEcUser(user, password);
   if (!local) {
     throw new Error(
-      "Identifiants incorrects. Si c'est votre première connexion, créez d'abord le premier utilisateur.",
+      "Identifiants incorrects pour le bureau d'état civil. Compte hôpital ? Utilisez /sante/login.",
     );
   }
 

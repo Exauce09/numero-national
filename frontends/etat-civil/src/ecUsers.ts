@@ -360,6 +360,40 @@ export function canManageEcUsers(roles: string[] | undefined | null): boolean {
   );
 }
 
+/** Crée un utilisateur EC à partir d'un hash déjà calculé (inscription plateforme). */
+export function createEcUserFromHash(input: {
+  email: string;
+  fullName: string;
+  passwordHash: string;
+  roles: EcUserRole[];
+  commune?: OfficerCommune;
+  createdBy?: string;
+}): EcUser {
+  const email = input.email.trim().toLowerCase();
+  const existing = getEcUserByEmail(email);
+  if (existing) return existing;
+  if (!input.roles.length) throw new Error("Choisissez au moins un rôle.");
+  if (!input.fullName.trim()) throw new Error("Le nom complet est obligatoire.");
+  if (input.roles.includes("SUPER_ADMIN_NATIONAL")) {
+    throw new Error("Le rôle super administrateur ne peut pas être attribué ainsi.");
+  }
+  const user: EcUser = {
+    id: crypto.randomUUID(),
+    email,
+    fullName: input.fullName.trim(),
+    passwordHash: input.passwordHash,
+    roles: input.roles,
+    commune: { ...(input.commune ?? DEFAULT_OFFICER_COMMUNE) },
+    created_at: new Date().toISOString(),
+    created_by: input.createdBy ?? "system:registration",
+    active: true,
+  };
+  const rows = listEcUsers();
+  rows.unshift(user);
+  saveEcUsers(rows);
+  return user;
+}
+
 /** Compte plateforme protégé (Hervé / SUPER_ADMIN) — hors autorité du responsable de bureau. */
 export function isProtectedPlatformAdmin(user: Pick<EcUser, "email" | "roles">): boolean {
   const email = user.email.trim().toLowerCase();

@@ -1,8 +1,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { getSession, login } from "../auth";
+import { clearSession, getSession, login } from "../auth";
 import PasswordField from "../components/PasswordField";
+import { syncHospitalFacilitiesFromRequests } from "../accountRegistration";
 import { ensureCanonicalAccounts, hasAnyEcUser } from "../ecUsers";
+import { findFacilityByUsername, loginHealth } from "../healthAuth";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -14,6 +16,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     void ensureCanonicalAccounts();
+    syncHospitalFacilitiesFromRequests();
   }, []);
 
   if (civil) return <Navigate to="/" replace />;
@@ -26,8 +29,22 @@ export default function LoginPage() {
     try {
       await login(username, password);
       navigate("/", { replace: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Connexion impossible.");
+    } catch (civilErr) {
+      try {
+        clearSession();
+        await loginHealth(username, password);
+        navigate("/sante", { replace: true });
+        return;
+      } catch {
+        const looksHealth = Boolean(findFacilityByUsername(username));
+        setError(
+          looksHealth
+            ? "Compte structure sanitaire : utilisez /sante/login (ou vérifiez le mot de passe)."
+            : civilErr instanceof Error
+              ? civilErr.message
+              : "Identifiants incorrects.",
+        );
+      }
     } finally {
       setBusy(false);
     }
@@ -42,12 +59,12 @@ export default function LoginPage() {
         <form onSubmit={(e) => void onSubmit(e)} method="post" action="#" autoComplete="off">
           {error ? <div className="login-error" role="alert">{error}</div> : null}
           <label className="form-label" htmlFor="username">
-            E-mail
+            E-mail / identifiant
           </label>
           <input
             id="username"
             className="form-control"
-            type="email"
+            type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoComplete="username"
