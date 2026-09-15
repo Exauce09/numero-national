@@ -6,6 +6,7 @@ import {
   canManageEcUsers,
   changeEcUserPassword,
   ensureBootstrapSuperAdmin,
+  ensureCanonicalAccounts,
   getEcUserByEmail,
   hasAnyEcUser,
   isSuperAdminNational,
@@ -142,17 +143,25 @@ function Shell() {
   void bumpSession;
 
   useEffect(() => {
-    ensureBootstrapSuperAdmin();
-    const s = getSession();
-    if (!s?.username || isSuperAdminNational(s.roles)) return;
-    const local = getEcUserByEmail(s.username);
-    if (!local || !isSuperAdminNational(local.roles)) return;
-    updateSession({
-      roles: local.roles,
-      permissions: permissionsForRoles(local.roles),
-      roleTitle: roleTitleFor(local.roles),
-    });
-    bumpSession((n) => n + 1);
+    void (async () => {
+      await ensureCanonicalAccounts();
+      ensureBootstrapSuperAdmin();
+      const s = getSession();
+      if (!s?.username) return;
+      const local = getEcUserByEmail(s.username);
+      if (!local) return;
+      const rolesChanged =
+        JSON.stringify([...(s.roles ?? [])].sort()) !==
+        JSON.stringify([...local.roles].sort());
+      if (!rolesChanged && s.displayName === local.fullName) return;
+      updateSession({
+        displayName: local.fullName,
+        roles: local.roles,
+        permissions: permissionsForRoles(local.roles),
+        roleTitle: roleTitleFor(local.roles),
+      });
+      bumpSession((n) => n + 1);
+    })();
   }, []);
 
   const [navOpen, setNavOpen] = useState(false);

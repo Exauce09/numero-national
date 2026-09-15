@@ -73,12 +73,108 @@ export const EC_ROLE_CATALOG: Array<{
   },
 ];
 
-/** Rôles du tout premier compte (bootstrap national). */
-export const FIRST_USER_ROLES: EcUserRole[] = [
-  "SUPER_ADMIN_NATIONAL",
-  "RESPONSABLE_BUREAU",
-  "OFFICIER_ETAT_CIVIL",
+/** Rôles du tout premier compte (legacy — préférer ensureCanonicalAccounts). */
+export const FIRST_USER_ROLES: EcUserRole[] = ["SUPER_ADMIN_NATIONAL"];
+
+/** Comptes nominatifs plateforme — Hervé = super admin, Tshidibi = responsable bureau. */
+export const CANONICAL_EC_ACCOUNTS: Array<{
+  email: string;
+  fullName: string;
+  roles: EcUserRole[];
+  /** Mot de passe initial si le compte n'existe pas encore. */
+  initialPassword: string;
+}> = [
+  {
+    email: "herve.kinkete@etatcivil.gov.cd",
+    fullName: "Hervé Kinkete",
+    roles: ["SUPER_ADMIN_NATIONAL"],
+    initialPassword: "HerveSuper2026!",
+  },
+  {
+    email: "tshidibi@etatcivil.gov.cd",
+    fullName: "Tshidibi",
+    roles: ["RESPONSABLE_BUREAU", "OFFICIER_ETAT_CIVIL"],
+    initialPassword: "TshidibiBureau2026!",
+  },
 ];
+
+function findCanonicalMatch(
+  rows: EcUser[],
+  seed: (typeof CANONICAL_EC_ACCOUNTS)[number],
+): number {
+  const email = seed.email.toLowerCase();
+  const byEmail = rows.findIndex((u) => u.email === email);
+  if (byEmail >= 0) return byEmail;
+  return rows.findIndex((u) => {
+    const n = u.fullName.toLowerCase();
+    if (seed.email.startsWith("herve")) return n.includes("herv") || n.includes("kinkete");
+    return n.includes("tshidibi");
+  });
+}
+
+/**
+ * Garantit Hervé (SUPER_ADMIN) et Tshidibi (RESPONSABLE_BUREAU).
+ * Ne réécrit pas le mot de passe d'un compte déjà existant.
+ */
+export async function ensureCanonicalAccounts(): Promise<void> {
+  let rows = listEcUsers();
+  let changed = false;
+
+  for (const seed of CANONICAL_EC_ACCOUNTS) {
+    const i = findCanonicalMatch(rows, seed);
+    if (i < 0) {
+      rows = [
+        {
+          id: crypto.randomUUID(),
+          email: seed.email.toLowerCase(),
+          fullName: seed.fullName,
+          passwordHash: await hashPassword(seed.initialPassword),
+          roles: [...seed.roles],
+          commune: { ...DEFAULT_OFFICER_COMMUNE },
+          created_at: new Date().toISOString(),
+          created_by: "system:canonical",
+          active: true,
+        },
+        ...rows,
+      ];
+      changed = true;
+      continue;
+    }
+    const cur = rows[i];
+    const nextRoles = [...seed.roles];
+    const sameRoles =
+      nextRoles.length === cur.roles.length && nextRoles.every((r) => cur.roles.includes(r));
+    if (
+      cur.email !== seed.email.toLowerCase() ||
+      cur.fullName !== seed.fullName ||
+      !sameRoles ||
+      !cur.active
+    ) {
+      rows[i] = {
+        ...cur,
+        email: seed.email.toLowerCase(),
+        fullName: seed.fullName,
+        roles: nextRoles,
+        active: true,
+      };
+      changed = true;
+    }
+  }
+
+  // Hervé seul SUPER_ADMIN : retirer le rôle des autres comptes.
+  const herveEmail = CANONICAL_EC_ACCOUNTS[0].email.toLowerCase();
+  rows = rows.map((u) => {
+    if (u.email === herveEmail) return u;
+    if (!u.roles.includes("SUPER_ADMIN_NATIONAL")) return u;
+    changed = true;
+    return {
+      ...u,
+      roles: u.roles.filter((r) => r !== "SUPER_ADMIN_NATIONAL") as EcUserRole[],
+    };
+  });
+
+  if (changed) saveEcUsers(rows);
+}
 
 export async function hashPassword(password: string): Promise<string> {
   const data = new TextEncoder().encode(password);
@@ -227,17 +323,27 @@ export function isSuperAdminNational(roles: string[] | undefined | null): boolea
 }
 
 /**
- * Si aucun SUPER_ADMIN n'existe encore (comptes créés avant cette évolution),
- * promeut le premier compte actif pour débloquer /register.
+ * Si aucun SUPER_ADMIN n'existe encore, promeut Hervé s'il est présent,
+ * sinon le premier compte actif (legacy).
  */
 export function ensureBootstrapSuperAdmin(): void {
   const rows = listEcUsers();
   if (!rows.length) return;
   if (rows.some((u) => u.roles.includes("SUPER_ADMIN_NATIONAL"))) return;
-  const i = rows.findIndex((u) => u.active);
+  const herveIdx = rows.findIndex(
+    (u) =>
+      u.email === CANONICAL_EC_ACCOUNTS[0].email ||
+      /herv|kinkete/i.test(u.fullName),
+  );
+  const i = herveIdx >= 0 ? herveIdx : rows.findIndex((u) => u.active);
   if (i < 0) return;
   const roles = Array.from(new Set([...rows[i].roles, "SUPER_ADMIN_NATIONAL"])) as EcUserRole[];
-  rows[i] = { ...rows[i], roles };
+  rows[i] = {
+    ...rows[i],
+    roles,
+    fullName: herveIdx >= 0 ? CANONICAL_EC_ACCOUNTS[0].fullName : rows[i].fullName,
+    email: herveIdx >= 0 ? CANONICAL_EC_ACCOUNTS[0].email : rows[i].email,
+  };
   saveEcUsers(rows);
 }
 

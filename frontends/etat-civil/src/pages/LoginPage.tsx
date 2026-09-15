@@ -1,16 +1,24 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { getSession, login } from "../auth";
 import PasswordField from "../components/PasswordField";
-import { hasAnyEcUser } from "../ecUsers";
+import {
+  CANONICAL_EC_ACCOUNTS,
+  ensureCanonicalAccounts,
+  hasAnyEcUser,
+} from "../ecUsers";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const civil = getSession();
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(CANONICAL_EC_ACCOUNTS[0].email);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    void ensureCanonicalAccounts();
+  }, []);
 
   if (civil) return <Navigate to="/" replace />;
   if (!hasAnyEcUser()) return <Navigate to="/setup" replace />;
@@ -29,12 +37,15 @@ export default function LoginPage() {
     }
   }
 
+  const herve = CANONICAL_EC_ACCOUNTS[0];
+  const tshidibi = CANONICAL_EC_ACCOUNTS[1];
+
   return (
     <div className="login-page">
       <div className="login-card">
         <img className="login-logo" src="/logo-rdc.jpg" alt="République Démocratique du Congo" />
         <h1 className="login-title">État civil — RDC</h1>
-        <p className="login-subtitle">Connexion bureau d&apos;état civil — aucun compte démo</p>
+        <p className="login-subtitle">Connexion bureau d&apos;état civil</p>
         <form onSubmit={(e) => void onSubmit(e)} method="post" action="#" autoComplete="off">
           {error ? <div className="login-error" role="alert">{error}</div> : null}
           <label className="form-label" htmlFor="username">
@@ -63,9 +74,18 @@ export default function LoginPage() {
             {busy ? "Connexion…" : "Se connecter"}
           </button>
         </form>
-        <p className="muted small" style={{ marginTop: "1rem" }}>
-          Mot de passe oublié — contactez le responsable de bureau.
-        </p>
+        <div className="panel" style={{ marginTop: "1rem", textAlign: "left" }}>
+          <p className="muted small" style={{ margin: "0 0 0.5rem" }}>
+            <strong>Hervé</strong> — super admin · <code>{herve.email}</code>
+            <br />
+            MDP initial : <code>{herve.initialPassword}</code>
+          </p>
+          <p className="muted small" style={{ margin: 0 }}>
+            <strong>Tshidibi</strong> — responsable bureau · <code>{tshidibi.email}</code>
+            <br />
+            MDP initial : <code>{tshidibi.initialPassword}</code>
+          </p>
+        </div>
         <p className="login-subtitle" style={{ marginTop: "0.75rem" }}>
           <Link to="/sante/login">Accès maternité / structure sanitaire →</Link>
         </p>
