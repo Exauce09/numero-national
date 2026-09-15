@@ -12,7 +12,7 @@ import {
   isSuperAdminNational,
   permissionsForRoles,
 } from "./ecUsers";
-import { isJudicialRole, primaryRole, roleTitleFor } from "./rbac";
+import { canSeeNav, isJudicialRole, primaryRole, roleTitleFor } from "./rbac";
 import {
   applyTheme,
   getPrefs,
@@ -465,14 +465,16 @@ function Shell() {
             <NavLink to="/verify-document">Vérifier document</NavLink>
             <NavLink to="/acts/qrcode">QR code</NavLink>
           </NavCollapsibleGroup>
-          <NavLink
-            to="/synoptique/naissances"
-            className={({ isActive }) =>
-              isActive || location.pathname.startsWith("/synoptique") ? "active" : undefined
-            }
-          >
-            <IconTable size={18} /> Tableau synoptique
-          </NavLink>
+          {canSeeNav("synoptique", roles) ? (
+            <NavLink
+              to="/synoptique/naissances"
+              className={({ isActive }) =>
+                isActive || location.pathname.startsWith("/synoptique") ? "active" : undefined
+              }
+            >
+              <IconTable size={18} /> Tableau synoptique
+            </NavLink>
+          ) : null}
           <NavLink to="/search">
             <IconFile size={18} /> Recherche
           </NavLink>
@@ -584,8 +586,26 @@ function Shell() {
             <Route path="/matrice" element={<ActorsMatrixPage />} />
             <Route path="/juge" element={<JugeEcPage />} />
             <Route path="/mentions" element={<MentionsEcPage />} />
-            <Route path="/synoptique" element={<SynopticPage />} />
-            <Route path="/synoptique/:section" element={<SynopticPage />} />
+            <Route
+              path="/synoptique"
+              element={
+                canSeeNav("synoptique", getSession()?.roles ?? []) ? (
+                  <SynopticPage />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route
+              path="/synoptique/:section"
+              element={
+                canSeeNav("synoptique", getSession()?.roles ?? []) ? (
+                  <SynopticPage />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
             <Route path="/manage/deces" element={<RequireCivilBureau><ManageDecesPage /></RequireCivilBureau>} />
             <Route path="/manage/divorce" element={<ManageDivorcePage />} />
             <Route path="/manage/adoption" element={<ManageAdoptionPage />} />

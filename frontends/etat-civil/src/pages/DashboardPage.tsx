@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api, type CivilAct } from "../api";
 import { ensureAccessToken, getSession } from "../auth";
 import { BarChart, LineChart, PieChart } from "../components/Charts";
+import { actBelongsToOfficerCommune, getOfficerCommune } from "../commune";
 import { isSuperAdminNational } from "../ecUsers";
 import {
   IconBaby,
@@ -110,10 +111,12 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const session = getSession();
   const variant = dashboardVariant(session?.roles ?? ["OFFICIER_ETAT_CIVIL"]);
+  const nationalScope = isSuperAdminNational(session?.roles);
+  const officerCommune = getOfficerCommune();
   const localActs = listActs();
 
   const [apiActs, setApiActs] = useState<CivilAct[]>([]);
-  const [apiLoaded, setApiLoaded] = useState(false);
+  const [, setApiLoaded] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -128,13 +131,14 @@ export default function DashboardPage() {
         return;
       }
       try {
+        const communeFilter = nationalScope ? undefined : officerCommune.code;
         const [births, deaths, marriages, divorces, adoptions, recognitions] = await Promise.all([
-          api.listActs("births").catch(() => [] as CivilAct[]),
-          api.listActs("deaths").catch(() => [] as CivilAct[]),
-          api.listActs("marriages").catch(() => [] as CivilAct[]),
-          api.listActs("divorces").catch(() => [] as CivilAct[]),
-          api.listActs("adoptions").catch(() => [] as CivilAct[]),
-          api.listActs("recognitions").catch(() => [] as CivilAct[]),
+          api.listActs("births", communeFilter).catch(() => [] as CivilAct[]),
+          api.listActs("deaths", communeFilter).catch(() => [] as CivilAct[]),
+          api.listActs("marriages", communeFilter).catch(() => [] as CivilAct[]),
+          api.listActs("divorces", communeFilter).catch(() => [] as CivilAct[]),
+          api.listActs("adoptions", communeFilter).catch(() => [] as CivilAct[]),
+          api.listActs("recognitions", communeFilter).catch(() => [] as CivilAct[]),
         ]);
         if (cancelled) return;
         setApiActs([...births, ...deaths, ...marriages, ...divorces, ...adoptions, ...recognitions]);
@@ -148,7 +152,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [session?.accessToken]);
+  }, [session?.accessToken, nationalScope, officerCommune.code]);
 
   const acts = useMemo(() => {
     const fromApi = apiActs.map((a) => ({
@@ -161,20 +165,28 @@ export default function DashboardPage() {
         (a) =>
           !["CENSUS", "DISPLACEMENT", "DOCUMENT"].includes(a.type) &&
           !apiIds.has(a.id) &&
-          !apiIds.has(String(a.payload?.server_act_id ?? "")),
+          !apiIds.has(String(a.payload?.server_act_id ?? "")) &&
+          (nationalScope || actBelongsToOfficerCommune(a.payload, officerCommune)),
       )
       .map((a) => ({
         id: a.id,
         act_type: a.type,
         act_number: a.act_number,
-        commune_code: "",
+        commune_code: String(a.payload?.commune_code ?? officerCommune.code),
         status: String(a.status ?? a.payload?.status ?? "DRAFT"),
         citizen_id: null as string | null,
         payload: a.payload,
         created_at: a.created_at,
       }));
-    return [...fromApi, ...fromLocal];
-  }, [apiActs, localActs]);
+    const merged = [...fromApi, ...fromLocal];
+    if (nationalScope) return merged;
+    return merged.filter((a) =>
+      actBelongsToOfficerCommune(
+        { ...(a.payload ?? {}), commune_code: a.commune_code || (a.payload as { commune_code?: string })?.commune_code },
+        officerCommune,
+      ),
+    );
+  }, [apiActs, localActs, nationalScope, officerCommune]);
 
   const births = acts.filter((a) => a.act_type === "BIRTH" || a.act_type === "births");
   const deaths = acts.filter((a) => a.act_type === "DEATH" || a.act_type === "deaths");
@@ -199,14 +211,7 @@ export default function DashboardPage() {
   const months = useMemo(() => lastNMonths(6), []);
   const birthSeries = countByMonth(births, months);
   const deathSeries = countByMonth(deaths, months);
-  const marriageSeries = countByMonth(marriages, months);
   const allActsSeries = countByMonth(acts, months);
-
-  const hasTemporal = [...birthSeries, ...deathSeries, ...allActsSeries].some((v) => v > 0);
-  const demoTemporal = !hasTemporal && apiLoaded;
-  const demoBirth = demoTemporal ? [2, 3, 4, 3, 5, 4] : birthSeries;
-  const demoDeath = demoTemporal ? [1, 1, 2, 1, 2, 1] : deathSeries;
-  const demoAll = demoTemporal ? [4, 5, 7, 6, 9, 8] : allActsSeries;
 
   const helloName = session?.displayName || session?.username || "utilisateur";
   const rolePrimary = primaryRole(session?.roles ?? []);
@@ -222,6 +227,11 @@ export default function DashboardPage() {
   const territory = [session?.commune_province, session?.commune_ville, session?.commune_name]
     .filter(Boolean)
     .join(" · ");
+  const scopeLabel = nationalScope
+    ? "Vue nationale"
+    : territory
+      ? `Périmètre : ${territory}`
+      : `Périmètre : ${officerCommune.name}`;
 
   if (variant === "judiciaire") {
     const isJuge = rolePrimary === "JUGE";
@@ -361,7 +371,8 @@ export default function DashboardPage() {
           <h2 className="page-title">Bonjour, {helloName}</h2>
           <p className="page-lead">
             {roleTitle}
-            {territory ? ` · ${territory}` : ""}
+            {" · "}
+            {scopeLabel}
             {" · "}Bureau d&apos;état civil
           </p>
         </div>
@@ -410,18 +421,12 @@ export default function DashboardPage() {
           Stats partielles — {apiError}
         </p>
       ) : null}
-      {demoTemporal ? (
-        <div className="dash-demo-banner" role="note">
-          Courbes temporelles en <strong>données de démonstration</strong> — les KPI ci-dessous
-          utilisent les actes réels disponibles.
-        </div>
-      ) : null}
 
       <div className="dash-kpi-grid">
         <StatCard
           title="Actes"
           value={acts.length}
-          subtitle="Registre du bureau"
+          subtitle={nationalScope ? "Registre national" : `Commune ${officerCommune.name}`}
           icon={<IconFile size={22} />}
           color={RDC.blue}
           href="/acts"
@@ -488,15 +493,17 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <h3 className="dash-section-title">Statistiques des actes</h3>
+      <h3 className="dash-section-title">
+        Statistiques {nationalScope ? "nationales" : `de ${officerCommune.name}`}
+      </h3>
       <div className="eg-charts-row dash-charts-main">
         <LineChart
-          title={demoTemporal ? "Évolution des actes (DEMO)" : "Évolution des actes (6 mois)"}
+          title="Évolution des actes (6 mois)"
           labels={months.map((m) => m.label)}
           series={[
-            { name: "Tous actes", color: RDC.blue, values: demoAll },
-            { name: "Naissances", color: RDC.yellow, values: demoBirth },
-            { name: "Décès", color: RDC.red, values: demoDeath },
+            { name: "Tous actes", color: RDC.blue, values: allActsSeries },
+            { name: "Naissances", color: RDC.yellow, values: birthSeries },
+            { name: "Décès", color: RDC.red, values: deathSeries },
           ]}
           height={240}
         />
@@ -544,17 +551,17 @@ export default function DashboardPage() {
           </ul>
         </div>
         <LineChart
-          title={demoTemporal ? "Naissances vs décès (DEMO)" : "Naissances vs décès"}
+          title="Naissances vs décès"
           labels={months.map((m) => m.label)}
           series={[
-            { name: "Naissances", color: RDC.yellow, values: demoBirth },
-            { name: "Décès", color: RDC.red, values: demoDeath },
+            { name: "Naissances", color: RDC.yellow, values: birthSeries },
+            { name: "Décès", color: RDC.red, values: deathSeries },
           ]}
         />
         <div className="eg-chart-card">
           <h4 className="eg-chart-title">Activité récente</h4>
           {acts.length === 0 ? (
-            <p className="muted">Aucun acte à afficher pour le moment.</p>
+            <p className="muted">Aucun acte à afficher pour votre périmètre.</p>
           ) : (
             <ul className="dash-activity">
               {[...acts]

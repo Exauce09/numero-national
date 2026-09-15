@@ -34,14 +34,29 @@ export function saveOfficerCommune(next: OfficerCommune): void {
   localStorage.setItem(KEY, JSON.stringify(next));
 }
 
-/** Acte rattaché à la commune de l'officier (sinon exclu du synoptique). */
+/** Acte rattaché à la commune de l'officier (sinon exclu du synoptique / stats bureau). */
 export function actBelongsToOfficerCommune(
-  payload: Record<string, unknown>,
+  payload: Record<string, unknown> | null | undefined,
   commune = getOfficerCommune(),
 ): boolean {
-  const code = String(payload.commune_code ?? "").trim().toUpperCase();
-  if (!code) return true;
+  const p = payload ?? {};
+  const code = String(p.commune_code ?? "").trim().toUpperCase();
+  const name = String(p.commune_name ?? p.commune ?? "").trim().toUpperCase();
+  const province = String(p.province ?? p.commune_province ?? "").trim().toUpperCase();
+  const ville = String(p.ville ?? p.commune_ville ?? "").trim().toUpperCase();
   const c = commune.code.toUpperCase();
   const n = commune.name.toUpperCase();
-  return code === c || code.includes(n) || code.endsWith(`-${n}`);
+  const prov = commune.province.toUpperCase();
+  const v = commune.ville.toUpperCase();
+
+  if (code) {
+    return code === c || code.includes(n) || code.endsWith(`-${n}`);
+  }
+  if (name) {
+    return name === n || name.includes(n);
+  }
+  // Sans commune : n'appartient pas au périmètre d'un autre bureau.
+  if (province && province !== prov) return false;
+  if (ville && ville !== v) return false;
+  return false;
 }
