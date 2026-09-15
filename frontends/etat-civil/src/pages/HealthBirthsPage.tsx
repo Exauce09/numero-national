@@ -1,13 +1,15 @@
 import { FormEvent, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import ActFormShell from "../components/ActFormShell";
 import PersonPicker from "../components/PersonPicker";
-import { displayName, generateNic, type Person } from "../registry";
+import { getActFormSchema } from "../ecActForms";
+import { displayName, generateBirthDossierId, type Person } from "../registry";
 import { getHealthSession } from "../healthAuth";
 import { listFacilityDeclarations, notifyEtatCivil } from "../civilDeclarations";
 import { pushHealthNotification } from "../healthPrefs";
 
 type BirthCoupon = {
-  nic: string;
+  id_naissance: string;
   nom: string;
   postnom: string;
   prenom: string;
@@ -43,10 +45,10 @@ export default function HealthBirthsPage() {
       return;
     }
     if (!mother) {
-      setError("La mère est obligatoire (recherche ou ajout).");
+      setError("La mère est obligatoire.");
       return;
     }
-    const childNic = generateNic();
+    const idNaissance = generateBirthDossierId(dateNaissance);
     const childNom = nom.trim();
     const childPostnom = postnom.trim() || mother.postnom || father?.postnom || "";
     const childPrenom = prenom.trim();
@@ -58,7 +60,9 @@ export default function HealthBirthsPage() {
         facility_name: session.facilityName,
         commune_code: session.commune_code,
         commune_name: session.commune_name,
-        child_nic: childNic,
+        notification_type: "NAISSANCE",
+        id_naissance: idNaissance,
+        child_nic: idNaissance,
         child_nom: childNom,
         child_postnom: childPostnom,
         child_prenom: childPrenom,
@@ -74,7 +78,7 @@ export default function HealthBirthsPage() {
       },
     });
     const birthCoupon: BirthCoupon = {
-      nic: childNic,
+      id_naissance: idNaissance,
       nom: childNom,
       postnom: childPostnom,
       prenom: childPrenom,
@@ -86,12 +90,12 @@ export default function HealthBirthsPage() {
     };
     setCoupon(birthCoupon);
     pushHealthNotification({
-      title: "Nouveau-né — NIC attribué",
-      body: `${childPrenom} ${childNom} — NIC ${childNic} (réf. ${decl.id.slice(0, 8)}).`,
+      title: "Notification de naissance transmise",
+      body: `${childPrenom} ${childNom} — ID naissance ${idNaissance} (réf. ${decl.id.slice(0, 8)}).`,
       href: "/sante/births",
     });
     setMessage(
-      `NIC ${childNic} attribué. Déclaration transmise à l'état civil (réf. ${decl.id.slice(0, 8)}).`,
+      `Notification transmise à l'état civil — ID naissance provisoire ${idNaissance} (réf. ${decl.id.slice(0, 8)}). L'officier établira l'acte officiel.`,
     );
     setNom("");
     setPostnom("");
@@ -104,10 +108,9 @@ export default function HealthBirthsPage() {
 
   const qrValue = coupon
     ? JSON.stringify({
-        type: "nn_birth_coupon",
-        v: 1,
-        nic: coupon.nic,
-        national_id: coupon.nic,
+        type: "nn_birth_notification",
+        v: 2,
+        id_naissance: coupon.id_naissance,
         family_name: coupon.nom,
         given_names: coupon.prenom,
         sex: coupon.sexe,
@@ -118,18 +121,13 @@ export default function HealthBirthsPage() {
     : "";
 
   return (
-    <div>
-      <h2 className="page-title">Nouveau-né</h2>
-      <p className="page-lead">
-        Enregistrement à la structure sanitaire — numéro national immédiat, coupon QR, puis
-        notification automatique vers l&apos;état civil.
-      </p>
+    <ActFormShell schema={getActFormSchema("notif_naissance")!}>
       <div className="panel">
-        <form className="form-grid" onSubmit={onSubmit}>
+        <form className="form-grid" onSubmit={(e) => void onSubmit(e)}>
           {error ? <div className="login-error full">{error}</div> : null}
           {message ? <div className="success-banner full">{message}</div> : null}
           <div>
-            <label className="form-label">Nom</label>
+            <label className="form-label">Nom *</label>
             <input className="form-control" value={nom} onChange={(e) => setNom(e.target.value)} required />
           </div>
           <div>
@@ -137,18 +135,18 @@ export default function HealthBirthsPage() {
             <input className="form-control" value={postnom} onChange={(e) => setPostnom(e.target.value)} />
           </div>
           <div>
-            <label className="form-label">Prénom</label>
+            <label className="form-label">Prénom(s)</label>
             <input className="form-control" value={prenom} onChange={(e) => setPrenom(e.target.value)} required />
           </div>
           <div>
-            <label className="form-label">Sexe</label>
+            <label className="form-label">Sexe *</label>
             <select className="form-control" value={sexe} onChange={(e) => setSexe(e.target.value as "M" | "F")}>
               <option value="M">Masculin</option>
               <option value="F">Féminin</option>
             </select>
           </div>
           <div>
-            <label className="form-label">Date de naissance</label>
+            <label className="form-label">Date de naissance *</label>
             <input
               className="form-control"
               type="date"
@@ -158,14 +156,14 @@ export default function HealthBirthsPage() {
             />
           </div>
           <div className="full">
-            <PersonPicker label="Nom de la mère" value={mother} onChange={setMother} required sexFilter="F" />
+            <PersonPicker label="Mère *" value={mother} onChange={setMother} required sexFilter="F" />
           </div>
           <div className="full">
-            <PersonPicker label="Nom du père" value={father} onChange={setFather} sexFilter="M" />
+            <PersonPicker label="Père (le cas échéant)" value={father} onChange={setFather} sexFilter="M" />
           </div>
           <div className="full">
             <button className="btn-primary" type="submit" style={{ width: "auto", minWidth: 280 }}>
-              Enregistrer, attribuer le NIC et notifier
+              Transmettre la notification à l&apos;état civil
             </button>
           </div>
         </form>
@@ -173,21 +171,21 @@ export default function HealthBirthsPage() {
 
       {coupon ? (
         <div className="panel print-area" style={{ marginTop: "1rem" }}>
-          <div className="success-banner">Coupon naissance — NIC {coupon.nic}</div>
+          <div className="success-banner">Accusé de notification — ID naissance {coupon.id_naissance}</div>
           <div className="act-print-card" style={{ marginTop: "0.75rem" }}>
             <div className="act-print-header">
               <img src="/logo-rdc.jpg" alt="RDC" />
               <div>
                 <strong>République Démocratique du Congo</strong>
-                <div>SIGPOP-RDC · Structure sanitaire</div>
-                <div>Coupon provisoire nouveau-né</div>
+                <div>État civil · Structure sanitaire</div>
+                <div>Notification de naissance (pas un acte officiel)</div>
               </div>
             </div>
             <div className="act-print-body">
               <div className="act-print-meta">
                 <div>
-                  <span className="muted">NIC</span>
-                  <strong>{coupon.nic}</strong>
+                  <span className="muted">ID naissance</span>
+                  <strong>{coupon.id_naissance}</strong>
                 </div>
                 <div>
                   <span className="muted">Enfant</span>
@@ -210,30 +208,35 @@ export default function HealthBirthsPage() {
               </div>
             </div>
           </div>
-          <button className="btn-primary" type="button" style={{ marginTop: "0.75rem", width: "auto" }} onClick={() => window.print()}>
-            Imprimer le coupon
+          <button
+            className="btn-primary"
+            type="button"
+            style={{ marginTop: "0.75rem", width: "auto" }}
+            onClick={() => window.print()}
+          >
+            Imprimer l&apos;accusé
           </button>
         </div>
       ) : null}
 
       <div className="panel" style={{ marginTop: "1rem" }}>
-        <h3 className="panel-title">Déclarations envoyées</h3>
+        <h3 className="panel-title">Notifications transmises</h3>
         <table className="data-table">
           <thead>
             <tr>
-              <th>NIC</th>
+              <th>ID naissance</th>
               <th>Enfant</th>
               <th>Mère</th>
               <th>Père</th>
               <th>Naissance</th>
-              <th>Statut état civil</th>
+              <th>Statut EC</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((d) => (
               <tr key={d.id}>
                 <td>
-                  <code>{String(d.payload.child_nic ?? "—")}</code>
+                  <code>{String(d.payload.id_naissance ?? d.payload.child_nic ?? "—")}</code>
                 </td>
                 <td>
                   {String(d.payload.child_nom ?? "")} {String(d.payload.child_prenom ?? "")}
@@ -247,6 +250,6 @@ export default function HealthBirthsPage() {
           </tbody>
         </table>
       </div>
-    </div>
+    </ActFormShell>
   );
 }

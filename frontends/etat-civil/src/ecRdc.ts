@@ -109,7 +109,7 @@ export const EC_RDC_MISSIONS: EcMission[] = [
     id: "rectification",
     title: "Rectifications & mentions",
     summary: "Erreurs matérielles ou mentions après jugement / demande régulière.",
-    href: "/corrections",
+    href: "/mentions",
     needsJudge: true,
     legalNote: "Erreur grave → souvent rectification judiciaire avant inscription.",
   },
@@ -120,9 +120,15 @@ export const EC_RDC_MISSIONS: EcMission[] = [
     href: "/documents",
   },
   {
+    id: "matrice",
+    title: "Matrice acteurs & permissions",
+    summary: "Qui peut créer, valider, transmettre, auditer — séparation des responsabilités.",
+    href: "/matrice",
+  },
+  {
     id: "declarations",
     title: "Déclarations à valider",
-    summary: "File d'attente officier : déclarations maternité / santé en attente de validation.",
+    summary: "File d'attente officier : notifications maternité / santé en attente de validation.",
     href: "/declarations",
   },
 ];

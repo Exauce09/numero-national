@@ -41,7 +41,9 @@ import DeclarationsPage from "./pages/DeclarationsPage";
 import MissionsEcPage from "./pages/MissionsEcPage";
 import ProcedureEcPage from "./pages/ProcedureEcPage";
 import RolesEcPage from "./pages/RolesEcPage";
+import ActorsMatrixPage from "./pages/ActorsMatrixPage";
 import JugeEcPage from "./pages/JugeEcPage";
+import MentionsEcPage from "./pages/MentionsEcPage";
 import RecognitionsPage from "./pages/RecognitionsPage";
 import TranscriptionsPage from "./pages/TranscriptionsPage";
 import CorrectionsInboxPage from "./pages/CorrectionsInboxPage";
@@ -287,11 +289,12 @@ function Shell() {
           <NavCollapsibleGroup
             label="Cadre & procédure"
             icon={<IconClipboard size={18} />}
-            activePrefixes={["/procedure", "/missions", "/roles", "/juge"]}
+            activePrefixes={["/procedure", "/missions", "/roles", "/juge", "/matrice"]}
           >
             <NavLink to="/procedure">Procédure d&apos;enregistrement</NavLink>
             <NavLink to="/missions">Missions EC</NavLink>
             <NavLink to="/roles">Qui fait quoi</NavLink>
+            <NavLink to="/matrice">Matrice acteurs & permissions</NavLink>
             <NavLink to="/juge">Quand le juge intervient</NavLink>
           </NavCollapsibleGroup>
           <NavLink to="/declarations">
@@ -313,17 +316,17 @@ function Shell() {
             ]}
           >
             <NavLink to="/manage/naissance">
-              <IconBaby size={16} /> Naissances
+              <IconBaby size={16} /> Actes de naissance
             </NavLink>
-            <NavLink to="/births">+ Enregistrer naissance</NavLink>
+            <NavLink to="/births">+ Établir un acte de naissance</NavLink>
             <NavLink to="/manage/mariage">
-              <IconRing size={16} /> Mariages
+              <IconRing size={16} /> Actes de mariage
             </NavLink>
-            <NavLink to="/marriages">+ Enregistrer mariage</NavLink>
+            <NavLink to="/marriages">+ Établir un acte de mariage</NavLink>
             <NavLink to="/manage/deces">
-              <IconCross size={16} /> Décès
+              <IconCross size={16} /> Actes de décès
             </NavLink>
-            <NavLink to="/deaths">+ Enregistrer décès</NavLink>
+            <NavLink to="/deaths">+ Établir un acte de décès</NavLink>
           </NavCollapsibleGroup>
           <NavCollapsibleGroup
             label="Actes liés"
@@ -334,11 +337,14 @@ function Shell() {
               "/manage/divorce",
               "/adoptions",
               "/divorces",
+              "/mentions",
+              "/corrections",
             ]}
           >
-            <NavLink to="/recognitions">Reconnaissances</NavLink>
-            <NavLink to="/manage/adoption">Adoptions (après juge)</NavLink>
-            <NavLink to="/manage/divorce">Divorces (transcription)</NavLink>
+            <NavLink to="/recognitions">Reconnaissance d&apos;enfant</NavLink>
+            <NavLink to="/manage/adoption">Adoption (après jugement)</NavLink>
+            <NavLink to="/manage/divorce">Divorce (transcription)</NavLink>
+            <NavLink to="/mentions">Mentions & rectifications</NavLink>
           </NavCollapsibleGroup>
           <NavCollapsibleGroup
             label="Mentions & documents"
@@ -347,13 +353,15 @@ function Shell() {
               "/acts",
               "/transcriptions",
               "/corrections",
+              "/mentions",
               "/documents",
               "/verify-document",
             ]}
           >
             <NavLink to="/acts">Registre des actes</NavLink>
             <NavLink to="/transcriptions">Transcriptions</NavLink>
-            <NavLink to="/corrections">Rectifications</NavLink>
+            <NavLink to="/corrections">Demandes de correction</NavLink>
+            <NavLink to="/mentions">Inscription de mention</NavLink>
             <NavLink to="/documents">Copies & extraits</NavLink>
             <NavLink to="/verify-document">Vérifier document</NavLink>
             <NavLink to="/acts/qrcode">QR code</NavLink>
@@ -471,7 +479,9 @@ function Shell() {
             <Route path="/procedure" element={<ProcedureEcPage />} />
             <Route path="/missions" element={<MissionsEcPage />} />
             <Route path="/roles" element={<RolesEcPage />} />
+            <Route path="/matrice" element={<ActorsMatrixPage />} />
             <Route path="/juge" element={<JugeEcPage />} />
+            <Route path="/mentions" element={<MentionsEcPage />} />
             <Route path="/synoptique" element={<SynopticPage />} />
             <Route path="/synoptique/:section" element={<SynopticPage />} />
             <Route path="/manage/deces" element={<ManageDecesPage />} />

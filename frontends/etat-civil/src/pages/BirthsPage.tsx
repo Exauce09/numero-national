@@ -2,6 +2,8 @@ import { FormEvent, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import ActPrintActions from "../components/ActPrintActions";
 import ActPrintCard from "../components/ActPrintCard";
+import ActFormShell from "../components/ActFormShell";
+import { getActFormSchema } from "../ecActForms";
 import { getSession } from "../auth";
 import DataToolbar from "../components/DataToolbar";
 import GeoCascade, {
@@ -17,6 +19,7 @@ import {
   addAct,
   addPerson,
   delaiEnregistrementLabel,
+  displayName,
   findDuplicateBirthAct,
   findDuplicatePerson,
   generateBirthDossierId,
@@ -62,6 +65,12 @@ export default function BirthsPage() {
   const [prenom, setPrenom] = useState("");
   const [sexe, setSexe] = useState<Sexe>("M");
   const [dateNaissance, setDateNaissance] = useState("");
+  const [heureNaissance, setHeureNaissance] = useState("");
+  const [naissanceMultiple, setNaissanceMultiple] = useState(false);
+  const [anneeRegistre, setAnneeRegistre] = useState(String(new Date().getFullYear()));
+  const [numeroRegistre, setNumeroRegistre] = useState("");
+  const [declarant, setDeclarant] = useState<Person | null>(null);
+  const [qualiteDeclarant, setQualiteDeclarant] = useState("MERE");
   const [lieuNaissance, setLieuNaissance] = useState("");
   const [geoNaissance, setGeoNaissance] = useState<GeoSelection>({
     commune_code: officer.code,
@@ -240,6 +249,10 @@ export default function BirthsPage() {
         prenom: child.prenom,
         sexe: child.sexe,
         date_naissance: child.date_naissance,
+        heure_naissance: heureNaissance || null,
+        naissance_multiple: naissanceMultiple,
+        annee_registre: anneeRegistre.trim() || null,
+        numero_registre: numeroRegistre.trim() || null,
         lieu_naissance: child.lieu_naissance,
         id_naissance: child.nic,
         code_dossier: child.nic,
@@ -268,8 +281,9 @@ export default function BirthsPage() {
         mother_id: mother.id,
         mother_name: motherFull,
         mere_nom: motherFull,
-        declarant: motherFull,
-        declarant_qualite: "mère de l'enfant",
+        declarant: declarant ? displayName(declarant) : motherFull,
+        declarant_id: declarant?.id ?? mother.id,
+        declarant_qualite: qualiteDeclarant,
         mother_dossier: mother.nic,
         mother_snapshot: link.mother_snapshot,
         adresse_mere: adresseMereLabel || null,
@@ -306,6 +320,12 @@ export default function BirthsPage() {
       setPostnom("");
       setPrenom("");
       setDateNaissance("");
+      setHeureNaissance("");
+      setNaissanceMultiple(false);
+      setAnneeRegistre(String(new Date().getFullYear()));
+      setNumeroRegistre("");
+      setDeclarant(null);
+      setQualiteDeclarant("MERE");
       setLieuNaissance("");
       setGeoNaissance({
         commune_code: officer.code,
@@ -365,23 +385,24 @@ export default function BirthsPage() {
   }));
 
   return (
-    <div>
-      <h2 className="page-title">Naissances — enregistrement</h2>
-      <p className="page-lead">
-        Canal bureau EC. Mère obligatoire · adresse mère · originaire · ID naissance (pas de N°
-        national).{" "}
-        <Link to="/procedure">Procédure</Link> · <Link to="/juge">Juge</Link> ·{" "}
-        <Link to="/declarations">Déclarations santé</Link>
-      </p>
+    <ActFormShell
+      schema={getActFormSchema("naissance")!}
+      extraLead={
+        <p className="page-lead" style={{ marginTop: 0 }}>
+          <Link to="/procedure">Procédure</Link> · <Link to="/juge">Juge</Link> ·{" "}
+          <Link to="/declarations">Déclarations santé</Link> · <Link to="/matrice">Matrice</Link>
+        </p>
+      }
+    >
       <div className="panel" style={{ marginBottom: "1rem" }}>
         <p className="muted" style={{ margin: 0, fontSize: "0.92rem" }}>
           <strong>Dans le délai (≤ {NEWBORN_DELAI_JOURS} j.)</strong> : enregistrement classique.{" "}
           <strong>Hors délai</strong> : jugement supplétif + référence du jugement obligatoire.
-          Maternité : déclarer via <Link to="/sante/login">/sante</Link> puis valider ici.
+          Maternité : notification via <Link to="/sante/login">/sante</Link> puis validation officier.
         </p>
       </div>
       <GpsLocatePanel
-        title="Localisation GPS du lieu"
+        title="Localisation GPS du lieu de naissance"
         onResolved={(g) => {
           setGpsLat(g.latitude);
           setGpsLng(g.longitude);
@@ -411,8 +432,13 @@ export default function BirthsPage() {
               {warning}
             </div>
           ) : null}
+          <div className="full">
+            <h3 className="panel-title" style={{ marginTop: 0 }}>
+              Enfant
+            </h3>
+          </div>
           <div>
-            <label className="form-label">Nom</label>
+            <label className="form-label">Nom *</label>
             <input className="form-control" value={nom} onChange={(e) => setNom(e.target.value)} required />
           </div>
           <div>
@@ -420,18 +446,18 @@ export default function BirthsPage() {
             <input className="form-control" value={postnom} onChange={(e) => setPostnom(e.target.value)} />
           </div>
           <div>
-            <label className="form-label">Prénom</label>
+            <label className="form-label">Prénom(s) *</label>
             <input className="form-control" value={prenom} onChange={(e) => setPrenom(e.target.value)} required />
           </div>
           <div>
-            <label className="form-label">Sexe</label>
+            <label className="form-label">Sexe *</label>
             <select className="form-control" value={sexe} onChange={(e) => setSexe(e.target.value as Sexe)}>
               <option value="M">Masculin</option>
               <option value="F">Féminin</option>
             </select>
           </div>
           <div>
-            <label className="form-label">Date de naissance</label>
+            <label className="form-label">Date de naissance *</label>
             <input
               className="form-control"
               type="date"
@@ -442,6 +468,43 @@ export default function BirthsPage() {
                 setDelaiEnregistrement(suggestDelaiEnregistrement(v));
               }}
               required
+            />
+          </div>
+          <div>
+            <label className="form-label">Heure de naissance</label>
+            <input
+              className="form-control"
+              type="time"
+              value={heureNaissance}
+              onChange={(e) => setHeureNaissance(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="form-label">Naissance multiple</label>
+            <select
+              className="form-control"
+              value={naissanceMultiple ? "oui" : "non"}
+              onChange={(e) => setNaissanceMultiple(e.target.value === "oui")}
+            >
+              <option value="non">Non</option>
+              <option value="oui">Oui (jumeaux…)</option>
+            </select>
+          </div>
+          <div>
+            <label className="form-label">Année du registre</label>
+            <input
+              className="form-control"
+              value={anneeRegistre}
+              onChange={(e) => setAnneeRegistre(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="form-label">N° d&apos;ordre au registre</label>
+            <input
+              className="form-control"
+              value={numeroRegistre}
+              onChange={(e) => setNumeroRegistre(e.target.value)}
+              placeholder="Attribué à la validation si vide"
             />
           </div>
           <div>
@@ -597,7 +660,34 @@ export default function BirthsPage() {
             </div>
           </div>
           <div className="full">
-            <PersonPicker label="Mère" value={mother} onChange={setMother} required sexFilter="F" />
+            <h3 className="panel-title">Filiation & déclaration</h3>
+          </div>
+          <div className="full">
+            <PersonPicker label="Mère *" value={mother} onChange={setMother} required sexFilter="F" />
+          </div>
+          <div className="full">
+            <PersonPicker
+              label="Déclarant *"
+              value={declarant}
+              onChange={(p) => {
+                setDeclarant(p);
+                if (p && mother && p.id === mother.id) setQualiteDeclarant("MERE");
+                if (p && father && p.id === father.id) setQualiteDeclarant("PERE");
+              }}
+            />
+          </div>
+          <div>
+            <label className="form-label">Qualité du déclarant *</label>
+            <select
+              className="form-control"
+              value={qualiteDeclarant}
+              onChange={(e) => setQualiteDeclarant(e.target.value)}
+            >
+              <option value="MERE">Mère</option>
+              <option value="PERE">Père</option>
+              <option value="MANDATAIRE">Mandataire</option>
+              <option value="AUTRE">Autre</option>
+            </select>
           </div>
           <div className="full">
             <label className="form-label">Adresse de la mère *</label>
@@ -772,6 +862,6 @@ export default function BirthsPage() {
           </div>
         </div>
       ) : null}
-    </div>
+    </ActFormShell>
   );
 }

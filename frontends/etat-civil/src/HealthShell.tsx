@@ -112,10 +112,10 @@ export default function HealthShell() {
             <IconTable size={18} /> Synoptique
           </NavLink>
           <NavLink to="/sante/births" onClick={() => setNavOpen(false)}>
-            <IconBaby size={18} /> Nouveau-né
+            <IconBaby size={18} /> Notification de naissance
           </NavLink>
           <NavLink to="/sante/deaths" onClick={() => setNavOpen(false)}>
-            <IconCross size={18} /> Décès
+            <IconCross size={18} /> Notification de décès
           </NavLink>
         </nav>
         <div className="sidebar-foot">
