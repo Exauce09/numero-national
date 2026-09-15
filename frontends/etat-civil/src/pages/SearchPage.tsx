@@ -140,7 +140,7 @@ export default function SearchPage() {
                           : "—"}
                   </td>
                   <td>
-                    <Link className="btn-secondary" to={`/population/${p.id}`}>
+                    <Link className="btn-secondary" to={`/search?q=${encodeURIComponent(p.nic || "")}`}>
                       Voir
                     </Link>
                   </td>
@@ -184,7 +184,7 @@ export default function SearchPage() {
                 </td>
                 <td>{d.updated_at ? new Date(d.updated_at).toLocaleString("fr-CD") : "—"}</td>
                 <td>
-                  <Link className="btn-secondary" to={`/census?draft=${encodeURIComponent(d.id)}`}>
+                  <Link className="btn-secondary" to={`/search?q=${encodeURIComponent(d.title || d.local_id || d.id)}`}>
                     Ouvrir
                   </Link>
                 </td>
