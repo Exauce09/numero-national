@@ -213,10 +213,137 @@ export default function DashboardPage() {
     session?.roleTitle ||
     (variant === "provincial"
       ? "Directrice de l'État civil général de la RDC"
-      : "Officier de l'état civil");
+      : variant === "judiciaire"
+        ? "Greffier"
+        : "Officier de l'état civil");
   const territory = [session?.commune_province, session?.commune_ville, session?.commune_name]
     .filter(Boolean)
     .join(" · ");
+
+  if (variant === "judiciaire") {
+    const judicialActs = [...divorces, ...adoptions];
+    const judicialSeries = countByMonth(judicialActs, months);
+    return (
+      <div className="dash-page">
+        <div className="dash-welcome">
+          <div>
+            <h2 className="page-title">Bonjour, {helloName}</h2>
+            <p className="page-lead">
+              {roleTitle}
+              {territory ? ` · ${territory}` : ""}
+              {" · "}Module judiciaire (greffe) — uniquement vos dossiers de jugement
+            </p>
+          </div>
+        </div>
+
+        <div className="dash-action-row" style={{ marginBottom: "1.25rem" }}>
+          <button type="button" className="dash-action-card" onClick={() => navigate("/transcriptions")}>
+            <span className="dash-action-label">Transcriptions</span>
+            <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
+              Jugements
+            </strong>
+            <span className="btn-add btn-sm">Ouvrir</span>
+          </button>
+          <button type="button" className="dash-action-card" onClick={() => navigate("/divorces")}>
+            <span className="dash-action-label">Divorces</span>
+            <strong className="dash-action-value">{divorces.length}</strong>
+            <span className="btn-secondary btn-sm">Transcrire</span>
+          </button>
+          <button type="button" className="dash-action-card" onClick={() => navigate("/adoptions")}>
+            <span className="dash-action-label">Adoptions</span>
+            <strong className="dash-action-value">{adoptions.length}</strong>
+            <span className="btn-secondary btn-sm">Transcrire</span>
+          </button>
+          <button type="button" className="dash-action-card" onClick={() => navigate("/juge")}>
+            <span className="dash-action-label">Cadre juge</span>
+            <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
+              Supplétif…
+            </strong>
+            <span className="btn-secondary btn-sm">Voir</span>
+          </button>
+        </div>
+
+        <div className="dash-kpi-grid">
+          <StatCard
+            title="Divorces"
+            value={divorces.length}
+            subtitle="Transcriptions greffe"
+            icon={<IconSplit size={22} />}
+            color={RDC.redDeep}
+            href="/lists/divorce"
+          />
+          <StatCard
+            title="Adoptions"
+            value={adoptions.length}
+            subtitle="Après jugement"
+            icon={<IconClipboard size={22} />}
+            color={RDC.blueMid}
+            href="/lists/adoption"
+          />
+          <StatCard
+            title="Dossiers judiciaires"
+            value={judicialActs.length}
+            subtitle="Divorce + adoption"
+            icon={<IconFile size={22} />}
+            color={RDC.blue}
+            href="/transcriptions"
+          />
+          <StatCard
+            title="En cours"
+            value={
+              judicialActs.filter((a) =>
+                ["DRAFT", "SUBMITTED", "UNDER_REVIEW", "PENDING_OFFICER"].includes(actStatus(a)),
+              ).length
+            }
+            subtitle="Brouillons / soumis"
+            icon={<IconClipboard size={22} />}
+            color={RDC.yellowDeep}
+            href="/transcriptions"
+          />
+        </div>
+
+        <h3 className="dash-section-title">Activité du greffe</h3>
+        <div className="eg-charts-row dash-charts-main">
+          <BarChart
+            title="Dossiers judiciaires par type"
+            height={200}
+            data={[
+              { label: "Divorces", value: divorces.length, color: RDC.redSoft },
+              { label: "Adoptions", value: adoptions.length, color: RDC.blueMid },
+            ]}
+          />
+          <LineChart
+            title="Transcriptions (6 mois)"
+            labels={months.map((m) => m.label)}
+            series={[{ name: "Dossiers", color: RDC.blue, values: judicialSeries }]}
+            height={240}
+          />
+        </div>
+
+        <div className="eg-chart-card" style={{ marginTop: "1rem" }}>
+          <h4 className="eg-chart-title">Derniers dossiers</h4>
+          {judicialActs.length === 0 ? (
+            <p className="muted">Aucun dossier judiciaire pour le moment.</p>
+          ) : (
+            <ul className="dash-activity">
+              {[...judicialActs]
+                .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
+                .slice(0, 8)
+                .map((a) => (
+                  <li key={a.id}>
+                    <IconFile size={14} />
+                    <span>
+                      <strong>{a.act_type}</strong> · {a.act_number || a.id.slice(0, 8)}
+                    </span>
+                    <span className="status-badge">{actStatus(a) || "—"}</span>
+                  </li>
+                ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dash-page">

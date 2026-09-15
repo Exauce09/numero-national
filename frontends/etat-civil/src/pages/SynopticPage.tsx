@@ -9,6 +9,7 @@ import { getSession } from "../auth";
 import { getOfficerCommune, type OfficerCommune } from "../commune";
 import { isSuperAdminNational } from "../ecUsers";
 import type { FlatCommune } from "../geoFallback";
+import { isJudicialRole } from "../rbac";
 import {
   listSynopticCommunes,
   synopticBirths,
@@ -710,6 +711,9 @@ function DocumentsTable({ commune }: { commune: CommuneSel }) {
 export default function SynopticPage() {
   const { section } = useParams<{ section?: string }>();
   const session = getSession();
+  if (isJudicialRole(session?.roles)) {
+    return <Navigate to="/" replace />;
+  }
   const isNational = isSuperAdminNational(session?.roles);
   const officer = getOfficerCommune();
   const [filterProvince, setFilterProvince] = useState("");

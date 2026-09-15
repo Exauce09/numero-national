@@ -9,6 +9,8 @@ export type AppRole =
   | "OFFICIER_ETAT_CIVIL"
   | "CIVIL_OFFICER"
   | "AGENT_ETAT_CIVIL"
+  | "GREFFIER"
+  | "JUGE"
   | "AUDITEUR"
   | "CITIZEN"
   | string;
@@ -31,16 +33,27 @@ export type NavKey =
   | "documents"
   | "cartes"
   | "search"
-  | "biometrie";
+  | "biometrie"
+  | "judiciaire";
 
 const NATIONAL = new Set(["SUPER_ADMIN_NATIONAL", "ADMIN_NATIONAL", "CENTRAL_ADMIN"]);
 const PROVINCIAL = new Set(["ADMIN_PROVINCIAL"]);
 const BUREAU_LEAD = new Set(["RESPONSABLE_BUREAU"]);
 const OFFICIER = new Set(["OFFICIER_ETAT_CIVIL", "CIVIL_OFFICER"]);
 const AGENT = new Set(["AGENT_ETAT_CIVIL"]);
+const JUDICIAL = new Set(["GREFFIER", "JUGE"]);
 
 export function normalizeRoles(roles: string[] | undefined | null): string[] {
   return (roles ?? []).map((r) => r.toUpperCase());
+}
+
+/** Greffier / juge — module judiciaire, pas le bureau EC opérationnel. */
+export function isJudicialRole(roles: string[] | undefined | null): boolean {
+  const r = normalizeRoles(roles);
+  return (
+    r.some((x) => JUDICIAL.has(x)) &&
+    !r.some((x) => NATIONAL.has(x) || BUREAU_LEAD.has(x) || OFFICIER.has(x) || AGENT.has(x))
+  );
 }
 
 export function primaryRole(roles: string[]): AppRole {
@@ -50,6 +63,8 @@ export function primaryRole(roles: string[]): AppRole {
   if (r.some((x) => BUREAU_LEAD.has(x))) return "RESPONSABLE_BUREAU";
   if (r.some((x) => OFFICIER.has(x))) return "OFFICIER_ETAT_CIVIL";
   if (r.some((x) => AGENT.has(x))) return "AGENT_ETAT_CIVIL";
+  if (r.includes("GREFFIER")) return "GREFFIER";
+  if (r.includes("JUGE")) return "JUGE";
   if (r.includes("AUDITEUR")) return "AUDITEUR";
   return r[0] ?? "AGENT_ETAT_CIVIL";
 }
@@ -70,6 +85,10 @@ export function roleTitleFor(roles: string[]): string {
       return "Officier de l'état civil";
     case "AGENT_ETAT_CIVIL":
       return "Agent de l'état civil";
+    case "GREFFIER":
+      return "Greffier";
+    case "JUGE":
+      return "Juge";
     case "AUDITEUR":
       return "Auditeur";
     default:
@@ -108,11 +127,28 @@ export function canSeeNav(key: NavKey, roles: string[], permissions?: string[] |
   const isProvincial = r.some((x) => PROVINCIAL.has(x));
   const isLead = r.some((x) => BUREAU_LEAD.has(x));
   const isOfficier = r.some((x) => OFFICIER.has(x));
-  const isAgent = r.some((x) => AGENT.has(x)) || (!isNational && !isProvincial && !isLead && !isOfficier);
+  const isJudicial = r.some((x) => JUDICIAL.has(x));
+  const isAgent =
+    r.some((x) => AGENT.has(x)) ||
+    (!isNational && !isProvincial && !isLead && !isOfficier && !isJudicial);
   const perms = permissions ?? [];
   const hasUserManage = can("users:manage", perms);
   const hasPersonnel = can("personnel:read", perms) || can("personnel:manage", perms);
   const hasAccountReq = can("account_request:manage", perms) || can("account_request:create", perms);
+
+  // Greffier / juge : uniquement module judiciaire (+ recherche / cadre).
+  if (isJudicial && !isNational && !isLead && !isOfficier) {
+    switch (key) {
+      case "dashboard":
+      case "search":
+      case "judiciaire":
+      case "divorces":
+      case "documents":
+        return true;
+      default:
+        return false;
+    }
+  }
 
   switch (key) {
     case "dashboard":
@@ -128,6 +164,8 @@ export function canSeeNav(key: NavKey, roles: string[], permissions?: string[] |
     case "declarations":
     case "documents":
       return isAgent || isOfficier || isLead || isProvincial || isNational;
+    case "judiciaire":
+      return isOfficier || isLead || isProvincial || isNational || isJudicial;
     case "validation":
       return isOfficier || isLead || isProvincial || isNational;
     case "corrections":
@@ -135,7 +173,6 @@ export function canSeeNav(key: NavKey, roles: string[], permissions?: string[] |
     case "census":
       return isLead || isProvincial || isNational || isOfficier;
     case "admin_personnel":
-      // Super admin / national : personnel national. Responsable = utilisateurs bureau via /users.
       return isNational && (hasPersonnel || hasUserManage || perms.length === 0);
     case "admin_bureaux":
       return isNational;
@@ -158,7 +195,13 @@ export function canSeeNav(key: NavKey, roles: string[], permissions?: string[] |
   }
 }
 
-export type DashboardVariant = "national" | "provincial" | "bureau" | "officier" | "agent";
+export type DashboardVariant =
+  | "national"
+  | "provincial"
+  | "bureau"
+  | "officier"
+  | "agent"
+  | "judiciaire";
 
 export function dashboardVariant(roles: string[]): DashboardVariant {
   const role = primaryRole(roles);
@@ -168,6 +211,7 @@ export function dashboardVariant(roles: string[]): DashboardVariant {
   if (role === "ADMIN_PROVINCIAL") return "provincial";
   if (role === "RESPONSABLE_BUREAU") return "bureau";
   if (role === "OFFICIER_ETAT_CIVIL" || role === "CIVIL_OFFICER") return "officier";
+  if (role === "GREFFIER" || role === "JUGE") return "judiciaire";
   return "agent";
 }
 

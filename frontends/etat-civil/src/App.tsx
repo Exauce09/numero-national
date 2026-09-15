@@ -12,7 +12,7 @@ import {
   isSuperAdminNational,
   permissionsForRoles,
 } from "./ecUsers";
-import { roleTitleFor } from "./rbac";
+import { isJudicialRole, roleTitleFor } from "./rbac";
 import {
   applyTheme,
   getPrefs,
@@ -132,6 +132,12 @@ function NavCollapsibleGroup({
       {open ? <div className="nav-group-items">{children}</div> : null}
     </div>
   );
+}
+
+function RequireCivilBureau({ children }: { children: ReactNode }) {
+  const session = getSession();
+  if (isJudicialRole(session?.roles)) return <Navigate to="/" replace />;
+  return <>{children}</>;
 }
 
 function Shell() {
@@ -302,6 +308,7 @@ function Shell() {
     .filter(Boolean)
     .join(" · ");
   const roles = session?.roles ?? ["OFFICIER_ETAT_CIVIL"];
+  const judicialOnly = isJudicialRole(roles);
   const badge = unreadCount();
   const photo = prefs.photoDataUrl || session?.photoDataUrl;
 
@@ -319,7 +326,9 @@ function Shell() {
         <div className="sidebar-brand">
           <img src="/logo-rdc.jpg" alt="République démocratique du Congo" />
           <strong>État civil — RDC</strong>
-          <span>Bureau d'état civil · registres & actes</span>
+          <span>
+            {judicialOnly ? "Module judiciaire · greffe" : "Bureau d'état civil · registres & actes"}
+          </span>
           <button
             type="button"
             className="sidebar-close"
@@ -339,11 +348,41 @@ function Shell() {
             activePrefixes={["/procedure", "/missions", "/roles", "/juge", "/matrice"]}
           >
             <NavLink to="/procedure">Procédure d&apos;enregistrement</NavLink>
-            <NavLink to="/missions">Missions EC</NavLink>
+            {!judicialOnly ? <NavLink to="/missions">Missions EC</NavLink> : null}
             <NavLink to="/roles">Qui fait quoi</NavLink>
-            <NavLink to="/matrice">Matrice acteurs & permissions</NavLink>
+            {!judicialOnly ? <NavLink to="/matrice">Matrice acteurs & permissions</NavLink> : null}
             <NavLink to="/juge">Quand le juge intervient</NavLink>
           </NavCollapsibleGroup>
+          {judicialOnly ? (
+            <>
+              <NavCollapsibleGroup
+                label="Greffe / jugements"
+                icon={<IconUsers size={18} />}
+                activePrefixes={[
+                  "/manage/adoption",
+                  "/manage/divorce",
+                  "/adoptions",
+                  "/divorces",
+                  "/transcriptions",
+                  "/mentions",
+                ]}
+              >
+                <NavLink to="/transcriptions">Transcriptions de jugements</NavLink>
+                <NavLink to="/manage/adoption">Adoption (après jugement)</NavLink>
+                <NavLink to="/adoptions">+ Enregistrer une adoption</NavLink>
+                <NavLink to="/manage/divorce">Divorce (transcription)</NavLink>
+                <NavLink to="/divorces">+ Enregistrer un divorce</NavLink>
+                <NavLink to="/mentions">Mentions & rectifications</NavLink>
+              </NavCollapsibleGroup>
+              <NavLink to="/documents">
+                <IconFile size={18} /> Copies & extraits
+              </NavLink>
+              <NavLink to="/search">
+                <IconFile size={18} /> Recherche
+              </NavLink>
+            </>
+          ) : (
+            <>
           <NavLink to="/declarations">
             <IconClipboard size={18} /> Déclarations à valider
           </NavLink>
@@ -424,6 +463,8 @@ function Shell() {
           <NavLink to="/search">
             <IconFile size={18} /> Recherche
           </NavLink>
+            </>
+          )}
           {isSuperAdminNational(roles) ? (
             <NavCollapsibleGroup
               label="Administration plateforme"
@@ -532,31 +573,31 @@ function Shell() {
             <Route path="/mentions" element={<MentionsEcPage />} />
             <Route path="/synoptique" element={<SynopticPage />} />
             <Route path="/synoptique/:section" element={<SynopticPage />} />
-            <Route path="/manage/deces" element={<ManageDecesPage />} />
+            <Route path="/manage/deces" element={<RequireCivilBureau><ManageDecesPage /></RequireCivilBureau>} />
             <Route path="/manage/divorce" element={<ManageDivorcePage />} />
             <Route path="/manage/adoption" element={<ManageAdoptionPage />} />
             <Route path="/manage/document" element={<ManageDocumentPage />} />
-            <Route path="/manage/mariage" element={<ManageMariagePage />} />
-            <Route path="/manage/naissance" element={<ManageNaissancePage />} />
-            <Route path="/lists/deces" element={<ManageActsPage config={MANAGE_CONFIGS.deces} showAnalytics />} />
+            <Route path="/manage/mariage" element={<RequireCivilBureau><ManageMariagePage /></RequireCivilBureau>} />
+            <Route path="/manage/naissance" element={<RequireCivilBureau><ManageNaissancePage /></RequireCivilBureau>} />
+            <Route path="/lists/deces" element={<RequireCivilBureau><ManageActsPage config={MANAGE_CONFIGS.deces} showAnalytics /></RequireCivilBureau>} />
             <Route path="/lists/divorce" element={<ManageActsPage config={MANAGE_CONFIGS.divorce} showAnalytics />} />
             <Route path="/lists/adoption" element={<ManageActsPage config={MANAGE_CONFIGS.adoption} showAnalytics />} />
-            <Route path="/lists/mariage" element={<ManageActsPage config={MANAGE_CONFIGS.mariage} showAnalytics />} />
-            <Route path="/lists/naissance" element={<ManageActsPage config={MANAGE_CONFIGS.naissance} showAnalytics />} />
-            <Route path="/lists/acts" element={<ActsPage showAnalytics />} />
-            <Route path="/births" element={<BirthsPage />} />
-            <Route path="/deaths" element={<DeathsPage />} />
-            <Route path="/marriages" element={<MarriagesPage />} />
+            <Route path="/lists/mariage" element={<RequireCivilBureau><ManageActsPage config={MANAGE_CONFIGS.mariage} showAnalytics /></RequireCivilBureau>} />
+            <Route path="/lists/naissance" element={<RequireCivilBureau><ManageActsPage config={MANAGE_CONFIGS.naissance} showAnalytics /></RequireCivilBureau>} />
+            <Route path="/lists/acts" element={<RequireCivilBureau><ActsPage showAnalytics /></RequireCivilBureau>} />
+            <Route path="/births" element={<RequireCivilBureau><BirthsPage /></RequireCivilBureau>} />
+            <Route path="/deaths" element={<RequireCivilBureau><DeathsPage /></RequireCivilBureau>} />
+            <Route path="/marriages" element={<RequireCivilBureau><MarriagesPage /></RequireCivilBureau>} />
             <Route path="/adoptions" element={<AdoptionsPage />} />
-            <Route path="/recognitions" element={<RecognitionsPage />} />
+            <Route path="/recognitions" element={<RequireCivilBureau><RecognitionsPage /></RequireCivilBureau>} />
             <Route path="/divorces" element={<DivorcesPage />} />
             <Route path="/documents" element={<DocumentsPage />} />
-            <Route path="/verify-document" element={<DocumentVerifyPage />} />
-            <Route path="/acts" element={<ActsPage />} />
-            <Route path="/acts/qrcode" element={<ActQrScanPage />} />
-            <Route path="/declarations" element={<DeclarationsPage />} />
+            <Route path="/verify-document" element={<RequireCivilBureau><DocumentVerifyPage /></RequireCivilBureau>} />
+            <Route path="/acts" element={<RequireCivilBureau><ActsPage /></RequireCivilBureau>} />
+            <Route path="/acts/qrcode" element={<RequireCivilBureau><ActQrScanPage /></RequireCivilBureau>} />
+            <Route path="/declarations" element={<RequireCivilBureau><DeclarationsPage /></RequireCivilBureau>} />
             <Route path="/transcriptions" element={<TranscriptionsPage />} />
-            <Route path="/corrections" element={<CorrectionsInboxPage />} />
+            <Route path="/corrections" element={<RequireCivilBureau><CorrectionsInboxPage /></RequireCivilBureau>} />
             <Route path="/admin/bureaux" element={<BureauxPage />} />
             <Route path="/admin/personnel" element={<PersonnelPage />} />
             <Route path="/admin/account-requests" element={<AccountRequestsPage />} />
