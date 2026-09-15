@@ -129,6 +129,8 @@ export default function SetupFirstUserPage() {
         </form>
         <p className="muted small" style={{ marginTop: "1rem" }}>
           <Link to="/login">Déjà un compte ? Se connecter</Link>
+          {" · "}
+          <Link to="/register">Créer un compte (demande)</Link>
         </p>
       </div>
     </div>

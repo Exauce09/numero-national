@@ -19,8 +19,10 @@ import {
 import { api } from "./api";
 import { listPendingOfficerDeclarations } from "./civilDeclarations";
 import LoginPage from "./pages/LoginPage";
+import RegisterAccountPage from "./pages/RegisterAccountPage";
 import SetupFirstUserPage from "./pages/SetupFirstUserPage";
 import UsersEcPage from "./pages/UsersEcPage";
+import AccountRequestsReviewPage from "./pages/AccountRequestsReviewPage";
 import HealthLoginPage from "./pages/HealthLoginPage";
 import HealthShell, { RequireHealth } from "./HealthShell";
 import DashboardPage from "./pages/DashboardPage";
@@ -383,6 +385,11 @@ function Shell() {
               <IconUsers size={18} /> Utilisateurs
             </NavLink>
           ) : null}
+          {canManageEcUsers(roles) ? (
+            <NavLink to="/account-requests">
+              <IconClipboard size={18} /> Demandes de compte
+            </NavLink>
+          ) : null}
           {canSeeNav("admin_bureaux", roles, permissions) ? (
             <NavLink to="/admin/bureaux">
               <IconHome size={18} /> Bureaux EC
@@ -516,6 +523,7 @@ function Shell() {
             <Route path="/territory" element={<TerritoryPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/users" element={<UsersEcPage />} />
+            <Route path="/account-requests" element={<AccountRequestsReviewPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
@@ -685,6 +693,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/setup" element={<SetupFirstUserPage />} />
+      <Route path="/register" element={<RegisterAccountPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/sante/login" element={<HealthLoginPage />} />
       <Route
