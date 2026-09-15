@@ -55,12 +55,12 @@ export default function TopbarSearch() {
   function selectPerson(p: Person) {
     setQ(p.nic);
     setOpen(false);
-    navigate(`/population/${p.id}`);
+    navigate(`/search?q=${encodeURIComponent(p.nic || displayName(p))}`);
   }
 
   function selectDraft(d: DraftSearchHit) {
     setOpen(false);
-    navigate(`/census?draft=${encodeURIComponent(d.id)}`);
+    navigate(`/search?q=${encodeURIComponent(d.title || d.local_id || d.id)}`);
   }
 
   return (
@@ -79,8 +79,8 @@ export default function TopbarSearch() {
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder="Recherche (nom, NIC, acte…) ou empreinte →"
-          aria-label="Recherche globale"
+          placeholder="Recherche (nom, NIC, acte…)"
+          aria-label="Recherche actes et personnes"
           autoComplete="off"
         />
       </form>

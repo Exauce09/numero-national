@@ -31,7 +31,7 @@ export const EC_RDC_MISSIONS: EcMission[] = [
     id: "deces",
     title: "Acte de décès",
     summary:
-      "Déclaration et enregistrement du décès, cause et lieux, inscription au registre des décès. La personne décédée quitte la population vivante.",
+      "Déclaration et enregistrement du décès, cause et lieux, inscription au registre des décès.",
     href: "/manage/deces",
   },
   {
@@ -86,6 +86,7 @@ export const EC_RDC_MISSIONS: EcMission[] = [
 ];
 
 export const EC_OUT_OF_SCOPE = [
+  "Registre population / identification nationale",
   "Recensement de la population",
   "Enrôlement biométrique / empreintes",
   "Production ou livraison de cartes d'identité",
