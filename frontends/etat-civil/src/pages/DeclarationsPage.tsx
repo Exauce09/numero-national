@@ -19,8 +19,15 @@ import {
   type FacilityAccount,
   type FacilityAccountPublic,
 } from "../healthAuth";
-import GpsLocatePanel from "../components/GpsLocatePanel";
+import GpsLocatePanel, { applyGpsToGeo } from "../components/GpsLocatePanel";
 import PasswordField from "../components/PasswordField";
+import GeoCascade, {
+  ADDRESS_FIELD_LABELS,
+  ORIGIN_FIELD_LABELS,
+  type GeoLevel,
+  type GeoSelection,
+} from "../components/GeoCascade";
+import { getOfficerCommune } from "../commune";
 
 const FACILITY_TYPES: { value: FacilityAccount["facilityType"]; label: string }[] = [
   { value: "HOPITAL", label: "Hôpital" },
@@ -28,6 +35,25 @@ const FACILITY_TYPES: { value: FacilityAccount["facilityType"]; label: string }[
   { value: "CS", label: "Centre de santé" },
   { value: "MATERNITE", label: "Maternité" },
 ];
+
+function isKinshasaProvince(name?: string | null): boolean {
+  return (name ?? "").trim().toLowerCase().includes("kinshasa");
+}
+
+/** Kinshasa : Province → Ville → Commune → Quartier. Autres : Province → Territoire → Secteur → Village. */
+function facilityGeoLevels(provinceName?: string | null): GeoLevel[] {
+  return isKinshasaProvince(provinceName)
+    ? ["province", "ville", "commune", "quartier"]
+    : ["province", "district", "commune", "localite"];
+}
+
+function facilityLocationLabel(a: FacilityAccountPublic): string {
+  if (a.geo_label) return a.geo_label;
+  const parts = isKinshasaProvince(a.province)
+    ? [a.quartier_name, a.commune_name, a.ville, a.province]
+    : [a.localite_name, a.commune_name, a.district_name, a.province];
+  return parts.filter(Boolean).join(" · ") || a.commune_name || "—";
+}
 
 function facilityBirthStats(facility: FacilityAccountPublic): { g: number; f: number; t: number } {
   const decls = listFacilityDeclarations(facility.id).filter(
@@ -56,14 +82,21 @@ function facilityBirthStats(facility: FacilityAccountPublic): { g: number; f: nu
 const emptyAccountForm = {
   facilityName: "",
   facilityType: "HOPITAL" as FacilityAccount["facilityType"],
-  province: "Kinshasa",
-  ville: "Kinshasa",
-  communeName: "Gombe",
-  communeCode: "KIN-GOMBE",
   username: "",
   password: "",
   confirmPassword: "",
 };
+
+function defaultFacilityGeo(): GeoSelection {
+  const c = getOfficerCommune();
+  return {
+    province_name: c.province || "Kinshasa",
+    ville_name: c.ville || "Kinshasa",
+    commune_name: c.name || "Gombe",
+    commune_code: c.code || "KIN-GOMBE",
+    label: [c.name, c.ville, c.province].filter(Boolean).join(" · "),
+  };
+}
 
 type PendingAction =
   | { type: "activate" | "deactivate" | "delete"; account: FacilityAccountPublic }
@@ -79,6 +112,7 @@ export default function DeclarationsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<FacilityAccountPublic[]>(() => listFacilityAccounts());
   const [form, setForm] = useState(emptyAccountForm);
+  const [facilityGeo, setFacilityGeo] = useState<GeoSelection>(() => defaultFacilityGeo());
   const [formError, setFormError] = useState<string | null>(null);
   const [formOk, setFormOk] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingAction>(null);
@@ -199,6 +233,7 @@ export default function DeclarationsPage() {
   function openCreate() {
     setEditingId(null);
     setForm(emptyAccountForm);
+    setFacilityGeo(defaultFacilityGeo());
     setFormError(null);
     setFormOk(null);
     setFormOpen(true);
@@ -210,13 +245,19 @@ export default function DeclarationsPage() {
     setForm({
       facilityName: account.facilityName,
       facilityType: account.facilityType,
-      province: account.province || "Kinshasa",
-      ville: account.ville || "Kinshasa",
-      communeName: account.commune_name || "Gombe",
-      communeCode: account.commune_code || "KIN-GOMBE",
       username: account.username,
       password: "",
       confirmPassword: "",
+    });
+    setFacilityGeo({
+      province_name: account.province || undefined,
+      ville_name: account.ville || undefined,
+      commune_name: account.commune_name || undefined,
+      commune_code: account.commune_code || undefined,
+      quartier_name: account.quartier_name || undefined,
+      district_name: account.district_name || undefined,
+      localite_name: account.localite_name || undefined,
+      label: account.geo_label || facilityLocationLabel(account),
     });
     setFormError(null);
     setFormOk(null);
@@ -227,6 +268,7 @@ export default function DeclarationsPage() {
     setFormOpen(false);
     setEditingId(null);
     setForm(emptyAccountForm);
+    setFacilityGeo(defaultFacilityGeo());
     setFormError(null);
     setFormOk(null);
   }
@@ -236,6 +278,27 @@ export default function DeclarationsPage() {
     setFormError(null);
     setFormOk(null);
     setError(null);
+
+    const province = (facilityGeo.province_name || "").trim();
+    const communeName = (facilityGeo.commune_name || "").trim();
+    const kin = isKinshasaProvince(province);
+
+    if (!province) {
+      setFormError("Sélectionnez la province.");
+      return;
+    }
+    if (!communeName) {
+      setFormError(kin ? "Sélectionnez la commune." : "Sélectionnez le secteur / la commune.");
+      return;
+    }
+    if (kin && !(facilityGeo.quartier_name || "").trim()) {
+      setFormError("Pour Kinshasa, le quartier est obligatoire.");
+      return;
+    }
+    if (!kin && !(facilityGeo.district_name || "").trim()) {
+      setFormError("Pour les autres provinces, le territoire est obligatoire.");
+      return;
+    }
 
     const pwd = form.password.trim();
     const confirm = form.confirmPassword.trim();
@@ -250,6 +313,27 @@ export default function DeclarationsPage() {
       }
     }
 
+    const geoPayload = {
+      commune_code: facilityGeo.commune_code || communeName.toUpperCase().replace(/\s+/g, "-"),
+      commune_name: communeName,
+      province,
+      ville: (facilityGeo.ville_name || "").trim() || (kin ? "Kinshasa" : province),
+      quartier_name: facilityGeo.quartier_name?.trim() || undefined,
+      district_name: facilityGeo.district_name?.trim() || undefined,
+      localite_name: facilityGeo.localite_name?.trim() || undefined,
+      geo_label:
+        facilityGeo.label ||
+        [
+          kin ? facilityGeo.quartier_name : facilityGeo.localite_name,
+          communeName,
+          kin ? facilityGeo.ville_name : facilityGeo.district_name,
+          province,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      geo_mode: (kin ? "kinshasa" : "province") as "kinshasa" | "province",
+    };
+
     try {
       if (editingId) {
         const account = updateFacilityAccount(editingId, {
@@ -257,10 +341,7 @@ export default function DeclarationsPage() {
           password: pwd || undefined,
           facilityName: form.facilityName,
           facilityType: form.facilityType,
-          commune_code: form.communeCode,
-          commune_name: form.communeName,
-          province: form.province,
-          ville: form.ville,
+          ...geoPayload,
         });
         refreshAccounts();
         setMessage(`Compte modifié : ${account.facilityName} (@${account.username}).`);
@@ -280,10 +361,7 @@ export default function DeclarationsPage() {
           password: pwd,
           facilityName: form.facilityName,
           facilityType: form.facilityType,
-          commune_code: form.communeCode,
-          commune_name: form.communeName,
-          province: form.province,
-          ville: form.ville,
+          ...geoPayload,
         });
         refreshAccounts();
         setMessage(
@@ -378,8 +456,10 @@ export default function DeclarationsPage() {
           </div>
         </div>
         <p className="muted small" style={{ marginTop: 0 }}>
-          Créer, modifier, activer ou désactiver une structure. Un compte désactivé ne peut plus se connecter
-          sur <code>/sante/login</code>.
+          Créer, modifier, activer ou désactiver une structure. Lieu obligatoire selon la province :
+          <strong> Kinshasa</strong> = Province → Ville → Commune → Quartier ;{" "}
+          <strong>autres provinces</strong> = Province → Territoire → Secteur → Village. Connexion :{" "}
+          <code>/sante/login</code>.
         </p>
         <table className="data-table">
           <thead>
@@ -387,7 +467,7 @@ export default function DeclarationsPage() {
               <th>Structure</th>
               <th>Type</th>
               <th>Identifiant</th>
-              <th>Commune</th>
+              <th>Lieu (ressort)</th>
               <th>Garçons</th>
               <th>Filles</th>
               <th>Total</th>
@@ -399,7 +479,7 @@ export default function DeclarationsPage() {
             {accounts.length === 0 ? (
               <tr>
                 <td colSpan={9} className="muted">
-                  Aucune structure.
+                  Aucune structure. Cliquez sur « Créer un compte structure ».
                 </td>
               </tr>
             ) : (
@@ -412,7 +492,7 @@ export default function DeclarationsPage() {
                   <td>
                     <code>{a.username}</code>
                   </td>
-                  <td>{a.commune_name}</td>
+                  <td className="muted small">{facilityLocationLabel(a)}</td>
                   <td>{stats.g}</td>
                   <td>{stats.f}</td>
                   <td>
@@ -587,8 +667,15 @@ export default function DeclarationsPage() {
               </button>
             </div>
             <p className="muted" style={{ marginTop: 0 }}>
-              Accès module santé : <code>/sante/login</code>
+              Accès module santé : <code>/sante/login</code>. Le lieu détermine le bureau EC de ressort.
             </p>
+            <div className="panel" style={{ marginBottom: "0.75rem" }}>
+              <p className="muted small" style={{ margin: 0 }}>
+                <strong>Kinshasa :</strong> Province → Ville → Commune → Quartier.
+                <br />
+                <strong>Autres provinces :</strong> Province → Territoire → Secteur / Chefferie → Village.
+              </p>
+            </div>
 
             <form className="form-grid" onSubmit={onSaveAccount} autoComplete="off">
               {formError ? <div className="login-error full">{formError}</div> : null}
@@ -623,46 +710,34 @@ export default function DeclarationsPage() {
               <div className="full">
                 <GpsLocatePanel
                   title="GPS de la structure"
-                  onResolved={(g) =>
-                    setForm((f) => ({
-                      ...f,
-                      province: g.province || f.province,
-                      ville: g.ville || f.ville,
-                      communeName: g.commune || f.communeName,
-                    }))
+                  onResolved={(g) => setFacilityGeo((prev) => applyGpsToGeo(prev, g))}
+                />
+              </div>
+              <div className="full">
+                <label className="form-label">
+                  Lieu de la structure *{" "}
+                  {isKinshasaProvince(facilityGeo.province_name)
+                    ? "(Kinshasa : jusqu'au quartier)"
+                    : facilityGeo.province_name
+                      ? "(province : territoire → secteur → village)"
+                      : "(choisissez d'abord la province)"}
+                </label>
+                <GeoCascade
+                  key={
+                    isKinshasaProvince(facilityGeo.province_name)
+                      ? `kin-${facilityGeo.province_id || facilityGeo.province_name || "x"}`
+                      : `prov-${facilityGeo.province_id || facilityGeo.province_name || "x"}`
                   }
-                />
-              </div>
-              <div>
-                <label className="form-label">Province</label>
-                <input
-                  className="form-control"
-                  value={form.province}
-                  onChange={(e) => setForm({ ...form, province: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="form-label">Ville</label>
-                <input
-                  className="form-control"
-                  value={form.ville}
-                  onChange={(e) => setForm({ ...form, ville: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="form-label">Commune</label>
-                <input
-                  className="form-control"
-                  value={form.communeName}
-                  onChange={(e) => setForm({ ...form, communeName: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="form-label">Code commune</label>
-                <input
-                  className="form-control"
-                  value={form.communeCode}
-                  onChange={(e) => setForm({ ...form, communeCode: e.target.value })}
+                  embedded
+                  levels={facilityGeoLevels(facilityGeo.province_name)}
+                  fieldLabels={
+                    isKinshasaProvince(facilityGeo.province_name)
+                      ? ADDRESS_FIELD_LABELS
+                      : ORIGIN_FIELD_LABELS
+                  }
+                  value={facilityGeo}
+                  onChange={setFacilityGeo}
+                  label="Lieu de la structure"
                 />
               </div>
               <div>

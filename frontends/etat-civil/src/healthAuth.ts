@@ -10,6 +10,16 @@ export type FacilityAccount = {
   commune_name: string;
   province: string;
   ville: string;
+  /** Kinshasa : quartier. Autres provinces : souvent vide. */
+  quartier_name?: string;
+  /** Hors Kinshasa : territoire / district. */
+  district_name?: string;
+  /** Hors Kinshasa : village / localité. */
+  localite_name?: string;
+  /** Libellé complet du lieu. */
+  geo_label?: string;
+  /** Profil géo utilisé à la création. */
+  geo_mode?: "kinshasa" | "province";
   active: boolean;
   created_at: string;
   updated_at?: string;
@@ -51,6 +61,11 @@ function normalizeAccount(raw: Partial<FacilityAccount> & {
     commune_name: String(raw.commune_name ?? "Gombe").trim() || "Gombe",
     province: String(raw.province ?? "Kinshasa").trim() || "Kinshasa",
     ville: String(raw.ville ?? "Kinshasa").trim() || "Kinshasa",
+    quartier_name: raw.quartier_name ? String(raw.quartier_name).trim() : undefined,
+    district_name: raw.district_name ? String(raw.district_name).trim() : undefined,
+    localite_name: raw.localite_name ? String(raw.localite_name).trim() : undefined,
+    geo_label: raw.geo_label ? String(raw.geo_label).trim() : undefined,
+    geo_mode: raw.geo_mode === "province" || raw.geo_mode === "kinshasa" ? raw.geo_mode : undefined,
     active: raw.active !== false,
     created_at: String(raw.created_at ?? new Date().toISOString()),
     updated_at: raw.updated_at ? String(raw.updated_at) : undefined,
@@ -108,6 +123,11 @@ export function createFacilityAccount(input: {
   commune_name: string;
   province: string;
   ville: string;
+  quartier_name?: string;
+  district_name?: string;
+  localite_name?: string;
+  geo_label?: string;
+  geo_mode?: "kinshasa" | "province";
 }): FacilityAccount {
   const username = input.username.trim().toLowerCase();
   if (!username || !input.password || !input.facilityName.trim()) {
@@ -115,6 +135,12 @@ export function createFacilityAccount(input: {
   }
   if (input.password.length < 8) {
     throw new Error("Le mot de passe doit contenir au moins 8 caractères.");
+  }
+  if (!input.province.trim()) {
+    throw new Error("La province est obligatoire.");
+  }
+  if (!input.commune_name.trim()) {
+    throw new Error("La commune (ou secteur) est obligatoire.");
   }
   ensureAccountsReady();
   const list = loadAccounts();
@@ -127,10 +153,15 @@ export function createFacilityAccount(input: {
     password: input.password,
     facilityName: input.facilityName.trim(),
     facilityType: input.facilityType,
-    commune_code: input.commune_code.trim() || "KIN-GOMBE",
-    commune_name: input.commune_name.trim() || "Gombe",
-    province: input.province.trim() || "Kinshasa",
-    ville: input.ville.trim() || "Kinshasa",
+    commune_code: input.commune_code.trim() || input.commune_name.trim().toUpperCase().replace(/\s+/g, "-"),
+    commune_name: input.commune_name.trim(),
+    province: input.province.trim(),
+    ville: input.ville.trim() || input.province.trim(),
+    quartier_name: input.quartier_name?.trim() || undefined,
+    district_name: input.district_name?.trim() || undefined,
+    localite_name: input.localite_name?.trim() || undefined,
+    geo_label: input.geo_label?.trim() || undefined,
+    geo_mode: input.geo_mode,
     active: true,
     created_at: new Date().toISOString(),
   };
@@ -149,6 +180,11 @@ export function updateFacilityAccount(
     commune_name: string;
     province: string;
     ville: string;
+    quartier_name?: string;
+    district_name?: string;
+    localite_name?: string;
+    geo_label?: string;
+    geo_mode?: "kinshasa" | "province";
   },
 ): FacilityAccount {
   ensureAccountsReady();
@@ -159,6 +195,9 @@ export function updateFacilityAccount(
   const username = input.username.trim().toLowerCase();
   if (!username || !input.facilityName.trim()) {
     throw new Error("Identifiant et nom de structure sont requis.");
+  }
+  if (!input.province.trim() || !input.commune_name.trim()) {
+    throw new Error("Province et commune (ou secteur) sont obligatoires.");
   }
   if (list.some((a) => a.username === username && a.id !== id)) {
     throw new Error("Cet identifiant existe déjà.");
@@ -174,10 +213,15 @@ export function updateFacilityAccount(
     password: input.password ? input.password : prev.password,
     facilityName: input.facilityName.trim(),
     facilityType: input.facilityType,
-    commune_code: input.commune_code.trim() || "KIN-GOMBE",
-    commune_name: input.commune_name.trim() || "Gombe",
-    province: input.province.trim() || "Kinshasa",
-    ville: input.ville.trim() || "Kinshasa",
+    commune_code: input.commune_code.trim() || input.commune_name.trim().toUpperCase().replace(/\s+/g, "-"),
+    commune_name: input.commune_name.trim(),
+    province: input.province.trim(),
+    ville: input.ville.trim() || input.province.trim(),
+    quartier_name: input.quartier_name?.trim() || undefined,
+    district_name: input.district_name?.trim() || undefined,
+    localite_name: input.localite_name?.trim() || undefined,
+    geo_label: input.geo_label?.trim() || undefined,
+    geo_mode: input.geo_mode,
     updated_at: new Date().toISOString(),
   };
   list[idx] = next;
