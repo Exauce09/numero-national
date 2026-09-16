@@ -11,6 +11,7 @@ import {
   getAccountTypeOption,
   getLocalOtpHint,
   JURIDICTION_OPTIONS,
+  listEcBureauOptions,
   maskPhone,
   resendRegistrationOtp,
   submitAccountRegistration,
@@ -69,6 +70,15 @@ export default function RegisterAccountPage() {
   const [tribunal, setTribunal] = useState("");
   const [idJudiciaire, setIdJudiciaire] = useState("");
   const tribunalOptions = juridiction ? TRIBUNAUX_BY_JURIDICTION[juridiction] ?? [] : [];
+  const bureauOptions = useMemo(
+    () =>
+      listEcBureauOptions({
+        province: province || undefined,
+        ville: isKinshasa(province) ? villeTerritoire || undefined : undefined,
+        commune: communeSecteur || undefined,
+      }),
+    [province, villeTerritoire, communeSecteur],
+  );
 
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
@@ -103,12 +113,20 @@ export default function RegisterAccountPage() {
   function onGeoChange(next: GeoSelection) {
     setGeo(next);
     setProvince(next.province_name || "");
-    setVilleTerritoire(
+    const villeOrTerr =
       isKinshasa(next.province_name)
         ? next.ville_name || ""
-        : next.district_name || next.ville_name || "",
-    );
+        : next.district_name || next.ville_name || "";
+    setVilleTerritoire(villeOrTerr);
     setCommuneSecteur(next.commune_name || "");
+    if (
+      typeOpt.institutionSelect === "bureau_ec" &&
+      next.commune_name &&
+      (next.ville_name || next.district_name)
+    ) {
+      const label = `Bureau d'état civil de ${next.commune_name} (${next.ville_name || next.district_name || next.province_name})`;
+      setInstitution(label);
+    }
   }
 
   if (!session) return <Navigate to="/login" replace />;
@@ -410,29 +428,74 @@ export default function RegisterAccountPage() {
                     {typeOpt.showFonction !== false ? (
                       <div>
                         <label className="form-label">Fonction</label>
-                        <input
-                          className="form-control"
-                          value={fonction}
-                          onChange={(e) => setFonction(e.target.value)}
-                          disabled={busy}
-                        />
+                        {(typeOpt.fonctionOptions?.length ?? 0) > 0 ? (
+                          <select
+                            className="form-control"
+                            value={fonction}
+                            onChange={(e) => setFonction(e.target.value)}
+                            disabled={busy}
+                          >
+                            <option value="">— Sélectionner la fonction —</option>
+                            {typeOpt.fonctionOptions!.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            className="form-control"
+                            value={fonction}
+                            onChange={(e) => setFonction(e.target.value)}
+                            disabled={busy}
+                          />
+                        )}
+                        <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
+                          Poste occupé dans le bureau (ex. agent de saisie, officier titulaire).
+                        </p>
                       </div>
                     ) : null}
                     {!typeOpt.needsJudgeFields ? (
                       <div className="full">
                         <label className="form-label">{typeOpt.institutionLabel || "Institution"} *</label>
-                        <input
-                          className="form-control"
-                          value={institution}
-                          onChange={(e) => setInstitution(e.target.value)}
-                          required
-                          disabled={busy}
-                          placeholder={
-                            accountType === "HOPITAL_MATERNITE"
-                              ? "ex. Hôpital Général de Référence de …"
-                              : undefined
-                          }
-                        />
+                        {typeOpt.institutionSelect === "bureau_ec" ? (
+                          <>
+                            <select
+                              className="form-control"
+                              value={institution}
+                              onChange={(e) => setInstitution(e.target.value)}
+                              required
+                              disabled={busy}
+                            >
+                              <option value="">— Choisir le bureau d&apos;état civil —</option>
+                              {(bureauOptions.length
+                                ? bureauOptions
+                                : listEcBureauOptions()
+                              ).map((b) => (
+                                <option key={b} value={b}>
+                                  {b}
+                                </option>
+                              ))}
+                            </select>
+                            <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
+                              Bureau d&apos;affectation de l&apos;agent ou de l&apos;officier. Sélectionnez
+                              d&apos;abord le lieu ci-dessous pour filtrer la liste.
+                            </p>
+                          </>
+                        ) : (
+                          <input
+                            className="form-control"
+                            value={institution}
+                            onChange={(e) => setInstitution(e.target.value)}
+                            required
+                            disabled={busy}
+                            placeholder={
+                              accountType === "HOPITAL_MATERNITE"
+                                ? "ex. Hôpital Général de Référence de …"
+                                : undefined
+                            }
+                          />
+                        )}
                       </div>
                     ) : null}
                     <div className="full">

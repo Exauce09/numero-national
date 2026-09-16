@@ -5,6 +5,7 @@
  */
 
 import { hashPassword, createEcUserFromHash, type EcUserRole } from "./ecUsers";
+import { listAllCommunesFlat } from "./geoFallback";
 import {
   createFacilityAccountFromHash,
   findFacilityByUsername,
@@ -44,6 +45,10 @@ export type AccountTypeOption = {
   institutionLabel?: string;
   showMatricule?: boolean;
   showFonction?: boolean;
+  /** Liste pour le champ Fonction (sinon texte libre). */
+  fonctionOptions?: string[];
+  /** Institution = liste de bureaux EC (sinon texte libre, ex. hôpital). */
+  institutionSelect?: "bureau_ec" | "free";
   showService?: boolean;
   serviceOptions?: string[];
 };
@@ -129,20 +134,29 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
   {
     code: "CITOYEN",
     label: "Citoyen",
-    summary: "Demandes et consultations personnelles",
+    summary: "Compte personnel — consulter / suivre ses demandes, sans accès bureau",
     institutional: false,
     portal: "none",
   },
   {
     code: "AGENT_ETAT_CIVIL",
     label: "Agent d'état civil",
-    summary: "Traitement administratif au bureau",
+    summary: "Saisie des dossiers au bureau ; soumet à l'officier pour validation",
     institutional: true,
     portal: "civil",
     assignRoles: ["AGENT_ETAT_CIVIL"],
-    institutionLabel: "Bureau / institution",
+    institutionLabel: "Bureau d'état civil",
+    institutionSelect: "bureau_ec",
     showMatricule: true,
     showFonction: true,
+    fonctionOptions: [
+      "Agent de saisie",
+      "Agent d'accueil",
+      "Agent guichet naissances",
+      "Agent guichet mariages",
+      "Agent guichet décès",
+      "Agent polyvalent",
+    ],
     showService: true,
     serviceOptions: [
       "Bureau d'état civil",
@@ -155,23 +169,30 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
   {
     code: "OFFICIER_ETAT_CIVIL",
     label: "Officier d'état civil",
-    summary: "Validation des actes — après habilitation",
+    summary: "Établit et valide les actes ; authentifie copies et mentions",
     institutional: true,
     portal: "civil",
     assignRoles: ["OFFICIER_ETAT_CIVIL"],
     institutionLabel: "Bureau d'état civil",
+    institutionSelect: "bureau_ec",
     showMatricule: true,
     showFonction: true,
+    fonctionOptions: [
+      "Officier d'état civil titulaire",
+      "Officier d'état civil adjoint",
+      "Officier intérimaire",
+    ],
     showService: true,
     serviceOptions: ["Bureau d'état civil principal", "Bureau secondaire", "Officier intérimaire"],
   },
   {
     code: "HOPITAL_MATERNITE",
     label: "Hôpital / Maternité",
-    summary: "Notifications de naissance et de décès — portail /sante",
+    summary: "Déclare naissances/décès sur /sante ; l'officier valide ensuite",
     institutional: true,
     portal: "sante",
     institutionLabel: "Nom de l'hôpital / maternité",
+    institutionSelect: "free",
     showMatricule: false,
     showFonction: false,
     showService: true,
@@ -180,33 +201,41 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
   {
     code: "AGENT_DELIVRANCE",
     label: "Agent de délivrance",
-    summary: "Copies et extraits",
+    summary: "Délivre copies, extraits et documents au public",
     institutional: true,
     portal: "civil",
     assignRoles: ["AGENT_ETAT_CIVIL"],
-    institutionLabel: "Bureau / service",
+    institutionLabel: "Bureau d'état civil",
+    institutionSelect: "bureau_ec",
     showMatricule: true,
     showFonction: true,
+    fonctionOptions: [
+      "Agent de délivrance",
+      "Chef de guichet copies & extraits",
+      "Agent polyvalent délivrance",
+    ],
     showService: true,
     serviceOptions: ["Guichet copies & extraits", "Délivrance documents"],
   },
   {
     code: "AGENT_ARCHIVES",
     label: "Agent d'archives",
-    summary: "Conservation documentaire",
+    summary: "Conserve et classe les registres et documents du bureau",
     institutional: true,
     portal: "civil",
     assignRoles: ["AGENT_ETAT_CIVIL"],
-    institutionLabel: "Service d'archives",
+    institutionLabel: "Bureau d'état civil",
+    institutionSelect: "bureau_ec",
     showMatricule: true,
     showFonction: true,
+    fonctionOptions: ["Archiviste", "Conservateur des registres", "Agent d'archives"],
     showService: true,
     serviceOptions: ["Archives centrales", "Archives du bureau"],
   },
   {
     code: "GREFFIER",
     label: "Greffier",
-    summary: "Module judiciaire — greffe",
+    summary: "Greffe — transcriptions de jugements (divorce, adoption…)",
     institutional: true,
     portal: "civil",
     needsJudgeFields: true,
@@ -220,7 +249,7 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
   {
     code: "JUGE",
     label: "Juge",
-    summary: "Décisions judiciaires — après habilitation",
+    summary: "Décide (supplétif, divorce, adoption…) ; l'EC transcrit ensuite",
     institutional: true,
     portal: "civil",
     needsJudgeFields: true,
@@ -233,7 +262,7 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
   {
     code: "MINISTERE_PUBLIC",
     label: "Ministère public",
-    summary: "Interventions selon procédure",
+    summary: "Parquet — interventions procédurales selon le dossier",
     institutional: true,
     portal: "civil",
     needsJudgeFields: true,
@@ -245,6 +274,28 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     serviceOptions: ["Parquet près le TGI", "Parquet près la Cour"],
   },
 ];
+
+/** Bureaux d'état civil dérivés du référentiel communes (sélection à l'inscription). */
+export function listEcBureauOptions(filter?: {
+  province?: string;
+  ville?: string;
+  commune?: string;
+}): string[] {
+  let rows = listAllCommunesFlat();
+  if (filter?.province) {
+    const p = filter.province.toLowerCase();
+    rows = rows.filter((c) => c.province.toLowerCase() === p);
+  }
+  if (filter?.ville) {
+    const v = filter.ville.toLowerCase();
+    rows = rows.filter((c) => c.ville.toLowerCase() === v);
+  }
+  if (filter?.commune) {
+    const n = filter.commune.toLowerCase();
+    rows = rows.filter((c) => c.name.toLowerCase() === n);
+  }
+  return rows.map((c) => `Bureau d'état civil de ${c.name} (${c.ville})`);
+}
 
 export type AccountRegistrationInput = {
   accountType: AccountRequestType;
