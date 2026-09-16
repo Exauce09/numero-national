@@ -16,6 +16,7 @@ export type AccountRequestType =
   | "CITOYEN"
   | "AGENT_ETAT_CIVIL"
   | "OFFICIER_ETAT_CIVIL"
+  | "RESPONSABLE_BUREAU"
   | "HOPITAL_MATERNITE"
   | "AGENT_DELIVRANCE"
   | "AGENT_ARCHIVES"
@@ -184,6 +185,26 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     ],
     showService: true,
     serviceOptions: ["Bureau d'état civil principal", "Bureau secondaire", "Officier intérimaire"],
+  },
+  {
+    code: "RESPONSABLE_BUREAU",
+    label: "Responsable de bureau",
+    summary:
+      "Dirige le bureau : gère les utilisateurs locaux, supervise et valide les actes",
+    institutional: true,
+    portal: "civil",
+    assignRoles: ["RESPONSABLE_BUREAU", "OFFICIER_ETAT_CIVIL"],
+    institutionLabel: "Bureau d'état civil",
+    institutionSelect: "bureau_ec",
+    showMatricule: true,
+    showFonction: true,
+    fonctionOptions: [
+      "Responsable de bureau d'état civil",
+      "Chef de bureau",
+      "Responsable adjoint",
+    ],
+    showService: true,
+    serviceOptions: ["Direction du bureau", "Bureau d'état civil principal"],
   },
   {
     code: "HOPITAL_MATERNITE",
