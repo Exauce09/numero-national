@@ -12,7 +12,7 @@ import {
   isSuperAdminNational,
   permissionsForRoles,
 } from "./ecUsers";
-import { canSeeNav, isJudicialRole, primaryRole, roleTitleFor } from "./rbac";
+import { canAccessPath, canSeeNav, isJudicialRole, primaryRole, roleTitleFor } from "./rbac";
 import {
   applyTheme,
   getPrefs,
@@ -137,6 +137,15 @@ function NavCollapsibleGroup({
 function RequireCivilBureau({ children }: { children: ReactNode }) {
   const session = getSession();
   if (isJudicialRole(session?.roles)) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
+function RequirePath({ children }: { children: ReactNode }) {
+  const session = getSession();
+  const location = useLocation();
+  if (!canAccessPath(location.pathname, session?.roles)) {
+    return <Navigate to="/" replace />;
+  }
   return <>{children}</>;
 }
 
@@ -309,9 +318,25 @@ function Shell() {
     .join(" · ");
   const roles = session?.roles ?? ["OFFICIER_ETAT_CIVIL"];
   const judicialOnly = isJudicialRole(roles);
-  const judicialKind = primaryRole(roles); // GREFFIER | JUGE when judicial
+  const judicialKind = primaryRole(roles);
+  const role = primaryRole(roles);
   const badge = unreadCount();
   const photo = prefs.photoDataUrl || session?.photoDataUrl;
+
+  const brandSub =
+    judicialOnly
+      ? judicialKind === "JUGE"
+        ? "Module judiciaire · tribunal"
+        : "Module judiciaire · greffe"
+      : role === "AGENT_ETAT_CIVIL"
+        ? "Espace agent · saisie"
+        : role === "AUDITEUR"
+          ? "Espace auditeur · consultation"
+          : role === "RESPONSABLE_BUREAU"
+            ? "Bureau · direction locale"
+            : role === "SUPER_ADMIN_NATIONAL"
+              ? "Administration nationale"
+              : "Bureau d'état civil · registres & actes";
 
   return (
     <div className={`page-wrapper${navOpen ? " nav-open" : ""}`}>
@@ -327,13 +352,7 @@ function Shell() {
         <div className="sidebar-brand">
           <img src="/logo-rdc.jpg" alt="République démocratique du Congo" />
           <strong>État civil — RDC</strong>
-          <span>
-            {judicialOnly
-              ? judicialKind === "JUGE"
-                ? "Module judiciaire · tribunal"
-                : "Module judiciaire · greffe"
-              : "Bureau d'état civil · registres & actes"}
-          </span>
+          <span>{brandSub}</span>
           <button
             type="button"
             className="sidebar-close"
@@ -347,19 +366,27 @@ function Shell() {
           <NavLink to="/" end>
             <IconDashboard size={18} /> Tableau de bord
           </NavLink>
-          <NavCollapsibleGroup
-            label="Cadre & procédure"
-            icon={<IconClipboard size={18} />}
-            activePrefixes={["/procedure", "/missions", "/roles", "/juge", "/matrice"]}
-          >
-            <NavLink to="/procedure">Procédure d&apos;enregistrement</NavLink>
-            {!judicialOnly ? <NavLink to="/missions">Missions EC</NavLink> : null}
-            <NavLink to="/roles">Qui fait quoi</NavLink>
-            {!judicialOnly ? <NavLink to="/matrice">Matrice acteurs & permissions</NavLink> : null}
-            <NavLink to="/juge">
-              {judicialKind === "JUGE" ? "Cas relevant du juge" : "Quand le juge intervient"}
-            </NavLink>
-          </NavCollapsibleGroup>
+
+          {canSeeNav("procedure", roles) ? (
+            <NavCollapsibleGroup
+              label="Cadre & procédure"
+              icon={<IconClipboard size={18} />}
+              activePrefixes={["/procedure", "/missions", "/roles", "/juge", "/matrice"]}
+            >
+              <NavLink to="/procedure">Procédure d&apos;enregistrement</NavLink>
+              {canSeeNav("procedure", roles) && !judicialOnly && role !== "AGENT_ETAT_CIVIL" ? (
+                <NavLink to="/missions">Missions EC</NavLink>
+              ) : null}
+              <NavLink to="/roles">Qui fait quoi</NavLink>
+              {role !== "AGENT_ETAT_CIVIL" && !judicialOnly ? (
+                <NavLink to="/matrice">Matrice acteurs & permissions</NavLink>
+              ) : null}
+              <NavLink to="/juge">
+                {judicialKind === "JUGE" ? "Cas relevant du juge" : "Quand le juge intervient"}
+              </NavLink>
+            </NavCollapsibleGroup>
+          ) : null}
+
           {judicialOnly ? (
             <>
               <NavCollapsibleGroup
@@ -378,108 +405,150 @@ function Shell() {
                   {judicialKind === "JUGE" ? "Dossiers & transcriptions" : "Transcriptions de jugements"}
                 </NavLink>
                 <NavLink to="/manage/adoption">Adoption (après jugement)</NavLink>
-                {judicialKind !== "JUGE" ? (
+                {canSeeNav("create_acts", roles) ? (
                   <NavLink to="/adoptions">+ Enregistrer une adoption</NavLink>
                 ) : null}
                 <NavLink to="/manage/divorce">Divorce (transcription)</NavLink>
-                {judicialKind !== "JUGE" ? (
+                {canSeeNav("create_acts", roles) ? (
                   <NavLink to="/divorces">+ Enregistrer un divorce</NavLink>
                 ) : null}
                 <NavLink to="/mentions">Mentions & rectifications</NavLink>
               </NavCollapsibleGroup>
-              <NavLink to="/documents">
-                <IconFile size={18} /> Copies & extraits
-              </NavLink>
+              {canSeeNav("documents", roles) ? (
+                <NavLink to="/documents">
+                  <IconFile size={18} /> Copies & extraits
+                </NavLink>
+              ) : null}
               <NavLink to="/search">
                 <IconFile size={18} /> Recherche
               </NavLink>
             </>
           ) : (
             <>
-          <NavLink to="/declarations">
-            <IconClipboard size={18} /> Déclarations à valider
-          </NavLink>
-          <NavCollapsibleGroup
-            label="Registres"
-            icon={<IconFile size={18} />}
-            activePrefixes={[
-              "/manage/naissance",
-              "/manage/mariage",
-              "/manage/deces",
-              "/births",
-              "/marriages",
-              "/deaths",
-              "/lists/naissance",
-              "/lists/mariage",
-              "/lists/deces",
-            ]}
-          >
-            <NavLink to="/manage/naissance">
-              <IconBaby size={16} /> Actes de naissance
-            </NavLink>
-            <NavLink to="/births">+ Établir un acte de naissance</NavLink>
-            <NavLink to="/manage/mariage">
-              <IconRing size={16} /> Actes de mariage
-            </NavLink>
-            <NavLink to="/marriages">+ Établir un acte de mariage</NavLink>
-            <NavLink to="/manage/deces">
-              <IconCross size={16} /> Actes de décès
-            </NavLink>
-            <NavLink to="/deaths">+ Établir un acte de décès</NavLink>
-          </NavCollapsibleGroup>
-          <NavCollapsibleGroup
-            label="Actes liés"
-            icon={<IconUsers size={18} />}
-            activePrefixes={[
-              "/recognitions",
-              "/manage/adoption",
-              "/manage/divorce",
-              "/adoptions",
-              "/divorces",
-              "/mentions",
-              "/corrections",
-            ]}
-          >
-            <NavLink to="/recognitions">Reconnaissance d&apos;enfant</NavLink>
-            <NavLink to="/manage/adoption">Adoption (après jugement)</NavLink>
-            <NavLink to="/manage/divorce">Divorce (transcription)</NavLink>
-            <NavLink to="/mentions">Mentions & rectifications</NavLink>
-          </NavCollapsibleGroup>
-          <NavCollapsibleGroup
-            label="Mentions & documents"
-            icon={<IconFile size={18} />}
-            activePrefixes={[
-              "/acts",
-              "/transcriptions",
-              "/corrections",
-              "/mentions",
-              "/documents",
-              "/verify-document",
-            ]}
-          >
-            <NavLink to="/acts">Registre des actes</NavLink>
-            <NavLink to="/transcriptions">Transcriptions</NavLink>
-            <NavLink to="/corrections">Demandes de correction</NavLink>
-            <NavLink to="/mentions">Inscription de mention</NavLink>
-            <NavLink to="/documents">Copies & extraits</NavLink>
-            <NavLink to="/verify-document">Vérifier document</NavLink>
-            <NavLink to="/acts/qrcode">QR code</NavLink>
-          </NavCollapsibleGroup>
-          {canSeeNav("synoptique", roles) ? (
-            <NavLink
-              to="/synoptique/naissances"
-              className={({ isActive }) =>
-                isActive || location.pathname.startsWith("/synoptique") ? "active" : undefined
-              }
-            >
-              <IconTable size={18} /> Tableau synoptique
-            </NavLink>
-          ) : null}
-          <NavLink to="/search">
-            <IconFile size={18} /> Recherche
-          </NavLink>
+              {canSeeNav("declarations", roles) ? (
+                <NavLink to="/declarations">
+                  <IconClipboard size={18} /> Déclarations à valider
+                </NavLink>
+              ) : null}
+
+              {canSeeNav("naissances", roles) ? (
+                <NavCollapsibleGroup
+                  label={role === "AGENT_ETAT_CIVIL" ? "Saisie des actes" : "Registres"}
+                  icon={<IconFile size={18} />}
+                  activePrefixes={[
+                    "/manage/naissance",
+                    "/manage/mariage",
+                    "/manage/deces",
+                    "/births",
+                    "/marriages",
+                    "/deaths",
+                    "/lists/naissance",
+                    "/lists/mariage",
+                    "/lists/deces",
+                  ]}
+                >
+                  <NavLink to="/manage/naissance">
+                    <IconBaby size={16} /> Actes de naissance
+                  </NavLink>
+                  {canSeeNav("create_acts", roles) && role !== "AUDITEUR" ? (
+                    <NavLink to="/births">+ Établir un acte de naissance</NavLink>
+                  ) : null}
+                  <NavLink to="/manage/mariage">
+                    <IconRing size={16} /> Actes de mariage
+                  </NavLink>
+                  {canSeeNav("create_acts", roles) && role !== "AUDITEUR" ? (
+                    <NavLink to="/marriages">+ Établir un acte de mariage</NavLink>
+                  ) : null}
+                  <NavLink to="/manage/deces">
+                    <IconCross size={16} /> Actes de décès
+                  </NavLink>
+                  {canSeeNav("create_acts", roles) && role !== "AUDITEUR" ? (
+                    <NavLink to="/deaths">+ Établir un acte de décès</NavLink>
+                  ) : null}
+                </NavCollapsibleGroup>
+              ) : null}
+
+              {canSeeNav("mentions", roles) || canSeeNav("judiciaire", roles) ? (
+                <NavCollapsibleGroup
+                  label="Actes liés"
+                  icon={<IconUsers size={18} />}
+                  activePrefixes={[
+                    "/recognitions",
+                    "/manage/adoption",
+                    "/manage/divorce",
+                    "/adoptions",
+                    "/divorces",
+                    "/mentions",
+                    "/corrections",
+                  ]}
+                >
+                  {canAccessPath("/recognitions", roles) ? (
+                    <NavLink to="/recognitions">Reconnaissance d&apos;enfant</NavLink>
+                  ) : null}
+                  <NavLink to="/manage/adoption">Adoption (après jugement)</NavLink>
+                  <NavLink to="/manage/divorce">Divorce (transcription)</NavLink>
+                  {canSeeNav("mentions", roles) ? (
+                    <NavLink to="/mentions">Mentions & rectifications</NavLink>
+                  ) : null}
+                </NavCollapsibleGroup>
+              ) : null}
+
+              {canSeeNav("acts_register", roles) || canSeeNav("documents", roles) ? (
+                <NavCollapsibleGroup
+                  label={role === "AGENT_ETAT_CIVIL" ? "Documents" : "Mentions & documents"}
+                  icon={<IconFile size={18} />}
+                  activePrefixes={[
+                    "/acts",
+                    "/transcriptions",
+                    "/corrections",
+                    "/mentions",
+                    "/documents",
+                    "/verify-document",
+                  ]}
+                >
+                  {canSeeNav("acts_register", roles) ? (
+                    <NavLink to="/acts">Registre des actes</NavLink>
+                  ) : null}
+                  {canSeeNav("transcriptions", roles) ? (
+                    <NavLink to="/transcriptions">Transcriptions</NavLink>
+                  ) : null}
+                  {canSeeNav("corrections", roles) ? (
+                    <NavLink to="/corrections">Demandes de correction</NavLink>
+                  ) : null}
+                  {canSeeNav("mentions", roles) ? (
+                    <NavLink to="/mentions">Inscription de mention</NavLink>
+                  ) : null}
+                  {canSeeNav("documents", roles) ? (
+                    <NavLink to="/documents">Copies & extraits</NavLink>
+                  ) : null}
+                  {canSeeNav("documents", roles) && role !== "AGENT_ETAT_CIVIL" ? (
+                    <NavLink to="/verify-document">Vérifier document</NavLink>
+                  ) : null}
+                  {canSeeNav("acts_register", roles) && role !== "AGENT_ETAT_CIVIL" ? (
+                    <NavLink to="/acts/qrcode">QR code</NavLink>
+                  ) : null}
+                </NavCollapsibleGroup>
+              ) : null}
+
+              {canSeeNav("synoptique", roles) ? (
+                <NavLink
+                  to="/synoptique/naissances"
+                  className={({ isActive }) =>
+                    isActive || location.pathname.startsWith("/synoptique") ? "active" : undefined
+                  }
+                >
+                  <IconTable size={18} /> Tableau synoptique
+                </NavLink>
+              ) : null}
+
+              {canSeeNav("search", roles) ? (
+                <NavLink to="/search">
+                  <IconFile size={18} /> Recherche
+                </NavLink>
+              ) : null}
             </>
           )}
+
           {isSuperAdminNational(roles) ? (
             <NavCollapsibleGroup
               label="Administration plateforme"
@@ -578,6 +647,7 @@ function Shell() {
           </div>
         </header>
         <main className="shell">
+          <RequirePath>
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/procedure" element={<ProcedureEcPage />} />
@@ -641,6 +711,7 @@ function Shell() {
             <Route path="/account-requests" element={<AccountRequestsReviewPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </RequirePath>
         </main>
       </div>
 

@@ -389,31 +389,61 @@ export default function DashboardPage() {
           </button>
         ) : null}
         <button type="button" className="dash-action-card" onClick={() => navigate("/procedure")}>
-          <span className="dash-action-label">1. Procédure</span>
+          <span className="dash-action-label">Procédure</span>
           <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
             Suivre
           </strong>
           <span className="btn-add btn-sm">Pas à pas</span>
         </button>
-        <button type="button" className="dash-action-card" onClick={() => navigate("/declarations")}>
-          <span className="dash-action-label">2. Déclarations santé</span>
-          <strong className="dash-action-value">{submitted}</strong>
-          <span className="btn-secondary btn-sm">Valider</span>
-        </button>
-        <button type="button" className="dash-action-card" onClick={() => navigate("/births")}>
-          <span className="dash-action-label">3. Naissance bureau</span>
-          <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
-            Enregistrer
-          </strong>
-          <span className="btn-secondary btn-sm">Formulaire</span>
-        </button>
-        <button type="button" className="dash-action-card" onClick={() => navigate("/juge")}>
-          <span className="dash-action-label">Cas juge</span>
-          <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
-            Supplétif…
-          </strong>
-          <span className="btn-secondary btn-sm">Voir</span>
-        </button>
+        {variant === "agent" || variant === "auditeur" ? (
+          <>
+            <button type="button" className="dash-action-card" onClick={() => navigate("/births")}>
+              <span className="dash-action-label">Naissance</span>
+              <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
+                {variant === "auditeur" ? "Consulter" : "Saisir"}
+              </strong>
+              <span className="btn-secondary btn-sm">
+                {variant === "auditeur" ? "Listes" : "Formulaire"}
+              </span>
+            </button>
+            <button type="button" className="dash-action-card" onClick={() => navigate("/marriages")}>
+              <span className="dash-action-label">Mariage</span>
+              <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
+                {variant === "auditeur" ? "Consulter" : "Saisir"}
+              </strong>
+              <span className="btn-secondary btn-sm">Ouvrir</span>
+            </button>
+            <button type="button" className="dash-action-card" onClick={() => navigate("/deaths")}>
+              <span className="dash-action-label">Décès</span>
+              <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
+                {variant === "auditeur" ? "Consulter" : "Saisir"}
+              </strong>
+              <span className="btn-secondary btn-sm">Ouvrir</span>
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="dash-action-card" onClick={() => navigate("/declarations")}>
+              <span className="dash-action-label">Déclarations santé</span>
+              <strong className="dash-action-value">{submitted}</strong>
+              <span className="btn-secondary btn-sm">Valider</span>
+            </button>
+            <button type="button" className="dash-action-card" onClick={() => navigate("/births")}>
+              <span className="dash-action-label">Naissance bureau</span>
+              <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
+                Enregistrer
+              </strong>
+              <span className="btn-secondary btn-sm">Formulaire</span>
+            </button>
+            <button type="button" className="dash-action-card" onClick={() => navigate("/juge")}>
+              <span className="dash-action-label">Cas juge</span>
+              <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
+                Supplétif…
+              </strong>
+              <span className="btn-secondary btn-sm">Voir</span>
+            </button>
+          </>
+        )}
       </div>
 
       {apiError ? (
@@ -455,22 +485,35 @@ export default function DashboardPage() {
           color={RDC.red}
           href="/lists/deces"
         />
-        <StatCard
-          title="Divorces"
-          value={divorces.length}
-          subtitle="Dissolutions"
-          icon={<IconSplit size={22} />}
-          color={RDC.redDeep}
-          href="/lists/divorce"
-        />
-        <StatCard
-          title="Dossiers en cours"
-          value={drafts + submitted}
-          subtitle={`${drafts} brouillons · ${submitted} soumis`}
-          icon={<IconClipboard size={22} />}
-          color={RDC.blueDeep}
-          href="/declarations"
-        />
+        {variant === "agent" || variant === "auditeur" ? (
+          <StatCard
+            title="Brouillons"
+            value={drafts}
+            subtitle="Dossiers en saisie"
+            icon={<IconClipboard size={22} />}
+            color={RDC.blueDeep}
+            href="/acts"
+          />
+        ) : (
+          <>
+            <StatCard
+              title="Divorces"
+              value={divorces.length}
+              subtitle="Dissolutions"
+              icon={<IconSplit size={22} />}
+              color={RDC.redDeep}
+              href="/lists/divorce"
+            />
+            <StatCard
+              title="Dossiers en cours"
+              value={drafts + submitted}
+              subtitle={`${drafts} brouillons · ${submitted} soumis`}
+              icon={<IconClipboard size={22} />}
+              color={RDC.blueDeep}
+              href="/declarations"
+            />
+          </>
+        )}
       </div>
 
       {(variant === "officier" || variant === "bureau") && (
