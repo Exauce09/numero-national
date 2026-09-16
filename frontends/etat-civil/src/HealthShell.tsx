@@ -20,7 +20,7 @@ import {
   type HealthNotification,
   type HealthPrefs,
 } from "./healthPrefs";
-import { IconBaby, IconClipboard, IconTable } from "./components/Icons";
+import { IconBaby, IconCross, IconDashboard, IconTable } from "./components/Icons";
 import PasswordField from "./components/PasswordField";
 import HealthDashboardPage from "./pages/HealthDashboardPage";
 import HealthBirthsPage from "./pages/HealthBirthsPage";
@@ -120,11 +120,11 @@ export default function HealthShell() {
           >
             <IconTable size={18} /> Tableau synoptique
           </NavLink>
-          <NavLink to="/sante/actes-en-cours" onClick={() => setNavOpen(false)}>
-            <IconClipboard size={18} /> L&apos;acte en cours
+          <NavLink to="/sante/births" onClick={() => setNavOpen(false)}>
+            <IconBaby size={18} /> Enregistrement de nouveau-né
           </NavLink>
-          <NavLink to="/sante/nos-valides" onClick={() => setNavOpen(false)}>
-            <IconBaby size={18} /> Nos validés
+          <NavLink to="/sante/deaths" onClick={() => setNavOpen(false)}>
+            <IconCross size={18} /> Enregistrement de décès
           </NavLink>
         </nav>
         <div className="sidebar-foot">
