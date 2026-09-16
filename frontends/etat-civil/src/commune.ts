@@ -34,27 +34,55 @@ export function saveOfficerCommune(next: OfficerCommune): void {
   localStorage.setItem(KEY, JSON.stringify(next));
 }
 
-/** Acte rattaché à la commune de l'officier (sinon exclu du synoptique / stats bureau). */
+/** Normalise pour comparaison exacte (sans accents / séparateurs). */
+export function normalizeCommuneKey(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "");
+}
+
+/**
+ * Extrait la clé commune d'un code (KIN-LEMBA → LEMBA, KIN-MONT-NGAFULA → MONTNGAFULA).
+ * Ne pas utiliser includes() : « BARUMBU » matchait à tort « Bumbu ».
+ */
+export function communeKeyFromCode(code: string): string {
+  const parts = code.toUpperCase().split(/[-_/]/).filter(Boolean);
+  if (parts.length <= 1) return normalizeCommuneKey(code);
+  return normalizeCommuneKey(parts.slice(1).join("-"));
+}
+
+/** Acte rattaché à la commune (égalité exacte — un acte = une seule commune). */
 export function actBelongsToOfficerCommune(
   payload: Record<string, unknown> | null | undefined,
   commune = getOfficerCommune(),
 ): boolean {
   const p = payload ?? {};
-  const code = String(p.commune_code ?? "").trim().toUpperCase();
-  const name = String(p.commune_name ?? p.commune ?? "").trim().toUpperCase();
+  const code = String(p.commune_code ?? "").trim();
+  const name = String(p.commune_name ?? p.commune ?? "").trim();
   const province = String(p.province ?? p.commune_province ?? "").trim().toUpperCase();
   const ville = String(p.ville ?? p.commune_ville ?? "").trim().toUpperCase();
-  const c = commune.code.toUpperCase();
-  const n = commune.name.toUpperCase();
+  const targetName = normalizeCommuneKey(commune.name);
+  const targetCode = normalizeCommuneKey(commune.code);
+  const targetFromCode = communeKeyFromCode(commune.code);
   const prov = commune.province.toUpperCase();
   const v = commune.ville.toUpperCase();
 
-  if (code) {
-    return code === c || code.includes(n) || code.endsWith(`-${n}`);
-  }
   if (name) {
-    return name === n || name.includes(n);
+    if (normalizeCommuneKey(name) === targetName) return true;
   }
+
+  if (code) {
+    const codeNorm = normalizeCommuneKey(code);
+    if (codeNorm === targetCode) return true;
+    const fromAct = communeKeyFromCode(code);
+    if (fromAct && (fromAct === targetName || fromAct === targetFromCode)) return true;
+  }
+
+  // Commune déjà renseignée mais ne correspond pas → hors périmètre.
+  if (name || code) return false;
+
   // Sans commune : n'appartient pas au périmètre d'un autre bureau.
   if (province && province !== prov) return false;
   if (ville && ville !== v) return false;

@@ -11,6 +11,7 @@ import {
   type Person,
   type Sexe,
 } from "./registry";
+import { listAllCommunesFlat } from "./geoFallback";
 
 const SEED_FLAG = "nn_civil_seed_births_batch_30_v1";
 
@@ -69,11 +70,25 @@ function normalizeCommune(raw: string): string {
   return c;
 }
 
-function parseAdresse(adresse: string): { ville: string; commune: string; province: string } {
+function parseAdresse(adresse: string): {
+  ville: string;
+  commune: string;
+  province: string;
+  communeCode: string;
+} {
   const [villeRaw, communeRaw] = adresse.split(",").map((s) => s.trim());
   const commune = normalizeCommune(communeRaw || "Gombe");
   const ville = villeRaw || "Kinshasa";
-  return { ville, commune, province: "Kinshasa" };
+  const province = "Kinshasa";
+  const flat = listAllCommunesFlat().find(
+    (c) =>
+      c.province === province &&
+      c.ville === ville &&
+      c.name.toLowerCase() === commune.toLowerCase(),
+  );
+  const communeCode =
+    flat?.code || `KIN-${commune.toUpperCase().replace(/[^A-Z0-9]+/g, "-")}`;
+  return { ville, commune, province, communeCode };
 }
 
 function isoDaysAgo(days: number): string {
@@ -156,7 +171,7 @@ export async function seedBatchBirths(): Promise<{ created: number; skipped: num
     const geo = parseAdresse(row.adresse);
     const dateNaissance = isoDaysAgo(i + 1);
     const lieu = `${geo.commune}, ${geo.ville}`;
-    const communeCode = `KIN-${geo.commune.toUpperCase().replace(/[^A-Z0-9]+/g, "-")}`;
+    const communeCode = geo.communeCode;
 
     const mother = ensureParent(row.motherFull, "F", lieu, "1990-05-15");
     const father = ensureParent(row.fatherFull, "M", lieu, "1988-03-20");

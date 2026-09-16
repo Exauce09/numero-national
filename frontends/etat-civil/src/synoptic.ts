@@ -1,6 +1,6 @@
 /** Agrégats tableau synoptique — toutes communes + détail quartiers. */
 
-import { actBelongsToOfficerCommune, getOfficerCommune, type OfficerCommune } from "./commune";
+import { actBelongsToOfficerCommune, communeKeyFromCode, getOfficerCommune, normalizeCommuneKey, type OfficerCommune } from "./commune";
 import { listAllCommunesFlat, listQuartierNamesForCommune, type FlatCommune } from "./geoFallback";
 import {
   ageYears,
@@ -268,35 +268,78 @@ export type SynopticTerritoryRow = {
   total: number;
 };
 
-/** Vue nationale : une ligne par commune (province → ville → commune). */
+/** Une seule commune gagnante par acte (évite les totaux 34/35/36 par double comptage). */
+function resolveActCommune(
+  payload: Record<string, unknown>,
+  communes: FlatCommune[],
+): FlatCommune | null {
+  const matches = communes.filter((c) => actBelongsToOfficerCommune(payload, toOfficerCommune(c)));
+  if (matches.length === 0) return null;
+  if (matches.length === 1) return matches[0];
+
+  const name = String(payload.commune_name ?? payload.commune ?? "").trim();
+  if (name) {
+    const key = normalizeCommuneKey(name);
+    const exact = matches.find((m) => normalizeCommuneKey(m.name) === key);
+    if (exact) return exact;
+  }
+
+  const code = String(payload.commune_code ?? "").trim();
+  if (code) {
+    const fromAct = communeKeyFromCode(code);
+    const codeNorm = normalizeCommuneKey(code);
+    const exact = matches.find(
+      (m) =>
+        normalizeCommuneKey(m.code) === codeNorm ||
+        communeKeyFromCode(m.code) === fromAct ||
+        normalizeCommuneKey(m.name) === fromAct,
+    );
+    if (exact) return exact;
+  }
+
+  return matches[0];
+}
+
+/** Vue nationale : une ligne par commune (province → ville → commune). Chaque acte compté une seule fois. */
 export function synopticNationalTerritory(): SynopticTerritoryRow[] {
   const communes = listSynopticCommunes();
-  return communes
-    .map((c) => {
-      const naissances = synopticBirths(c).totalNaissances.t;
-      const mat = synopticMarriagesDivorces(c);
-      const deces = synopticDeaths(c).totalAB;
-      const documents = synopticDocuments(c).total;
-      const mariages = mat.mariage.total;
-      const divorces = mat.divorce.total;
-      return {
-        province: c.province,
-        ville: c.ville,
-        commune: c.name,
-        code: c.code,
-        naissances,
-        mariages,
-        divorces,
-        deces,
-        documents,
-        total: naissances + mariages + divorces + deces + documents,
-      };
-    })
-    .sort((a, b) =>
+  const buckets = new Map<string, SynopticTerritoryRow>();
+  for (const c of communes) {
+    buckets.set(c.code, {
+      province: c.province,
+      ville: c.ville,
+      commune: c.name,
+      code: c.code,
+      naissances: 0,
+      mariages: 0,
+      divorces: 0,
+      deces: 0,
+      documents: 0,
+      total: 0,
+    });
+  }
+
+  function bump(kind: "naissances" | "mariages" | "divorces" | "deces" | "documents", act: Act) {
+    const hit = resolveActCommune(act.payload, communes);
+    if (!hit) return;
+    const row = buckets.get(hit.code);
+    if (!row) return;
+    row[kind] += 1;
+    row.total += 1;
+  }
+
+  for (const a of listActs("BIRTH")) bump("naissances", a);
+  for (const a of listActs("MARRIAGE")) bump("mariages", a);
+  for (const a of listActs("DIVORCE")) bump("divorces", a);
+  for (const a of listActs("DEATH")) bump("deces", a);
+  for (const a of listActs("DOCUMENT")) bump("documents", a);
+
+  return [...buckets.values()].sort(
+    (a, b) =>
       a.province.localeCompare(b.province, "fr") ||
       a.ville.localeCompare(b.ville, "fr") ||
       a.commune.localeCompare(b.commune, "fr"),
-    );
+  );
 }
 
 export type SynopticProvinceRollup = {

@@ -462,6 +462,35 @@ function ProvincesOverviewTable({
                 </td>
               </tr>
             ))}
+            <tr>
+              <td className="syn-commune-cell">
+                <strong>TOTAL RDC</strong>
+              </td>
+              <td>
+                <strong>{rows.reduce((a, r) => a + r.villes, 0)}</strong>
+              </td>
+              <td>
+                <strong>{rows.reduce((a, r) => a + r.communes, 0)}</strong>
+              </td>
+              <td>
+                <strong>{rows.reduce((a, r) => a + r.naissances, 0)}</strong>
+              </td>
+              <td>
+                <strong>{rows.reduce((a, r) => a + r.mariages, 0)}</strong>
+              </td>
+              <td>
+                <strong>{rows.reduce((a, r) => a + r.divorces, 0)}</strong>
+              </td>
+              <td>
+                <strong>{rows.reduce((a, r) => a + r.deces, 0)}</strong>
+              </td>
+              <td>
+                <strong>{rows.reduce((a, r) => a + r.documents, 0)}</strong>
+              </td>
+              <td>
+                <strong>{rows.reduce((a, r) => a + r.total, 0)}</strong>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
