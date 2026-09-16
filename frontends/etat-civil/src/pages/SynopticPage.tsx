@@ -1,6 +1,4 @@
-/** Tableaux synoptiques — forme officielle (Justicia) par commune.
- *  Filtres Province → Ville → Commune, puis détail G/F/T.
- */
+/** Tableaux synoptiques — vue provinces, détail province, puis forme Justicia par commune. */
 
 import { useMemo, useState } from "react";
 import { Link, NavLink, Navigate, useParams } from "react-router-dom";
@@ -16,9 +14,16 @@ import {
   synopticDeaths,
   synopticDocuments,
   synopticMarriagesDivorces,
+  synopticNationalByProvince,
+  synopticNationalByVille,
+  synopticNationalTerritory,
   synopticQuartiersForCommune,
   type Gft,
+  type SynopticProvinceRollup,
+  type SynopticTerritoryRow,
+  type SynopticVilleRollup,
 } from "../synoptic";
+import { listActs } from "../registry";
 
 const TABS = [
   {
@@ -392,6 +397,245 @@ function DocumentsTable({ commune }: { commune: CommuneSel }) {
   );
 }
 
+function ProvincesOverviewTable({
+  rows,
+  onSelect,
+}: {
+  rows: SynopticProvinceRollup[];
+  onSelect: (province: string) => void;
+}) {
+  const exportRows = rows.map((r) => ({
+    province: r.province,
+    villes: r.villes,
+    communes: r.communes,
+    naissances: r.naissances,
+    mariages: r.mariages,
+    divorces: r.divorces,
+    deces: r.deces,
+    documents: r.documents,
+    total: r.total,
+  }));
+
+  return (
+    <>
+      <div className="syn-toolbar no-print">
+        <DataToolbar filename="synoptique_provinces" rows={exportRows} />
+      </div>
+      <h2 className="syn-official-title">
+        TABLEAU SYNOPTIQUE RÉCAPITULATIF PAR PROVINCE
+        <br />
+        RÉPUBLIQUE DÉMOCRATIQUE DU CONGO
+      </h2>
+      <div className="table-scroll">
+        <table className="syn-official">
+          <thead>
+            <tr>
+              <th>PROVINCE</th>
+              <th>VILLES</th>
+              <th>COMMUNES</th>
+              <th>NAISSANCES</th>
+              <th>MARIAGES</th>
+              <th>DIVORCES</th>
+              <th>DÉCÈS</th>
+              <th>DOCUMENTS</th>
+              <th>TOTAL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr
+                key={r.province}
+                className="syn-row-click"
+                onClick={() => onSelect(r.province)}
+                title={`Voir le détail de ${r.province}`}
+              >
+                <td className="syn-commune-cell">{r.province}</td>
+                <td>{r.villes}</td>
+                <td>{r.communes}</td>
+                <td>{r.naissances}</td>
+                <td>{r.mariages}</td>
+                <td>{r.divorces}</td>
+                <td>{r.deces}</td>
+                <td>{r.documents}</td>
+                <td>
+                  <strong>{r.total}</strong>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="syn-legend muted small">Cliquez une province pour afficher ses informations détaillées.</p>
+    </>
+  );
+}
+
+function ProvinceDetailView({
+  province,
+  summary,
+  villes,
+  communes,
+  onSelectVille,
+  onSelectCommune,
+  filterVille,
+}: {
+  province: string;
+  summary: SynopticProvinceRollup | null;
+  villes: SynopticVilleRollup[];
+  communes: SynopticTerritoryRow[];
+  filterVille: string;
+  onSelectVille: (ville: string) => void;
+  onSelectCommune: (code: string) => void;
+}) {
+  const filteredCommunes = filterVille
+    ? communes.filter((c) => c.ville === filterVille)
+    : communes;
+
+  return (
+    <>
+      <h2 className="syn-official-title">
+        INFORMATIONS DE LA PROVINCE
+        <br />
+        {province.toUpperCase()}
+      </h2>
+
+      <div className="table-scroll" style={{ marginBottom: "1rem" }}>
+        <table className="syn-official">
+          <thead>
+            <tr>
+              <th>PROVINCE</th>
+              <th>VILLES</th>
+              <th>COMMUNES</th>
+              <th>NAISSANCES</th>
+              <th>MARIAGES</th>
+              <th>DIVORCES</th>
+              <th>DÉCÈS</th>
+              <th>DOCUMENTS</th>
+              <th>TOTAL</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="syn-commune-cell">{province}</td>
+              <td>{summary?.villes ?? 0}</td>
+              <td>{summary?.communes ?? 0}</td>
+              <td>{summary?.naissances ?? 0}</td>
+              <td>{summary?.mariages ?? 0}</td>
+              <td>{summary?.divorces ?? 0}</td>
+              <td>{summary?.deces ?? 0}</td>
+              <td>{summary?.documents ?? 0}</td>
+              <td>
+                <strong>{summary?.total ?? 0}</strong>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 className="syn-official-title" style={{ fontSize: "0.85rem" }}>
+        VILLES DE LA PROVINCE {province.toUpperCase()}
+      </h3>
+      <div className="table-scroll" style={{ marginBottom: "1rem" }}>
+        <table className="syn-official">
+          <thead>
+            <tr>
+              <th>VILLE</th>
+              <th>COMMUNES</th>
+              <th>NAISSANCES</th>
+              <th>MARIAGES</th>
+              <th>DIVORCES</th>
+              <th>DÉCÈS</th>
+              <th>DOCUMENTS</th>
+              <th>TOTAL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {villes.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="muted">
+                  Aucune ville
+                </td>
+              </tr>
+            ) : (
+              villes.map((v) => (
+                <tr
+                  key={`${v.province}-${v.ville}`}
+                  className={`syn-row-click${filterVille === v.ville ? " syn-row-active" : ""}`}
+                  onClick={() => onSelectVille(v.ville)}
+                  title={`Filtrer les communes de ${v.ville}`}
+                >
+                  <td className="syn-commune-cell">{v.ville}</td>
+                  <td>{v.communes}</td>
+                  <td>{v.naissances}</td>
+                  <td>{v.mariages}</td>
+                  <td>{v.divorces}</td>
+                  <td>{v.deces}</td>
+                  <td>{v.documents}</td>
+                  <td>
+                    <strong>{v.total}</strong>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <h3 className="syn-official-title" style={{ fontSize: "0.85rem" }}>
+        COMMUNES{filterVille ? ` — ${filterVille.toUpperCase()}` : ""}
+      </h3>
+      <div className="table-scroll">
+        <table className="syn-official">
+          <thead>
+            <tr>
+              <th>COMMUNE</th>
+              <th>VILLE</th>
+              <th>NAISSANCES</th>
+              <th>MARIAGES</th>
+              <th>DIVORCES</th>
+              <th>DÉCÈS</th>
+              <th>DOCUMENTS</th>
+              <th>TOTAL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredCommunes.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="muted">
+                  Aucune commune
+                </td>
+              </tr>
+            ) : (
+              filteredCommunes.map((c) => (
+                <tr
+                  key={c.code}
+                  className="syn-row-click"
+                  onClick={() => onSelectCommune(c.code)}
+                  title={`Ouvrir le synoptique de ${c.commune}`}
+                >
+                  <td className="syn-commune-cell">{c.commune}</td>
+                  <td>{c.ville}</td>
+                  <td>{c.naissances}</td>
+                  <td>{c.mariages}</td>
+                  <td>{c.divorces}</td>
+                  <td>{c.deces}</td>
+                  <td>{c.documents}</td>
+                  <td>
+                    <strong>{c.total}</strong>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      <p className="syn-legend muted small">
+        Cliquez une ville pour filtrer · Cliquez une commune pour le tableau synoptique détaillé.
+      </p>
+    </>
+  );
+}
+
 export default function SynopticPage() {
   const { section } = useParams<{ section?: string }>();
   const session = getSession();
@@ -400,20 +644,39 @@ export default function SynopticPage() {
   }
   const isNational = isSuperAdminNational(session?.roles);
   const officer = getOfficerCommune();
-  const [filterProvince, setFilterProvince] = useState(() => officer.province || "Kinshasa");
-  const [filterVille, setFilterVille] = useState(() => officer.ville || "Kinshasa");
-  const [selected, setSelected] = useState<FlatCommune | null>(() => {
-    const all = listSynopticCommunes();
-    return (
-      all.find((c) => c.code === officer.code || c.name === officer.name) ??
-      all.find((c) => c.name === "Gombe" && c.ville === "Kinshasa") ??
-      null
-    );
-  });
+  const [filterProvince, setFilterProvince] = useState("");
+  const [filterVille, setFilterVille] = useState("");
+  const [selected, setSelected] = useState<FlatCommune | null>(null);
 
   if (!section) return <Navigate to="/synoptique/naissances" replace />;
   const tab = (TABS.some((t) => t.slug === section) ? section : "naissances") as TabSlug;
   const commune: CommuneSel | null = selected;
+
+  const actCount = listActs().length;
+  const provinceRows = useMemo(() => synopticNationalByProvince(), [actCount]);
+  const villeRows = useMemo(
+    () => (filterProvince ? synopticNationalByVille(filterProvince) : []),
+    [filterProvince, actCount],
+  );
+  const communeRows = useMemo(
+    () =>
+      filterProvince
+        ? synopticNationalTerritory().filter((r) => r.province === filterProvince)
+        : [],
+    [filterProvince, actCount],
+  );
+  const provinceSummary = useMemo(
+    () => provinceRows.find((r) => r.province === filterProvince) ?? null,
+    [provinceRows, filterProvince],
+  );
+
+  const overviewRows = useMemo(() => {
+    if (isNational || !officer.province) return provinceRows;
+    const scoped = provinceRows.filter(
+      (r) => r.province.toLowerCase() === officer.province.toLowerCase(),
+    );
+    return scoped.length > 0 ? scoped : provinceRows;
+  }, [isNational, officer.province, provinceRows]);
 
   function pickCommuneByCode(code: string) {
     const hit = listSynopticCommunes().find((c) => c.code === code) ?? null;
@@ -424,10 +687,16 @@ export default function SynopticPage() {
     }
   }
 
+  function selectProvince(province: string) {
+    setFilterProvince(province);
+    setFilterVille("");
+    setSelected(null);
+  }
+
   function resetToGeneral() {
     setSelected(null);
-    setFilterProvince(isNational ? "" : officer.province || "");
-    setFilterVille(isNational ? "" : officer.ville || "");
+    setFilterProvince("");
+    setFilterVille("");
   }
 
   const provinces = useMemo(
@@ -468,7 +737,8 @@ export default function SynopticPage() {
           </p>
           <h2 className="page-title">Tableau synoptique</h2>
           <p className="page-lead">
-            Filtrez par province, ville puis commune pour afficher le tableau synoptique détaillé.
+            Vue par province · cliquez une province pour ses infos · puis une commune pour le détail
+            Justicia.
           </p>
         </div>
       </div>
@@ -479,7 +749,7 @@ export default function SynopticPage() {
             Filtres
           </h3>
           <button type="button" className="btn-secondary btn-sm" onClick={resetToGeneral}>
-            Vue générale
+            Vue générale (provinces)
           </button>
         </div>
         <div className="form-grid">
@@ -577,8 +847,19 @@ export default function SynopticPage() {
                 <>
                   Détail commune <strong>{selected.name}</strong> — onglet {active.label}
                 </>
+              ) : filterProvince ? (
+                <>
+                  Province <strong>{filterProvince}</strong>
+                  {filterVille ? (
+                    <>
+                      {" "}
+                      · ville <strong>{filterVille}</strong>
+                    </>
+                  ) : null}{" "}
+                  — cliquez une commune pour le détail
+                </>
               ) : (
-                <>Choisissez une commune (détail) pour afficher le tableau synoptique.</>
+                <>Tableau national par province — cliquez une ligne pour le détail.</>
               )}
             </p>
             <Link className="btn-primary" style={{ width: "auto" }} to={active.createPath}>
@@ -587,14 +868,14 @@ export default function SynopticPage() {
             <Link className="btn-secondary" style={{ width: "auto" }} to={active.managePath}>
               Voir la liste gérable
             </Link>
-            {selected ? (
+            {selected || filterProvince ? (
               <button
                 type="button"
                 className="btn-secondary"
                 style={{ width: "auto" }}
-                onClick={resetToGeneral}
+                onClick={selected ? () => setSelected(null) : resetToGeneral}
               >
-                Retour vue générale
+                {selected ? "Retour province" : "Retour provinces"}
               </button>
             ) : null}
           </div>
@@ -609,12 +890,21 @@ export default function SynopticPage() {
             {tab === "deces" ? <DeathsTable commune={commune} /> : null}
             {tab === "documents" ? <DocumentsTable commune={commune} /> : null}
           </>
+        ) : filterProvince ? (
+          <ProvinceDetailView
+            province={filterProvince}
+            summary={provinceSummary}
+            villes={villeRows}
+            communes={communeRows}
+            filterVille={filterVille}
+            onSelectVille={(ville) => {
+              setFilterVille((prev) => (prev === ville ? "" : ville));
+              setSelected(null);
+            }}
+            onSelectCommune={pickCommuneByCode}
+          />
         ) : (
-          <div className="panel">
-            <p className="muted" style={{ margin: 0 }}>
-              Sélectionnez Province → Ville → Commune (détail) pour afficher le tableau.
-            </p>
-          </div>
+          <ProvincesOverviewTable rows={overviewRows} onSelect={selectProvince} />
         )}
       </div>
     </div>

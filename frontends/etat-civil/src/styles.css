@@ -1019,6 +1019,19 @@
   padding-left: 0.55rem !important;
 }
 
+.syn-row-click {
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.syn-row-click:hover td {
+  background: #e8efff;
+}
+
+.syn-row-click.syn-row-active td {
+  background: #d6e4ff;
+}
+
 .syn-legend {
   margin: 0.65rem 0 0;
   color: rgba(255, 255, 255, 0.85);
