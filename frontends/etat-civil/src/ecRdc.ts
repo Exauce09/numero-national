@@ -16,7 +16,7 @@ export type EcMission = {
 export const EC_REGISTRES = [
   {
     id: "naissances",
-    title: "Registre des naissances",
+    title: "Enregistrement de nouveau-né",
     href: "/manage/naissance",
     summary: "Déclaration dans le délai, hors délai (jugement supplétif), procuration.",
   },
@@ -58,7 +58,7 @@ export const EC_ACTES_LIES = [
 export const EC_RDC_MISSIONS: EcMission[] = [
   {
     id: "naissance",
-    title: "Acte de naissance",
+    title: "Enregistrement de nouveau-né",
     summary:
       "Canal maternité ou bureau EC. ID naissance (pas de N° national). Adresse de la mère + originaire (province → territoire → secteur → village). Dans le délai ≤ 90 j. ; hors délai → jugement supplétif.",
     href: "/births",
@@ -73,7 +73,7 @@ export const EC_RDC_MISSIONS: EcMission[] = [
   },
   {
     id: "deces",
-    title: "Acte de décès",
+    title: "Enregistrement de décès",
     summary: "Déclaration et enregistrement du décès (cause, lieux, dates) au registre des décès.",
     href: "/deaths",
   },

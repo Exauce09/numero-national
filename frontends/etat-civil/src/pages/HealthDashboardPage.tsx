@@ -31,18 +31,18 @@ export default function HealthDashboardPage() {
   const items: DashItem[] = [
     {
       id: "birth",
-      title: "Nouveau-né",
+      title: "Enregistrement de nouveau-né",
       value: births,
-      subtitle: "Déclarations de naissance envoyées",
+      subtitle: "Déclarations envoyées",
       tone: "success",
       href: "/sante/births",
       icon: <IconBaby size={26} />,
     },
     {
       id: "death",
-      title: "Décès",
+      title: "Enregistrement de décès",
       value: deaths,
-      subtitle: "Déclarations de décès envoyées",
+      subtitle: "Déclarations envoyées",
       tone: "danger",
       href: "/sante/deaths",
       icon: <IconCross size={26} />,
@@ -67,7 +67,7 @@ export default function HealthDashboardPage() {
     },
     {
       id: "syn-birth",
-      title: "Synoptique naissances",
+      title: "Synoptique nouveau-nés",
       value: synBirths,
       subtitle: "Tableau officiel de la structure",
       tone: "info",

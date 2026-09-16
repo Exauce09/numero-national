@@ -45,7 +45,7 @@ export default function HealthActsValidatedPage() {
                       : String(p.deceased_name ?? p.nom ?? "Décès");
                   return (
                     <tr key={d.id}>
-                      <td>{d.declaration_type === "BIRTH" ? "Naissance" : "Décès"}</td>
+                      <td>{d.declaration_type === "BIRTH" ? "Nouveau-né" : "Décès"}</td>
                       <td>{label}</td>
                       <td>Validé</td>
                       <td>{new Date(d.created_at).toLocaleString("fr-FR")}</td>

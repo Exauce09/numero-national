@@ -876,7 +876,7 @@ export default function BirthsPage() {
 
       <div className="panel" style={{ marginTop: "1rem" }}>
         <div className="panel-head">
-          <h3 className="panel-title">Actes de naissance</h3>
+          <h3 className="panel-title">Enregistrement de nouveau-né</h3>
           <DataToolbar filename="naissances" rows={rows} />
         </div>
         <table className="data-table">

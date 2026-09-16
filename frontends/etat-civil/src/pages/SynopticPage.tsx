@@ -28,8 +28,8 @@ import { listActs } from "../registry";
 const TABS = [
   {
     slug: "naissances",
-    label: "Liste des Nouveaux-nés",
-    createLabel: "Enregistrer une naissance",
+    label: "Enregistrement de nouveau-né",
+    createLabel: "Enregistrement de nouveau-né",
     createPath: "/births",
     managePath: "/manage/naissance",
   },
@@ -433,7 +433,7 @@ function ProvincesOverviewTable({
               <th>PROVINCE</th>
               <th>VILLES</th>
               <th>COMMUNES</th>
-              <th>NAISSANCES</th>
+              <th>NOUVEAU-NÉS</th>
               <th>MARIAGES</th>
               <th>DIVORCES</th>
               <th>DÉCÈS</th>
@@ -535,7 +535,7 @@ function ProvinceDetailView({
               <th>PROVINCE</th>
               <th>VILLES</th>
               <th>COMMUNES</th>
-              <th>NAISSANCES</th>
+              <th>NOUVEAU-NÉS</th>
               <th>MARIAGES</th>
               <th>DIVORCES</th>
               <th>DÉCÈS</th>
@@ -570,7 +570,7 @@ function ProvinceDetailView({
             <tr>
               <th>VILLE</th>
               <th>COMMUNES</th>
-              <th>NAISSANCES</th>
+              <th>NOUVEAU-NÉS</th>
               <th>MARIAGES</th>
               <th>DIVORCES</th>
               <th>DÉCÈS</th>
@@ -619,7 +619,7 @@ function ProvinceDetailView({
             <tr>
               <th>COMMUNE</th>
               <th>VILLE</th>
-              <th>NAISSANCES</th>
+              <th>NOUVEAU-NÉS</th>
               <th>MARIAGES</th>
               <th>DIVORCES</th>
               <th>DÉCÈS</th>

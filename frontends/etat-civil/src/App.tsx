@@ -389,7 +389,7 @@ function Shell() {
 
           {canSeeNav("naissances", roles) ? (
             <NavLink to="/manage/naissance">
-              <IconBaby size={18} /> Naissances
+              <IconBaby size={18} /> Enregistrement de nouveau-né
             </NavLink>
           ) : null}
 

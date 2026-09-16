@@ -28,9 +28,9 @@ export type ActFormSchema = {
 export const EC_ACT_FORMS: ActFormSchema[] = [
   {
     id: "naissance",
-    title: "Acte de naissance",
+    title: "Enregistrement de nouveau-né",
     subtitle:
-      "Inscription au registre des naissances. ID naissance (pas de numéro national). Délai ≤ 90 jours ou jugement supplétif.",
+      "Inscription au registre. ID naissance (pas de numéro national). Délai ≤ 90 jours ou jugement supplétif.",
     href: "/births",
     sections: [
       {
@@ -292,7 +292,7 @@ export const EC_ACT_FORMS: ActFormSchema[] = [
   },
   {
     id: "notif_naissance",
-    title: "Notification de naissance (structure sanitaire)",
+    title: "Enregistrement de nouveau-né (structure sanitaire)",
     subtitle:
       "Même identité enfant / mère / père que l'acte EC — transmis au bureau pour validation. Ce n'est pas l'acte officiel.",
     href: "/sante/births",

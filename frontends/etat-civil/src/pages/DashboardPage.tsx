@@ -394,7 +394,7 @@ export default function DashboardPage() {
           href="/acts"
         />
         <StatCard
-          title="Naissances"
+          title="Enregistrement de nouveau-né"
           value={births.length}
           subtitle="Actes enregistrés"
           icon={<IconBaby size={22} />}
@@ -476,7 +476,7 @@ export default function DashboardPage() {
           title="Actes d'état civil par type"
           height={200}
           data={[
-            { label: "Naiss.", value: births.length, color: RDC.yellow },
+            { label: "N.-nés", value: births.length, color: RDC.yellow },
             { label: "Mariages", value: marriages.length, color: RDC.yellowDeep },
             { label: "Divorces", value: divorces.length, color: RDC.redSoft },
             { label: "Décès", value: deaths.length, color: RDC.red },
@@ -516,10 +516,10 @@ export default function DashboardPage() {
           </ul>
         </div>
         <LineChart
-          title="Naissances vs décès"
+          title="Nouveau-nés vs décès"
           labels={months.map((m) => m.label)}
           series={[
-            { name: "Naissances", color: RDC.yellow, values: birthSeries },
+            { name: "Nouveau-nés", color: RDC.yellow, values: birthSeries },
             { name: "Décès", color: RDC.red, values: deathSeries },
           ]}
         />

@@ -145,9 +145,9 @@ export const MANAGE_CONFIGS: Record<string, ManageConfig> = {
   },
   naissance: {
     slug: "naissance",
-    title: "Registre des naissances",
-    listTitle: "Actes de naissance",
-    breadcrumb: "Actes de naissance",
+    title: "Enregistrement de nouveau-né",
+    listTitle: "Enregistrement de nouveau-né",
+    breadcrumb: "Enregistrement de nouveau-né",
     justiciaUrl: "https://www.justicia.website/egouv/COMMUNE/manage-naissance.php",
     justiciaFile: "manage-naissance.php",
     actType: "BIRTH",
