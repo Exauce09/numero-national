@@ -20,8 +20,9 @@ import {
   type HealthNotification,
   type HealthPrefs,
 } from "./healthPrefs";
-import { IconClipboard, IconDashboard, IconTable } from "./components/Icons";
+import { IconBaby, IconClipboard, IconTable } from "./components/Icons";
 import PasswordField from "./components/PasswordField";
+import HealthDashboardPage from "./pages/HealthDashboardPage";
 import HealthBirthsPage from "./pages/HealthBirthsPage";
 import HealthDeathsPage from "./pages/HealthDeathsPage";
 import HealthSynopticPage from "./pages/HealthSynopticPage";
@@ -107,14 +108,23 @@ export default function HealthShell() {
           </button>
         </div>
         <nav className="sidebar-nav">
-          <NavLink to="/sante/synoptique/naissances" onClick={() => setNavOpen(false)}>
+          <NavLink to="/sante" end onClick={() => setNavOpen(false)}>
+            <IconDashboard size={18} /> Tableau de bord
+          </NavLink>
+          <NavLink
+            to="/sante/synoptique/naissances"
+            className={({ isActive }) =>
+              isActive || location.pathname.startsWith("/sante/synoptique") ? "active" : undefined
+            }
+            onClick={() => setNavOpen(false)}
+          >
             <IconTable size={18} /> Tableau synoptique
           </NavLink>
           <NavLink to="/sante/actes-en-cours" onClick={() => setNavOpen(false)}>
             <IconClipboard size={18} /> L&apos;acte en cours
           </NavLink>
           <NavLink to="/sante/nos-valides" onClick={() => setNavOpen(false)}>
-            <IconDashboard size={18} /> Nos validés
+            <IconBaby size={18} /> Nos validés
           </NavLink>
         </nav>
         <div className="sidebar-foot">
@@ -170,14 +180,14 @@ export default function HealthShell() {
 
         <main className="shell">
           <Routes>
-            <Route path="/" element={<Navigate to="/sante/synoptique/naissances" replace />} />
+            <Route path="/" element={<HealthDashboardPage />} />
             <Route path="/synoptique" element={<HealthSynopticPage />} />
             <Route path="/synoptique/:section" element={<HealthSynopticPage />} />
             <Route path="/actes-en-cours" element={<HealthActsPendingPage />} />
             <Route path="/nos-valides" element={<HealthActsValidatedPage />} />
             <Route path="/births" element={<HealthBirthsPage />} />
             <Route path="/deaths" element={<HealthDeathsPage />} />
-            <Route path="*" element={<Navigate to="/sante/synoptique/naissances" replace />} />
+            <Route path="*" element={<Navigate to="/sante" replace />} />
           </Routes>
         </main>
       </div>

@@ -279,6 +279,12 @@ export function canAccessPath(pathname: string, roles: string[] | undefined | nu
   if (path.startsWith("/missions") || path.startsWith("/matrice")) {
     return canSeeNav("procedure", r) && !isAgentOnly(r) && !isJudicialRole(r);
   }
+  if (path.startsWith("/population") || path.startsWith("/personnes")) {
+    return canSeeNav("population", r);
+  }
+  if (path.startsWith("/manage/deplacement") || path.startsWith("/displacements")) {
+    return canSeeNav("naissances", r) || canSeeNav("create_acts", r);
+  }
   if (path.startsWith("/synoptique")) return canSeeNav("synoptique", r);
   if (path.startsWith("/declarations")) return canSeeNav("declarations", r);
   if (path.startsWith("/corrections")) return canSeeNav("corrections", r);
