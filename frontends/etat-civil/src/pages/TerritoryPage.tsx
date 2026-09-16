@@ -81,7 +81,7 @@ export default function TerritoryPage() {
       <h2 className="page-title">Référentiel territorial RDC</h2>
       <p className="page-lead">
         Données en base PostgreSQL (schéma <code>geography</code>). Sélectionnez une province pour afficher toutes
-        les villes, districts, communes, quartiers et voies liées — puis affinez ville → commune → quartier.
+        les villes, territoires, communes, quartiers et voies liées — puis affinez ville → commune → quartier.
       </p>
       <GpsLocatePanel
         title="GPS — préremplir le référentiel"
@@ -102,7 +102,7 @@ export default function TerritoryPage() {
                 Chef-lieu : <strong>{tree.chef_lieu}</strong> · code <code>{tree.code}</code>
               </p>
               <p className="muted" style={{ marginBottom: "1rem" }}>
-                {tree.counts.villes} ville(s) · {tree.counts.districts} district(s) · {tree.counts.communes}{" "}
+                {tree.counts.villes} ville(s) · {tree.counts.districts} territoire(s) · {tree.counts.communes}{" "}
                 commune(s) · {tree.counts.quartiers} quartier(s) · {tree.counts.localites} localité(s) ·{" "}
                 {tree.counts.voies} voie(s)
               </p>
@@ -165,7 +165,7 @@ export default function TerritoryPage() {
 
               {filteredDistricts.length > 0 ? (
                 <div>
-                  <h4 style={{ margin: "0 0 0.5rem" }}>Districts</h4>
+                  <h4 style={{ margin: "0 0 0.5rem" }}>Territoires</h4>
                   {filteredDistricts.map((d) => (
                     <details key={d.id} open={Boolean(geo.district_id)} style={{ marginBottom: "0.5rem" }}>
                       <summary>

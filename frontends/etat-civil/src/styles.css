@@ -1019,9 +1019,20 @@
   padding-left: 0.55rem !important;
 }
 
-.syn-row-click {
-  cursor: pointer;
-  transition: background 0.12s ease;
+.fiche-ident-wrap {
+  background: #fff;
+  overflow: auto;
+}
+
+@media print {
+  .fiche-ident-wrap {
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .fiche-ident-print {
+    padding: 0 !important;
+  }
 }
 
 .syn-row-click:hover td {

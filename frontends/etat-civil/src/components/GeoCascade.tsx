@@ -53,9 +53,9 @@ export const GEO_PRESETS = {
 const DEFAULT_FIELD_LABELS: Record<GeoLevel, string> = {
   province: "Province",
   ville: "Ville",
-  district: "District",
-  commune: "Commune",
-  localite: "Village",
+  district: "Territoire",
+  commune: "Commune / Secteur",
+  localite: "Village / Localité",
   quartier: "Quartier",
   avenue: "Avenue",
   rue: "Rue",

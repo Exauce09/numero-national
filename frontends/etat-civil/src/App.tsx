@@ -44,6 +44,7 @@ import MarriagesPage from "./pages/MarriagesPage";
 import AdoptionsPage from "./pages/AdoptionsPage";
 import DivorcesPage from "./pages/DivorcesPage";
 import DocumentsPage from "./pages/DocumentsPage";
+import FicheIdentificationPage from "./pages/FicheIdentificationPage";
 import DocumentVerifyPage from "./pages/DocumentVerifyPage";
 import ActsPage from "./pages/ActsPage";
 import ActQrScanPage from "./pages/ActQrScanPage";
@@ -415,9 +416,14 @@ function Shell() {
                 <NavLink to="/mentions">Mentions & rectifications</NavLink>
               </NavCollapsibleGroup>
               {canSeeNav("documents", roles) ? (
-                <NavLink to="/documents">
-                  <IconFile size={18} /> Copies & extraits
-                </NavLink>
+                <>
+                  <NavLink to="/documents">
+                    <IconFile size={18} /> Copies & extraits
+                  </NavLink>
+                  <NavLink to="/fiche-identification">
+                    <IconFile size={18} /> Fiche d&apos;identification
+                  </NavLink>
+                </>
               ) : null}
               <NavLink to="/search">
                 <IconFile size={18} /> Recherche
@@ -503,6 +509,7 @@ function Shell() {
                     "/corrections",
                     "/mentions",
                     "/documents",
+                    "/fiche-identification",
                     "/verify-document",
                   ]}
                 >
@@ -520,6 +527,9 @@ function Shell() {
                   ) : null}
                   {canSeeNav("documents", roles) ? (
                     <NavLink to="/documents">Copies & extraits</NavLink>
+                  ) : null}
+                  {canSeeNav("documents", roles) ? (
+                    <NavLink to="/fiche-identification">Fiche d&apos;identification</NavLink>
                   ) : null}
                   {canSeeNav("documents", roles) && role !== "AGENT_ETAT_CIVIL" ? (
                     <NavLink to="/verify-document">Vérifier document</NavLink>
@@ -695,6 +705,7 @@ function Shell() {
             <Route path="/recognitions" element={<RequireCivilBureau><RecognitionsPage /></RequireCivilBureau>} />
             <Route path="/divorces" element={<DivorcesPage />} />
             <Route path="/documents" element={<DocumentsPage />} />
+            <Route path="/fiche-identification" element={<FicheIdentificationPage />} />
             <Route path="/verify-document" element={<RequireCivilBureau><DocumentVerifyPage /></RequireCivilBureau>} />
             <Route path="/acts" element={<RequireCivilBureau><ActsPage /></RequireCivilBureau>} />
             <Route path="/acts/qrcode" element={<RequireCivilBureau><ActQrScanPage /></RequireCivilBureau>} />

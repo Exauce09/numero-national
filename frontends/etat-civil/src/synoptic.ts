@@ -126,12 +126,11 @@ export function synopticQuartiersForCommune(commune: OfficerCommune | FlatCommun
   );
   const names = listQuartierNamesForCommune(flat?.id);
   const acts = actsForCommune("BIRTH", c);
-  const census = listActs("CENSUS").filter((a) => actBelongsToOfficerCommune(a.payload, c));
 
   const map = new Map<string, Gft>();
   for (const name of names) map.set(name, emptyGft());
 
-  for (const act of [...acts, ...census]) {
+  for (const act of acts) {
     const q = extractQuartier(act.payload);
     // Ne pas afficher de ligne « Non précisé » : seuls les quartiers renseignés comptent.
     if (!q) continue;
