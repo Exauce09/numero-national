@@ -6,6 +6,7 @@ import PersonPicker from "../components/PersonPicker";
 import { getActFormSchema } from "../ecActForms";
 import {
   addAct,
+  ageYears,
   displayName,
   getActiveMarriage,
   markMarriageDivorced,
@@ -38,6 +39,10 @@ export default function DivorcesPage() {
     setError(null);
     if (!epoux || !epouse) {
       setError("Époux et épouse sont obligatoires.");
+      return;
+    }
+    if (ageYears(epoux.date_naissance) < 18 || ageYears(epouse.date_naissance) < 18) {
+      setError("Les deux parties doivent avoir au moins 18 ans.");
       return;
     }
     if (!numeroMariage) {
@@ -138,10 +143,10 @@ export default function DivorcesPage() {
             <h3 className="panel-title">Mariage concerné</h3>
           </div>
           <div className="full">
-            <PersonPicker label="Époux *" value={epoux} onChange={setEpoux} required sexFilter="M" />
+            <PersonPicker label="Époux *" value={epoux} onChange={setEpoux} required sexFilter="M" minAge={18} />
           </div>
           <div className="full">
-            <PersonPicker label="Épouse *" value={epouse} onChange={setEpouse} required sexFilter="F" />
+            <PersonPicker label="Épouse *" value={epouse} onChange={setEpouse} required sexFilter="F" minAge={18} />
           </div>
           <div className="full">
             <label className="form-label">Référence de l&apos;acte de mariage *</label>

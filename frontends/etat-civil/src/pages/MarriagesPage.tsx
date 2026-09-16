@@ -128,10 +128,10 @@ export default function MarriagesPage() {
             </h3>
           </div>
           <div className="full">
-            <PersonPicker label="Époux *" value={conjoint} onChange={setConjoint} required sexFilter="M" />
+            <PersonPicker label="Époux *" value={conjoint} onChange={setConjoint} required sexFilter="M" minAge={18} />
           </div>
           <div className="full">
-            <PersonPicker label="Épouse *" value={conjointe} onChange={setConjointe} required sexFilter="F" />
+            <PersonPicker label="Épouse *" value={conjointe} onChange={setConjointe} required sexFilter="F" minAge={18} />
           </div>
           <div>
             <label className="form-label">Régime matrimonial *</label>
@@ -215,13 +215,13 @@ export default function MarriagesPage() {
             <h3 className="panel-title">Célébration</h3>
           </div>
           <div className="full">
-            <PersonPicker label="Témoin 1 *" value={temoin1} onChange={setTemoin1} required />
+            <PersonPicker label="Témoin 1 *" value={temoin1} onChange={setTemoin1} required minAge={18} />
           </div>
           <div className="full">
-            <PersonPicker label="Témoin 2 *" value={temoin2} onChange={setTemoin2} required />
+            <PersonPicker label="Témoin 2 *" value={temoin2} onChange={setTemoin2} required minAge={18} />
           </div>
           <div className="full">
-            <PersonPicker label="Receveur de la dot (le cas échéant)" value={receveurDote} onChange={setReceveurDote} />
+            <PersonPicker label="Receveur de la dot (le cas échéant)" value={receveurDote} onChange={setReceveurDote} minAge={18} />
           </div>
           <div className="full">
             <OfficerSessionField />

@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import {
   ETAT_CIVIL_OPTIONS,
   addPerson,
+  ageYears,
   displayName,
   isDeceased,
   personOrigin,
@@ -35,6 +36,8 @@ type Props = {
   nicSearchHint?: boolean;
   /** Exclut les personnes déjà déclarées décédées (défaut: true). */
   excludeDeceased?: boolean;
+  /** Âge minimum (ans) — exclus des résultats de recherche et du formulaire d'ajout. */
+  minAge?: number;
 };
 
 const emptyForm = {
@@ -60,6 +63,7 @@ export default function PersonPicker({
   sexFilter,
   nicSearchHint = false,
   excludeDeceased = true,
+  minAge,
 }: Props) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -95,6 +99,7 @@ export default function PersonPicker({
           const filtered = hits.filter((p) => {
             if (sexFilter && p.sexe !== sexFilter) return false;
             if (excludeDeceased && isDeceased(p.id, p.nic)) return false;
+            if (minAge != null && ageYears(p.date_naissance) < minAge) return false;
             return true;
           });
           setResults(filtered.slice(0, 50));
@@ -107,7 +112,7 @@ export default function PersonPicker({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [query, open, value, sexFilter, excludeDeceased]);
+  }, [query, open, value, sexFilter, excludeDeceased, minAge]);
 
   function select(person: Person) {
     onChange(person);
@@ -120,6 +125,10 @@ export default function PersonPicker({
     setError(null);
     if (!form.nom.trim() || !form.prenom.trim() || !form.date_naissance) {
       setError("Nom, prénom et date de naissance sont requis.");
+      return;
+    }
+    if (minAge != null && ageYears(form.date_naissance) < minAge) {
+      setError(`La personne doit avoir au moins ${minAge} ans.`);
       return;
     }
     try {
