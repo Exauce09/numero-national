@@ -222,7 +222,7 @@ export const EC_PROCEDURE_NAISSANCE = [
     step: 4,
     title: "Validation par l'officier",
     detail:
-      "L'officier vérifie, valide l'acte, attribue N° d'acte + ID naissance. L'acte entre au registre des naissances.",
+      "L'officier vérifie, valide l'acte, attribue N° d'acte + ID naissance. L'acte entre au registre des nouveau-nés.",
     href: "/declarations",
   },
   {
