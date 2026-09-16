@@ -3,7 +3,7 @@ import { QRCodeSVG } from "qrcode.react";
 import ActFormShell from "../components/ActFormShell";
 import { getActFormSchema } from "../ecActForms";
 import { addPerson, displayName, findDuplicatePerson, generateBirthDossierId, listPersons } from "../registry";
-import { getHealthSession } from "../healthAuth";
+import { getHealthSession, findFacilityByUsername } from "../healthAuth";
 import { listFacilityDeclarations, notifyEtatCivil } from "../civilDeclarations";
 import { pushHealthNotification } from "../healthPrefs";
 
@@ -103,7 +103,10 @@ export default function HealthBirthsPage() {
       const fatherPerson =
         father.nom.trim() && father.prenom.trim() ? resolveParent(father, "M") : null;
 
-      const idNaissance = generateBirthDossierId(dateNaissance);
+      const idNaissance = generateBirthDossierId(dateNaissance, {
+        provinceName: session.province || session.commune_name,
+        provinceDigits: undefined,
+      });
       const childNom = nom.trim();
       const childPostnom = postnom.trim() || motherPerson.postnom || fatherPerson?.postnom || "";
       const childPrenom = prenom.trim();

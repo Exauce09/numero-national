@@ -131,11 +131,79 @@ export function generateNic(opts?: {
   return `${pp}${territory}${sex}${year}${seq}`;
 }
 
-/** Identifiant dossier naissance (cahier EC) — pas un numéro national. */
-export function generateBirthDossierId(dateOfBirth?: string): string {
-  const year = (dateOfBirth || "").slice(0, 4) || String(new Date().getFullYear());
-  const seq = String(Math.abs(hashSeed()) % 100000).padStart(5, "0");
-  return `NAIS-${year}-${seq}`;
+/** Code province numérique (2 chiffres) pour ID naissance / N° acte. */
+export function provinceDigitsFromName(provinceName?: string | null): string {
+  const key = (provinceName ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+  const map: Record<string, string> = {
+    kinshasa: "15",
+    "kongo central": "01",
+    kwango: "02",
+    kwilu: "03",
+    "mai-ndombe": "04",
+    mai: "04",
+    equateur: "05",
+    mongala: "06",
+    "nord-ubangi": "07",
+    "sud-ubangi": "08",
+    tshuapa: "09",
+    tshopo: "10",
+    "bas-uele": "11",
+    "haut-uele": "12",
+    ituri: "13",
+    "nord-kivu": "14",
+    "sud-kivu": "16",
+    maniema: "17",
+    "haut-katanga": "18",
+    lualaba: "19",
+    "haut-lomami": "20",
+    tanganyika: "21",
+    kasai: "22",
+    "kasai central": "23",
+    "kasai oriental": "24",
+    lomami: "25",
+    sankuru: "26",
+  };
+  if (map[key]) return map[key];
+  let h = 0;
+  for (let i = 0; i < key.length; i += 1) h = (h * 31 + key.charCodeAt(i)) % 90;
+  return String(10 + h).padStart(2, "0");
+}
+
+/**
+ * ID naissance — chiffres uniquement.
+ * Structure : PP(2) + AAAAMMJJ naissance(8) + séquence(5) = 15 chiffres.
+ */
+export function generateBirthDossierId(
+  dateOfBirth?: string,
+  opts?: { provinceName?: string | null; provinceDigits?: string },
+): string {
+  const pp = (
+    opts?.provinceDigits ||
+    provinceDigitsFromName(opts?.provinceName) ||
+    "15"
+  )
+    .replace(/\D/g, "")
+    .padStart(2, "0")
+    .slice(-2);
+  const raw = (dateOfBirth || "").replace(/\D/g, "");
+  const ymd =
+    raw.length >= 8
+      ? raw.slice(0, 8)
+      : `${String(new Date().getFullYear())}${"0101"}`;
+  const registry = load();
+  const prefix = `${pp}${ymd}`;
+  const existing = registry.persons.filter((p) => /^\d{15}$/.test(p.nic) && p.nic.startsWith(prefix));
+  const actsWithId = registry.acts.filter((a) => {
+    const id = String(a.payload?.id_naissance ?? a.national_id ?? "");
+    return /^\d{15}$/.test(id) && id.startsWith(prefix);
+  });
+  const next = existing.length + actsWithId.length + 1;
+  const seq = String(next).padStart(5, "0");
+  return `${prefix}${seq}`;
 }
 
 function hashSeed(): number {
@@ -725,9 +793,39 @@ export function getAct(id: string): Act | undefined {
   return load().acts.find((a) => a.id === id);
 }
 
+const ACT_TYPE_CODE: Record<ActType, string> = {
+  BIRTH: "01",
+  DEATH: "02",
+  MARRIAGE: "03",
+  DIVORCE: "04",
+  ADOPTION: "05",
+  RECOGNITION: "06",
+  RECTIFICATION: "07",
+  CENSUS: "08",
+  DISPLACEMENT: "09",
+  DOCUMENT: "10",
+};
+
+/**
+ * N° d'acte — chiffres uniquement.
+ * Structure : AAAA(4) + type(2) + jour de l'année(3) + séquence(6) = 15 chiffres.
+ * Ex. naissance 2026, jour 259, 3e acte → 202601259000003
+ */
 function nextActNumber(type: ActType): string {
-  const prefix = type.slice(0, 3);
-  return `${prefix}-${Date.now().toString(36).toUpperCase()}`;
+  const now = new Date();
+  const year = String(now.getFullYear());
+  const tt = ACT_TYPE_CODE[type] ?? "99";
+  const start = new Date(now.getFullYear(), 0, 0);
+  const doy = String(
+    Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)),
+  ).padStart(3, "0");
+  const registry = load();
+  const prefix = `${year}${tt}${doy}`;
+  const sameDay = registry.acts.filter(
+    (a) => a.type === type && /^\d{15}$/.test(a.act_number) && a.act_number.startsWith(prefix),
+  ).length;
+  const seq = String(sameDay + 1).padStart(6, "0");
+  return `${prefix}${seq}`;
 }
 
 /** Erreur d'auth API : l'acte local doit être conservé. */

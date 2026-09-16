@@ -274,7 +274,9 @@ export default function BirthsPage() {
         mother_id: mother.id,
         father_id: father?.id,
         nationalite: personNationalite(father ?? mother),
-        nic: generateBirthDossierId(dateNaissance),
+        nic: generateBirthDossierId(dateNaissance, {
+          provinceName: geoNaissance.province_name || getOfficerCommune().province,
+        }),
       });
       const commune = getOfficerCommune();
       const session = getSession();
