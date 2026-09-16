@@ -378,74 +378,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="dash-action-row" style={{ marginBottom: "1.25rem" }}>
-        {isSuperAdminNational(session?.roles) ? (
-          <button type="button" className="dash-action-card" onClick={() => navigate("/register")}>
-            <span className="dash-action-label">Créer un compte</span>
-            <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
-              Plateforme
-            </strong>
-            <span className="btn-add btn-sm">Formulaire</span>
-          </button>
-        ) : null}
-        <button type="button" className="dash-action-card" onClick={() => navigate("/procedure")}>
-          <span className="dash-action-label">Procédure</span>
-          <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
-            Suivre
-          </strong>
-          <span className="btn-add btn-sm">Pas à pas</span>
-        </button>
-        {variant === "agent" || variant === "auditeur" ? (
-          <>
-            <button type="button" className="dash-action-card" onClick={() => navigate("/births")}>
-              <span className="dash-action-label">Naissance</span>
-              <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
-                {variant === "auditeur" ? "Consulter" : "Saisir"}
-              </strong>
-              <span className="btn-secondary btn-sm">
-                {variant === "auditeur" ? "Listes" : "Formulaire"}
-              </span>
-            </button>
-            <button type="button" className="dash-action-card" onClick={() => navigate("/marriages")}>
-              <span className="dash-action-label">Mariage</span>
-              <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
-                {variant === "auditeur" ? "Consulter" : "Saisir"}
-              </strong>
-              <span className="btn-secondary btn-sm">Ouvrir</span>
-            </button>
-            <button type="button" className="dash-action-card" onClick={() => navigate("/deaths")}>
-              <span className="dash-action-label">Décès</span>
-              <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
-                {variant === "auditeur" ? "Consulter" : "Saisir"}
-              </strong>
-              <span className="btn-secondary btn-sm">Ouvrir</span>
-            </button>
-          </>
-        ) : (
-          <>
-            <button type="button" className="dash-action-card" onClick={() => navigate("/declarations")}>
-              <span className="dash-action-label">Déclarations santé</span>
-              <strong className="dash-action-value">{submitted}</strong>
-              <span className="btn-secondary btn-sm">Valider</span>
-            </button>
-            <button type="button" className="dash-action-card" onClick={() => navigate("/births")}>
-              <span className="dash-action-label">Naissance bureau</span>
-              <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
-                Enregistrer
-              </strong>
-              <span className="btn-secondary btn-sm">Formulaire</span>
-            </button>
-            <button type="button" className="dash-action-card" onClick={() => navigate("/juge")}>
-              <span className="dash-action-label">Cas juge</span>
-              <strong className="dash-action-value" style={{ fontSize: "1.05rem" }}>
-                Supplétif…
-              </strong>
-              <span className="btn-secondary btn-sm">Voir</span>
-            </button>
-          </>
-        )}
-      </div>
-
       {apiError ? (
         <p className="muted small" role="status">
           Stats partielles — {apiError}
@@ -541,7 +473,7 @@ export default function DashboardPage() {
       </h3>
       <div className="eg-charts-row dash-charts-main">
         <LineChart
-          title="Évolution des actes (6 mois)"
+          title="Évolution des actes"
           labels={months.map((m) => m.label)}
           series={[
             { name: "Tous actes", color: RDC.blue, values: allActsSeries },
@@ -549,18 +481,6 @@ export default function DashboardPage() {
             { name: "Décès", color: RDC.red, values: deathSeries },
           ]}
           height={240}
-        />
-        <BarChart
-          title="Actes d'état civil par type"
-          height={200}
-          data={[
-            { label: "Naiss.", value: births.length, color: RDC.yellow },
-            { label: "Mariages", value: marriages.length, color: RDC.yellowDeep },
-            { label: "Divorces", value: divorces.length, color: RDC.redSoft },
-            { label: "Décès", value: deaths.length, color: RDC.red },
-            { label: "Adopt.", value: adoptions.length, color: RDC.blueMid },
-            { label: "Reconn.", value: recognitions.length, color: RDC.blueSoft },
-          ]}
         />
       </div>
 

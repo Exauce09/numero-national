@@ -387,26 +387,6 @@ function Shell() {
             </NavLink>
           ) : null}
 
-          {canSeeNav("population", roles) ? (
-            <NavCollapsibleGroup
-              label="Population"
-              icon={<IconUsers size={18} />}
-              activePrefixes={["/population", "/personnes", "/fiche-identification"]}
-            >
-              <NavLink
-                to="/population"
-                className={({ isActive }) =>
-                  isActive || location.pathname.startsWith("/population/") ? "active" : undefined
-                }
-              >
-                Registre population
-              </NavLink>
-              {canSeeNav("documents", roles) ? (
-                <NavLink to="/fiche-identification">Fiche d&apos;identification</NavLink>
-              ) : null}
-            </NavCollapsibleGroup>
-          ) : null}
-
           {canSeeNav("naissances", roles) ? (
             <NavLink to="/manage/naissance">
               <IconBaby size={18} /> Naissances
@@ -443,55 +423,6 @@ function Shell() {
             </NavLink>
           ) : null}
 
-          {canSeeNav("documents", roles) || canSeeNav("acts_register", roles) ? (
-            <NavCollapsibleGroup
-              label="Actes et documents"
-              icon={<IconFile size={18} />}
-              activePrefixes={[
-                "/acts",
-                "/declarations",
-                "/transcriptions",
-                "/corrections",
-                "/documents",
-                "/fiche-identification",
-                "/verify-document",
-                "/mentions",
-              ]}
-            >
-              {canSeeNav("acts_register", roles) ? <NavLink to="/acts">Registre</NavLink> : null}
-              {canSeeNav("acts_register", roles) ? <NavLink to="/acts/qrcode">QR code</NavLink> : null}
-              {canSeeNav("declarations", roles) ? (
-                <NavLink to="/declarations">Déclarations santé</NavLink>
-              ) : null}
-              {canSeeNav("transcriptions", roles) ? (
-                <NavLink to="/transcriptions">Transcriptions</NavLink>
-              ) : null}
-              {canSeeNav("corrections", roles) ? (
-                <NavLink to="/corrections">Corrections</NavLink>
-              ) : null}
-              {canSeeNav("mentions", roles) ? <NavLink to="/mentions">Mentions</NavLink> : null}
-              {canSeeNav("documents", roles) ? (
-                <NavLink to="/documents">Copies et extraits</NavLink>
-              ) : null}
-              {canSeeNav("documents", roles) ? (
-                <NavLink to="/fiche-identification">Fiche d&apos;identification</NavLink>
-              ) : null}
-              {canSeeNav("documents", roles) ? (
-                <NavLink to="/verify-document">Vérifier document</NavLink>
-              ) : null}
-            </NavCollapsibleGroup>
-          ) : null}
-
-          {canSeeNav("admin_bureaux", roles) ? (
-            <NavLink to="/admin/bureaux">
-              <IconHome size={18} /> Bureaux EC
-            </NavLink>
-          ) : null}
-          {canSeeNav("admin_personnel", roles) ? (
-            <NavLink to="/admin/personnel">
-              <IconUsers size={18} /> Personnel
-            </NavLink>
-          ) : null}
           {isSuperAdminNational(roles) ? (
             <NavCollapsibleGroup
               label="Administration"
@@ -506,12 +437,6 @@ function Shell() {
           {!isSuperAdminNational(roles) && canManageEcUsers(roles) ? (
             <NavLink to="/users">
               <IconUsers size={18} /> Utilisateurs du bureau
-            </NavLink>
-          ) : null}
-
-          {canSeeNav("search", roles) ? (
-            <NavLink to="/search">
-              <IconFile size={18} /> Recherche
             </NavLink>
           ) : null}
         </nav>

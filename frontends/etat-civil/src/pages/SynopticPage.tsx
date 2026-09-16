@@ -718,8 +718,12 @@ export default function SynopticPage() {
 
   function selectProvince(province: string) {
     setFilterProvince(province);
-    setFilterVille("");
-    setSelected(null);
+    const communes = listSynopticCommunes()
+      .filter((c) => c.province === province)
+      .sort((a, b) => a.name.localeCompare(b.name, "fr"));
+    const first = communes[0] ?? null;
+    setFilterVille(first?.ville ?? "");
+    setSelected(first);
   }
 
   function resetToGeneral() {
