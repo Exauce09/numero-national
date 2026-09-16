@@ -103,9 +103,9 @@ export default function HealthBirthsPage() {
       const fatherPerson =
         father.nom.trim() && father.prenom.trim() ? resolveParent(father, "M") : null;
 
+      const facility = findFacilityByUsername(session.username);
       const idNaissance = generateBirthDossierId(dateNaissance, {
-        provinceName: session.province || session.commune_name,
-        provinceDigits: undefined,
+        provinceName: facility?.province,
       });
       const childNom = nom.trim();
       const childPostnom = postnom.trim() || motherPerson.postnom || fatherPerson?.postnom || "";
