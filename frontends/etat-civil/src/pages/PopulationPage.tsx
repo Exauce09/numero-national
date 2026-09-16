@@ -462,7 +462,7 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                 <th>Nom</th>
                 <th>Postnom</th>
                 <th>Prénom</th>
-                <th>Naissance</th>
+                <th>Date</th>
                 <th>Situation</th>
                 {view === "identification" ? <th>Biométrie</th> : null}
                 {view === "recenses" ? <th>Recensement</th> : null}

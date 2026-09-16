@@ -371,7 +371,7 @@ export default function PersonPicker({
               </fieldset>
 
               <fieldset className="id-fieldset">
-                <legend>Naissance</legend>
+                <legend>Date / lieu de naissance</legend>
                 <div className="form-grid">
                   <div className="full">
                     <label className="form-label">Lieu de naissance</label>

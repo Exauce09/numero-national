@@ -387,7 +387,7 @@ export default function HealthBirthsPage() {
                   </strong>
                 </div>
                 <div>
-                  <span className="muted">Naissance</span>
+                  <span className="muted">Date</span>
                   <strong>{coupon.date_naissance}</strong>
                 </div>
                 <div>

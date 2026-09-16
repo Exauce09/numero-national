@@ -36,7 +36,7 @@ export default function ProcedureEcPage() {
               Saisie directe
             </strong>
             <span className="muted small">Agent / officier enregistre au guichet de la commune</span>
-            <span className="btn-secondary btn-sm">Naissance au bureau</span>
+            <span className="btn-secondary btn-sm">Enregistrement de nouveau-né</span>
           </Link>
           <Link className="dash-action-card" to="/declarations" style={{ textDecoration: "none" }}>
             <span className="dash-action-label">File officier</span>
@@ -50,7 +50,7 @@ export default function ProcedureEcPage() {
       </div>
 
       <div className="panel" style={{ marginBottom: "1.25rem" }} id="naissance">
-        <h3 className="panel-title">2. Naissance — étapes</h3>
+        <h3 className="panel-title">2. Enregistrement de nouveau-né — étapes</h3>
         <ol style={{ margin: 0, paddingLeft: "1.25rem", lineHeight: 1.65 }}>
           {EC_PROCEDURE_NAISSANCE.map((s) => (
             <li key={s.step} style={{ marginBottom: "0.85rem" }}>

@@ -393,22 +393,22 @@ export const EC_ROLE_CONFLICTS = [
 export const EC_WORKFLOWS = [
   {
     id: "naissance_sante",
-    title: "Naissance via maternité",
+    title: "Enregistrement de nouveau-né via maternité",
     steps: [
-      "Hôpital : notification de naissance",
+      "Hôpital : enregistrement de nouveau-né",
       "Transmission au bureau EC",
       "Agent : vérification / brouillon",
-      "Officier : validation → acte de naissance",
+      "Officier : validation → enregistrement de nouveau-né",
       "Délivrance : copie / extrait",
     ],
   },
   {
     id: "naissance_bureau",
-    title: "Naissance au bureau",
+    title: "Enregistrement de nouveau-né au bureau",
     steps: [
       "Déclarant / agent : saisie",
       "Contrôle du délai (≤ 90 j. ou jugement supplétif)",
-      "Officier : validation → registre des naissances",
+      "Officier : validation → registre des nouveau-nés",
     ],
   },
   {

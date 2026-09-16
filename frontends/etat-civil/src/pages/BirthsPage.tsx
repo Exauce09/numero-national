@@ -239,7 +239,7 @@ export default function BirthsPage() {
       });
       if (existingAct) {
         setError(
-          `Naissance déjà enregistrée — acte ${existingAct.act_number} (ID ${existingAct.payload.id_naissance ?? existingAct.national_id}). Doublon refusé.`,
+          `Nouveau-né déjà enregistré — acte ${existingAct.act_number} (ID ${existingAct.payload.id_naissance ?? existingAct.national_id}). Doublon refusé.`,
         );
         setViewAct(existingAct);
         setCreated(existingAct);
@@ -857,7 +857,7 @@ export default function BirthsPage() {
               type="submit"
               disabled={submitting}
             >
-              {submitting ? "Enregistrement…" : "Enregistrer la naissance"}
+              {submitting ? "Enregistrement…" : "Enregistrer le nouveau-né"}
             </button>
           </div>
         </form>
@@ -866,7 +866,7 @@ export default function BirthsPage() {
       {created ? (
         <div className="panel" style={{ marginTop: "1rem" }}>
           <div className="success-banner no-print">
-            Acte de naissance créé — ID naissance{" "}
+            Enregistrement de nouveau-né créé — ID naissance{" "}
             {String(created.payload.id_naissance ?? created.act_number ?? created.national_id)}
           </div>
           <ActPrintCard act={created} />
@@ -886,7 +886,7 @@ export default function BirthsPage() {
               <th>ID naissance</th>
               <th>Nom</th>
               <th>Sexe</th>
-              <th>Naissance</th>
+              <th>Date</th>
               <th>Quartier</th>
               <th>Enregistrement</th>
               <th />

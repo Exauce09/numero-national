@@ -109,7 +109,7 @@ export default function SearchPage() {
               <th>Nom</th>
               <th>Postnom</th>
               <th>Prénom</th>
-              <th>Naissance</th>
+              <th>Date</th>
               <th>Province</th>
               <th>Ville</th>
               <th>Origine</th>
