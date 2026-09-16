@@ -472,15 +472,17 @@ export default function DashboardPage() {
         Statistiques {nationalScope ? "nationales" : `de ${officerCommune.name}`}
       </h3>
       <div className="eg-charts-row dash-charts-main">
-        <LineChart
-          title="Évolution des actes"
-          labels={months.map((m) => m.label)}
-          series={[
-            { name: "Tous actes", color: RDC.blue, values: allActsSeries },
-            { name: "Naissances", color: RDC.yellow, values: birthSeries },
-            { name: "Décès", color: RDC.red, values: deathSeries },
+        <BarChart
+          title="Actes d'état civil par type"
+          height={200}
+          data={[
+            { label: "Naiss.", value: births.length, color: RDC.yellow },
+            { label: "Mariages", value: marriages.length, color: RDC.yellowDeep },
+            { label: "Divorces", value: divorces.length, color: RDC.redSoft },
+            { label: "Décès", value: deaths.length, color: RDC.red },
+            { label: "Adopt.", value: adoptions.length, color: RDC.blueMid },
+            { label: "Reconn.", value: recognitions.length, color: RDC.blueSoft },
           ]}
-          height={240}
         />
       </div>
 
