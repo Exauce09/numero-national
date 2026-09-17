@@ -118,7 +118,7 @@ function extractQuartier(payload: Record<string, unknown>): string {
   ).trim();
 }
 
-/** Quartiers d'une commune sélectionnée (référentiel + stats G/F/T). */
+/** Quartiers d'une commune — détail G/F/T par mode d'enregistrement. */
 export function synopticQuartiersForCommune(commune: OfficerCommune | FlatCommune) {
   const c = toOfficerCommune(commune);
   const flat = listAllCommunesFlat().find(
@@ -127,19 +127,31 @@ export function synopticQuartiersForCommune(commune: OfficerCommune | FlatCommun
   const names = listQuartierNamesForCommune(flat?.id);
   const acts = actsForCommune("BIRTH", c);
 
-  const map = new Map<string, Gft>();
-  for (const name of names) map.set(name, emptyGft());
+  type QRow = { sans: Gft; avec: Gft; jugement: Gft };
+  const emptyRow = (): QRow => ({ sans: emptyGft(), avec: emptyGft(), jugement: emptyGft() });
+  const map = new Map<string, QRow>();
+  for (const name of names) map.set(name, emptyRow());
 
   for (const act of acts) {
     const q = extractQuartier(act.payload);
     // Ne pas afficher de ligne « Non précisé » : seuls les quartiers renseignés comptent.
     if (!q) continue;
-    if (!map.has(q)) map.set(q, emptyGft());
-    addGft(map.get(q)!, birthSexe(act));
+    if (!map.has(q)) map.set(q, emptyRow());
+    const row = map.get(q)!;
+    const mode = birthMode(act.payload);
+    addGft(row[mode], birthSexe(act));
   }
 
   const rows = [...map.entries()]
-    .map(([quartier, stats]) => ({ quartier, ...stats }))
+    .map(([quartier, stats]) => ({
+      quartier,
+      sans: stats.sans,
+      avec: stats.avec,
+      jugement: stats.jugement,
+      g: stats.sans.g + stats.avec.g + stats.jugement.g,
+      f: stats.sans.f + stats.avec.f + stats.jugement.f,
+      t: stats.sans.t + stats.avec.t + stats.jugement.t,
+    }))
     .sort((a, b) => a.quartier.localeCompare(b.quartier, "fr"));
 
   return { commune: c, rows, total: rows.reduce((acc, r) => acc + r.t, 0) };
