@@ -503,10 +503,11 @@ export default function DashboardPage() {
           </h3>
           <ul className="muted small" style={{ margin: 0, paddingLeft: "1.1rem", lineHeight: 1.55 }}>
             <li>
-              <strong>Brouillon</strong> — saisie d&apos;un acte commencée, non finalisée.
+              <strong>Brouillon</strong> — saisie d&apos;un acte commencée, non validée.
             </li>
             <li>
-              <strong>Soumis / revue</strong> — transmis pour contrôle par l&apos;officier.
+              <strong>Soumis / revue</strong> — transmis pour contrôle, en attente de validation
+              par l&apos;officier.
             </li>
             <li>
               <strong>Validé / auth.</strong> — acte authentifié par l&apos;officier.
