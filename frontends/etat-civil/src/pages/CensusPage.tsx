@@ -586,6 +586,7 @@ export default function CensusPage() {
       step,
       ficheKind,
       dateDeces,
+      typeDeces,
       delaiEnregistrement,
       handicap,
       nom,
