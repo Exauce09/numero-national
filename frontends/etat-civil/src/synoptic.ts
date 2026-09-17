@@ -272,6 +272,8 @@ export type SynopticTerritoryRow = {
   commune: string;
   code: string;
   naissances: number;
+  naissances_g: number;
+  naissances_f: number;
   mariages: number;
   divorces: number;
   deces: number;
@@ -322,6 +324,8 @@ export function synopticNationalTerritory(): SynopticTerritoryRow[] {
       commune: c.name,
       code: c.code,
       naissances: 0,
+      naissances_g: 0,
+      naissances_f: 0,
       mariages: 0,
       divorces: 0,
       deces: 0,
@@ -336,6 +340,11 @@ export function synopticNationalTerritory(): SynopticTerritoryRow[] {
     const row = buckets.get(hit.code);
     if (!row) return;
     row[kind] += 1;
+    if (kind === "naissances") {
+      const s = birthSexe(act).toUpperCase();
+      if (s === "F") row.naissances_f += 1;
+      else row.naissances_g += 1;
+    }
     row.total += 1;
   }
 
@@ -358,6 +367,8 @@ export type SynopticProvinceRollup = {
   villes: number;
   communes: number;
   naissances: number;
+  naissances_g: number;
+  naissances_f: number;
   mariages: number;
   divorces: number;
   deces: number;
@@ -376,6 +387,8 @@ export function synopticNationalByProvince(): SynopticProvinceRollup[] {
         villes: 0,
         communes: 0,
         naissances: 0,
+        naissances_g: 0,
+        naissances_f: 0,
         mariages: 0,
         divorces: 0,
         deces: 0,
@@ -388,6 +401,8 @@ export function synopticNationalByProvince(): SynopticProvinceRollup[] {
     hit.communes += 1;
     hit.villeSet.add(r.ville);
     hit.naissances += r.naissances;
+    hit.naissances_g += r.naissances_g;
+    hit.naissances_f += r.naissances_f;
     hit.mariages += r.mariages;
     hit.divorces += r.divorces;
     hit.deces += r.deces;
@@ -404,6 +419,8 @@ export type SynopticVilleRollup = {
   ville: string;
   communes: number;
   naissances: number;
+  naissances_g: number;
+  naissances_f: number;
   mariages: number;
   divorces: number;
   deces: number;
@@ -425,6 +442,8 @@ export function synopticNationalByVille(province?: string | null): SynopticVille
         ville: r.ville,
         communes: 0,
         naissances: 0,
+        naissances_g: 0,
+        naissances_f: 0,
         mariages: 0,
         divorces: 0,
         deces: 0,
@@ -435,6 +454,8 @@ export function synopticNationalByVille(province?: string | null): SynopticVille
     }
     hit.communes += 1;
     hit.naissances += r.naissances;
+    hit.naissances_g += r.naissances_g;
+    hit.naissances_f += r.naissances_f;
     hit.mariages += r.mariages;
     hit.divorces += r.divorces;
     hit.deces += r.deces;

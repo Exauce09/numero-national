@@ -422,13 +422,19 @@ function ProvincesOverviewTable({
     province: r.province,
     villes: r.villes,
     communes: r.communes,
-    naissances: r.naissances,
+    naissances_g: r.naissances_g,
+    naissances_f: r.naissances_f,
+    naissances_t: r.naissances,
     mariages: r.mariages,
     divorces: r.divorces,
     deces: r.deces,
     documents: r.documents,
     total: r.total,
   }));
+
+  const sumG = rows.reduce((a, r) => a + r.naissances_g, 0);
+  const sumF = rows.reduce((a, r) => a + r.naissances_f, 0);
+  const sumT = rows.reduce((a, r) => a + r.naissances, 0);
 
   return (
     <>
@@ -444,15 +450,18 @@ function ProvincesOverviewTable({
         <table className="syn-official">
           <thead>
             <tr>
-              <th>PROVINCE</th>
-              <th>VILLES</th>
-              <th>COMMUNES</th>
-              <th>NOUVEAU-NÉS</th>
-              <th>MARIAGES</th>
-              <th>DIVORCES</th>
-              <th>DÉCÈS</th>
-              <th>DOCUMENTS</th>
-              <th>TOTAL</th>
+              <th rowSpan={2}>PROVINCE</th>
+              <th rowSpan={2}>VILLES</th>
+              <th rowSpan={2}>COMMUNES</th>
+              <th colSpan={3}>NOUVEAU-NÉS</th>
+              <th rowSpan={2}>MARIAGES</th>
+              <th rowSpan={2}>DIVORCES</th>
+              <th rowSpan={2}>DÉCÈS</th>
+              <th rowSpan={2}>DOCUMENTS</th>
+              <th rowSpan={2}>TOTAL</th>
+            </tr>
+            <tr>
+              <GftHeads />
             </tr>
           </thead>
           <tbody>
@@ -466,6 +475,8 @@ function ProvincesOverviewTable({
                 <td className="syn-commune-cell">{r.province}</td>
                 <td>{r.villes}</td>
                 <td>{r.communes}</td>
+                <td>{r.naissances_g}</td>
+                <td>{r.naissances_f}</td>
                 <td>{r.naissances}</td>
                 <td>{r.mariages}</td>
                 <td>{r.divorces}</td>
@@ -487,7 +498,13 @@ function ProvincesOverviewTable({
                 <strong>{rows.reduce((a, r) => a + r.communes, 0)}</strong>
               </td>
               <td>
-                <strong>{rows.reduce((a, r) => a + r.naissances, 0)}</strong>
+                <strong>{sumG}</strong>
+              </td>
+              <td>
+                <strong>{sumF}</strong>
+              </td>
+              <td>
+                <strong>{sumT}</strong>
               </td>
               <td>
                 <strong>{rows.reduce((a, r) => a + r.mariages, 0)}</strong>
@@ -508,7 +525,10 @@ function ProvincesOverviewTable({
           </tbody>
         </table>
       </div>
-      <p className="syn-legend muted small">Cliquez une province pour afficher ses informations détaillées.</p>
+      <p className="syn-legend muted small">
+        G = Garçons · F = Filles · T = Total — Cliquez une province pour afficher ses informations
+        détaillées.
+      </p>
     </>
   );
 }
