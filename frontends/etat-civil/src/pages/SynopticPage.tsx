@@ -42,8 +42,8 @@ const TABS = [
   },
   {
     slug: "deces",
-    label: "Liste des Décès",
-    createLabel: "Enregistrer un décès",
+    label: "Enregistrement de décès",
+    createLabel: "Enregistrement de décès",
     createPath: "/deaths",
     managePath: "/manage/deces",
   },

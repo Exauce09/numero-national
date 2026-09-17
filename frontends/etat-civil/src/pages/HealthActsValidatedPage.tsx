@@ -42,10 +42,10 @@ export default function HealthActsValidatedPage() {
                   const label =
                     d.declaration_type === "BIRTH"
                       ? [p.nom, p.postnom, p.prenom].filter(Boolean).join(" ") || "Nouveau-né"
-                      : String(p.deceased_name ?? p.nom ?? "Décès");
+                      : String(p.deceased_name ?? p.nom ?? "Enregistrement de décès");
                   return (
                     <tr key={d.id}>
-                      <td>{d.declaration_type === "BIRTH" ? "Nouveau-né" : "Décès"}</td>
+                      <td>{d.declaration_type === "BIRTH" ? "Nouveau-né" : "Enregistrement de décès"}</td>
                       <td>{label}</td>
                       <td>Validé</td>
                       <td>{new Date(d.created_at).toLocaleString("fr-FR")}</td>

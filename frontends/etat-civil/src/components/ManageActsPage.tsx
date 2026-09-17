@@ -34,16 +34,16 @@ export type ManageConfig = {
 export const MANAGE_CONFIGS: Record<string, ManageConfig> = {
   deces: {
     slug: "deces",
-    title: "Registre des décès",
-    listTitle: "Actes de décès",
-    breadcrumb: "Actes de décès",
+    title: "Enregistrement de décès",
+    listTitle: "Enregistrement de décès",
+    breadcrumb: "Enregistrement de décès",
     justiciaUrl: "https://www.justicia.website/egouv/COMMUNE/manage-deces.php",
     justiciaFile: "manage-deces.php",
     actType: "DEATH",
     createPath: "/deaths",
-    searchHint: "Rechercher (n° acte, défunt, lieu)…",
+    searchHint: "Rechercher (n° acte, nom, lieu)…",
     summaryFields: [
-      { key: "deceased_name", label: "Défunt" },
+      { key: "deceased_name", label: "Personne" },
       { key: "cause_deces", label: "Cause du décès" },
       { key: "lieu_deces", label: "Lieu du décès" },
       { key: "date_deces", label: "Date du décès" },

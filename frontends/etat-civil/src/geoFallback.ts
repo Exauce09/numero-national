@@ -439,6 +439,108 @@ export function listAllCommunesFlat(): FlatCommune[] {
   return out.sort((a, b) => a.name.localeCompare(b.name, "fr"));
 }
 
+export type PlaceHit = {
+  kind: "commune" | "ville" | "territoire" | "province";
+  name: string;
+  province: string;
+  ville?: string;
+  commune?: string;
+  label: string;
+};
+
+function normalizePlaceQuery(q: string): string {
+  return q
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[''`]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/** Recherche libre : un lieu → province / ville / commune (ex. Tshilenge, Nsele). */
+export function searchPlaces(query: string, limit = 12): PlaceHit[] {
+  const q = normalizePlaceQuery(query);
+  if (q.length < 2) return [];
+  const hits: PlaceHit[] = [];
+  const seen = new Set<string>();
+
+  const push = (hit: PlaceHit) => {
+    const key = `${hit.kind}:${hit.label}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    hits.push(hit);
+  };
+
+  const match = (name: string) => {
+    const n = normalizePlaceQuery(name);
+    return n === q || n.startsWith(q) || n.includes(q) || q.includes(n);
+  };
+
+  for (const c of listAllCommunesFlat()) {
+    if (match(c.name)) {
+      push({
+        kind: "commune",
+        name: c.name,
+        province: c.province,
+        ville: c.ville,
+        commune: c.name,
+        label: `${c.name} · ${c.ville} · ${c.province}`,
+      });
+    }
+  }
+
+  for (const [provName, villes] of Object.entries(CITY_COMMUNES)) {
+    for (const villeName of Object.keys(villes)) {
+      if (match(villeName)) {
+        push({
+          kind: "ville",
+          name: villeName,
+          province: provName,
+          ville: villeName,
+          label: `${villeName} · ${provName}`,
+        });
+      }
+    }
+  }
+
+  for (const [provName, territoires] of Object.entries(PROVINCE_TERRITOIRES)) {
+    for (const t of territoires) {
+      if (match(t)) {
+        push({
+          kind: "territoire",
+          name: t,
+          province: provName,
+          ville: t,
+          label: `${t} · ${provName}`,
+        });
+      }
+    }
+  }
+
+  for (const p of PROVINCES) {
+    if (match(p.name) || match(p.chef_lieu)) {
+      push({
+        kind: "province",
+        name: p.name,
+        province: p.name,
+        label: p.name,
+      });
+    }
+  }
+
+  const rank = (h: PlaceHit) => {
+    const n = normalizePlaceQuery(h.name);
+    if (n === q) return 0;
+    if (n.startsWith(q)) return 1;
+    if (h.kind === "commune") return 2;
+    if (h.kind === "ville" || h.kind === "territoire") return 3;
+    return 4;
+  };
+
+  return hits.sort((a, b) => rank(a) - rank(b) || a.label.localeCompare(b.label, "fr")).slice(0, limit);
+}
+
 export function listQuartierNamesForCommune(communeIdValue?: string): string[] {
   return fallbackQuartiers(communeIdValue || "com-generic").map((q) => q.name);
 }

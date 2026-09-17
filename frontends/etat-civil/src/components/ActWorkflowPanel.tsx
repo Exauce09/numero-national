@@ -631,7 +631,7 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
                 >
                   <option value="MARRIAGE">Mariage</option>
                   <option value="DIVORCE">Divorce</option>
-                  <option value="DEATH">Décès</option>
+                  <option value="DEATH">Enregistrement de décès</option>
                   <option value="RECOGNITION">Reconnaissance</option>
                   <option value="ADOPTION">Adoption</option>
                   <option value="RECTIFICATION">Rectification</option>

@@ -410,7 +410,7 @@ export default function DashboardPage() {
           href="/lists/mariage"
         />
         <StatCard
-          title="Décès"
+          title="Enregistrement de décès"
           value={deaths.length}
           subtitle="Actes de décès"
           icon={<IconCross size={22} />}
@@ -479,7 +479,7 @@ export default function DashboardPage() {
             { label: "N.-nés", value: births.length, color: RDC.yellow },
             { label: "Mariages", value: marriages.length, color: RDC.yellowDeep },
             { label: "Divorces", value: divorces.length, color: RDC.redSoft },
-            { label: "Décès", value: deaths.length, color: RDC.red },
+            { label: "Enregistrement de décès", value: deaths.length, color: RDC.red },
             { label: "Adopt.", value: adoptions.length, color: RDC.blueMid },
             { label: "Reconn.", value: recognitions.length, color: RDC.blueSoft },
           ]}
@@ -520,7 +520,7 @@ export default function DashboardPage() {
           labels={months.map((m) => m.label)}
           series={[
             { name: "Nouveau-nés", color: RDC.yellow, values: birthSeries },
-            { name: "Décès", color: RDC.red, values: deathSeries },
+            { name: "Enregistrement de décès", color: RDC.red, values: deathSeries },
           ]}
         />
         <div className="eg-chart-card">

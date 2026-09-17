@@ -570,7 +570,7 @@ export default function DeclarationsPage() {
             ) : (
               rows.map((d) => (
                 <tr key={d.id}>
-                  <td>{d.declaration_type === "BIRTH" ? "Nouveau-né" : "Décès"}</td>
+                  <td>{d.declaration_type === "BIRTH" ? "Nouveau-né" : "Enregistrement de décès"}</td>
                   <td>{String(d.payload.facility_name ?? d.source)}</td>
                   <td>
                     {d.declaration_type === "BIRTH"

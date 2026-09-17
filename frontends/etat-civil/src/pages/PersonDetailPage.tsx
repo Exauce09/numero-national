@@ -25,7 +25,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "actes", label: "Actes" },
   { id: "mariage", label: "Mariage" },
   { id: "divorce", label: "Divorce" },
-  { id: "deces", label: "Décès" },
+  { id: "deces", label: "Enregistrement de décès" },
   { id: "mentions", label: "Mentions" },
   { id: "documents", label: "Documents" },
   { id: "biometrie", label: "Biométrie" },

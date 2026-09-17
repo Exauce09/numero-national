@@ -413,7 +413,7 @@ function Shell() {
 
           {canSeeNav("deces", roles) ? (
             <NavLink to="/manage/deces">
-              <IconCross size={18} /> Décès
+              <IconCross size={18} /> Enregistrement de décès
             </NavLink>
           ) : null}
 

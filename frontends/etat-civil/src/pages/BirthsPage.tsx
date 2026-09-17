@@ -115,6 +115,8 @@ export default function BirthsPage() {
   const [dateNaissance, setDateNaissance] = useState("");
   const [heureNaissance, setHeureNaissance] = useState("");
   const [naissanceMultiple, setNaissanceMultiple] = useState(false);
+  const [typeAccouchement, setTypeAccouchement] = useState("");
+  const [etatMorphologique, setEtatMorphologique] = useState("");
   const [anneeRegistre, setAnneeRegistre] = useState(String(new Date().getFullYear()));
   const [numeroRegistre, setNumeroRegistre] = useState("");
   const [declarant, setDeclarant] = useState<Person | null>(null);
@@ -179,6 +181,14 @@ export default function BirthsPage() {
     }
     if (!nom.trim() || !prenom.trim() || !dateNaissance) {
       setError("Nom, prénom et date de naissance de l'enfant sont requis.");
+      return;
+    }
+    if (!typeAccouchement) {
+      setError("Le type d'accouchement est obligatoire.");
+      return;
+    }
+    if (!etatMorphologique) {
+      setError("L'état morphologique est obligatoire.");
       return;
     }
     if (!geoNaissance.commune_name && !lieuNaissance.trim()) {
@@ -317,6 +327,8 @@ export default function BirthsPage() {
         date_naissance: child.date_naissance,
         heure_naissance: heureNaissance || null,
         naissance_multiple: naissanceMultiple,
+        type_accouchement: typeAccouchement || null,
+        etat_morphologique: etatMorphologique || null,
         annee_registre: anneeRegistre.trim() || null,
         numero_registre: numeroRegistre.trim() || null,
         lieu_naissance: child.lieu_naissance,
@@ -388,6 +400,8 @@ export default function BirthsPage() {
       setDateNaissance("");
       setHeureNaissance("");
       setNaissanceMultiple(false);
+      setTypeAccouchement("");
+      setEtatMorphologique("");
       setAnneeRegistre(String(new Date().getFullYear()));
       setNumeroRegistre("");
       setDeclarant(null);
@@ -555,6 +569,36 @@ export default function BirthsPage() {
               <option value="non">Non</option>
               <option value="oui">Oui (jumeaux…)</option>
             </select>
+          </div>
+          <div>
+            <label className="form-label">Type d&apos;accouchement *</label>
+            <select
+              className="form-control"
+              value={typeAccouchement}
+              onChange={(e) => setTypeAccouchement(e.target.value)}
+              required
+            >
+              <option value="">— Sélectionner —</option>
+              <option value="VOIE_BASSE">Voie basse</option>
+              <option value="CESARIENNE">Césarienne</option>
+              <option value="INSTRUMENTAL">Instrumental (ventouse / forceps)</option>
+            </select>
+          </div>
+          <div>
+            <label className="form-label">État morphologique *</label>
+            <select
+              className="form-control"
+              value={etatMorphologique}
+              onChange={(e) => setEtatMorphologique(e.target.value)}
+              required
+            >
+              <option value="">— Selon le médecin —</option>
+              <option value="BIEN_FORME">Bien formé</option>
+              <option value="MALFORME">Malformé</option>
+            </select>
+            <p className="muted small" style={{ margin: "0.25rem 0 0" }}>
+              Terme médical : état morphologique du nouveau-né.
+            </p>
           </div>
           <div>
             <label className="form-label">Année du registre</label>

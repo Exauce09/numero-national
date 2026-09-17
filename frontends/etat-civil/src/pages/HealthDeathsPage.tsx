@@ -1,6 +1,8 @@
 import { FormEvent, useState } from "react";
 import ActFormShell from "../components/ActFormShell";
+import GeoPlaceLookup from "../components/GeoPlaceLookup";
 import PersonPicker from "../components/PersonPicker";
+import type { GeoSelection } from "../components/GeoCascade";
 import { getActFormSchema } from "../ecActForms";
 import { displayName, type Person } from "../registry";
 import { getHealthSession } from "../healthAuth";
@@ -13,6 +15,9 @@ export default function HealthDeathsPage() {
   const [declarant, setDeclarant] = useState<Person | null>(null);
   const [dateDeces, setDateDeces] = useState("");
   const [cause, setCause] = useState("");
+  const [geoDeces, setGeoDeces] = useState<GeoSelection>({
+    label: session.facilityName,
+  });
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, bump] = useState(0);
@@ -23,13 +28,19 @@ export default function HealthDeathsPage() {
     setError(null);
     setMessage(null);
     if (!deceased) {
-      setError("L'identité du défunt est obligatoire.");
+      setError("L'identité de la personne est obligatoire.");
       return;
     }
     if (!dateDeces || !cause.trim()) {
       setError("Date et cause du décès sont requis.");
       return;
     }
+    const lieuDeces =
+      geoDeces.label ||
+      [geoDeces.commune_name, geoDeces.ville_name, geoDeces.province_name]
+        .filter(Boolean)
+        .join(" · ") ||
+      session.facilityName;
     const decl = await notifyEtatCivil({
       type: "DEATH",
       facilityName: session.facilityName,
@@ -40,21 +51,23 @@ export default function HealthDeathsPage() {
         commune_name: session.commune_name,
         notification_type: "DECES",
         deceased_id: deceased.id,
-        deceased_nic: deceased.nic,
         deceased_name: displayName(deceased),
         sexe: deceased.sexe,
         date_deces: dateDeces,
         cause_deces: cause.trim(),
-        lieu_deces: session.facilityName,
+        lieu_deces: lieuDeces,
+        geo_deces: geoDeces,
+        province_deces: geoDeces.province_name || null,
+        ville_deces: geoDeces.ville_name || null,
+        commune_deces: geoDeces.commune_name || null,
         declarant_id: declarant?.id ?? null,
         declarant_name: declarant ? displayName(declarant) : null,
         responsable_id: declarant?.id ?? null,
-        responsable_nic: declarant?.nic ?? null,
         responsable_name: declarant ? displayName(declarant) : null,
       },
     });
     pushHealthNotification({
-      title: "Notification de décès transmise",
+      title: "Enregistrement de décès transmis",
       body: `${displayName(deceased)} — en attente de validation officier (réf. ${decl.id.slice(0, 8)}).`,
       href: "/sante/deaths",
     });
@@ -65,6 +78,7 @@ export default function HealthDeathsPage() {
     setDeclarant(null);
     setDateDeces("");
     setCause("");
+    setGeoDeces({ label: session.facilityName });
     bump((n) => n + 1);
   }
 
@@ -75,13 +89,21 @@ export default function HealthDeathsPage() {
           {error ? <div className="login-error full">{error}</div> : null}
           {message ? <div className="success-banner full">{message}</div> : null}
           <div className="full">
-            <PersonPicker label="Identité du défunt *" value={deceased} onChange={setDeceased} required />
+            <PersonPicker
+              label="Identité de la personne"
+              value={deceased}
+              onChange={setDeceased}
+              required
+              hideNic
+              excludeDeceased={false}
+            />
           </div>
           <div className="full">
             <PersonPicker
               label="Déclarant / responsable de la déclaration"
               value={declarant}
               onChange={setDeclarant}
+              hideNic
             />
           </div>
           <div>
@@ -104,8 +126,17 @@ export default function HealthDeathsPage() {
             />
           </div>
           <div className="full">
+            <GeoPlaceLookup
+              label="Lieu du décès"
+              value={geoDeces}
+              onChange={setGeoDeces}
+              required
+              placeholder="Tapez un lieu — ex. Tshilenge, Nsele…"
+            />
+          </div>
+          <div className="full">
             <button className="btn-primary" type="submit" style={{ width: "auto", minWidth: 280 }}>
-              Transmettre la notification à l&apos;état civil
+              Transmettre à l&apos;état civil
             </button>
           </div>
         </form>
@@ -116,9 +147,10 @@ export default function HealthDeathsPage() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Défunt</th>
+              <th>Personne</th>
               <th>Date</th>
               <th>Cause</th>
+              <th>Lieu</th>
               <th>Déclarant</th>
               <th>Statut EC</th>
             </tr>
@@ -129,6 +161,7 @@ export default function HealthDeathsPage() {
                 <td>{String(d.payload.deceased_name ?? "—")}</td>
                 <td>{String(d.payload.date_deces ?? "—")}</td>
                 <td>{String(d.payload.cause_deces ?? "—")}</td>
+                <td>{String(d.payload.lieu_deces ?? "—")}</td>
                 <td>{String(d.payload.declarant_name ?? d.payload.responsable_name ?? "—")}</td>
                 <td>{d.status}</td>
               </tr>

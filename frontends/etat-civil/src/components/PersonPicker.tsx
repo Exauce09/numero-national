@@ -38,6 +38,8 @@ type Props = {
   excludeDeceased?: boolean;
   /** Âge minimum (ans) — exclus des résultats de recherche et du formulaire d'ajout. */
   minAge?: number;
+  /** Masque tout affichage / hint lié au NIC (ancien système). */
+  hideNic?: boolean;
 };
 
 const emptyForm = {
@@ -64,6 +66,7 @@ export default function PersonPicker({
   nicSearchHint = false,
   excludeDeceased = true,
   minAge,
+  hideNic = false,
 }: Props) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -161,7 +164,7 @@ export default function PersonPicker({
         <div className="person-picker-selected">
           <div>
             <strong>{displayName(value)}</strong>
-            <div className="muted small">{value.nic}</div>
+            {!hideNic && value.nic ? <div className="muted small">{value.nic}</div> : null}
             {originGeoFilter ? (
               <div className="muted small">
                 {[
@@ -187,15 +190,17 @@ export default function PersonPicker({
           <input
             className="form-control"
             placeholder={
-              nicSearchHint
-                ? "N° d'état civil (NIC) ou nom de l'officier…"
-                : originGeoFilter
-                  ? "Sélection intelligente : nom, NIC, province, ville, territoire, secteur, village…"
-                  : sexFilter === "F"
-                    ? "Recherche mère (sexe féminin) — nom, NIC…"
-                    : sexFilter === "M"
-                      ? "Recherche père (sexe masculin) — nom, NIC…"
-                      : "Recherche nationale (nom, post-nom, prénom, NIC)…"
+              hideNic
+                ? "Recherche (nom, post-nom, prénom)…"
+                : nicSearchHint
+                  ? "N° d'état civil (NIC) ou nom de l'officier…"
+                  : originGeoFilter
+                    ? "Sélection intelligente : nom, NIC, province, ville, territoire, secteur, village…"
+                    : sexFilter === "F"
+                      ? "Recherche mère (sexe féminin) — nom, NIC…"
+                      : sexFilter === "M"
+                        ? "Recherche père (sexe masculin) — nom, NIC…"
+                        : "Recherche nationale (nom, post-nom, prénom, NIC)…"
             }
             value={query}
             onChange={(e) => {
@@ -243,7 +248,7 @@ export default function PersonPicker({
                     <strong>{displayName(p)}</strong>
                     <span className="muted small">
                       {[
-                        p.nic,
+                        hideNic ? null : p.nic,
                         p.sexe,
                         p.date_naissance,
                         o.province,

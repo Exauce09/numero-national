@@ -24,10 +24,10 @@ export default function HealthActsPendingPage() {
       <div className="panel" style={{ marginBottom: "1rem" }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
           <Link className="btn-primary" style={{ width: "auto" }} to="/sante/births">
-            + Notification de naissance
+            + Enregistrement de nouveau-né
           </Link>
           <Link className="btn-secondary" style={{ width: "auto" }} to="/sante/deaths">
-            + Notification de décès
+            + Enregistrement de décès
           </Link>
         </div>
       </div>
@@ -56,10 +56,10 @@ export default function HealthActsPendingPage() {
                   const label =
                     d.declaration_type === "BIRTH"
                       ? [p.nom, p.postnom, p.prenom].filter(Boolean).join(" ") || "Nouveau-né"
-                      : String(p.deceased_name ?? p.nom ?? "Décès");
+                      : String(p.deceased_name ?? p.nom ?? "Enregistrement de décès");
                   return (
                     <tr key={d.id}>
-                      <td>{d.declaration_type === "BIRTH" ? "Nouveau-né" : "Décès"}</td>
+                      <td>{d.declaration_type === "BIRTH" ? "Nouveau-né" : "Enregistrement de décès"}</td>
                       <td>{label}</td>
                       <td>En cours — en attente officier</td>
                       <td>{new Date(d.created_at).toLocaleString("fr-FR")}</td>

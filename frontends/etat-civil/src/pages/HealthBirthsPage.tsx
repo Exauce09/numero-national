@@ -30,6 +30,8 @@ export default function HealthBirthsPage() {
   const [dateNaissance, setDateNaissance] = useState("");
   const [heureNaissance, setHeureNaissance] = useState("");
   const [naissanceMultiple, setNaissanceMultiple] = useState(false);
+  const [typeAccouchement, setTypeAccouchement] = useState("");
+  const [etatMorphologique, setEtatMorphologique] = useState("");
   const [adresseMere, setAdresseMere] = useState("");
   const [mother, setMother] = useState(emptyParent);
   const [father, setFather] = useState(emptyParent);
@@ -46,6 +48,14 @@ export default function HealthBirthsPage() {
     setCoupon(null);
     if (!nom.trim() || !prenom.trim() || !dateNaissance) {
       setError("Nom, prénom et date de naissance de l'enfant sont requis.");
+      return;
+    }
+    if (!typeAccouchement) {
+      setError("Le type d'accouchement est obligatoire.");
+      return;
+    }
+    if (!etatMorphologique) {
+      setError("L'état morphologique est obligatoire.");
       return;
     }
     if (!mother.nom.trim() || !mother.prenom.trim()) {
@@ -120,7 +130,6 @@ export default function HealthBirthsPage() {
           commune_name: session.commune_name,
           notification_type: "NAISSANCE",
           id_naissance: idNaissance,
-          child_nic: idNaissance,
           child_nom: childNom,
           child_postnom: childPostnom,
           child_prenom: childPrenom,
@@ -128,12 +137,12 @@ export default function HealthBirthsPage() {
           date_naissance: dateNaissance,
           heure_naissance: heureNaissance || null,
           naissance_multiple: naissanceMultiple,
+          type_accouchement: typeAccouchement || null,
+          etat_morphologique: etatMorphologique || null,
           mother_id: motherPerson.id,
-          mother_nic: motherPerson.nic,
           mother_name: displayName(motherPerson),
           adresse_mere: adresseMere.trim() || null,
           father_id: fatherPerson?.id ?? null,
-          father_nic: fatherPerson?.nic ?? null,
           father_name: fatherPerson ? displayName(fatherPerson) : null,
           lieu_naissance: session.facilityName,
           declarant_qualite: "MERE",
@@ -166,6 +175,8 @@ export default function HealthBirthsPage() {
       setDateNaissance("");
       setHeureNaissance("");
       setNaissanceMultiple(false);
+      setTypeAccouchement("");
+      setEtatMorphologique("");
       setAdresseMere("");
       setMother(emptyParent);
       setFather(emptyParent);
@@ -259,6 +270,36 @@ export default function HealthBirthsPage() {
               <option value="non">Non</option>
               <option value="oui">Oui (jumeaux…)</option>
             </select>
+          </div>
+          <div>
+            <label className="form-label">Type d&apos;accouchement *</label>
+            <select
+              className="form-control"
+              value={typeAccouchement}
+              onChange={(e) => setTypeAccouchement(e.target.value)}
+              required
+            >
+              <option value="">— Sélectionner —</option>
+              <option value="VOIE_BASSE">Voie basse</option>
+              <option value="CESARIENNE">Césarienne</option>
+              <option value="INSTRUMENTAL">Instrumental (ventouse / forceps)</option>
+            </select>
+          </div>
+          <div>
+            <label className="form-label">État morphologique *</label>
+            <select
+              className="form-control"
+              value={etatMorphologique}
+              onChange={(e) => setEtatMorphologique(e.target.value)}
+              required
+            >
+              <option value="">— Selon le médecin —</option>
+              <option value="BIEN_FORME">Bien formé</option>
+              <option value="MALFORME">Malformé</option>
+            </select>
+            <p className="muted small" style={{ margin: "0.25rem 0 0" }}>
+              Terme médical : état morphologique du nouveau-né.
+            </p>
           </div>
           <div className="full">
             <label className="form-label">Lieu de naissance</label>

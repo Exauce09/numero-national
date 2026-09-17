@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import ActFormShell from "../components/ActFormShell";
 import ActPrintCard from "../components/ActPrintCard";
 import GeoCascade, { GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
+import GeoPlaceLookup from "../components/GeoPlaceLookup";
 import GpsLocatePanel, { applyGpsToGeo } from "../components/GpsLocatePanel";
 import PersonPicker from "../components/PersonPicker";
 import { getOfficerCommune } from "../commune";
@@ -30,7 +31,7 @@ export default function DeathsPage() {
     e.preventDefault();
     setError(null);
     if (!deceased) {
-      setError("L'identité du défunt est obligatoire.");
+      setError("L'identité de la personne est obligatoire.");
       return;
     }
     if (!declarant) {
@@ -45,8 +46,17 @@ export default function DeathsPage() {
       setError("La date du décès est obligatoire.");
       return;
     }
+    if (!geoDeces.province_name && !geoDeces.label) {
+      setError("Indiquez le lieu du décès (ex. Tshilenge, Nsele…).");
+      return;
+    }
     try {
       const commune = getOfficerCommune();
+      const lieuDeces =
+        geoDeces.label ||
+        [geoDeces.commune_name, geoDeces.ville_name, geoDeces.province_name]
+          .filter(Boolean)
+          .join(" · ");
       const payload = {
         deceased_id: deceased.id,
         citizen_id: deceased.id,
@@ -56,8 +66,11 @@ export default function DeathsPage() {
         heure_deces: heureDeces || null,
         medecin_constatant: medecin.trim() || null,
         certificat_deces_ref: certificatRef.trim() || null,
-        lieu_deces: geoDeces.label || "",
+        lieu_deces: lieuDeces,
         geo_deces: geoDeces,
+        province_deces: geoDeces.province_name || null,
+        ville_deces: geoDeces.ville_name || null,
+        commune_deces: geoDeces.commune_name || null,
         lieu_enterrement: geoEnterrement.label || "",
         lieu_inhumation: geoEnterrement.label || "",
         geo_enterrement: geoEnterrement,
@@ -73,7 +86,8 @@ export default function DeathsPage() {
         responsable_id: declarant.id,
         responsable_name: displayName(declarant),
       };
-      const act = await addAct("DEATH", payload, deceased.nic);
+      // Pas de NIC — identifiant interne de la personne uniquement.
+      const act = await addAct("DEATH", payload, deceased.id);
       setCreated(act);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Enregistrement impossible.");
@@ -93,14 +107,21 @@ export default function DeathsPage() {
 
           <div className="full">
             <h3 className="panel-title" style={{ marginTop: 0 }}>
-              Personne décédée
+              Personne à enregistrer
             </h3>
           </div>
           <div className="full">
-            <PersonPicker label="Identité du défunt *" value={deceased} onChange={setDeceased} required />
+            <PersonPicker
+              label="Identité de la personne"
+              value={deceased}
+              onChange={setDeceased}
+              required
+              hideNic
+              excludeDeceased={false}
+            />
           </div>
           <div>
-            <label className="form-label">État matrimonial du défunt</label>
+            <label className="form-label">État matrimonial</label>
             <select
               className="form-control"
               value={etatMatrimonial}
@@ -143,13 +164,12 @@ export default function DeathsPage() {
             />
           </div>
           <div className="full">
-            <label className="form-label">Lieu du décès *</label>
-            <GeoCascade
-              embedded
-              levels={GEO_PRESETS.place}
+            <GeoPlaceLookup
+              label="Lieu du décès"
               value={geoDeces}
               onChange={setGeoDeces}
-              label="Lieu du décès"
+              required
+              placeholder="Tapez un lieu — ex. Tshilenge, Nsele…"
             />
           </div>
 
@@ -173,7 +193,13 @@ export default function DeathsPage() {
             <h3 className="panel-title">Déclaration & inhumation</h3>
           </div>
           <div className="full">
-            <PersonPicker label="Déclarant *" value={declarant} onChange={setDeclarant} required />
+            <PersonPicker
+              label="Déclarant"
+              value={declarant}
+              onChange={setDeclarant}
+              required
+              hideNic
+            />
           </div>
           <div>
             <label className="form-label">Qualité du déclarant *</label>
@@ -189,13 +215,11 @@ export default function DeathsPage() {
             </select>
           </div>
           <div className="full">
-            <label className="form-label">Lieu d&apos;inhumation</label>
-            <GeoCascade
-              embedded
-              levels={GEO_PRESETS.place}
+            <GeoPlaceLookup
+              label="Lieu d'inhumation"
               value={geoEnterrement}
               onChange={setGeoEnterrement}
-              label="Lieu d'inhumation"
+              placeholder="Tapez un lieu — ex. commune, ville…"
             />
           </div>
           <div>
@@ -228,7 +252,7 @@ export default function DeathsPage() {
 
           <div className="full">
             <button className="btn-primary" style={{ width: "auto", minWidth: 200 }} type="submit">
-              Établir l&apos;acte de décès
+              Enregistrer le décès
             </button>
           </div>
         </form>
@@ -236,7 +260,7 @@ export default function DeathsPage() {
 
       {created ? (
         <div className="panel" style={{ marginTop: "1rem" }}>
-          <div className="success-banner">Acte de décès créé</div>
+          <div className="success-banner">Enregistrement de décès créé</div>
           <ActPrintCard act={created} />
         </div>
       ) : null}

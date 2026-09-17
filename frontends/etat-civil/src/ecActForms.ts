@@ -44,6 +44,12 @@ export const EC_ACT_FORMS: ActFormSchema[] = [
           { key: "date_naissance", label: "Date de naissance", required: true },
           { key: "heure_naissance", label: "Heure de naissance" },
           { key: "jumeaux", label: "Naissance multiple (jumeaux…)" },
+          { key: "type_accouchement", label: "Type d'accouchement", required: true },
+          {
+            key: "etat_morphologique",
+            label: "État morphologique (bien formé / malformé)",
+            required: true,
+          },
           { key: "lieu_naissance", label: "Lieu de naissance", required: true },
         ],
       },
@@ -73,16 +79,16 @@ export const EC_ACT_FORMS: ActFormSchema[] = [
   },
   {
     id: "deces",
-    title: "Acte de décès",
+    title: "Enregistrement de décès",
     subtitle: "Inscription au registre des décès sur déclaration régulière.",
     href: "/deaths",
     sections: [
       {
         id: "defunt",
-        title: "Personne décédée",
+        title: "Personne à enregistrer",
         fields: [
-          { key: "defunt", label: "Identité du défunt", required: true },
-          { key: "etat_matrimonial", label: "État matrimonial du défunt" },
+          { key: "defunt", label: "Identité de la personne", required: true },
+          { key: "etat_matrimonial", label: "État matrimonial" },
           { key: "date_deces", label: "Date du décès", required: true },
           { key: "heure_deces", label: "Heure du décès" },
           { key: "lieu_deces", label: "Lieu du décès", required: true },
@@ -308,6 +314,12 @@ export const EC_ACT_FORMS: ActFormSchema[] = [
           { key: "date_naissance", label: "Date de naissance", required: true },
           { key: "heure_naissance", label: "Heure de naissance" },
           { key: "jumeaux", label: "Naissance multiple (jumeaux…)" },
+          { key: "type_accouchement", label: "Type d'accouchement", required: true },
+          {
+            key: "etat_morphologique",
+            label: "État morphologique (bien formé / malformé)",
+            required: true,
+          },
           { key: "lieu_naissance", label: "Lieu (structure)", required: true },
         ],
       },
@@ -324,17 +336,18 @@ export const EC_ACT_FORMS: ActFormSchema[] = [
   },
   {
     id: "notif_deces",
-    title: "Notification de décès (structure sanitaire)",
+    title: "Enregistrement de décès (structure sanitaire)",
     subtitle: "Constat transmis au bureau EC — ne constitue pas l'acte officiel.",
     href: "/sante/deaths",
     sections: [
       {
         id: "defunt",
-        title: "Défunt",
+        title: "Personne à enregistrer",
         fields: [
-          { key: "defunt", label: "Identité du défunt", required: true },
+          { key: "defunt", label: "Identité de la personne", required: true },
           { key: "date_deces", label: "Date du décès", required: true },
           { key: "cause", label: "Cause du décès", required: true },
+          { key: "lieu_deces", label: "Lieu du décès", required: true },
           { key: "declarant", label: "Déclarant / responsable de la déclaration" },
         ],
       },
