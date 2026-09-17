@@ -6,6 +6,7 @@ import GeoPlaceLookup from "../components/GeoPlaceLookup";
 import GpsLocatePanel, { applyGpsToGeo } from "../components/GpsLocatePanel";
 import PersonPicker from "../components/PersonPicker";
 import { getOfficerCommune } from "../commune";
+import { CIMETIERES_RDC, cimetiereLabel } from "../data/cimetieresRdc";
 import { getActFormSchema } from "../ecActForms";
 import { addAct, displayName, type Act, type Person } from "../registry";
 
@@ -21,6 +22,7 @@ export default function DeathsPage() {
   const [geoDeces, setGeoDeces] = useState<GeoSelection>({});
   const [geoEnterrement, setGeoEnterrement] = useState<GeoSelection>({});
   const [cimetiere, setCimetiere] = useState("");
+  const [cimetiereAutre, setCimetiereAutre] = useState("");
   const [geoEnregistrement, setGeoEnregistrement] = useState<GeoSelection>({});
   const [dateDeces, setDateDeces] = useState("");
   const [dateEnterrement, setDateEnterrement] = useState("");
@@ -74,7 +76,8 @@ export default function DeathsPage() {
         lieu_enterrement: geoEnterrement.label || "",
         lieu_inhumation: geoEnterrement.label || "",
         geo_enterrement: geoEnterrement,
-        cimetiere: cimetiere.trim(),
+        cimetiere:
+          cimetiere === "__autre__" ? cimetiereAutre.trim() : cimetiere.trim(),
         lieu_enregistrement: geoEnregistrement.label || "",
         geo_enregistrement: geoEnregistrement,
         commune_code: geoEnregistrement.commune_code || geoDeces.commune_code || commune.code,
@@ -222,13 +225,49 @@ export default function DeathsPage() {
               placeholder="Tapez un lieu — ex. commune, ville…"
             />
           </div>
-          <div>
+          <div className="full">
             <label className="form-label">Cimetière</label>
-            <input
+            <select
               className="form-control"
-              value={cimetiere}
-              onChange={(e) => setCimetiere(e.target.value)}
-            />
+              value={
+                cimetiere &&
+                cimetiere !== "__autre__" &&
+                !CIMETIERES_RDC.some((c) => cimetiereLabel(c) === cimetiere)
+                  ? "__autre__"
+                  : cimetiere
+              }
+              onChange={(e) => {
+                const v = e.target.value;
+                setCimetiere(v);
+                if (v !== "__autre__") setCimetiereAutre("");
+              }}
+            >
+              <option value="">— Sélectionner un cimetière —</option>
+              {CIMETIERES_RDC.map((c) => {
+                const label = cimetiereLabel(c);
+                return (
+                  <option key={label} value={label}>
+                    {label}
+                  </option>
+                );
+              })}
+              <option value="__autre__">Autre (saisie manuelle)</option>
+            </select>
+            {cimetiere === "__autre__" ||
+            (cimetiere &&
+              cimetiere !== "__autre__" &&
+              !CIMETIERES_RDC.some((c) => cimetiereLabel(c) === cimetiere)) ? (
+              <input
+                className="form-control"
+                style={{ marginTop: "0.5rem" }}
+                value={cimetiere === "__autre__" ? cimetiereAutre : cimetiere}
+                onChange={(e) => {
+                  setCimetiere("__autre__");
+                  setCimetiereAutre(e.target.value);
+                }}
+                placeholder="Nom du cimetière"
+              />
+            ) : null}
           </div>
           <div>
             <label className="form-label">Date d&apos;inhumation</label>

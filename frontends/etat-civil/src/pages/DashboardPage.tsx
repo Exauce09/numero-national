@@ -386,14 +386,6 @@ export default function DashboardPage() {
 
       <div className="dash-kpi-grid">
         <StatCard
-          title="Actes"
-          value={acts.length}
-          subtitle={nationalScope ? "Registre national" : `Commune ${officerCommune.name}`}
-          icon={<IconFile size={22} />}
-          color={RDC.blue}
-          href="/acts"
-        />
-        <StatCard
           title="Enregistrement de nouveau-né"
           value={births.length}
           subtitle="Actes enregistrés"
