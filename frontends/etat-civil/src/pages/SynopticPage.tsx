@@ -566,15 +566,18 @@ function ProvinceDetailView({
         <table className="syn-official">
           <thead>
             <tr>
-              <th>PROVINCE</th>
-              <th>VILLES</th>
-              <th>COMMUNES</th>
-              <th>NOUVEAU-NÉS</th>
-              <th>MARIAGES</th>
-              <th>DIVORCES</th>
-              <th>DÉCÈS</th>
-              <th>DOCUMENTS</th>
-              <th>TOTAL</th>
+              <th rowSpan={2}>PROVINCE</th>
+              <th rowSpan={2}>VILLES</th>
+              <th rowSpan={2}>COMMUNES</th>
+              <th colSpan={3}>NOUVEAU-NÉS</th>
+              <th rowSpan={2}>MARIAGES</th>
+              <th rowSpan={2}>DIVORCES</th>
+              <th rowSpan={2}>DÉCÈS</th>
+              <th rowSpan={2}>DOCUMENTS</th>
+              <th rowSpan={2}>TOTAL</th>
+            </tr>
+            <tr>
+              <GftHeads />
             </tr>
           </thead>
           <tbody>
@@ -582,6 +585,8 @@ function ProvinceDetailView({
               <td className="syn-commune-cell">{province}</td>
               <td>{summary?.villes ?? 0}</td>
               <td>{summary?.communes ?? 0}</td>
+              <td>{summary?.naissances_g ?? 0}</td>
+              <td>{summary?.naissances_f ?? 0}</td>
               <td>{summary?.naissances ?? 0}</td>
               <td>{summary?.mariages ?? 0}</td>
               <td>{summary?.divorces ?? 0}</td>
@@ -602,20 +607,23 @@ function ProvinceDetailView({
         <table className="syn-official">
           <thead>
             <tr>
-              <th>VILLE</th>
-              <th>COMMUNES</th>
-              <th>NOUVEAU-NÉS</th>
-              <th>MARIAGES</th>
-              <th>DIVORCES</th>
-              <th>DÉCÈS</th>
-              <th>DOCUMENTS</th>
-              <th>TOTAL</th>
+              <th rowSpan={2}>VILLE</th>
+              <th rowSpan={2}>COMMUNES</th>
+              <th colSpan={3}>NOUVEAU-NÉS</th>
+              <th rowSpan={2}>MARIAGES</th>
+              <th rowSpan={2}>DIVORCES</th>
+              <th rowSpan={2}>DÉCÈS</th>
+              <th rowSpan={2}>DOCUMENTS</th>
+              <th rowSpan={2}>TOTAL</th>
+            </tr>
+            <tr>
+              <GftHeads />
             </tr>
           </thead>
           <tbody>
             {villes.length === 0 ? (
               <tr>
-                <td colSpan={8} className="muted">
+                <td colSpan={10} className="muted">
                   Aucune ville
                 </td>
               </tr>
@@ -629,6 +637,8 @@ function ProvinceDetailView({
                 >
                   <td className="syn-commune-cell">{v.ville}</td>
                   <td>{v.communes}</td>
+                  <td>{v.naissances_g}</td>
+                  <td>{v.naissances_f}</td>
                   <td>{v.naissances}</td>
                   <td>{v.mariages}</td>
                   <td>{v.divorces}</td>
@@ -651,20 +661,23 @@ function ProvinceDetailView({
         <table className="syn-official">
           <thead>
             <tr>
-              <th>COMMUNE</th>
-              <th>VILLE</th>
-              <th>NOUVEAU-NÉS</th>
-              <th>MARIAGES</th>
-              <th>DIVORCES</th>
-              <th>DÉCÈS</th>
-              <th>DOCUMENTS</th>
-              <th>TOTAL</th>
+              <th rowSpan={2}>COMMUNE</th>
+              <th rowSpan={2}>VILLE</th>
+              <th colSpan={3}>NOUVEAU-NÉS</th>
+              <th rowSpan={2}>MARIAGES</th>
+              <th rowSpan={2}>DIVORCES</th>
+              <th rowSpan={2}>DÉCÈS</th>
+              <th rowSpan={2}>DOCUMENTS</th>
+              <th rowSpan={2}>TOTAL</th>
+            </tr>
+            <tr>
+              <GftHeads />
             </tr>
           </thead>
           <tbody>
             {filteredCommunes.length === 0 ? (
               <tr>
-                <td colSpan={8} className="muted">
+                <td colSpan={10} className="muted">
                   Aucune commune
                 </td>
               </tr>
@@ -678,6 +691,8 @@ function ProvinceDetailView({
                 >
                   <td className="syn-commune-cell">{c.commune}</td>
                   <td>{c.ville}</td>
+                  <td>{c.naissances_g}</td>
+                  <td>{c.naissances_f}</td>
                   <td>{c.naissances}</td>
                   <td>{c.mariages}</td>
                   <td>{c.divorces}</td>
@@ -693,7 +708,8 @@ function ProvinceDetailView({
         </table>
       </div>
       <p className="syn-legend muted small">
-        Cliquez une ville pour filtrer · Cliquez une commune pour le tableau synoptique détaillé.
+        G = Garçons · F = Filles · T = Total — Cliquez une ville pour filtrer · Cliquez une commune
+        pour le tableau synoptique détaillé.
       </p>
     </>
   );
