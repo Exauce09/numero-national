@@ -44,6 +44,7 @@ export const MANAGE_CONFIGS: Record<string, ManageConfig> = {
     searchHint: "Rechercher (n° acte, nom, lieu)…",
     summaryFields: [
       { key: "deceased_name", label: "Personne" },
+      { key: "type_deces_label", label: "Type" },
       { key: "cause_deces", label: "Cause du décès" },
       { key: "lieu_deces", label: "Lieu du décès" },
       { key: "date_deces", label: "Date du décès" },

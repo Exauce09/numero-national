@@ -4,6 +4,7 @@ import GeoPlaceLookup from "../components/GeoPlaceLookup";
 import PersonPicker from "../components/PersonPicker";
 import type { GeoSelection } from "../components/GeoCascade";
 import { getActFormSchema } from "../ecActForms";
+import { TYPE_DECES_OPTIONS, typeDecesLabel, type TypeDeces } from "../deathType";
 import { displayName, type Person } from "../registry";
 import { getHealthSession } from "../healthAuth";
 import { listFacilityDeclarations, notifyEtatCivil } from "../civilDeclarations";
@@ -13,6 +14,7 @@ export default function HealthDeathsPage() {
   const session = getHealthSession()!;
   const [deceased, setDeceased] = useState<Person | null>(null);
   const [declarant, setDeclarant] = useState<Person | null>(null);
+  const [typeDeces, setTypeDeces] = useState<TypeDeces>("DECES");
   const [dateDeces, setDateDeces] = useState("");
   const [cause, setCause] = useState("");
   const [geoDeces, setGeoDeces] = useState<GeoSelection>({
@@ -53,6 +55,10 @@ export default function HealthDeathsPage() {
         deceased_id: deceased.id,
         deceased_name: displayName(deceased),
         sexe: deceased.sexe,
+        date_naissance: deceased.date_naissance,
+        type_deces: typeDeces,
+        type_deces_label: typeDecesLabel(typeDeces),
+        mort_ne: typeDeces === "MORT_NE",
         date_deces: dateDeces,
         cause_deces: cause.trim(),
         lieu_deces: lieuDeces,
@@ -76,6 +82,7 @@ export default function HealthDeathsPage() {
     );
     setDeceased(null);
     setDeclarant(null);
+    setTypeDeces("DECES");
     setDateDeces("");
     setCause("");
     setGeoDeces({ label: session.facilityName });
@@ -97,6 +104,24 @@ export default function HealthDeathsPage() {
               hideNic
               excludeDeceased={false}
             />
+          </div>
+          <div>
+            <label className="form-label">Type de décès *</label>
+            <select
+              className="form-control"
+              value={typeDeces}
+              onChange={(e) => setTypeDeces(e.target.value as TypeDeces)}
+              required
+            >
+              {TYPE_DECES_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <p className="muted small" style={{ margin: "0.25rem 0 0" }}>
+              Mort-né = enfant mort à la naissance. Décès = personne déjà née vivante.
+            </p>
           </div>
           <div className="full">
             <PersonPicker
@@ -148,6 +173,7 @@ export default function HealthDeathsPage() {
           <thead>
             <tr>
               <th>Personne</th>
+              <th>Type</th>
               <th>Date</th>
               <th>Cause</th>
               <th>Lieu</th>
@@ -159,6 +185,7 @@ export default function HealthDeathsPage() {
             {rows.map((d) => (
               <tr key={d.id}>
                 <td>{String(d.payload.deceased_name ?? "—")}</td>
+                <td>{String(d.payload.type_deces_label ?? (d.payload.mort_ne ? "Mort-né" : "Décès"))}</td>
                 <td>{String(d.payload.date_deces ?? "—")}</td>
                 <td>{String(d.payload.cause_deces ?? "—")}</td>
                 <td>{String(d.payload.lieu_deces ?? "—")}</td>

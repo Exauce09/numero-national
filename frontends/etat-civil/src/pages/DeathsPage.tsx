@@ -7,6 +7,7 @@ import GpsLocatePanel, { applyGpsToGeo } from "../components/GpsLocatePanel";
 import PersonPicker from "../components/PersonPicker";
 import { getOfficerCommune } from "../commune";
 import { CIMETIERES_RDC, cimetiereLabel } from "../data/cimetieresRdc";
+import { TYPE_DECES_OPTIONS, typeDecesLabel, type TypeDeces } from "../deathType";
 import { getActFormSchema } from "../ecActForms";
 import { addAct, displayName, type Act, type Person } from "../registry";
 
@@ -14,6 +15,7 @@ export default function DeathsPage() {
   const [deceased, setDeceased] = useState<Person | null>(null);
   const [declarant, setDeclarant] = useState<Person | null>(null);
   const [qualiteDeclarant, setQualiteDeclarant] = useState("PROCHE");
+  const [typeDeces, setTypeDeces] = useState<TypeDeces>("DECES");
   const [etatMatrimonial, setEtatMatrimonial] = useState("");
   const [cause, setCause] = useState("");
   const [heureDeces, setHeureDeces] = useState("");
@@ -63,6 +65,11 @@ export default function DeathsPage() {
         deceased_id: deceased.id,
         citizen_id: deceased.id,
         deceased_name: displayName(deceased),
+        sexe: deceased.sexe,
+        date_naissance: deceased.date_naissance,
+        type_deces: typeDeces,
+        type_deces_label: typeDecesLabel(typeDeces),
+        mort_ne: typeDeces === "MORT_NE",
         etat_matrimonial_defunt: etatMatrimonial || deceased.etat_civil || null,
         cause_deces: cause.trim(),
         heure_deces: heureDeces || null,
@@ -122,6 +129,24 @@ export default function DeathsPage() {
               hideNic
               excludeDeceased={false}
             />
+          </div>
+          <div>
+            <label className="form-label">Type de décès *</label>
+            <select
+              className="form-control"
+              value={typeDeces}
+              onChange={(e) => setTypeDeces(e.target.value as TypeDeces)}
+              required
+            >
+              {TYPE_DECES_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <p className="muted small" style={{ margin: "0.25rem 0 0" }}>
+              Mort-né = enfant mort à la naissance (stillbirth). Décès = personne déjà née vivante.
+            </p>
           </div>
           <div>
             <label className="form-label">État matrimonial</label>

@@ -51,10 +51,13 @@ function fieldLabel(key: string): string {
     lieu_naissance: "Lieu de naissance",
     geo_actuelle: "Adresse actuelle",
     cause_deces: "Cause du décès",
+    type_deces: "Type de décès",
+    type_deces_label: "Type de décès",
+    mort_ne: "Mort-né",
     date_deces: "Date du décès",
     date_enterrement: "Date d'enterrement",
     cimetiere: "Cimetière",
-    deceased_name: "Défunt",
+    deceased_name: "Personne",
     responsable_name: "Responsable",
   };
   return labels[key] ?? key.replace(/_/g, " ");

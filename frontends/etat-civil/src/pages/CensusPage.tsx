@@ -7,6 +7,7 @@ import GeoCascade, {
   type GeoSelection,
 } from "../components/GeoCascade";
 import PersonPicker from "../components/PersonPicker";
+import { TYPE_DECES_OPTIONS, typeDecesLabel, type TypeDeces } from "../deathType";
 import SituationFamilialeForm from "../components/SituationFamilialeForm";
 import EtudesFaitesForm from "../components/EtudesFaitesForm";
 import ExperienceProfessionnelleForm from "../components/ExperienceProfessionnelleForm";
@@ -93,6 +94,7 @@ type CensusDraft = {
   step: StepId;
   ficheKind?: FicheKind;
   dateDeces?: string;
+  typeDeces?: TypeDeces;
   delaiEnregistrement?: DelaiEnregistrement;
   handicap: HandicapType;
   nom: string;
@@ -144,6 +146,7 @@ export default function CensusPage() {
   const [step, setStep] = useState<StepId>(1);
   const [ficheKind, setFicheKind] = useState<FicheKind>("personne");
   const [dateDeces, setDateDeces] = useState("");
+  const [typeDeces, setTypeDeces] = useState<TypeDeces>("DECES");
   const [delaiEnregistrement, setDelaiEnregistrement] = useState<DelaiEnregistrement>("DANS_DELAI");
   const [handicap, setHandicap] = useState<HandicapType>("NORMAL");
   const [nom, setNom] = useState("");
@@ -218,6 +221,7 @@ export default function CensusPage() {
       setStep(Math.min(6, Math.max(1, Number(d.step) || 1)) as StepId);
       setFicheKind(d.ficheKind ?? "personne");
       setDateDeces(d.dateDeces ?? "");
+      setTypeDeces(d.typeDeces === "MORT_NE" ? "MORT_NE" : "DECES");
       setDelaiEnregistrement(
         d.delaiEnregistrement ?? suggestDelaiEnregistrement(d.dateNaissance ?? ""),
       );
@@ -665,6 +669,7 @@ export default function CensusPage() {
     setStep(1);
     setFicheKind("personne");
     setDateDeces("");
+    setTypeDeces("DECES");
     setDelaiEnregistrement("DANS_DELAI");
     setHandicap("NORMAL");
     setNom("");
@@ -867,6 +872,11 @@ export default function CensusPage() {
             deceased_id: person.id,
             citizen_id: person.id,
             deceased_name: displayName(person),
+            sexe: person.sexe,
+            date_naissance: person.date_naissance,
+            type_deces: typeDeces,
+            type_deces_label: typeDecesLabel(typeDeces),
+            mort_ne: typeDeces === "MORT_NE",
             cause_deces: "Déclaré au recensement",
             date_deces: dateDeces || null,
             lieu_deces: lieuNaissance || geoActuelle.label || "",
@@ -1144,6 +1154,20 @@ export default function CensusPage() {
                       value={dateDeces}
                       onChange={(e) => setDateDeces(e.target.value)}
                     />
+                  </div>
+                  <div>
+                    <label className="form-label">Type de décès *</label>
+                    <select
+                      className="form-control"
+                      value={typeDeces}
+                      onChange={(e) => setTypeDeces(e.target.value as TypeDeces)}
+                    >
+                      {TYPE_DECES_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="full">
                     <label className="form-label">Lieu de naissance *</label>

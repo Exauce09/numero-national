@@ -1,6 +1,7 @@
 /** Agrégats tableau synoptique — structure sanitaire connectée uniquement. */
 
 import { listFacilityDeclarations, type CivilDeclaration } from "./civilDeclarations";
+import { isMortNe } from "./deathType";
 import { getHealthSession } from "./healthAuth";
 import {
   ageYears,
@@ -214,12 +215,7 @@ export function healthSynopticMarriagesDivorces() {
 }
 
 function deathFromPayload(payload: Record<string, unknown>) {
-  const blob = `${payload.cause_deces ?? ""} ${payload.note ?? ""}`.toLowerCase();
-  const isStillbirth =
-    blob.includes("mort-né") ||
-    blob.includes("mort ne") ||
-    blob.includes("mortné") ||
-    payload.mort_ne === true;
+  const isStillbirth = isMortNe(payload);
   const deceasedId = payload.deceased_id;
   const person =
     (typeof deceasedId === "string" ? getPerson(deceasedId) : undefined) ??

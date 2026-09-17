@@ -88,6 +88,7 @@ export const EC_ACT_FORMS: ActFormSchema[] = [
         title: "Personne à enregistrer",
         fields: [
           { key: "defunt", label: "Identité de la personne", required: true },
+          { key: "type_deces", label: "Type de décès (Décès / Mort-né)", required: true },
           { key: "etat_matrimonial", label: "État matrimonial" },
           { key: "date_deces", label: "Date du décès", required: true },
           { key: "heure_deces", label: "Heure du décès" },
@@ -345,6 +346,7 @@ export const EC_ACT_FORMS: ActFormSchema[] = [
         title: "Personne à enregistrer",
         fields: [
           { key: "defunt", label: "Identité de la personne", required: true },
+          { key: "type_deces", label: "Type de décès (Décès / Mort-né)", required: true },
           { key: "date_deces", label: "Date du décès", required: true },
           { key: "cause", label: "Cause du décès", required: true },
           { key: "lieu_deces", label: "Lieu du décès", required: true },

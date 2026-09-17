@@ -1,6 +1,7 @@
 /** Agrégats tableau synoptique — toutes communes + détail quartiers. */
 
 import { actBelongsToOfficerCommune, communeKeyFromCode, getOfficerCommune, normalizeCommuneKey, type OfficerCommune } from "./commune";
+import { isMortNe } from "./deathType";
 import { listAllCommunesFlat, listQuartierNamesForCommune, type FlatCommune } from "./geoFallback";
 import {
   ageYears,
@@ -209,12 +210,7 @@ export function synopticDeaths(communeOverride?: OfficerCommune | FlatCommune | 
   let mortsNesF = 0;
 
   for (const act of acts) {
-    const blob = `${act.payload.cause_deces ?? ""} ${act.payload.note ?? ""}`.toLowerCase();
-    const isStillbirth =
-      blob.includes("mort-né") ||
-      blob.includes("mort ne") ||
-      blob.includes("mortné") ||
-      act.payload.mort_ne === true;
+    const isStillbirth = isMortNe(act.payload);
     const person = act.national_id ? getPersonByNic(act.national_id) : undefined;
     const sexe = String(act.payload.sexe ?? person?.sexe ?? "M").toUpperCase();
     const dob = String(act.payload.date_naissance ?? person?.date_naissance ?? "");
