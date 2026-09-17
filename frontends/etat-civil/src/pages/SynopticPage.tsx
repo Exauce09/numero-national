@@ -98,7 +98,16 @@ function QuartiersPanel({ commune }: { commune: CommuneSel }) {
         <table className="syn-official data-table">
           <thead>
             <tr>
-              <th>Quartier</th>
+              <th rowSpan={2}>Quartier</th>
+              <th colSpan={3}>NAISSANCES SANS PROCURATION (1)</th>
+              <th colSpan={3}>NAISSANCES AVEC PROCURATION (2)</th>
+              <th colSpan={3}>NAISSANCES PAR JUGEMENT SUPPLÉTIF (3)</th>
+              <th colSpan={3}>TOTAL</th>
+            </tr>
+            <tr>
+              <GftHeads />
+              <GftHeads />
+              <GftHeads />
               <GftHeads />
             </tr>
           </thead>
@@ -106,6 +115,9 @@ function QuartiersPanel({ commune }: { commune: CommuneSel }) {
             {q.rows.map((r) => (
               <tr key={r.quartier}>
                 <td>{r.quartier}</td>
+                <GftCells v={r.sans} />
+                <GftCells v={r.avec} />
+                <GftCells v={r.jugement} />
                 <td>{r.g}</td>
                 <td>{r.f}</td>
                 <td>{r.t}</td>
@@ -114,7 +126,9 @@ function QuartiersPanel({ commune }: { commune: CommuneSel }) {
           </tbody>
         </table>
       </div>
-      <p className="muted small">Total enregistrés rattachés aux quartiers : {q.total}</p>
+      <p className="muted small">
+        G = Garçons · F = Filles · T = Total — enregistrés rattachés aux quartiers : {q.total}
+      </p>
     </div>
   );
 }
