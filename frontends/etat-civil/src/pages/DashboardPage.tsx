@@ -10,6 +10,7 @@ import {
   IconClipboard,
   IconCross,
   IconFile,
+  IconHome,
   IconRing,
   IconSplit,
 } from "../components/Icons";
@@ -408,6 +409,14 @@ export default function DashboardPage() {
           icon={<IconCross size={22} />}
           color={RDC.red}
           href="/lists/deces"
+        />
+        <StatCard
+          title="Adoptions"
+          value={adoptions.length}
+          subtitle="Après jugement"
+          icon={<IconHome size={22} />}
+          color={RDC.blueMid}
+          href="/lists/adoption"
         />
         {variant === "agent" || variant === "auditeur" ? (
           <StatCard
