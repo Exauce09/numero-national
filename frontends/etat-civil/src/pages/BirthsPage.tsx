@@ -37,6 +37,7 @@ import {
   type Sexe,
 } from "../registry";
 import { getOfficerCommune } from "../commune";
+import { ISSUE_NAISSANCE_OPTIONS, type IssueNaissance } from "../deathType";
 import { listFacilityAccounts } from "../healthAuth";
 import { HOPITAUX_KEY, loadNamedList, rememberNamed } from "../namedLists";
 
@@ -115,6 +116,7 @@ export default function BirthsPage() {
   const [dateNaissance, setDateNaissance] = useState("");
   const [heureNaissance, setHeureNaissance] = useState("");
   const [naissanceMultiple, setNaissanceMultiple] = useState(false);
+  const [issueNaissance, setIssueNaissance] = useState<IssueNaissance>("NE_VIVANT");
   const [typeAccouchement, setTypeAccouchement] = useState("");
   const [etatMorphologique, setEtatMorphologique] = useState("");
   const [anneeRegistre, setAnneeRegistre] = useState(String(new Date().getFullYear()));
@@ -205,8 +207,10 @@ export default function BirthsPage() {
       setError("Avec procuration : indiquez le nom du mandataire.");
       return;
     }
+    const isMortNeIssue = issueNaissance === "MORT_NE";
     const needsJuge =
-      delaiEnregistrement === "HORS_DELAI" || modeEnregistrement === "jugement_suppletif";
+      !isMortNeIssue &&
+      (delaiEnregistrement === "HORS_DELAI" || modeEnregistrement === "jugement_suppletif");
     if (needsJuge && !refJugement.trim()) {
       setError(
         "Hors délai ou jugement supplétif : indiquez la référence du jugement (le juge intervient avant l'inscription).",
@@ -240,21 +244,23 @@ export default function BirthsPage() {
         mother_id: mother.id,
       };
 
-      const existingAct = findDuplicateBirthAct({
-        nom: identity.nom,
-        prenom: identity.prenom,
-        postnom: identity.postnom,
-        date_naissance: identity.date_naissance,
-        mother_id: mother.id,
-      });
-      if (existingAct) {
-        setError(
-          `Nouveau-né déjà enregistré — acte ${existingAct.act_number} (ID ${existingAct.payload.id_naissance ?? existingAct.national_id}). Doublon refusé.`,
-        );
-        setViewAct(existingAct);
-        setCreated(existingAct);
-        setSubmitting(false);
-        return;
+      if (!isMortNeIssue) {
+        const existingAct = findDuplicateBirthAct({
+          nom: identity.nom,
+          prenom: identity.prenom,
+          postnom: identity.postnom,
+          date_naissance: identity.date_naissance,
+          mother_id: mother.id,
+        });
+        if (existingAct) {
+          setError(
+            `Nouveau-né déjà enregistré — acte ${existingAct.act_number} (ID ${existingAct.payload.id_naissance ?? existingAct.national_id}). Doublon refusé.`,
+          );
+          setViewAct(existingAct);
+          setCreated(existingAct);
+          setSubmitting(false);
+          return;
+        }
       }
 
       const existingPerson = findDuplicatePerson(identity);
@@ -318,6 +324,50 @@ export default function BirthsPage() {
         ]
           .filter(Boolean)
           .join(", ");
+
+      if (isMortNeIssue) {
+        const deathPayload = {
+          deceased_id: child.id,
+          citizen_id: child.id,
+          deceased_name: displayName(child),
+          sexe: child.sexe,
+          date_naissance: child.date_naissance,
+          type_deces: "MORT_NE" as const,
+          type_deces_label: "Mort-né",
+          mort_ne: true,
+          issue_naissance: "MORT_NE",
+          cause_deces: "Mort-né à la naissance",
+          date_deces: dateNaissance,
+          heure_deces: heureNaissance || null,
+          lieu_deces: lieu,
+          geo_deces: geoPayload,
+          province_deces: geoNaissance.province_name || null,
+          ville_deces: geoNaissance.ville_name || null,
+          commune_deces: geoNaissance.commune_name || null,
+          commune_code: geoNaissance.commune_code || commune.code,
+          type_accouchement: typeAccouchement || null,
+          etat_morphologique: etatMorphologique || null,
+          naissance_multiple: naissanceMultiple,
+          hopital_naissance: hopitalResolved || null,
+          mother_id: mother.id,
+          mother_name: motherFull,
+          father_id: father?.id ?? null,
+          father_name: fatherFull,
+          declarant_id: effectiveDeclarant.id,
+          declarant_name: displayName(effectiveDeclarant),
+          declarant_qualite: qualiteDeclarant,
+          from_naissance_form: true,
+          note: "Mort-né déclaré via formulaire d'enregistrement de nouveau-né",
+          latitude: gpsLat,
+          longitude: gpsLng,
+          gps_captured_at: gpsLat != null ? new Date().toISOString() : null,
+          officer_name: officerDisplay,
+        };
+        const act = await addAct("DEATH", deathPayload, child.id);
+        const syncWarn = act.payload.sync_warning ? String(act.payload.sync_warning) : null;
+        if (syncWarn) setWarning(syncWarn);
+        setCreated(act);
+      } else {
       const payload = {
         child_id: child.id,
         nom: child.nom,
@@ -327,6 +377,7 @@ export default function BirthsPage() {
         date_naissance: child.date_naissance,
         heure_naissance: heureNaissance || null,
         naissance_multiple: naissanceMultiple,
+        issue_naissance: "NE_VIVANT",
         type_accouchement: typeAccouchement || null,
         etat_morphologique: etatMorphologique || null,
         annee_registre: anneeRegistre.trim() || null,
@@ -394,12 +445,15 @@ export default function BirthsPage() {
       const syncWarn = act.payload.sync_warning ? String(act.payload.sync_warning) : null;
       if (syncWarn) setWarning(syncWarn);
       setCreated(act);
+      }
+
       setNom("");
       setPostnom("");
       setPrenom("");
       setDateNaissance("");
       setHeureNaissance("");
       setNaissanceMultiple(false);
+      setIssueNaissance("NE_VIVANT");
       setTypeAccouchement("");
       setEtatMorphologique("");
       setAnneeRegistre(String(new Date().getFullYear()));
@@ -558,6 +612,24 @@ export default function BirthsPage() {
               value={heureNaissance}
               onChange={(e) => setHeureNaissance(e.target.value)}
             />
+          </div>
+          <div>
+            <label className="form-label">Issue à la naissance *</label>
+            <select
+              className="form-control"
+              value={issueNaissance}
+              onChange={(e) => setIssueNaissance(e.target.value as IssueNaissance)}
+              required
+            >
+              {ISSUE_NAISSANCE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <p className="muted small" style={{ margin: "0.25rem 0 0" }}>
+              Mort-né → enregistré au registre des décès (morts-nés), pas comme naissance vivante.
+            </p>
           </div>
           <div>
             <label className="form-label">Naissance multiple</label>
@@ -910,7 +982,10 @@ export default function BirthsPage() {
       {created ? (
         <div className="panel" style={{ marginTop: "1rem" }}>
           <div className="success-banner no-print">
-            Enregistrement de nouveau-né créé — ID naissance{" "}
+            {created.type === "DEATH"
+              ? "Mort-né enregistré (registre des décès)"
+              : "Enregistrement de nouveau-né créé"}{" "}
+            — ID{" "}
             {String(created.payload.id_naissance ?? created.act_number ?? created.national_id)}
           </div>
           <ActPrintCard act={created} />

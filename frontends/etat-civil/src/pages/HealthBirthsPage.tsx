@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import ActFormShell from "../components/ActFormShell";
 import { getActFormSchema } from "../ecActForms";
+import { ISSUE_NAISSANCE_OPTIONS, type IssueNaissance } from "../deathType";
 import { addPerson, displayName, findDuplicatePerson, generateBirthDossierId, listPersons } from "../registry";
 import { getHealthSession, findFacilityByUsername } from "../healthAuth";
 import { listFacilityDeclarations, notifyEtatCivil } from "../civilDeclarations";
@@ -17,6 +18,7 @@ type BirthCoupon = {
   mother_name: string;
   facility_name: string;
   declaration_id: string;
+  issue?: IssueNaissance;
 };
 
 const emptyParent = { nom: "", postnom: "", prenom: "", date_naissance: "" };
@@ -30,6 +32,7 @@ export default function HealthBirthsPage() {
   const [dateNaissance, setDateNaissance] = useState("");
   const [heureNaissance, setHeureNaissance] = useState("");
   const [naissanceMultiple, setNaissanceMultiple] = useState(false);
+  const [issueNaissance, setIssueNaissance] = useState<IssueNaissance>("NE_VIVANT");
   const [typeAccouchement, setTypeAccouchement] = useState("");
   const [etatMorphologique, setEtatMorphologique] = useState("");
   const [adresseMere, setAdresseMere] = useState("");
@@ -39,7 +42,12 @@ export default function HealthBirthsPage() {
   const [error, setError] = useState<string | null>(null);
   const [coupon, setCoupon] = useState<BirthCoupon | null>(null);
   const [, bump] = useState(0);
-  const rows = listFacilityDeclarations(session.facilityId).filter((d) => d.declaration_type === "BIRTH");
+  const rows = listFacilityDeclarations(session.facilityId).filter(
+    (d) =>
+      d.declaration_type === "BIRTH" ||
+      (d.declaration_type === "DEATH" &&
+        (d.payload.issue_naissance === "MORT_NE" || d.payload.mort_ne === true)),
+  );
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -120,23 +128,33 @@ export default function HealthBirthsPage() {
       const childNom = nom.trim();
       const childPostnom = postnom.trim() || motherPerson.postnom || fatherPerson?.postnom || "";
       const childPrenom = prenom.trim();
+      const isMortNeIssue = issueNaissance === "MORT_NE";
       const decl = await notifyEtatCivil({
-        type: "BIRTH",
+        type: isMortNeIssue ? "DEATH" : "BIRTH",
         facilityName: session.facilityName,
         payload: {
           facility_id: session.facilityId,
           facility_name: session.facilityName,
           commune_code: session.commune_code,
           commune_name: session.commune_name,
-          notification_type: "NAISSANCE",
+          notification_type: isMortNeIssue ? "DECES" : "NAISSANCE",
           id_naissance: idNaissance,
           child_nom: childNom,
           child_postnom: childPostnom,
           child_prenom: childPrenom,
+          deceased_name: isMortNeIssue
+            ? [childPrenom, childPostnom, childNom].filter(Boolean).join(" ")
+            : undefined,
           sexe,
           date_naissance: dateNaissance,
           heure_naissance: heureNaissance || null,
           naissance_multiple: naissanceMultiple,
+          issue_naissance: issueNaissance,
+          type_deces: isMortNeIssue ? "MORT_NE" : undefined,
+          type_deces_label: isMortNeIssue ? "Mort-né" : undefined,
+          mort_ne: isMortNeIssue,
+          cause_deces: isMortNeIssue ? "Mort-né à la naissance" : undefined,
+          date_deces: isMortNeIssue ? dateNaissance : undefined,
           type_accouchement: typeAccouchement || null,
           etat_morphologique: etatMorphologique || null,
           mother_id: motherPerson.id,
@@ -145,6 +163,7 @@ export default function HealthBirthsPage() {
           father_id: fatherPerson?.id ?? null,
           father_name: fatherPerson ? displayName(fatherPerson) : null,
           lieu_naissance: session.facilityName,
+          lieu_deces: isMortNeIssue ? session.facilityName : undefined,
           declarant_qualite: "MERE",
           declarant_name: displayName(motherPerson),
         },
@@ -159,15 +178,20 @@ export default function HealthBirthsPage() {
         mother_name: displayName(motherPerson),
         facility_name: session.facilityName,
         declaration_id: decl.id,
+        issue: issueNaissance,
       };
       setCoupon(birthCoupon);
       pushHealthNotification({
-        title: "Notification de naissance transmise",
-        body: `${childPrenom} ${childNom} — ID naissance ${idNaissance} (réf. ${decl.id.slice(0, 8)}).`,
-        href: "/sante/births",
+        title: isMortNeIssue
+          ? "Notification de mort-né transmise"
+          : "Notification de naissance transmise",
+        body: `${childPrenom} ${childNom} — ${isMortNeIssue ? "Mort-né" : `ID naissance ${idNaissance}`} (réf. ${decl.id.slice(0, 8)}).`,
+        href: isMortNeIssue ? "/sante/deaths" : "/sante/births",
       });
       setMessage(
-        `Notification transmise à l'état civil — ID naissance provisoire ${idNaissance} (réf. ${decl.id.slice(0, 8)}). L'officier établira l'acte officiel.`,
+        isMortNeIssue
+          ? `Mort-né transmis à l'état civil (réf. ${decl.id.slice(0, 8)}). Compté au registre des décès / morts-nés.`
+          : `Notification transmise à l'état civil — ID naissance provisoire ${idNaissance} (réf. ${decl.id.slice(0, 8)}). L'officier établira l'acte officiel.`,
       );
       setNom("");
       setPostnom("");
@@ -175,6 +199,7 @@ export default function HealthBirthsPage() {
       setDateNaissance("");
       setHeureNaissance("");
       setNaissanceMultiple(false);
+      setIssueNaissance("NE_VIVANT");
       setTypeAccouchement("");
       setEtatMorphologique("");
       setAdresseMere("");
@@ -259,6 +284,24 @@ export default function HealthBirthsPage() {
               value={heureNaissance}
               onChange={(e) => setHeureNaissance(e.target.value)}
             />
+          </div>
+          <div>
+            <label className="form-label">Issue à la naissance *</label>
+            <select
+              className="form-control"
+              value={issueNaissance}
+              onChange={(e) => setIssueNaissance(e.target.value as IssueNaissance)}
+              required
+            >
+              {ISSUE_NAISSANCE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <p className="muted small" style={{ margin: "0.25rem 0 0" }}>
+              Mort-né → notification de décès (morts-nés) vers l&apos;état civil.
+            </p>
           </div>
           <div>
             <label className="form-label">Naissance multiple</label>

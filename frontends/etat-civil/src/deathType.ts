@@ -7,7 +7,17 @@ export const TYPE_DECES_OPTIONS: Array<{ value: TypeDeces; label: string }> = [
   { value: "MORT_NE", label: "Mort-né" },
 ];
 
+/** Issue à la naissance (formulaire nouveau-né / maternité). */
+export type IssueNaissance = "NE_VIVANT" | "MORT_NE";
+
+export const ISSUE_NAISSANCE_OPTIONS: Array<{ value: IssueNaissance; label: string }> = [
+  { value: "NE_VIVANT", label: "Né vivant" },
+  { value: "MORT_NE", label: "Mort-né" },
+];
+
 export function isMortNe(payload: Record<string, unknown>): boolean {
+  const issue = String(payload.issue_naissance ?? "").toUpperCase().replace(/[-\s]/g, "_");
+  if (issue === "MORT_NE" || issue === "MORTNE") return true;
   const t = String(payload.type_deces ?? "").toUpperCase().replace(/[-\s]/g, "_");
   if (t === "MORT_NE" || t === "MORTNE") return true;
   if (t === "DECES" || t === "DECES_NORMAL" || t === "NORMAL") return false;

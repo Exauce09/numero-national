@@ -43,6 +43,7 @@ export const EC_ACT_FORMS: ActFormSchema[] = [
           { key: "sexe", label: "Sexe", required: true },
           { key: "date_naissance", label: "Date de naissance", required: true },
           { key: "heure_naissance", label: "Heure de naissance" },
+          { key: "issue_naissance", label: "Issue (né vivant / mort-né)", required: true },
           { key: "jumeaux", label: "Naissance multiple (jumeaux…)" },
           { key: "type_accouchement", label: "Type d'accouchement", required: true },
           {
@@ -314,6 +315,7 @@ export const EC_ACT_FORMS: ActFormSchema[] = [
           { key: "sexe", label: "Sexe", required: true },
           { key: "date_naissance", label: "Date de naissance", required: true },
           { key: "heure_naissance", label: "Heure de naissance" },
+          { key: "issue_naissance", label: "Issue (né vivant / mort-né)", required: true },
           { key: "jumeaux", label: "Naissance multiple (jumeaux…)" },
           { key: "type_accouchement", label: "Type d'accouchement", required: true },
           {
