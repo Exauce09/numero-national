@@ -428,6 +428,8 @@ function ProvincesOverviewTable({
     deces: r.deces,
     documents: r.documents,
     total: r.total,
+    villes: r.villes,
+    communes: r.communes,
   }));
 
   const sumG = rows.reduce((a, r) => a + r.naissances_g, 0);
@@ -455,6 +457,8 @@ function ProvincesOverviewTable({
               <th rowSpan={2}>DÉCÈS</th>
               <th rowSpan={2}>DOCUMENTS</th>
               <th rowSpan={2}>TOTAL</th>
+              <th rowSpan={2}>VILLES</th>
+              <th rowSpan={2}>COMMUNES</th>
             </tr>
             <tr>
               <GftHeads />
@@ -479,6 +483,8 @@ function ProvincesOverviewTable({
                 <td>
                   <strong>{r.total}</strong>
                 </td>
+                <td>{r.villes}</td>
+                <td>{r.communes}</td>
               </tr>
             ))}
             <tr>
@@ -508,6 +514,12 @@ function ProvincesOverviewTable({
               </td>
               <td>
                 <strong>{rows.reduce((a, r) => a + r.total, 0)}</strong>
+              </td>
+              <td>
+                <strong>{rows.reduce((a, r) => a + r.villes, 0)}</strong>
+              </td>
+              <td>
+                <strong>{rows.reduce((a, r) => a + r.communes, 0)}</strong>
               </td>
             </tr>
           </tbody>
