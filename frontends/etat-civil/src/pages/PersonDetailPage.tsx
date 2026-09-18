@@ -158,7 +158,6 @@ export default function PersonDetailPage() {
       ? displayName(local)
       : "Personne";
 
-  const nic = citizen?.nic || local?.nic || "—";
   const deceased = Boolean(citizen?.deceased_at);
 
   return (
@@ -170,8 +169,6 @@ export default function PersonDetailPage() {
         <div>
           <h2 className="page-title">{title}</h2>
           <p className="page-lead">
-            Numéro : <code>{nic}</code>
-            {" · "}
             Statut :{" "}
             <span className="status-badge">
               {statusBadge(citizen?.status || local?.etat_civil || "LOCAL", deceased)}
@@ -266,12 +263,6 @@ export default function PersonDetailPage() {
                 <div>
                   <dt>Nationalité</dt>
                   <dd>{citizen?.nationality || local?.nationalite || "—"}</dd>
-                </div>
-                <div>
-                  <dt>NIC</dt>
-                  <dd>
-                    <code>{nic}</code>
-                  </dd>
                 </div>
               </dl>
             ) : null}

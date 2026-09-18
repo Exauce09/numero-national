@@ -74,7 +74,7 @@ export default function RecognitionsPage() {
               className="form-control"
               value={acteNaissanceRef}
               onChange={(e) => setActeNaissanceRef(e.target.value)}
-              placeholder="N° acte / ID naissance"
+              placeholder="N° acte"
             />
           </div>
           <div className="full">

@@ -199,10 +199,7 @@ export default function BirthCertificatePrint({
   const fatherNat =
     fatherSnap?.nationalite === "ETRANGER" ? "étranger" : fatherSnap?.nationalite ? "congolais" : "congolais";
   const created = parseDateParts(act.created_at);
-  const nic =
-    (act.national_id || "").replace(/\D/g, "") ||
-    (p(act, "nic", "national_id") || "").replace(/\D/g, "") ||
-    "——————————————";
+  const acteNo = act.act_number || p(act, "act_number") || "……";
   const code =
     verificationCode ||
     (typeof act.payload?.verification_code === "string" ? act.payload.verification_code : "") ||
@@ -223,7 +220,7 @@ export default function BirthCertificatePrint({
     try {
       qrValue = JSON.stringify(JSON.parse(act.qr_payload));
     } catch {
-      qrValue = JSON.stringify({ act: act.act_number, nic: act.national_id, type: act.type });
+      qrValue = JSON.stringify({ act: act.act_number, type: act.type });
     }
   }
 
@@ -246,7 +243,7 @@ export default function BirthCertificatePrint({
           <p>Bureau Principal de l&apos;État civil de <u>{bureau}</u></p>
           <p>Bureau secondaire de l&apos;État civil de <u>……</u></p>
           <p>
-            Acte n° <strong>{nic}</strong> &nbsp; Volume <u>{volume}</u> &nbsp; Folio n° <u>{folio}</u>
+            Acte n° <strong>{acteNo}</strong> &nbsp; Volume <u>{volume}</u> &nbsp; Folio n° <u>{folio}</u>
           </p>
           <p className="birth-acte-ref">
             N° registre {act.act_number} · Contrôle {code}

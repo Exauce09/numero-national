@@ -291,7 +291,7 @@ export async function pushCensusToOnip(input: {
       citizenId: citizen.id,
       nic: registryNic ?? undefined,
       message: registryNic
-        ? `Dossier envoyé à SIGPOP-RDC — NIC ${registryNic}. Sur SIGPOP-RDC → Cartes, recherchez « ${input.person.nom} ${input.person.prenom} ».`
+        ? `Dossier envoyé à SIGPOP-RDC. Sur SIGPOP-RDC → Cartes, recherchez « ${input.person.nom} ${input.person.prenom} ».`
         : `Citoyen créé dans le registre (brouillon). Sur SIGPOP-RDC → Cartes, recherchez « ${input.person.nom} » puis validez/générez la carte.`,
     };
   } catch (err) {

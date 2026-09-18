@@ -38,7 +38,7 @@ export default function SearchPage() {
       } else if (!rows.length && !draftRows.length) {
         setHint("Aucun résultat (personnes ni brouillons) pour cette recherche.");
       } else if (rows.length >= 100) {
-        setHint("Affichage des 100 premiers résultats — affinez la recherche (nom + prénom ou NIC).");
+        setHint("Affichage des 100 premiers résultats — affinez la recherche (nom + prénom).");
       }
     } finally {
       setBusy(false);
@@ -61,7 +61,6 @@ export default function SearchPage() {
   const rows = hits.map((p) => {
     const origin = personOrigin(p);
     return {
-      nic: p.nic,
       nom: p.nom,
       postnom: p.postnom,
       prenom: p.prenom,
@@ -79,7 +78,7 @@ export default function SearchPage() {
     <div>
       <h2 className="page-title">Recherche</h2>
       <p className="page-lead">
-        Registre national, fiches locales et brouillons partagés (APK / commune) : NIC, nom, titre, local_id…
+        Registre national, fiches locales et brouillons partagés (APK / commune) : nom, titre…
         {hasApi ? " · Connecté à l’API." : " · Sans jeton API : résultats locaux seulement."}
       </p>
       <div className="panel">
@@ -90,7 +89,7 @@ export default function SearchPage() {
               className="form-control"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Ex. Azerty — NIC — ou titre de brouillon"
+              placeholder="Ex. Azerty — nom ou titre de brouillon"
             />
           </div>
           <button className="btn-primary" style={{ width: "auto", minWidth: 140 }} type="submit" disabled={busy}>
@@ -105,7 +104,6 @@ export default function SearchPage() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>NIC</th>
               <th>Nom</th>
               <th>Postnom</th>
               <th>Prénom</th>
@@ -121,9 +119,6 @@ export default function SearchPage() {
               const origin = personOrigin(p);
               return (
                 <tr key={p.id}>
-                  <td>
-                    <code>{p.nic}</code>
-                  </td>
                   <td>{p.nom}</td>
                   <td>{p.postnom}</td>
                   <td>{p.prenom}</td>
@@ -149,7 +144,7 @@ export default function SearchPage() {
             })}
             {!hits.length ? (
               <tr>
-                <td colSpan={9} className="muted">
+                <td colSpan={8} className="muted">
                   Aucune personne trouvée.
                 </td>
               </tr>

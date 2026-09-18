@@ -185,13 +185,13 @@ export default function HealthBirthsPage() {
         title: isMortNeIssue
           ? "Notification de mort-né transmise"
           : "Notification de naissance transmise",
-        body: `${childPrenom} ${childNom} — ${isMortNeIssue ? "Mort-né" : `ID naissance ${idNaissance}`} (réf. ${decl.id.slice(0, 8)}).`,
+        body: `${childPrenom} ${childNom} — ${isMortNeIssue ? "Mort-né" : "Nouveau-né"} (réf. ${decl.id.slice(0, 8)}).`,
         href: isMortNeIssue ? "/sante/deaths" : "/sante/births",
       });
       setMessage(
         isMortNeIssue
           ? `Mort-né transmis à l'état civil (réf. ${decl.id.slice(0, 8)}). Compté au registre des décès / morts-nés.`
-          : `Notification transmise à l'état civil — ID naissance provisoire ${idNaissance} (réf. ${decl.id.slice(0, 8)}). L'officier établira l'acte officiel.`,
+          : `Notification transmise à l'état civil (réf. ${decl.id.slice(0, 8)}). L'officier établira l'acte officiel.`,
       );
       setNom("");
       setPostnom("");
@@ -448,7 +448,7 @@ export default function HealthBirthsPage() {
 
       {coupon ? (
         <div className="panel print-area" style={{ marginTop: "1rem" }}>
-          <div className="success-banner">Accusé de notification — ID naissance {coupon.id_naissance}</div>
+          <div className="success-banner">Accusé de notification transmis</div>
           <div className="act-print-card" style={{ marginTop: "0.75rem" }}>
             <div className="act-print-header">
               <img src="/logo-rdc.jpg" alt="RDC" />
@@ -461,8 +461,8 @@ export default function HealthBirthsPage() {
             <div className="act-print-body">
               <div className="act-print-meta">
                 <div>
-                  <span className="muted">ID naissance</span>
-                  <strong>{coupon.id_naissance}</strong>
+                  <span className="muted">Réf. notification</span>
+                  <strong>{(coupon.declaration_id || coupon.id_naissance).slice(0, 8)}</strong>
                 </div>
                 <div>
                   <span className="muted">Enfant</span>

@@ -497,7 +497,7 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
             <a
               className="btn-primary"
               style={{ width: "auto", textDecoration: "none" }}
-              href={`/search?q=${encodeURIComponent(String(current.national_id || current.payload?.nom || ""))}`}
+              href={`/search?q=${encodeURIComponent(String(current.payload?.nom || current.act_number || ""))}`}
             >
               Rechercher l&apos;acte / personne
             </a>
@@ -511,8 +511,8 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
           </div>
           <ol className="muted small" style={{ margin: "0.5rem 0 0", paddingLeft: "1.2rem", lineHeight: 1.55 }}>
             <li>
-              <strong>État civil</strong> : recherchez par ID naissance{" "}
-              <code>{current.national_id || "—"}</code> dans le registre des actes du bureau.
+              <strong>État civil</strong> : recherchez par n° d&apos;acte{" "}
+              <code>{current.act_number || "—"}</code> dans le registre des actes du bureau.
             </li>
             <li>
               Population, recensement et cartes restent sur SIGPOP (

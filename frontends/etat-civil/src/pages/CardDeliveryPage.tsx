@@ -106,7 +106,6 @@ export default function CardDeliveryPage() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>NIC</th>
               <th>Titulaire</th>
               <th>N° carte</th>
               <th>Adresse</th>
@@ -117,9 +116,6 @@ export default function CardDeliveryPage() {
           <tbody>
             {items.map((c) => (
               <tr key={c.card_id}>
-                <td>
-                  <code>{c.holder?.nic || "—"}</code>
-                </td>
                 <td>
                   {[c.holder?.family_name, c.holder?.given_names].filter(Boolean).join(" ") || "—"}
                 </td>

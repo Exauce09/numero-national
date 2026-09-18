@@ -95,7 +95,7 @@ export default function DocumentsPage() {
               value={refActe}
               onChange={(e) => setRefActe(e.target.value)}
               required
-              placeholder="N° d'acte / ID naissance…"
+              placeholder="N° d'acte…"
             />
           </div>
           <div className="full">

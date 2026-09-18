@@ -98,7 +98,7 @@ export const MANAGE_CONFIGS: Record<string, ManageConfig> = {
     justiciaFile: "manage-deplacement.php",
     actType: "DISPLACEMENT",
     createPath: "/displacements",
-    searchHint: "Rechercher (n° acte, NIC, destination)…",
+    searchHint: "Rechercher (n° acte, destination)…",
     summaryFields: [
       { key: "person_name", label: "Personne" },
       { key: "lieu_a_aller", label: "Destination" },
@@ -153,14 +153,13 @@ export const MANAGE_CONFIGS: Record<string, ManageConfig> = {
     justiciaFile: "manage-naissance.php",
     actType: "BIRTH",
     createPath: "/births",
-    searchHint: "Rechercher (n° acte, ID naissance, nom)…",
+    searchHint: "Rechercher (n° acte, nom)…",
     summaryFields: [
       { key: "nom", label: "Nom" },
       { key: "prenom", label: "Prénom" },
       { key: "sexe", label: "Sexe" },
       { key: "date_naissance", label: "Date" },
       { key: "lieu_naissance", label: "Lieu" },
-      { key: "id_naissance", label: "ID naissance" },
       { key: "mode", label: "Mode" },
     ],
   },
@@ -191,7 +190,7 @@ function subjectLabel(act: Act, cfg: ManageConfig): string {
     const v = cell(act, f.key);
     if (v !== "—") return v;
   }
-  return act.national_id || act.act_number;
+  return act.act_number;
 }
 
 function monthKey(iso: string): string {
@@ -315,7 +314,6 @@ export default function ManageActsPage({
   const exportRows = rows.map((a) => {
     const base: Record<string, string> = {
       act_number: a.act_number,
-      national_id: a.national_id,
       status: a.status ?? "",
       created_at: a.created_at,
     };
@@ -417,7 +415,6 @@ export default function ManageActsPage({
                 <th>#</th>
                 <th>Photo</th>
                 <th>N° acte</th>
-                <th>ID naissance</th>
                 {primary ? <th>{primary.label}</th> : null}
                 {secondary ? <th>{secondary.label}</th> : null}
                 {tertiary ? <th>{tertiary.label}</th> : null}
@@ -429,7 +426,7 @@ export default function ManageActsPage({
             <tbody>
               {pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="muted">
+                  <td colSpan={9} className="muted">
                     Aucun enregistrement. Cliquez « + Ajouter » pour créer.
                   </td>
                 </tr>
@@ -450,9 +447,6 @@ export default function ManageActsPage({
                         )}
                       </td>
                       <td>{a.act_number}</td>
-                      <td>
-                        <code>{a.national_id || "—"}</code>
-                      </td>
                       {primary ? <td>{cell(a, primary.key)}</td> : null}
                       {secondary ? <td>{cell(a, secondary.key)}</td> : null}
                       {tertiary ? <td>{cell(a, tertiary.key)}</td> : null}

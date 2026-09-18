@@ -237,7 +237,7 @@ export default function ActQrScanPage() {
       <h2 className="page-title">Scanner QR code d&apos;acte</h2>
       <p className="page-lead">
         Cliquez sur <strong>Démarrer la caméra</strong>, autorisez l&apos;accès, puis présentez le QR imprimé
-        sur l&apos;acte. Vous pouvez aussi coller le JSON, le N° d&apos;acte ou le NIC.
+        sur l&apos;acte. Vous pouvez aussi coller le JSON ou le N° d&apos;acte.
       </p>
 
       <div className="panel">
@@ -293,7 +293,7 @@ export default function ActQrScanPage() {
 
         <form className="toolbar" style={{ marginTop: "1rem" }} onSubmit={onSubmit}>
           <div style={{ flex: 1, minWidth: 220 }}>
-            <label className="form-label">Contenu QR, N° d&apos;acte ou NIC</label>
+            <label className="form-label">Contenu QR ou N° d&apos;acte</label>
             <textarea
               className="form-control"
               rows={3}

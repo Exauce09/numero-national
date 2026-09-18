@@ -667,12 +667,12 @@ export function addPerson(input: PersonInput & { id?: string }): Person {
   });
   if (dup) {
     throw new Error(
-      `Personne déjà enregistrée : ${displayName(dup)} (NIC ${dup.nic}). Utilisez la fiche existante.`,
+      `Personne déjà enregistrée : ${displayName(dup)}. Utilisez la fiche existante.`,
     );
   }
   const nic = input.nic ?? generateNic();
   if (registry.persons.some((p) => p.nic === nic)) {
-    throw new Error(`NIC déjà attribué : ${nic}`);
+    throw new Error(`Identifiant déjà attribué`);
   }
   const person: Person = {
     ...input,

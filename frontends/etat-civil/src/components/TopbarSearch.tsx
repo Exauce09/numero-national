@@ -53,9 +53,9 @@ export default function TopbarSearch() {
   }
 
   function selectPerson(p: Person) {
-    setQ(p.nic);
+    setQ(displayName(p));
     setOpen(false);
-    navigate(`/search?q=${encodeURIComponent(p.nic || displayName(p))}`);
+    navigate(`/search?q=${encodeURIComponent(displayName(p))}`);
   }
 
   function selectDraft(d: DraftSearchHit) {
@@ -79,7 +79,7 @@ export default function TopbarSearch() {
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder="Recherche (nom, NIC, acte…)"
+          placeholder="Recherche (nom, acte…)"
           aria-label="Recherche actes et personnes"
           autoComplete="off"
         />
@@ -102,7 +102,7 @@ export default function TopbarSearch() {
                   >
                     <strong>{displayName(p)}</strong>
                     <span>
-                      {p.nic} · {p.date_naissance || "—"}
+                      {p.date_naissance || "—"}
                       {loc.ville || loc.province
                         ? ` · ${[loc.ville, loc.province].filter(Boolean).join(", ")}`
                         : ""}

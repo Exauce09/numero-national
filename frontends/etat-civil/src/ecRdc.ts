@@ -60,7 +60,7 @@ export const EC_RDC_MISSIONS: EcMission[] = [
     id: "naissance",
     title: "Enregistrement de nouveau-né",
     summary:
-      "Canal maternité ou bureau EC. ID naissance (pas de N° national). Adresse de la mère + originaire (province → territoire → secteur → village). Dans le délai ≤ 90 j. ; hors délai → jugement supplétif.",
+      "Canal maternité ou bureau EC. Adresse de la mère + originaire (province → territoire → secteur → village). Dans le délai ≤ 90 j. ; hors délai → jugement supplétif.",
     href: "/births",
     legalNote: "Deux canaux : structure sanitaire puis validation officier, ou saisie directe au bureau.",
   },
@@ -222,7 +222,7 @@ export const EC_PROCEDURE_NAISSANCE = [
     step: 4,
     title: "Validation par l'officier",
     detail:
-      "L'officier vérifie, valide l'acte, attribue N° d'acte + ID naissance. L'acte entre au registre des nouveau-nés.",
+      "L'officier vérifie, valide l'acte, attribue N° d'acte. L'acte entre au registre des nouveau-nés.",
     href: "/declarations",
   },
   {

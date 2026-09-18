@@ -149,16 +149,12 @@ export default function ActPrintCard({
           </div>
           <div>
             <span className="muted">
-              {act.type === "BIRTH"
-                ? "ID naissance"
-                : act.type === "DEATH"
-                  ? "Personne"
-                  : "Référence"}
+              {act.type === "DEATH" ? "Personne" : "Référence"}
             </span>
             <strong>
               {act.type === "DEATH"
-                ? String(act.payload.deceased_name ?? act.national_id ?? "—")
-                : act.national_id}
+                ? String(act.payload.deceased_name ?? "—")
+                : act.act_number}
             </strong>
           </div>
           <div>

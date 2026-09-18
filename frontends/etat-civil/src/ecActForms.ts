@@ -30,7 +30,7 @@ export const EC_ACT_FORMS: ActFormSchema[] = [
     id: "naissance",
     title: "Enregistrement de nouveau-né",
     subtitle:
-      "Inscription au registre. ID naissance (pas de numéro national). Délai ≤ 90 jours ou jugement supplétif.",
+      "Inscription au registre. Délai ≤ 90 jours ou jugement supplétif.",
     href: "/births",
     sections: [
       {

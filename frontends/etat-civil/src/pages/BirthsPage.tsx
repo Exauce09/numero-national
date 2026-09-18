@@ -254,7 +254,7 @@ export default function BirthsPage() {
         });
         if (existingAct) {
           setError(
-            `Nouveau-né déjà enregistré — acte ${existingAct.act_number} (ID ${existingAct.payload.id_naissance ?? existingAct.national_id}). Doublon refusé.`,
+            `Nouveau-né déjà enregistré — acte ${existingAct.act_number}. Doublon refusé.`,
           );
           setViewAct(existingAct);
           setCreated(existingAct);
@@ -266,7 +266,7 @@ export default function BirthsPage() {
       const existingPerson = findDuplicatePerson(identity);
       if (existingPerson) {
         setError(
-          `Enfant déjà au registre : ${existingPerson.nom} ${existingPerson.prenom} (ID ${existingPerson.nic}). Doublon refusé.`,
+          `Enfant déjà au registre : ${existingPerson.nom} ${existingPerson.prenom}. Doublon refusé.`,
         );
         setSubmitting(false);
         return;
@@ -985,8 +985,7 @@ export default function BirthsPage() {
             {created.type === "DEATH"
               ? "Mort-né enregistré (registre des décès)"
               : "Enregistrement de nouveau-né créé"}{" "}
-            — ID{" "}
-            {String(created.payload.id_naissance ?? created.act_number ?? created.national_id)}
+            — n° {created.act_number}
           </div>
           <ActPrintCard act={created} />
           <ActPrintActions label="Imprimer l'acte de naissance" />
@@ -1002,7 +1001,6 @@ export default function BirthsPage() {
           <thead>
             <tr>
               <th>N° acte</th>
-              <th>ID naissance</th>
               <th>Nom</th>
               <th>Sexe</th>
               <th>Date</th>
@@ -1015,9 +1013,6 @@ export default function BirthsPage() {
             {acts.map((a) => (
               <tr key={a.id}>
                 <td>{a.act_number}</td>
-                <td>
-                  {String(a.payload.id_naissance ?? a.payload.code_dossier ?? a.national_id ?? "—")}
-                </td>
                 <td>
                   {String(a.payload.nom ?? "")} {String(a.payload.prenom ?? "")}
                 </td>

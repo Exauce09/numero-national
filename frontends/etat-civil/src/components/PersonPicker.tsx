@@ -110,7 +110,7 @@ export default function PersonPicker({
   nicSearchHint = false,
   excludeDeceased = true,
   minAge,
-  hideNic = false,
+  hideNic = true,
 }: Props) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -262,14 +262,14 @@ export default function PersonPicker({
               hideNic
                 ? "Recherche (nom, post-nom, prénom)…"
                 : nicSearchHint
-                  ? "N° d'état civil (NIC) ou nom de l'officier…"
+                  ? "Nom de l'officier ou personne…"
                   : originGeoFilter
-                    ? "Sélection intelligente : nom, NIC, province, ville, territoire, secteur, village…"
+                    ? "Sélection intelligente : nom, province, ville, territoire, secteur, village…"
                     : sexFilter === "F"
-                      ? "Recherche mère (sexe féminin) — nom, NIC…"
+                      ? "Recherche mère (sexe féminin) — nom…"
                       : sexFilter === "M"
-                        ? "Recherche père (sexe masculin) — nom, NIC…"
-                        : "Recherche nationale (nom, post-nom, prénom, NIC)…"
+                        ? "Recherche père (sexe masculin) — nom…"
+                        : "Recherche nationale (nom, post-nom, prénom)…"
             }
             value={query}
             onChange={(e) => {
@@ -318,7 +318,6 @@ export default function PersonPicker({
                     <strong>{displayName(p)}</strong>
                     <span className="muted small">
                       {[
-                        hideNic ? null : p.nic,
                         p.sexe,
                         p.date_naissance,
                         o.province,

@@ -182,7 +182,10 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
   const exportRows = acts.map((a) => ({
     act_number: a.act_number,
     type: a.type,
-    national_id: a.national_id,
+    act_number: a.act_number,
+    type: a.type,
+    status: a.status ?? "",
+    created_at: a.created_at,
     created_at: a.created_at,
   }));
 
@@ -281,7 +284,6 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
                 <th>Photo</th>
                 <th>N° acte</th>
                 <th>Type</th>
-                <th>ID naissance</th>
                 <th>Statut</th>
                 <th>Enregistré le</th>
                 <th>Action</th>
@@ -290,7 +292,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
             <tbody>
               {pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="muted">
+                  <td colSpan={7} className="muted">
                     Aucun acte.
                   </td>
                 </tr>
@@ -311,9 +313,6 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
                       </td>
                       <td>{a.act_number}</td>
                       <td>{actTypeLabel(a.type)}</td>
-                      <td>
-                        <code>{a.national_id || "—"}</code>
-                      </td>
                       <td>{displayActStatus(a)}</td>
                       <td>{new Date(a.created_at).toLocaleString("fr-CD")}</td>
                       <td className="table-actions">

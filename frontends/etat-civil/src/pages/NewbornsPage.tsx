@@ -33,7 +33,6 @@ export default function NewbornsPage() {
 
   const exportRows = newborns.map((a) => ({
     act_number: a.act_number,
-    nic: a.national_id,
     nom: String(a.payload.nom ?? ""),
     prenom: String(a.payload.prenom ?? ""),
     sexe: String(a.payload.sexe ?? ""),
@@ -83,7 +82,7 @@ export default function NewbornsPage() {
             <input
               className="form-control"
               style={{ marginBottom: 0, minWidth: 200 }}
-              placeholder="Rechercher (nom, NIC, n° acte)…"
+              placeholder="Rechercher (nom, n° acte)…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
@@ -106,7 +105,6 @@ export default function NewbornsPage() {
             <thead>
               <tr>
                 <th>N° acte</th>
-                <th>NIC</th>
                 <th>Enfant</th>
                 <th>Sexe</th>
                 <th>Date naissance</th>
@@ -117,7 +115,7 @@ export default function NewbornsPage() {
             <tbody>
               {newborns.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="muted">
+                  <td colSpan={6} className="muted">
                     Aucun nouveau-né sur la période.
                   </td>
                 </tr>
@@ -125,9 +123,6 @@ export default function NewbornsPage() {
                 newborns.map((a) => (
                   <tr key={a.id}>
                     <td>{a.act_number}</td>
-                    <td>
-                      <code>{a.national_id}</code>
-                    </td>
                     <td>
                       {String(a.payload.nom ?? "")} {String(a.payload.postnom ?? "")}{" "}
                       {String(a.payload.prenom ?? "")}

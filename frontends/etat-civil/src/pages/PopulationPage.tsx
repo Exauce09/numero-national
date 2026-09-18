@@ -7,7 +7,7 @@ import DataToolbar from "../components/DataToolbar";
 import { PopulationStatBlocks } from "../components/StatBlocks";
 import { api, type CitizenListItem } from "../api";
 import { ensureAccessToken, getSession } from "../auth";
-import { displayNic, splitFamilyName, splitGivenNames } from "../nationalSearch";
+import { splitFamilyName, splitGivenNames } from "../nationalSearch";
 import { RDC, rdcColor } from "../rdcColors";
 import {
   ETAT_CIVIL_OPTIONS,
@@ -246,7 +246,6 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
   const pageRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const exportRows = rows.map((p) => ({
-    nic: p.nic,
     nom_complet: displayName(p),
     sexe: p.sexe,
     nationalite: personNationalite(p),
@@ -308,13 +307,12 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
               <>Données biométriques et statut civil de chaque personne du registre.</>
             ) : view === "recenses" ? (
               <>
-                Personnes recensées (NIC actif national ou acte local). Total registre : {total}.
+                Personnes recensées (registre national ou acte local). Total registre : {total}.
               </>
             ) : source === "api" ? (
               <>
                 Registre national — <strong>{total}</strong> fiche(s) au total. Affichage {PAGE_SIZE}{" "}
-                par page ({rows.length} après filtres) — pagination en bas. Les NIC officiels ont 14
-                chiffres.
+                par page ({rows.length} après filtres) — pagination en bas.
               </>
             ) : (
               <>
@@ -403,7 +401,7 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
               id="pop-search"
               className="form-control"
               style={{ marginBottom: 0, minWidth: 200 }}
-              placeholder="NIC, nom, prénom…"
+              placeholder="Nom, post-nom, prénom…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
@@ -460,7 +458,6 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
             <thead>
               <tr>
                 <th>#</th>
-                <th>N°</th>
                 <th>Nom</th>
                 <th>Postnom</th>
                 <th>Prénom</th>
@@ -474,7 +471,7 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
             <tbody>
               {pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={view === "identification" || view === "recenses" ? 9 : 8} className="muted">
+                  <td colSpan={view === "identification" || view === "recenses" ? 8 : 7} className="muted">
                     {busy ? "Chargement…" : "Aucune personne trouvée."}
                   </td>
                 </tr>
@@ -482,14 +479,6 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                 pageRows.map((p, i) => (
                   <tr key={p.id}>
                     <td>{(safePage - 1) * PAGE_SIZE + i + 1}</td>
-                    <td>
-                      <code title={p.registryStatus || ""}>
-                        {displayNic(p.nic, p.registryStatus)}
-                      </code>
-                      {(p.registryStatus || "").toUpperCase() === "DRAFT" ? (
-                        <div className="muted small">Brouillon</div>
-                      ) : null}
-                    </td>
                     <td>{p.nom}</td>
                     <td>{p.postnom || "—"}</td>
                     <td>{p.prenom}</td>

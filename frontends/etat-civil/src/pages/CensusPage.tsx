@@ -1862,7 +1862,7 @@ export default function CensusPage() {
 
       {created ? (
         <div className="panel" style={{ marginTop: "1rem" }}>
-          <div className="success-banner">Fiche de recensement créée — NIC {created.national_id}</div>
+          <div className="success-banner">Fiche de recensement créée</div>
           {createdWasMarried ? (
             <div
               style={{
