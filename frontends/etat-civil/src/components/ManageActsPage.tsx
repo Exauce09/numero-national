@@ -9,8 +9,10 @@ import { SimpleStatBlocks } from "./StatBlocks";
 import { api } from "../api";
 import { getSession } from "../auth";
 import {
+  ACT_REF_LABEL,
   getAct,
   getPersonByNic,
+  isActCountedInTotals,
   listActs,
   upsertActsFromApi,
   type Act,
@@ -209,6 +211,7 @@ export default function ManageActsPage({
   const navigate = useNavigate();
   const session = getSession();
   const [q, setQ] = useState("");
+  const [monthFilter, setMonthFilter] = useState("");
   const [page, setPage] = useState(1);
   const [viewAct, setViewAct] = useState<Act | null>(null);
   const [tick, setTick] = useState(0);
@@ -236,10 +239,21 @@ export default function ManageActsPage({
   }, [refresh]);
 
   const all = useMemo(() => listActs(config.actType), [config.actType, tick]);
+  const counted = useMemo(() => all.filter(isActCountedInTotals), [all]);
+
+  const monthOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const a of all) {
+      const k = monthKey(a.created_at);
+      if (k !== "—") set.add(k);
+    }
+    return [...set].sort((a, b) => b.localeCompare(a));
+  }, [all]);
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return all.filter((act) => {
+      if (monthFilter && monthKey(act.created_at) !== monthFilter) return false;
       if (!needle) return true;
       const parts = [
         act.act_number,
@@ -249,29 +263,46 @@ export default function ManageActsPage({
       ];
       return parts.join(" ").toLowerCase().includes(needle);
     });
-  }, [all, config.summaryFields, q]);
+  }, [all, config.summaryFields, q, monthFilter]);
 
   useEffect(() => {
     setPage(1);
-  }, [q, config.slug]);
+  }, [q, monthFilter, config.slug]);
 
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
   const pageRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  const countedFiltered = useMemo(
+    () =>
+      counted.filter((a) => {
+        if (monthFilter && monthKey(a.created_at) !== monthFilter) return false;
+        const needle = q.trim().toLowerCase();
+        if (!needle) return true;
+        const parts = [
+          a.act_number,
+          a.national_id,
+          a.status ?? "",
+          ...config.summaryFields.map((f) => String(a.payload[f.key] ?? "")),
+        ];
+        return parts.join(" ").toLowerCase().includes(needle);
+      }),
+    [counted, monthFilter, q, config.summaryFields],
+  );
+
   const last30 = useMemo(() => {
     const cut = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    return all.filter((a) => new Date(a.created_at).getTime() >= cut).length;
-  }, [all]);
+    return counted.filter((a) => new Date(a.created_at).getTime() >= cut).length;
+  }, [counted]);
 
   const last90 = useMemo(() => {
     const cut = Date.now() - 90 * 24 * 60 * 60 * 1000;
-    return all.filter((a) => new Date(a.created_at).getTime() >= cut).length;
-  }, [all]);
+    return counted.filter((a) => new Date(a.created_at).getTime() >= cut).length;
+  }, [counted]);
 
   const monthBars = useMemo(() => {
     const map = new Map<string, number>();
-    for (const a of all) {
+    for (const a of counted) {
       const k = monthKey(a.created_at);
       map.set(k, (map.get(k) ?? 0) + 1);
     }
@@ -283,7 +314,7 @@ export default function ManageActsPage({
         value,
         color: COLORS[i % COLORS.length],
       }));
-  }, [all]);
+  }, [counted]);
 
   const breakdownField = config.summaryFields.find((f) =>
     ["sexe", "cause_deces", "cause", "type_document", "regime_matrimonial", "motif"].includes(f.key),
@@ -292,12 +323,12 @@ export default function ManageActsPage({
   const pieBreakdown = useMemo(() => {
     if (!breakdownField) {
       return [
-        { label: "Total", value: all.length, color: COLORS[0] },
+        { label: "Total", value: counted.length, color: COLORS[0] },
         { label: "30 j", value: last30, color: COLORS[1] },
       ];
     }
     const map = new Map<string, number>();
-    for (const a of all) {
+    for (const a of counted) {
       const k = cell(a, breakdownField.key);
       map.set(k, (map.get(k) ?? 0) + 1);
     }
@@ -309,7 +340,7 @@ export default function ManageActsPage({
         value,
         color: COLORS[i % COLORS.length],
       }));
-  }, [all, breakdownField, last30]);
+  }, [counted, breakdownField, last30]);
 
   const exportRows = rows.map((a) => {
     const base: Record<string, string> = {
@@ -363,10 +394,10 @@ export default function ManageActsPage({
           <SimpleStatBlocks
             title={config.listTitle}
             items={[
-              { label: "TOTAL", value: all.length, color: rdcColor(0) },
+              { label: "TOTAL", value: counted.length, color: rdcColor(0) },
               { label: "30 DERNIERS JOURS", value: last30, color: rdcColor(1) },
               { label: "90 DERNIERS JOURS", value: last90, color: rdcColor(2) },
-              { label: "FILTRÉS", value: rows.length, color: rdcColor(3) },
+              { label: "FILTRÉS", value: countedFiltered.length, color: rdcColor(3) },
             ]}
           />
 
@@ -401,6 +432,20 @@ export default function ManageActsPage({
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
+            <select
+              className="form-control"
+              style={{ marginBottom: 0, width: "auto" }}
+              value={monthFilter}
+              onChange={(e) => setMonthFilter(e.target.value)}
+              aria-label="Filtrer par mois"
+            >
+              <option value="">Tous les mois</option>
+              {monthOptions.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
             <button type="button" className="btn-secondary btn-sm" onClick={() => void refresh()}>
               Actualiser
             </button>
@@ -414,7 +459,7 @@ export default function ManageActsPage({
               <tr>
                 <th>#</th>
                 <th>Photo</th>
-                <th>N° acte</th>
+                <th>{ACT_REF_LABEL}</th>
                 {primary ? <th>{primary.label}</th> : null}
                 {secondary ? <th>{secondary.label}</th> : null}
                 {tertiary ? <th>{tertiary.label}</th> : null}

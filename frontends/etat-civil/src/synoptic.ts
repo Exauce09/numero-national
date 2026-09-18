@@ -7,6 +7,7 @@ import {
   ageYears,
   getPerson,
   getPersonByNic,
+  isActCountedInTotals,
   listActs,
   listPersons,
   personNationalite,
@@ -72,7 +73,9 @@ export function listSynopticCommunes(): FlatCommune[] {
 }
 
 function actsForCommune(type: Act["type"], commune: OfficerCommune): Act[] {
-  return listActs(type).filter((a) => actBelongsToOfficerCommune(a.payload, commune));
+  return listActs(type).filter(
+    (a) => isActCountedInTotals(a) && actBelongsToOfficerCommune(a.payload, commune),
+  );
 }
 
 export function synopticBirths(communeOverride?: OfficerCommune | FlatCommune | null) {
@@ -331,6 +334,7 @@ export function synopticNationalTerritory(): SynopticTerritoryRow[] {
   }
 
   function bump(kind: "naissances" | "mariages" | "divorces" | "deces" | "documents", act: Act) {
+    if (!isActCountedInTotals(act)) return;
     const hit = resolveActCommune(act.payload, communes);
     if (!hit) return;
     const row = buckets.get(hit.code);

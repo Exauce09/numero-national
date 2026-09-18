@@ -65,6 +65,25 @@ export type Act = {
   status?: string;
 };
 
+/** Libellé unique pour naissance, décès, mariage, divorce, adoption. */
+export const ACT_REF_LABEL = "N° d'acte";
+
+/**
+ * Seuls les actes validés / enregistrés comptent dans les totaux et synoptiques.
+ * Brouillons, soumis, en révision, rejetés : exclus.
+ */
+export function isActCountedInTotals(a: { type?: string; status?: string | null }): boolean {
+  const s = String(a.status ?? "").toUpperCase().trim();
+  const type = String(a.type ?? "").toUpperCase();
+  if (type === "CENSUS" || type === "DOCUMENT" || type === "DISPLACEMENT") {
+    if (s === "DRAFT" || s === "REJECTED" || s === "CORRECTION_REQUIRED" || s === "SUBMITTED") {
+      return false;
+    }
+    return true;
+  }
+  return s === "VALIDATED" || s === "AUTHENTICATED" || s === "ARCHIVED";
+}
+
 export type MarriageLink = {
   id: string;
   act_number: string;

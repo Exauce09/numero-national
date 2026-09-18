@@ -50,7 +50,7 @@ export const EC_ROLE_CATALOG: Array<{
     code: "RESPONSABLE_BUREAU",
     label: "Responsable de bureau",
     summary:
-      "Dirige le bureau : crée les comptes (officier, agent, auditeur), supervise, valide les actes.",
+      "Dirige le bureau : crée les comptes (officier, agent), supervise, valide les actes.",
     canCreateUsers: true,
     canValidateActs: true,
   },
@@ -79,13 +79,6 @@ export const EC_ROLE_CATALOG: Array<{
     code: "JUGE",
     label: "Juge",
     summary: "Décisions judiciaires (supplétif, etc.) — consultation et références.",
-    canCreateUsers: false,
-    canValidateActs: false,
-  },
-  {
-    code: "AUDITEUR",
-    label: "Auditeur",
-    summary: "Consultation et contrôle ; pas de création d'actes ni de comptes.",
     canCreateUsers: false,
     canValidateActs: false,
   },

@@ -331,29 +331,6 @@ export const EC_ACTOR_MATRIX: EcActorRow[] = [
     },
   },
   {
-    id: "auditeur",
-    title: "Auditeur",
-    loginStatus: "implemented",
-    loginNote: "Compte AUDITEUR — consultation / contrôle.",
-    restrictions: [
-      "Ne crée / ne modifie / ne valide pas d'acte",
-      "Ne supprime pas une trace d'audit",
-    ],
-    permissions: {
-      creer: { level: "NON", detail: "Rapports d'audit seulement" },
-      consulter: { level: "OUI", detail: "Journaux, historiques, opérations" },
-      modifier: { level: "NON", detail: "Lecture seule métier" },
-      valider: { level: "NON", detail: "—" },
-      transmettre: { level: "LIMITE", detail: "Rapports" },
-      executer: { level: "NON", detail: "—" },
-      annuler: { level: "NON", detail: "—" },
-      imprimer: { level: "OUI", detail: "Rapports d'audit" },
-      telecharger: { level: "OUI", detail: "Traces / exports d'audit" },
-      exporter: { level: "OUI", detail: "Rapports d'audit" },
-      auditer: { level: "OUI", detail: "Consultation complète des journaux" },
-    },
-  },
-  {
     id: "super_admin",
     title: "Super administrateur",
     loginStatus: "partial",
@@ -385,7 +362,6 @@ export const EC_ROLE_CONFLICTS = [
   "Juge ne transcrit pas lui-même au registre EC",
   "Greffier ne rend pas le jugement",
   "Super admin ≠ officier d'état civil ni juge",
-  "Auditeur ne crée / ne valide / ne modifie pas d'acte",
   "Celui qui crée n'est pas automatiquement celui qui valide",
   "Celui qui juge n'est pas automatiquement celui qui exécute à l'EC",
 ] as const;

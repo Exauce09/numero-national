@@ -8,9 +8,11 @@ import { SimpleStatBlocks } from "../components/StatBlocks";
 import { api } from "../api";
 import { getSession } from "../auth";
 import {
+  ACT_REF_LABEL,
   actTypeLabel,
   getAct,
   getPersonByNic,
+  isActCountedInTotals,
   listActs,
   updateAct,
   upsertActsFromApi,
@@ -65,6 +67,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<ActType | "">("");
   const [q, setQ] = useState("");
+  const [monthFilter, setMonthFilter] = useState("");
   const [page, setPage] = useState(1);
   const [viewAct, setViewAct] = useState<Act | null>(null);
   const [editAct, setEditAct] = useState<Act | null>(null);
@@ -115,17 +118,39 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
   }
 
   const all = useMemo(() => listActs(), [tick]);
+  const counted = useMemo(() => all.filter(isActCountedInTotals), [all]);
+
+  function monthKey(iso: string): string {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "—";
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  const monthOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const a of all) {
+      const k = monthKey(a.created_at);
+      if (k !== "—") set.add(k);
+    }
+    return [...set].sort((a, b) => b.localeCompare(a));
+  }, [all]);
 
   const acts = useMemo(() => {
     const base = filter ? all.filter((a) => a.type === filter) : all;
-    const needle = q.trim().toLowerCase();
-    if (!needle) return base;
-    return base.filter((a) =>
-      `${a.act_number} ${a.national_id} ${a.type} ${a.status ?? ""} ${JSON.stringify(a.payload)}`
+    return base.filter((a) => {
+      if (monthFilter && monthKey(a.created_at) !== monthFilter) return false;
+      const needle = q.trim().toLowerCase();
+      if (!needle) return true;
+      return `${a.act_number} ${a.national_id} ${a.type} ${a.status ?? ""} ${JSON.stringify(a.payload)}`
         .toLowerCase()
-        .includes(needle),
-    );
-  }, [all, filter, q]);
+        .includes(needle);
+    });
+  }, [all, filter, q, monthFilter]);
+
+  const countedFiltered = useMemo(
+    () => acts.filter(isActCountedInTotals),
+    [acts],
+  );
 
   useEffect(() => {
     const type = params.get("type");
@@ -136,7 +161,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
 
   useEffect(() => {
     setPage(1);
-  }, [filter, q]);
+  }, [filter, q, monthFilter]);
 
   useEffect(() => {
     const editId = params.get("edit");
@@ -169,15 +194,15 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
 
   const byType = useMemo(() => {
     const map = new Map<string, number>();
-    for (const a of all) map.set(a.type, (map.get(a.type) ?? 0) + 1);
+    for (const a of counted) map.set(a.type, (map.get(a.type) ?? 0) + 1);
     return [...map.entries()].map(([type, value], i) => ({
       label: actTypeLabel(type as ActType),
       value,
       color: COLORS[i % COLORS.length],
     }));
-  }, [all]);
+  }, [counted]);
 
-  const docs = all.filter((a) => a.type === "DOCUMENT").length;
+  const docs = counted.filter((a) => a.type === "DOCUMENT").length;
 
   const exportRows = acts.map((a) => ({
     act_number: a.act_number,
@@ -211,10 +236,10 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
           <SimpleStatBlocks
             title="LISTE DES ACTES & DOCUMENTS"
             items={[
-              { label: "TOTAL ACTES", value: all.length, color: rdcColor(0) },
+              { label: "TOTAL ACTES", value: counted.length, color: rdcColor(0) },
               { label: "DOCUMENTS", value: docs, color: rdcColor(1) },
-              { label: "AUTRES ACTES", value: all.length - docs, color: rdcColor(2) },
-              { label: "FILTRÉS", value: acts.length, color: rdcColor(3) },
+              { label: "AUTRES ACTES", value: counted.length - docs, color: rdcColor(2) },
+              { label: "FILTRÉS", value: countedFiltered.length, color: rdcColor(3) },
             ]}
           />
 
@@ -264,6 +289,20 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
                 </option>
               ))}
             </select>
+            <select
+              className="form-control"
+              style={{ marginBottom: 0, width: "auto" }}
+              value={monthFilter}
+              onChange={(e) => setMonthFilter(e.target.value)}
+              aria-label="Filtrer par mois"
+            >
+              <option value="">Tous les mois</option>
+              {monthOptions.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="toolbar" style={{ margin: 0, display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
             <button type="button" className="btn-primary btn-sm" onClick={() => navigate("/documents")}>
@@ -279,7 +318,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
               <tr>
                 <th>#</th>
                 <th>Photo</th>
-                <th>N° acte</th>
+                <th>{ACT_REF_LABEL}</th>
                 <th>Type</th>
                 <th>Statut</th>
                 <th>Enregistré le</th>

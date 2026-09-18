@@ -189,13 +189,35 @@ export default function DashboardPage() {
     );
   }, [apiActs, localActs, nationalScope, officerCommune]);
 
-  const births = acts.filter((a) => a.act_type === "BIRTH" || a.act_type === "births");
-  const deaths = acts.filter((a) => a.act_type === "DEATH" || a.act_type === "deaths");
-  const marriages = acts.filter((a) => a.act_type === "MARRIAGE" || a.act_type === "marriages");
-  const divorces = acts.filter((a) => a.act_type === "DIVORCE" || a.act_type === "divorces");
-  const adoptions = acts.filter((a) => a.act_type === "ADOPTION" || a.act_type === "adoptions");
+  const births = acts.filter(
+    (a) =>
+      (a.act_type === "BIRTH" || a.act_type === "births") &&
+      ["VALIDATED", "AUTHENTICATED", "ARCHIVED"].includes(actStatus(a)),
+  );
+  const deaths = acts.filter(
+    (a) =>
+      (a.act_type === "DEATH" || a.act_type === "deaths") &&
+      ["VALIDATED", "AUTHENTICATED", "ARCHIVED"].includes(actStatus(a)),
+  );
+  const marriages = acts.filter(
+    (a) =>
+      (a.act_type === "MARRIAGE" || a.act_type === "marriages") &&
+      ["VALIDATED", "AUTHENTICATED", "ARCHIVED"].includes(actStatus(a)),
+  );
+  const divorces = acts.filter(
+    (a) =>
+      (a.act_type === "DIVORCE" || a.act_type === "divorces") &&
+      ["VALIDATED", "AUTHENTICATED", "ARCHIVED"].includes(actStatus(a)),
+  );
+  const adoptions = acts.filter(
+    (a) =>
+      (a.act_type === "ADOPTION" || a.act_type === "adoptions") &&
+      ["VALIDATED", "AUTHENTICATED", "ARCHIVED"].includes(actStatus(a)),
+  );
   const recognitions = acts.filter(
-    (a) => a.act_type === "RECOGNITION" || a.act_type === "recognitions",
+    (a) =>
+      (a.act_type === "RECOGNITION" || a.act_type === "recognitions") &&
+      ["VALIDATED", "AUTHENTICATED", "ARCHIVED"].includes(actStatus(a)),
   );
 
   const drafts = acts.filter((a) => actStatus(a) === "DRAFT").length;
@@ -212,7 +234,6 @@ export default function DashboardPage() {
   const months = useMemo(() => lastNMonths(6), []);
   const birthSeries = countByMonth(births, months);
   const deathSeries = countByMonth(deaths, months);
-  const allActsSeries = countByMonth(acts, months);
 
   const helloName = session?.displayName || session?.username || "utilisateur";
   const rolePrimary = primaryRole(session?.roles ?? []);

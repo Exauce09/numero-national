@@ -104,7 +104,7 @@ export default function NewbornsPage() {
           <table className="data-table eg-table">
             <thead>
               <tr>
-                <th>N° acte</th>
+                <th>N° d&apos;acte</th>
                 <th>Enfant</th>
                 <th>Sexe</th>
                 <th>Date naissance</th>
