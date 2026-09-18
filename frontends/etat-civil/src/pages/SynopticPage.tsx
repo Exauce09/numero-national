@@ -443,8 +443,6 @@ function ProvincesOverviewTable({
     const base: Record<string, string | number> = {
       province: r.province,
       total: tabMetricTotal(r, tab),
-      villes: r.villes,
-      communes: r.communes,
     };
     if (tab === "naissances") {
       base.naissances_g = r.naissances_g;
@@ -492,8 +490,6 @@ function ProvincesOverviewTable({
               {tab === "deces" ? <th>DÉCÈS</th> : null}
               {tab === "documents" ? <th>DOCUMENTS</th> : null}
               <th rowSpan={needsGft ? 2 : 1}>TOTAL</th>
-              <th rowSpan={needsGft ? 2 : 1}>VILLES</th>
-              <th rowSpan={needsGft ? 2 : 1}>COMMUNES</th>
             </tr>
             {needsGft ? (
               <tr>
@@ -528,8 +524,6 @@ function ProvincesOverviewTable({
                 <td>
                   <strong>{tabMetricTotal(r, tab)}</strong>
                 </td>
-                <td>{r.villes}</td>
-                <td>{r.communes}</td>
               </tr>
             ))}
             <tr>
@@ -571,12 +565,6 @@ function ProvincesOverviewTable({
               ) : null}
               <td>
                 <strong>{sumMetric}</strong>
-              </td>
-              <td>
-                <strong>{rows.reduce((a, r) => a + r.villes, 0)}</strong>
-              </td>
-              <td>
-                <strong>{rows.reduce((a, r) => a + r.communes, 0)}</strong>
               </td>
             </tr>
           </tbody>
@@ -669,7 +657,7 @@ function ProvinceDetailView({
   }
 
   const emptyVilleCols =
-    2 + (tab === "naissances" ? 3 : tab === "matrimonial" ? 2 : 1) + 1;
+    1 + (tab === "naissances" ? 3 : tab === "matrimonial" ? 2 : 1) + 1;
   const emptyCommuneCols =
     1 + (tab === "naissances" ? 3 : tab === "matrimonial" ? 2 : 1) + 1;
 
@@ -684,11 +672,7 @@ function ProvinceDetailView({
       <div className="table-scroll" style={{ marginBottom: "1rem" }}>
         <table className="syn-official">
           <thead>
-            <tr>
-              {metricHeads("PROVINCE")}
-              <th rowSpan={rs}>VILLES</th>
-              <th rowSpan={rs}>COMMUNES</th>
-            </tr>
+            <tr>{metricHeads("PROVINCE")}</tr>
             {needsGft ? (
               <tr>
                 <GftHeads />
@@ -698,17 +682,17 @@ function ProvinceDetailView({
           <tbody>
             <tr>
               <td className="syn-commune-cell">{province}</td>
-              {summary ? metricCells(summary) : metricCells({
-                naissances_g: 0,
-                naissances_f: 0,
-                naissances: 0,
-                mariages: 0,
-                divorces: 0,
-                deces: 0,
-                documents: 0,
-              })}
-              <td>{summary?.villes ?? 0}</td>
-              <td>{summary?.communes ?? 0}</td>
+              {summary
+                ? metricCells(summary)
+                : metricCells({
+                    naissances_g: 0,
+                    naissances_f: 0,
+                    naissances: 0,
+                    mariages: 0,
+                    divorces: 0,
+                    deces: 0,
+                    documents: 0,
+                  })}
             </tr>
           </tbody>
         </table>
@@ -720,10 +704,7 @@ function ProvinceDetailView({
       <div className="table-scroll" style={{ marginBottom: "1rem" }}>
         <table className="syn-official">
           <thead>
-            <tr>
-              {metricHeads("VILLE")}
-              <th rowSpan={rs}>COMMUNES</th>
-            </tr>
+            <tr>{metricHeads("VILLE")}</tr>
             {needsGft ? (
               <tr>
                 <GftHeads />
@@ -747,7 +728,6 @@ function ProvinceDetailView({
                 >
                   <td className="syn-commune-cell">{v.ville}</td>
                   {metricCells(v)}
-                  <td>{v.communes}</td>
                 </tr>
               ))
             )}
