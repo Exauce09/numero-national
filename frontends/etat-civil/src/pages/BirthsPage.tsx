@@ -504,7 +504,6 @@ export default function BirthsPage() {
 
   const rows = acts.map((a) => ({
     act_number: a.act_number,
-    national_id: a.national_id,
     nom: String(a.payload.nom ?? ""),
     sexe: String(a.payload.sexe ?? ""),
     date_naissance: String(a.payload.date_naissance ?? ""),
