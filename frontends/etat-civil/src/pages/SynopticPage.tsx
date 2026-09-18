@@ -411,38 +411,69 @@ function DocumentsTable({ commune }: { commune: CommuneSel }) {
   );
 }
 
+function tabMetricTotal(
+  r: { naissances: number; mariages: number; divorces: number; deces: number; documents: number },
+  tab: TabSlug,
+): number {
+  if (tab === "naissances") return r.naissances;
+  if (tab === "matrimonial") return r.mariages + r.divorces;
+  if (tab === "deces") return r.deces;
+  return r.documents;
+}
+
 function ProvincesOverviewTable({
   rows,
+  tab,
   onSelect,
 }: {
   rows: SynopticProvinceRollup[];
+  tab: TabSlug;
   onSelect: (province: string) => void;
 }) {
-  const exportRows = rows.map((r) => ({
-    province: r.province,
-    naissances_g: r.naissances_g,
-    naissances_f: r.naissances_f,
-    naissances_t: r.naissances,
-    mariages: r.mariages,
-    divorces: r.divorces,
-    deces: r.deces,
-    documents: r.documents,
-    total: r.total,
-    villes: r.villes,
-    communes: r.communes,
-  }));
+  const title =
+    tab === "naissances"
+      ? "TABLEAU SYNOPTIQUE RÉCAPITULATIF DES NOUVEAU-NÉS PAR PROVINCE"
+      : tab === "matrimonial"
+        ? "TABLEAU SYNOPTIQUE RÉCAPITULATIF DE L'ÉTAT MATRIMONIAL PAR PROVINCE"
+        : tab === "deces"
+          ? "TABLEAU SYNOPTIQUE RÉCAPITULATIF DES DÉCÈS PAR PROVINCE"
+          : "TABLEAU SYNOPTIQUE RÉCAPITULATIF DES DOCUMENTS PAR PROVINCE";
 
+  const exportRows = rows.map((r) => {
+    const base: Record<string, string | number> = {
+      province: r.province,
+      total: tabMetricTotal(r, tab),
+      villes: r.villes,
+      communes: r.communes,
+    };
+    if (tab === "naissances") {
+      base.naissances_g = r.naissances_g;
+      base.naissances_f = r.naissances_f;
+      base.naissances_t = r.naissances;
+    } else if (tab === "matrimonial") {
+      base.mariages = r.mariages;
+      base.divorces = r.divorces;
+    } else if (tab === "deces") {
+      base.deces = r.deces;
+    } else {
+      base.documents = r.documents;
+    }
+    return base;
+  });
+
+  const sumMetric = rows.reduce((a, r) => a + tabMetricTotal(r, tab), 0);
   const sumG = rows.reduce((a, r) => a + r.naissances_g, 0);
   const sumF = rows.reduce((a, r) => a + r.naissances_f, 0);
   const sumT = rows.reduce((a, r) => a + r.naissances, 0);
+  const needsGft = tab === "naissances";
 
   return (
     <>
       <div className="syn-toolbar no-print">
-        <DataToolbar filename="synoptique_provinces" rows={exportRows} />
+        <DataToolbar filename={`synoptique_provinces_${tab}`} rows={exportRows} />
       </div>
       <h2 className="syn-official-title">
-        TABLEAU SYNOPTIQUE RÉCAPITULATIF PAR PROVINCE
+        {title}
         <br />
         RÉPUBLIQUE DÉMOCRATIQUE DU CONGO
       </h2>
@@ -450,19 +481,25 @@ function ProvincesOverviewTable({
         <table className="syn-official">
           <thead>
             <tr>
-              <th rowSpan={2}>PROVINCE</th>
-              <th colSpan={3}>NOUVEAU-NÉS</th>
-              <th rowSpan={2}>MARIAGES</th>
-              <th rowSpan={2}>DIVORCES</th>
-              <th rowSpan={2}>DÉCÈS</th>
-              <th rowSpan={2}>DOCUMENTS</th>
-              <th rowSpan={2}>TOTAL</th>
-              <th rowSpan={2}>VILLES</th>
-              <th rowSpan={2}>COMMUNES</th>
+              <th rowSpan={needsGft ? 2 : 1}>PROVINCE</th>
+              {tab === "naissances" ? <th colSpan={3}>NOUVEAU-NÉS</th> : null}
+              {tab === "matrimonial" ? (
+                <>
+                  <th>MARIAGES</th>
+                  <th>DIVORCES</th>
+                </>
+              ) : null}
+              {tab === "deces" ? <th>DÉCÈS</th> : null}
+              {tab === "documents" ? <th>DOCUMENTS</th> : null}
+              <th rowSpan={needsGft ? 2 : 1}>TOTAL</th>
+              <th rowSpan={needsGft ? 2 : 1}>VILLES</th>
+              <th rowSpan={needsGft ? 2 : 1}>COMMUNES</th>
             </tr>
-            <tr>
-              <GftHeads />
-            </tr>
+            {needsGft ? (
+              <tr>
+                <GftHeads />
+              </tr>
+            ) : null}
           </thead>
           <tbody>
             {rows.map((r) => (
@@ -473,15 +510,23 @@ function ProvincesOverviewTable({
                 title={`Voir le détail de ${r.province}`}
               >
                 <td className="syn-commune-cell">{r.province}</td>
-                <td>{r.naissances_g}</td>
-                <td>{r.naissances_f}</td>
-                <td>{r.naissances}</td>
-                <td>{r.mariages}</td>
-                <td>{r.divorces}</td>
-                <td>{r.deces}</td>
-                <td>{r.documents}</td>
+                {tab === "naissances" ? (
+                  <>
+                    <td>{r.naissances_g}</td>
+                    <td>{r.naissances_f}</td>
+                    <td>{r.naissances}</td>
+                  </>
+                ) : null}
+                {tab === "matrimonial" ? (
+                  <>
+                    <td>{r.mariages}</td>
+                    <td>{r.divorces}</td>
+                  </>
+                ) : null}
+                {tab === "deces" ? <td>{r.deces}</td> : null}
+                {tab === "documents" ? <td>{r.documents}</td> : null}
                 <td>
-                  <strong>{r.total}</strong>
+                  <strong>{tabMetricTotal(r, tab)}</strong>
                 </td>
                 <td>{r.villes}</td>
                 <td>{r.communes}</td>
@@ -491,29 +536,41 @@ function ProvincesOverviewTable({
               <td className="syn-commune-cell">
                 <strong>TOTAL RDC</strong>
               </td>
+              {tab === "naissances" ? (
+                <>
+                  <td>
+                    <strong>{sumG}</strong>
+                  </td>
+                  <td>
+                    <strong>{sumF}</strong>
+                  </td>
+                  <td>
+                    <strong>{sumT}</strong>
+                  </td>
+                </>
+              ) : null}
+              {tab === "matrimonial" ? (
+                <>
+                  <td>
+                    <strong>{rows.reduce((a, r) => a + r.mariages, 0)}</strong>
+                  </td>
+                  <td>
+                    <strong>{rows.reduce((a, r) => a + r.divorces, 0)}</strong>
+                  </td>
+                </>
+              ) : null}
+              {tab === "deces" ? (
+                <td>
+                  <strong>{rows.reduce((a, r) => a + r.deces, 0)}</strong>
+                </td>
+              ) : null}
+              {tab === "documents" ? (
+                <td>
+                  <strong>{rows.reduce((a, r) => a + r.documents, 0)}</strong>
+                </td>
+              ) : null}
               <td>
-                <strong>{sumG}</strong>
-              </td>
-              <td>
-                <strong>{sumF}</strong>
-              </td>
-              <td>
-                <strong>{sumT}</strong>
-              </td>
-              <td>
-                <strong>{rows.reduce((a, r) => a + r.mariages, 0)}</strong>
-              </td>
-              <td>
-                <strong>{rows.reduce((a, r) => a + r.divorces, 0)}</strong>
-              </td>
-              <td>
-                <strong>{rows.reduce((a, r) => a + r.deces, 0)}</strong>
-              </td>
-              <td>
-                <strong>{rows.reduce((a, r) => a + r.documents, 0)}</strong>
-              </td>
-              <td>
-                <strong>{rows.reduce((a, r) => a + r.total, 0)}</strong>
+                <strong>{sumMetric}</strong>
               </td>
               <td>
                 <strong>{rows.reduce((a, r) => a + r.villes, 0)}</strong>
@@ -526,8 +583,8 @@ function ProvincesOverviewTable({
         </table>
       </div>
       <p className="syn-legend muted small">
-        G = Garçons · F = Filles · T = Total — Cliquez une province pour afficher ses informations
-        détaillées.
+        {needsGft ? "G = Garçons · F = Filles · T = Total — " : ""}
+        Cliquez une province pour afficher ses informations détaillées.
       </p>
     </>
   );
@@ -538,6 +595,7 @@ function ProvinceDetailView({
   summary,
   villes,
   communes,
+  tab,
   onSelectVille,
   onSelectCommune,
   filterVille,
@@ -546,6 +604,7 @@ function ProvinceDetailView({
   summary: SynopticProvinceRollup | null;
   villes: SynopticVilleRollup[];
   communes: SynopticTerritoryRow[];
+  tab: TabSlug;
   filterVille: string;
   onSelectVille: (ville: string) => void;
   onSelectCommune: (code: string) => void;
@@ -553,6 +612,66 @@ function ProvinceDetailView({
   const filteredCommunes = filterVille
     ? communes.filter((c) => c.ville === filterVille)
     : communes;
+  const needsGft = tab === "naissances";
+  const rs = needsGft ? 2 : 1;
+
+  function metricHeads(firstLabel: string) {
+    return (
+      <>
+        <th rowSpan={rs}>{firstLabel}</th>
+        {tab === "naissances" ? <th colSpan={3}>NOUVEAU-NÉS</th> : null}
+        {tab === "matrimonial" ? (
+          <>
+            <th>MARIAGES</th>
+            <th>DIVORCES</th>
+          </>
+        ) : null}
+        {tab === "deces" ? <th>DÉCÈS</th> : null}
+        {tab === "documents" ? <th>DOCUMENTS</th> : null}
+        <th rowSpan={rs}>TOTAL</th>
+      </>
+    );
+  }
+
+  function metricCells(
+    r: {
+      naissances_g: number;
+      naissances_f: number;
+      naissances: number;
+      mariages: number;
+      divorces: number;
+      deces: number;
+      documents: number;
+    },
+  ) {
+    return (
+      <>
+        {tab === "naissances" ? (
+          <>
+            <td>{r.naissances_g}</td>
+            <td>{r.naissances_f}</td>
+            <td>{r.naissances}</td>
+          </>
+        ) : null}
+        {tab === "matrimonial" ? (
+          <>
+            <td>{r.mariages}</td>
+            <td>{r.divorces}</td>
+          </>
+        ) : null}
+        {tab === "deces" ? <td>{r.deces}</td> : null}
+        {tab === "documents" ? <td>{r.documents}</td> : null}
+        <td>
+          <strong>{tabMetricTotal(r, tab)}</strong>
+        </td>
+      </>
+    );
+  }
+
+  const emptyVilleCols =
+    2 + (tab === "naissances" ? 3 : tab === "matrimonial" ? 2 : 1) + 1;
+  const emptyCommuneCols =
+    1 + (tab === "naissances" ? 3 : tab === "matrimonial" ? 2 : 1) + 1;
 
   return (
     <>
@@ -566,31 +685,30 @@ function ProvinceDetailView({
         <table className="syn-official">
           <thead>
             <tr>
-              <th rowSpan={2}>PROVINCE</th>
-              <th colSpan={3}>NOUVEAU-NÉS</th>
-              <th rowSpan={2}>MARIAGES</th>
-              <th rowSpan={2}>DIVORCES</th>
-              <th rowSpan={2}>DÉCÈS</th>
-              <th rowSpan={2}>DOCUMENTS</th>
-              <th rowSpan={2}>TOTAL</th>
+              {metricHeads("PROVINCE")}
+              <th rowSpan={rs}>VILLES</th>
+              <th rowSpan={rs}>COMMUNES</th>
             </tr>
-            <tr>
-              <GftHeads />
-            </tr>
+            {needsGft ? (
+              <tr>
+                <GftHeads />
+              </tr>
+            ) : null}
           </thead>
           <tbody>
             <tr>
               <td className="syn-commune-cell">{province}</td>
-              <td>{summary?.naissances_g ?? 0}</td>
-              <td>{summary?.naissances_f ?? 0}</td>
-              <td>{summary?.naissances ?? 0}</td>
-              <td>{summary?.mariages ?? 0}</td>
-              <td>{summary?.divorces ?? 0}</td>
-              <td>{summary?.deces ?? 0}</td>
-              <td>{summary?.documents ?? 0}</td>
-              <td>
-                <strong>{summary?.total ?? 0}</strong>
-              </td>
+              {summary ? metricCells(summary) : metricCells({
+                naissances_g: 0,
+                naissances_f: 0,
+                naissances: 0,
+                mariages: 0,
+                divorces: 0,
+                deces: 0,
+                documents: 0,
+              })}
+              <td>{summary?.villes ?? 0}</td>
+              <td>{summary?.communes ?? 0}</td>
             </tr>
           </tbody>
         </table>
@@ -603,23 +721,19 @@ function ProvinceDetailView({
         <table className="syn-official">
           <thead>
             <tr>
-              <th rowSpan={2}>VILLE</th>
-              <th rowSpan={2}>COMMUNES</th>
-              <th colSpan={3}>NOUVEAU-NÉS</th>
-              <th rowSpan={2}>MARIAGES</th>
-              <th rowSpan={2}>DIVORCES</th>
-              <th rowSpan={2}>DÉCÈS</th>
-              <th rowSpan={2}>DOCUMENTS</th>
-              <th rowSpan={2}>TOTAL</th>
+              {metricHeads("VILLE")}
+              <th rowSpan={rs}>COMMUNES</th>
             </tr>
-            <tr>
-              <GftHeads />
-            </tr>
+            {needsGft ? (
+              <tr>
+                <GftHeads />
+              </tr>
+            ) : null}
           </thead>
           <tbody>
             {villes.length === 0 ? (
               <tr>
-                <td colSpan={10} className="muted">
+                <td colSpan={emptyVilleCols} className="muted">
                   Aucune ville
                 </td>
               </tr>
@@ -632,17 +746,8 @@ function ProvinceDetailView({
                   title={`Filtrer les communes de ${v.ville}`}
                 >
                   <td className="syn-commune-cell">{v.ville}</td>
+                  {metricCells(v)}
                   <td>{v.communes}</td>
-                  <td>{v.naissances_g}</td>
-                  <td>{v.naissances_f}</td>
-                  <td>{v.naissances}</td>
-                  <td>{v.mariages}</td>
-                  <td>{v.divorces}</td>
-                  <td>{v.deces}</td>
-                  <td>{v.documents}</td>
-                  <td>
-                    <strong>{v.total}</strong>
-                  </td>
                 </tr>
               ))
             )}
@@ -656,23 +761,17 @@ function ProvinceDetailView({
       <div className="table-scroll">
         <table className="syn-official">
           <thead>
-            <tr>
-              <th rowSpan={2}>COMMUNE</th>
-              <th colSpan={3}>NOUVEAU-NÉS</th>
-              <th rowSpan={2}>MARIAGES</th>
-              <th rowSpan={2}>DIVORCES</th>
-              <th rowSpan={2}>DÉCÈS</th>
-              <th rowSpan={2}>DOCUMENTS</th>
-              <th rowSpan={2}>TOTAL</th>
-            </tr>
-            <tr>
-              <GftHeads />
-            </tr>
+            <tr>{metricHeads("COMMUNE")}</tr>
+            {needsGft ? (
+              <tr>
+                <GftHeads />
+              </tr>
+            ) : null}
           </thead>
           <tbody>
             {filteredCommunes.length === 0 ? (
               <tr>
-                <td colSpan={9} className="muted">
+                <td colSpan={emptyCommuneCols} className="muted">
                   Aucune commune
                 </td>
               </tr>
@@ -685,16 +784,7 @@ function ProvinceDetailView({
                   title={`Ouvrir le synoptique de ${c.commune}`}
                 >
                   <td className="syn-commune-cell">{c.commune}</td>
-                  <td>{c.naissances_g}</td>
-                  <td>{c.naissances_f}</td>
-                  <td>{c.naissances}</td>
-                  <td>{c.mariages}</td>
-                  <td>{c.divorces}</td>
-                  <td>{c.deces}</td>
-                  <td>{c.documents}</td>
-                  <td>
-                    <strong>{c.total}</strong>
-                  </td>
+                  {metricCells(c)}
                 </tr>
               ))
             )}
@@ -702,8 +792,8 @@ function ProvinceDetailView({
         </table>
       </div>
       <p className="syn-legend muted small">
-        G = Garçons · F = Filles · T = Total — Cliquez une ville pour filtrer · Cliquez une commune
-        pour le tableau synoptique détaillé.
+        {needsGft ? "G = Garçons · F = Filles · T = Total — " : ""}
+        Cliquez une ville pour filtrer · Cliquez une commune pour le tableau synoptique détaillé.
       </p>
     </>
   );
@@ -973,6 +1063,7 @@ export default function SynopticPage() {
             summary={provinceSummary}
             villes={villeRows}
             communes={communeRows}
+            tab={tab}
             filterVille={filterVille}
             onSelectVille={(ville) => {
               setFilterVille((prev) => (prev === ville ? "" : ville));
@@ -981,7 +1072,7 @@ export default function SynopticPage() {
             onSelectCommune={pickCommuneByCode}
           />
         ) : (
-          <ProvincesOverviewTable rows={overviewRows} onSelect={selectProvince} />
+          <ProvincesOverviewTable rows={overviewRows} tab={tab} onSelect={selectProvince} />
         )}
       </div>
     </div>
