@@ -308,7 +308,7 @@ export function canAccessPath(pathname: string, roles: string[] | undefined | nu
   }
   if (path.startsWith("/transcriptions")) return canSeeNav("transcriptions", r);
   if (path.startsWith("/mentions")) return canSeeNav("mentions", r);
-  if (path.startsWith("/documents") || path.startsWith("/fiche-identification") || path.startsWith("/manage/document") || path.startsWith("/verify-document")) {
+  if (path.startsWith("/documents") || path.startsWith("/manage/document") || path.startsWith("/verify-document")) {
     return canSeeNav("documents", r);
   }
   if (path.startsWith("/acts")) return canSeeNav("acts_register", r);

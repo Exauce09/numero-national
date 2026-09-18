@@ -240,7 +240,7 @@ export default function BirthCertificatePrint({
           <p className="birth-acte-brand">SIGPOP-RDC — Système intégré de gouvernance de la population</p>
           <p>Province de <u>{province}</u></p>
           <p>Ville de <u>{ville}</u></p>
-          <p>District de <u>{district}</u></p>
+          <p>Territoire de <u>{district}</u></p>
           <p>Territoire / Secteur ou Cité de <u>{commune}</u></p>
           <p>Chefferie / secteur ou Cité de <u>{quartier || commune}</u></p>
           <p>Bureau Principal de l&apos;État civil de <u>{bureau}</u></p>

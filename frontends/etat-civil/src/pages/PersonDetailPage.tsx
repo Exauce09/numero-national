@@ -186,12 +186,6 @@ export default function PersonDetailPage() {
           >
             Modifier
           </button>
-          <Link
-            className="btn-primary btn-sm"
-            to={`/fiche-identification?personId=${encodeURIComponent(id)}`}
-          >
-            Fiche d&apos;identification
-          </Link>
           <Link className="btn-secondary btn-sm" to="/corrections">
             Demande de correction
           </Link>

@@ -296,10 +296,10 @@ export default function PersonPicker({
 
             <form onSubmit={onAdd} className="person-add-form">
               <fieldset className="id-fieldset">
-                <legend>Identité</legend>
+                <legend>Fiche d&apos;identification</legend>
                 <div className="form-grid person-add-grid">
                   <div>
-                    <label className="form-label">Nom *</label>
+                    <label className="form-label">Nom de l&apos;intéressé *</label>
                     <input
                       className="form-control"
                       value={form.nom}
@@ -325,12 +325,6 @@ export default function PersonPicker({
                       required
                     />
                   </div>
-                </div>
-              </fieldset>
-
-              <fieldset className="id-fieldset">
-                <legend>État civil</legend>
-                <div className="form-grid person-add-grid">
                   <div>
                     <label className="form-label">Sexe *</label>
                     <select
@@ -349,17 +343,7 @@ export default function PersonPicker({
                     ) : null}
                   </div>
                   <div>
-                    <label className="form-label">Date de naissance *</label>
-                    <input
-                      className="form-control"
-                      type="date"
-                      value={form.date_naissance}
-                      onChange={(e) => setForm({ ...form, date_naissance: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Situation matrimoniale</label>
+                    <label className="form-label">Etat-Civil</label>
                     <select
                       className="form-control"
                       value={form.etat_civil}
@@ -372,12 +356,16 @@ export default function PersonPicker({
                       ))}
                     </select>
                   </div>
-                </div>
-              </fieldset>
-
-              <fieldset className="id-fieldset">
-                <legend>Date / lieu de naissance</legend>
-                <div className="form-grid">
+                  <div>
+                    <label className="form-label">Date de naissance *</label>
+                    <input
+                      className="form-control"
+                      type="date"
+                      value={form.date_naissance}
+                      onChange={(e) => setForm({ ...form, date_naissance: e.target.value })}
+                      required
+                    />
+                  </div>
                   <div className="full">
                     <label className="form-label">Lieu de naissance</label>
                     <input

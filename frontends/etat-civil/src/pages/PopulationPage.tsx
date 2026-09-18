@@ -512,12 +512,6 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                       <Link className="btn-add btn-sm" to={`/population/${p.id}`}>
                         Voir
                       </Link>
-                      <Link
-                        className="btn-secondary btn-sm"
-                        to={`/fiche-identification?personId=${encodeURIComponent(p.id)}`}
-                      >
-                        Fiche
-                      </Link>
                       <button
                         type="button"
                         className="btn-secondary btn-sm"
@@ -665,7 +659,7 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
               }}
             >
               <div>
-                <label className="form-label">Nom</label>
+                <label className="form-label">Nom de l&apos;intéressé</label>
                 <input
                   className="form-control"
                   value={editForm.nom}
@@ -674,7 +668,7 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                 />
               </div>
               <div>
-                <label className="form-label">Postnom</label>
+                <label className="form-label">Post-nom</label>
                 <input
                   className="form-control"
                   value={editForm.postnom}
@@ -711,7 +705,7 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                 />
               </div>
               <div>
-                <label className="form-label">Situation</label>
+                <label className="form-label">Etat-Civil</label>
                 <select
                   className="form-control"
                   value={editForm.etat_civil}

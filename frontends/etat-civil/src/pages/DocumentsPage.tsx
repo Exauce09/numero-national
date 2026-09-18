@@ -1,5 +1,4 @@
 import { FormEvent, useState } from "react";
-import { Link } from "react-router-dom";
 import ActFormShell from "../components/ActFormShell";
 import ActPrintCard from "../components/ActPrintCard";
 import PersonPicker from "../components/PersonPicker";
@@ -60,23 +59,6 @@ export default function DocumentsPage() {
 
   return (
     <ActFormShell schema={getActFormSchema("copies")!}>
-      <div className="panel" style={{ marginBottom: "1rem" }}>
-        <p className="muted" style={{ margin: 0 }}>
-          Pour la <strong>fiche d&apos;identification</strong> officielle (intéressé, conjoint, père,
-          mère) :{" "}
-          <Link to="/fiche-identification">ouvrir le modèle d&apos;état civil</Link>
-          {beneficiaire ? (
-            <>
-              {" "}
-              ou{" "}
-              <Link to={`/fiche-identification?personId=${encodeURIComponent(beneficiaire.id)}`}>
-                préremplir pour {displayName(beneficiaire)}
-              </Link>
-            </>
-          ) : null}
-          .
-        </p>
-      </div>
       <div className="panel">
         <form className="form-grid" onSubmit={(e) => void onSubmit(e)}>
           {error ? <div className="login-error full">{error}</div> : null}

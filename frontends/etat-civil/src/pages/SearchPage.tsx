@@ -142,12 +142,6 @@ export default function SearchPage() {
                   <td>
                     <Link className="btn-secondary btn-sm" to={`/population/${p.id}`}>
                       Voir
-                    </Link>{" "}
-                    <Link
-                      className="btn-secondary btn-sm"
-                      to={`/fiche-identification?personId=${encodeURIComponent(p.id)}`}
-                    >
-                      Fiche
                     </Link>
                   </td>
                 </tr>

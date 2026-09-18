@@ -94,7 +94,7 @@ function PersonColumn({ title, data }: { title?: string; data: FichePersonBlock 
       <Line label="Profession" value={data.profession} />
       <Line label="Secteur" value={data.secteur} />
       <Line label="Territoire" value={data.territoire} />
-      <Line label="District" value={data.ville} />
+      <Line label="Ville" value={data.ville} />
       <Line label="Province" value={data.province} />
       <Line label="Adresse" value={data.adresse} />
     </div>
@@ -105,7 +105,7 @@ type Props = {
   data: FicheIdentificationData;
 };
 
-/** Document imprimable — calqué sur la fiche Justicia (District → Ville). */
+/** Document imprimable — modèle fiche d'identification (sans District). */
 export default function FicheIdentificationForm({ data }: Props) {
   return (
     <article className="fiche-ident-print" style={{ background: "#fff", color: "#1e88e5", padding: "1.25rem" }}>

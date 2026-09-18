@@ -1103,10 +1103,10 @@ export default function CensusPage() {
 
             {ficheKind === "decede" ? (
               <fieldset className="id-fieldset">
-                <legend>Formulaire — Personne décédée</legend>
+                <legend>Fiche d&apos;identification — Personne décédée</legend>
                 <div className="form-grid">
                   <div className="full">
-                    <label className="form-label">Nom *</label>
+                    <label className="form-label">Nom de l&apos;intéressé *</label>
                     <input className="form-control" value={nom} onChange={(e) => setNom(e.target.value)} />
                   </div>
                   <div className="full">
@@ -1125,7 +1125,7 @@ export default function CensusPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="form-label">État-civil</label>
+                    <label className="form-label">Etat-Civil</label>
                     <select
                       className="form-control"
                       value={etatCivil}
@@ -1210,7 +1210,7 @@ export default function CensusPage() {
 
             {ficheKind === "marie" ? (
               <fieldset className="id-fieldset">
-                <legend>Formulaire — Marié(e)</legend>
+                <legend>Fiche d&apos;identification — Marié(e)</legend>
                 <p className="muted small" style={{ marginBottom: "0.75rem" }}>
                   Ce formulaire crée la <strong>fiche population</strong> (statut marié). L&apos;acte
                   officiel de mariage se crée ensuite dans{" "}
@@ -1219,7 +1219,7 @@ export default function CensusPage() {
                 </p>
                 <div className="form-grid">
                   <div className="full">
-                    <label className="form-label">Nom *</label>
+                    <label className="form-label">Nom de l&apos;intéressé *</label>
                     <input className="form-control" value={nom} onChange={(e) => setNom(e.target.value)} />
                   </div>
                   <div className="full">
@@ -1238,7 +1238,7 @@ export default function CensusPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="form-label">État-civil</label>
+                    <label className="form-label">Etat-Civil</label>
                     <input className="form-control" value="Marié(e)" disabled />
                   </div>
                   <div>
@@ -1360,14 +1360,14 @@ export default function CensusPage() {
 
             {ficheKind === "personne" ? (
               <fieldset className="id-fieldset">
-                <legend>Formulaire — Personne vivante</legend>
+                <legend>Fiche d&apos;identification</legend>
                 <div className="form-grid">
                   <div className="full">
-                    <label className="form-label">Nom de la personne *</label>
+                    <label className="form-label">Nom de l&apos;intéressé *</label>
                     <input className="form-control" value={nom} onChange={(e) => setNom(e.target.value)} />
                   </div>
                   <div className="full">
-                    <label className="form-label">Post-nom de la personne *</label>
+                    <label className="form-label">Post-nom *</label>
                     <input className="form-control" value={postnom} onChange={(e) => setPostnom(e.target.value)} />
                   </div>
                   <div className="full">
@@ -1382,7 +1382,7 @@ export default function CensusPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="form-label">État-civil</label>
+                    <label className="form-label">Etat-Civil</label>
                     <select
                       className="form-control"
                       value={etatCivil}
@@ -1394,21 +1394,6 @@ export default function CensusPage() {
                         </option>
                       ))}
                     </select>
-                  </div>
-                  <div className="full">
-                    <label className="form-label">Profession</label>
-                    <input
-                      className="form-control"
-                      list="professions-connues"
-                      value={profession}
-                      onChange={(e) => setProfession(e.target.value)}
-                      placeholder="Saisir ou sélectionner une profession connue"
-                    />
-                    <datalist id="professions-connues">
-                      {professionsConnues.map((p) => (
-                        <option key={p} value={p} />
-                      ))}
-                    </datalist>
                   </div>
                   <div className="full">
                     <label className="form-label">Lieu de naissance *</label>
@@ -1431,6 +1416,29 @@ export default function CensusPage() {
                       value={dateNaissance}
                       onChange={(e) => setDateNaissance(e.target.value)}
                     />
+                  </div>
+                  <div>
+                    <label className="form-label">Nationalité</label>
+                    <input
+                      className="form-control"
+                      value={nationalite}
+                      onChange={(e) => setNationalite(e.target.value)}
+                    />
+                  </div>
+                  <div className="full">
+                    <label className="form-label">Profession</label>
+                    <input
+                      className="form-control"
+                      list="professions-connues"
+                      value={profession}
+                      onChange={(e) => setProfession(e.target.value)}
+                      placeholder="Saisir ou sélectionner une profession connue"
+                    />
+                    <datalist id="professions-connues">
+                      {professionsConnues.map((p) => (
+                        <option key={p} value={p} />
+                      ))}
+                    </datalist>
                   </div>
                   <div>
                     <label className="form-label">Hôpital de naissance</label>
@@ -1506,14 +1514,6 @@ export default function CensusPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="form-label">Nationalité</label>
-                    <input
-                      className="form-control"
-                      value={nationalite}
-                      onChange={(e) => setNationalite(e.target.value)}
-                    />
-                  </div>
-                  <div>
                     <label className="form-label">Pays de résidence</label>
                     <input
                       className="form-control"
@@ -1541,7 +1541,7 @@ export default function CensusPage() {
 
             {ficheKind !== "bebe" ? (
             <fieldset className="id-fieldset">
-              <legend>Adresse actuelle</legend>
+                <legend>Adresse (Secteur · Territoire · Ville · Province)</legend>
               <GpsLocatePanel
                 title="Localisation GPS de l’adresse"
                 onResolved={(g) => {
@@ -1609,7 +1609,7 @@ export default function CensusPage() {
             ) : null}
 
             <fieldset className="id-fieldset">
-              <legend>Parents (facultatif)</legend>
+              <legend>Père / Mère</legend>
               <p className="muted small" style={{ marginTop: 0 }}>
                 Recherche Papa limitée à l&apos;origine. Si le père a un conjoint enregistré, la mère est
                 remplie automatiquement.
