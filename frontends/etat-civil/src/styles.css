@@ -1297,6 +1297,17 @@
   width: min(720px, 100%);
 }
 
+.person-add-modal-fiche {
+  width: min(980px, 100%);
+  max-height: min(92vh, 920px);
+  overflow: auto;
+}
+
+.fiche-ident-edit input:focus,
+.fiche-ident-edit select:focus {
+  background: #e3f2fd;
+}
+
 .person-add-head {
   display: flex;
   align-items: flex-start;

@@ -1,12 +1,17 @@
 import { FormEvent, useEffect, useState } from "react";
+import FicheIdentificationEditor, {
+  emptyFicheEditorState,
+  type FicheEditorState,
+} from "./FicheIdentificationEditor";
+import { getOfficerCommune } from "../commune";
 import {
-  ETAT_CIVIL_OPTIONS,
   addPerson,
   ageYears,
   displayName,
   isDeceased,
   personOrigin,
-  type EtatCivil,
+  provinceDigitsFromName,
+  type Nationalite,
   type Person,
   type Sexe,
 } from "../registry";
@@ -42,14 +47,53 @@ type Props = {
   hideNic?: boolean;
 };
 
-const emptyForm = {
-  nom: "",
-  postnom: "",
-  prenom: "",
-  sexe: "M" as Sexe,
-  date_naissance: "",
-  etat_civil: "CELIBATAIRE" as EtatCivil,
-};
+function natFromLabel(raw: string): Nationalite {
+  const t = raw.trim().toUpperCase();
+  if (t.includes("ETRANG") || t.includes("ÉTRANG")) return "ETRANGER";
+  return "CONGOLAIS";
+}
+
+function buildEditorSeed(sexFilter?: Sexe): FicheEditorState {
+  const officer = getOfficerCommune();
+  const pp = provinceDigitsFromName(officer.province || "Kinshasa");
+  return emptyFicheEditorState({
+    communeName: officer.name,
+    villeProvince: officer.ville || officer.province || "Kinshasa",
+    serie: `${pp}/INF001-TSL/………`,
+    sexe: sexFilter,
+  });
+}
+
+function tryAddRelative(
+  block: { nom: string; postnom: string; prenom: string; sexe: string; lieu_date_naissance: string },
+  sexe: Sexe,
+): string | undefined {
+  if (!block.nom.trim()) return undefined;
+  const lieu = block.lieu_date_naissance.trim();
+  const dateMatch = /(\d{4}-\d{2}-\d{2}|\d{1,2}[/.]\d{1,2}[/.]\d{4})/.exec(lieu);
+  const date_naissance = dateMatch?.[1]?.includes("-")
+    ? dateMatch[1]
+    : dateMatch
+      ? (() => {
+          const m = /^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/.exec(dateMatch[1]);
+          return m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : "1970-01-01";
+        })()
+      : "1970-01-01";
+  try {
+    const p = addPerson({
+      nom: block.nom.trim(),
+      postnom: block.postnom.trim(),
+      prenom: block.prenom.trim() || "—",
+      sexe,
+      date_naissance,
+      lieu_naissance: lieu.replace(dateMatch?.[0] ?? "", "").replace(/[—\-–]/g, " ").trim(),
+      etat_civil: "UNKNOWN" as Person["etat_civil"],
+    });
+    return p.id;
+  } catch {
+    return undefined;
+  }
+}
 
 export default function PersonPicker({
   label,
@@ -71,20 +115,18 @@ export default function PersonPicker({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState(() =>
-    sexFilter ? { ...emptyForm, sexe: sexFilter } : emptyForm,
-  );
-  const [lieuNaissance, setLieuNaissance] = useState("");
+  const [fiche, setFiche] = useState<FicheEditorState>(() => buildEditorSeed(sexFilter));
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<Person[]>([]);
   const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     if (forceAddOpen) {
+      setFiche(buildEditorSeed(sexFilter));
       setModal(true);
       onForceAddConsumed?.();
     }
-  }, [forceAddOpen, onForceAddConsumed]);
+  }, [forceAddOpen, onForceAddConsumed, sexFilter]);
 
   useEffect(() => {
     if (!open || value) return;
@@ -126,33 +168,60 @@ export default function PersonPicker({
   function onAdd(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!form.nom.trim() || !form.prenom.trim() || !form.date_naissance) {
+    const i = fiche.interesse;
+    if (!i.nom.trim() || !i.prenom.trim() || !i.date_naissance) {
       setError("Nom, prénom et date de naissance sont requis.");
       return;
     }
-    if (minAge != null && ageYears(form.date_naissance) < minAge) {
+    if (minAge != null && ageYears(i.date_naissance) < minAge) {
       setError(`La personne doit avoir au moins ${minAge} ans.`);
       return;
     }
     try {
-      const sexe = sexFilter ?? form.sexe;
+      const sexe = sexFilter ?? i.sexe_code;
+      const father_id = tryAddRelative(fiche.pere, "M");
+      const mother_id = tryAddRelative(fiche.mere, "F");
+      const situationParts = [
+        fiche.conjoint.nom.trim()
+          ? `Conjoint: ${fiche.conjoint.nom.trim()}${
+              fiche.conjoint.lieu_date_naissance ? ` (${fiche.conjoint.lieu_date_naissance})` : ""
+            }`
+          : "",
+        fiche.conjoint.profession.trim() ? `Prof. conjoint: ${fiche.conjoint.profession.trim()}` : "",
+        fiche.conjoint.adresse.trim() ? `Adr. conjoint: ${fiche.conjoint.adresse.trim()}` : "",
+      ].filter(Boolean);
+
       const person = addPerson({
-        nom: form.nom.trim(),
-        postnom: form.postnom.trim(),
-        prenom: form.prenom.trim(),
+        nom: i.nom.trim(),
+        postnom: i.postnom.trim(),
+        prenom: i.prenom.trim(),
         sexe,
-        date_naissance: form.date_naissance,
-        lieu_naissance: lieuNaissance.trim(),
-        etat_civil: form.etat_civil,
+        date_naissance: i.date_naissance,
+        lieu_naissance: i.lieu_date_naissance.trim(),
+        etat_civil: i.etat_civil_code,
+        nationalite: natFromLabel(i.nationalite),
+        parcours_professionnel: i.profession.trim() || undefined,
+        adresse: i.adresse.trim() || undefined,
+        secteur: i.secteur.trim() || undefined,
+        territoire: i.territoire.trim() || undefined,
+        ville: i.ville.trim() || undefined,
+        province: i.province.trim() || undefined,
+        father_id,
+        mother_id,
+        situation_familiale: situationParts.length ? situationParts.join(" · ") : undefined,
       });
       onChange(person);
-      setForm(sexFilter ? { ...emptyForm, sexe: sexFilter } : emptyForm);
-      setLieuNaissance("");
+      setFiche(buildEditorSeed(sexFilter));
       setModal(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ajout impossible.");
     }
   }
+
+  const isPere =
+    label.toLowerCase().includes("papa") || label.toLowerCase().includes("père");
+  const isMere =
+    label.toLowerCase().includes("maman") || label.toLowerCase().includes("mère");
 
   return (
     <div className="person-picker">
@@ -214,7 +283,8 @@ export default function PersonPicker({
               type="button"
               className="btn-add"
               onClick={() => {
-                setForm(sexFilter ? { ...emptyForm, sexe: sexFilter } : emptyForm);
+                setFiche(buildEditorSeed(sexFilter));
+                setError(null);
                 setModal(true);
               }}
             >
@@ -270,18 +340,17 @@ export default function PersonPicker({
 
       {modal ? (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setModal(false)}>
-          <div className="modal-panel modal-wide person-add-modal" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal-panel modal-wide person-add-modal person-add-modal-fiche"
+            onClick={(e) => e.stopPropagation()}
+          >
             <header className="person-add-head">
               <div>
                 <h3>
-                  {label.toLowerCase().includes("papa") || label.toLowerCase().includes("père")
-                    ? "Ajouter le père"
-                    : label.toLowerCase().includes("maman") || label.toLowerCase().includes("mère")
-                      ? "Ajouter la mère"
-                      : "Ajouter une personne"}
+                  {isPere ? "Ajouter le père" : isMere ? "Ajouter la mère" : "Fiche d'identification"}
                 </h3>
                 <p className="muted small" style={{ margin: 0 }}>
-                  Renseignez l&apos;identité, puis validez pour lier la fiche.
+                  Saisie sur le modèle officiel — même présentation que la fiche papier.
                 </p>
               </div>
               <button
@@ -295,88 +364,12 @@ export default function PersonPicker({
             </header>
 
             <form onSubmit={onAdd} className="person-add-form">
-              <fieldset className="id-fieldset">
-                <legend>Fiche d&apos;identification</legend>
-                <div className="form-grid person-add-grid">
-                  <div>
-                    <label className="form-label">Nom de l&apos;intéressé *</label>
-                    <input
-                      className="form-control"
-                      value={form.nom}
-                      onChange={(e) => setForm({ ...form, nom: e.target.value })}
-                      autoFocus
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Post-nom</label>
-                    <input
-                      className="form-control"
-                      value={form.postnom}
-                      onChange={(e) => setForm({ ...form, postnom: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Prénom *</label>
-                    <input
-                      className="form-control"
-                      value={form.prenom}
-                      onChange={(e) => setForm({ ...form, prenom: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Sexe *</label>
-                    <select
-                      className="form-control"
-                      value={sexFilter ?? form.sexe}
-                      disabled={Boolean(sexFilter)}
-                      onChange={(e) => setForm({ ...form, sexe: e.target.value as Sexe })}
-                    >
-                      <option value="M">Masculin</option>
-                      <option value="F">Féminin</option>
-                    </select>
-                    {sexFilter ? (
-                      <div className="muted small" style={{ marginTop: 4 }}>
-                        Verrouillé ({sexFilter === "F" ? "féminin" : "masculin"}).
-                      </div>
-                    ) : null}
-                  </div>
-                  <div>
-                    <label className="form-label">Etat-Civil</label>
-                    <select
-                      className="form-control"
-                      value={form.etat_civil}
-                      onChange={(e) => setForm({ ...form, etat_civil: e.target.value as EtatCivil })}
-                    >
-                      {ETAT_CIVIL_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="form-label">Date de naissance *</label>
-                    <input
-                      className="form-control"
-                      type="date"
-                      value={form.date_naissance}
-                      onChange={(e) => setForm({ ...form, date_naissance: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="full">
-                    <label className="form-label">Lieu de naissance</label>
-                    <input
-                      className="form-control"
-                      value={lieuNaissance}
-                      onChange={(e) => setLieuNaissance(e.target.value)}
-                      placeholder="Ex. Kinshasa, Gombe…"
-                    />
-                  </div>
-                </div>
-              </fieldset>
+              <FicheIdentificationEditor
+                value={fiche}
+                onChange={setFiche}
+                sexeLocked={sexFilter}
+                compact={isPere || isMere}
+              />
 
               {error ? <div className="login-error">{error}</div> : null}
 

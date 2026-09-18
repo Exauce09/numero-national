@@ -72,10 +72,8 @@ import PasswordField from "./components/PasswordField";
 import {
   IconBaby,
   IconCar,
-  IconClipboard,
   IconCross,
   IconDashboard,
-  IconFile,
   IconHome,
   IconRing,
   IconSplit,

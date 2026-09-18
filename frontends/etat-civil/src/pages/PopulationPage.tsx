@@ -63,6 +63,8 @@ function citizenToRow(c: CitizenListItem): PopRow {
     lieu_naissance: local?.lieu_naissance || c.place_of_birth || c.ville || "",
     etat_civil: etat,
     nic: nic || local?.nic || "",
+    handicap_type: local?.handicap_type || "NORMAL",
+    created_at: local?.created_at || "",
     registryStatus: c.status,
   };
 }

@@ -33,6 +33,7 @@ function etatLabel(etat: string): string {
 }
 
 function addressFromPerson(p: Person): string {
+  if (p.adresse?.trim()) return p.adresse.trim();
   const o = personOrigin(p);
   const parts = [o.village, o.secteur || o.commune, o.ville, o.province].filter(Boolean);
   return parts.join(", ");
@@ -53,10 +54,10 @@ function personToBlock(p: Person | null | undefined): FichePersonBlock {
         ? "Étrangère"
         : "Congolaise",
     profession: String(p.parcours_professionnel ?? "").trim() || "",
-    secteur: o.secteur || o.commune || "",
-    territoire: o.territoire || "",
-    ville: o.ville || "",
-    province: o.province || "",
+    secteur: p.secteur || o.secteur || o.commune || "",
+    territoire: p.territoire || o.territoire || "",
+    ville: p.ville || o.ville || "",
+    province: p.province || o.province || "",
     adresse: addressFromPerson(p),
   };
 }

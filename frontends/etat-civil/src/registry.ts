@@ -43,6 +43,12 @@ export type Person = {
   parcours_universitaire?: string;
   parcours_professionnel?: string;
   situation_familiale?: string;
+  /** Adresse / géo saisie sur fiche d'identification (hors actes). */
+  adresse?: string;
+  secteur?: string;
+  territoire?: string;
+  ville?: string;
+  province?: string;
   created_at: string;
 };
 
@@ -476,6 +482,19 @@ export function inheritParentOrigin(father?: Person | null, mother?: Person | nu
  * Origine affichée : infos propres, sinon père, sinon mère.
  */
 export function personOrigin(p: Person): ParentOrigin {
+  if (p.province || p.ville || p.territoire || p.secteur || p.adresse) {
+    return {
+      source: "self",
+      source_name: displayName(p),
+      province: p.province || "",
+      ville: p.ville || "",
+      territoire: p.territoire || "",
+      secteur: p.secteur || "",
+      village: "",
+      commune: p.secteur || "",
+      label: [p.province, p.ville, p.territoire, p.secteur, p.adresse].filter(Boolean).join(" · "),
+    };
+  }
   const self = locationFromActs(p.id, p.nic);
   if (self.province || self.ville || self.territoire || self.commune) {
     return {
