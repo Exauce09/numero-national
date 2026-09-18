@@ -65,7 +65,18 @@ export type Act = {
   status?: string;
 };
 
-/** Libellé unique pour naissance, décès, mariage, divorce, adoption. */
+/** Libellé N° d'acte selon le type d'acte. */
+export function actRefLabel(type?: string | null): string {
+  const t = String(type ?? "").toUpperCase();
+  if (t === "BIRTH" || t === "BIRTHS") return "N° d'acte pour Naissances";
+  if (t === "MARRIAGE" || t === "MARRIAGES") return "N° d'acte pour Mariage";
+  if (t === "DIVORCE" || t === "DIVORCES") return "N° d'acte pour Divorce";
+  if (t === "ADOPTION" || t === "ADOPTIONS") return "N° d'acte pour Adoption";
+  if (t === "DEATH" || t === "DEATHS") return "N° d'acte pour Décès";
+  return "N° d'acte";
+}
+
+/** @deprecated Préférer actRefLabel(type). */
 export const ACT_REF_LABEL = "N° d'acte";
 
 /**

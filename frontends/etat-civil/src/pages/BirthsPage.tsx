@@ -999,7 +999,7 @@ export default function BirthsPage() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>N° d&apos;acte</th>
+              <th>N° d&apos;acte pour Naissances</th>
               <th>Nom</th>
               <th>Sexe</th>
               <th>Date</th>

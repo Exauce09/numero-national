@@ -1,7 +1,7 @@
 import { QRCodeSVG } from "qrcode.react";
 import { getSession } from "../auth";
 import { getOfficerCommune } from "../commune";
-import { actTypeLabel, type Act } from "../registry";
+import { actRefLabel, actTypeLabel, type Act } from "../registry";
 import BirthCertificatePrint from "./BirthCertificatePrint";
 
 type Props = {
@@ -144,19 +144,15 @@ export default function ActPrintCard({
       <div className="act-print-body">
         <div className="act-print-meta">
           <div>
-            <span className="muted">N° d&apos;acte</span>
+            <span className="muted">{actRefLabel(act.type)}</span>
             <strong>{act.act_number}</strong>
           </div>
-          <div>
-            <span className="muted">
-              {act.type === "DEATH" ? "Personne" : "Référence"}
-            </span>
-            <strong>
-              {act.type === "DEATH"
-                ? String(act.payload.deceased_name ?? "—")
-                : act.act_number}
-            </strong>
-          </div>
+          {act.type === "DEATH" ? (
+            <div>
+              <span className="muted">Personne</span>
+              <strong>{String(act.payload.deceased_name ?? "—")}</strong>
+            </div>
+          ) : null}
           <div>
             <span className="muted">Type</span>
             <strong>{actTypeLabel(act.type)}</strong>

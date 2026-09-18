@@ -9,7 +9,7 @@ import { SimpleStatBlocks } from "./StatBlocks";
 import { api } from "../api";
 import { getSession } from "../auth";
 import {
-  ACT_REF_LABEL,
+  actRefLabel,
   getAct,
   getPersonByNic,
   isActCountedInTotals,
@@ -459,7 +459,7 @@ export default function ManageActsPage({
               <tr>
                 <th>#</th>
                 <th>Photo</th>
-                <th>{ACT_REF_LABEL}</th>
+                <th>{actRefLabel(config.actType)}</th>
                 {primary ? <th>{primary.label}</th> : null}
                 {secondary ? <th>{secondary.label}</th> : null}
                 {tertiary ? <th>{tertiary.label}</th> : null}

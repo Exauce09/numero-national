@@ -8,7 +8,7 @@ import { SimpleStatBlocks } from "../components/StatBlocks";
 import { api } from "../api";
 import { getSession } from "../auth";
 import {
-  ACT_REF_LABEL,
+  actRefLabel,
   actTypeLabel,
   getAct,
   getPersonByNic,
@@ -318,7 +318,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
               <tr>
                 <th>#</th>
                 <th>Photo</th>
-                <th>{ACT_REF_LABEL}</th>
+                <th>{actRefLabel(filter || undefined)}</th>
                 <th>Type</th>
                 <th>Statut</th>
                 <th>Enregistré le</th>
