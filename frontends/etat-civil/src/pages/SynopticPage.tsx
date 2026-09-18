@@ -420,8 +420,6 @@ function ProvincesOverviewTable({
 }) {
   const exportRows = rows.map((r) => ({
     province: r.province,
-    villes: r.villes,
-    communes: r.communes,
     naissances_g: r.naissances_g,
     naissances_f: r.naissances_f,
     naissances_t: r.naissances,
@@ -451,8 +449,6 @@ function ProvincesOverviewTable({
           <thead>
             <tr>
               <th rowSpan={2}>PROVINCE</th>
-              <th rowSpan={2}>VILLES</th>
-              <th rowSpan={2}>COMMUNES</th>
               <th colSpan={3}>NOUVEAU-NÉS</th>
               <th rowSpan={2}>MARIAGES</th>
               <th rowSpan={2}>DIVORCES</th>
@@ -473,8 +469,6 @@ function ProvincesOverviewTable({
                 title={`Voir le détail de ${r.province}`}
               >
                 <td className="syn-commune-cell">{r.province}</td>
-                <td>{r.villes}</td>
-                <td>{r.communes}</td>
                 <td>{r.naissances_g}</td>
                 <td>{r.naissances_f}</td>
                 <td>{r.naissances}</td>
@@ -490,12 +484,6 @@ function ProvincesOverviewTable({
             <tr>
               <td className="syn-commune-cell">
                 <strong>TOTAL RDC</strong>
-              </td>
-              <td>
-                <strong>{rows.reduce((a, r) => a + r.villes, 0)}</strong>
-              </td>
-              <td>
-                <strong>{rows.reduce((a, r) => a + r.communes, 0)}</strong>
               </td>
               <td>
                 <strong>{sumG}</strong>
@@ -567,8 +555,6 @@ function ProvinceDetailView({
           <thead>
             <tr>
               <th rowSpan={2}>PROVINCE</th>
-              <th rowSpan={2}>VILLES</th>
-              <th rowSpan={2}>COMMUNES</th>
               <th colSpan={3}>NOUVEAU-NÉS</th>
               <th rowSpan={2}>MARIAGES</th>
               <th rowSpan={2}>DIVORCES</th>
@@ -583,8 +569,6 @@ function ProvinceDetailView({
           <tbody>
             <tr>
               <td className="syn-commune-cell">{province}</td>
-              <td>{summary?.villes ?? 0}</td>
-              <td>{summary?.communes ?? 0}</td>
               <td>{summary?.naissances_g ?? 0}</td>
               <td>{summary?.naissances_f ?? 0}</td>
               <td>{summary?.naissances ?? 0}</td>
@@ -662,7 +646,6 @@ function ProvinceDetailView({
           <thead>
             <tr>
               <th rowSpan={2}>COMMUNE</th>
-              <th rowSpan={2}>VILLE</th>
               <th colSpan={3}>NOUVEAU-NÉS</th>
               <th rowSpan={2}>MARIAGES</th>
               <th rowSpan={2}>DIVORCES</th>
@@ -677,7 +660,7 @@ function ProvinceDetailView({
           <tbody>
             {filteredCommunes.length === 0 ? (
               <tr>
-                <td colSpan={10} className="muted">
+                <td colSpan={9} className="muted">
                   Aucune commune
                 </td>
               </tr>
@@ -690,7 +673,6 @@ function ProvinceDetailView({
                   title={`Ouvrir le synoptique de ${c.commune}`}
                 >
                   <td className="syn-commune-cell">{c.commune}</td>
-                  <td>{c.ville}</td>
                   <td>{c.naissances_g}</td>
                   <td>{c.naissances_f}</td>
                   <td>{c.naissances}</td>
