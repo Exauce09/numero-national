@@ -182,10 +182,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
   const exportRows = acts.map((a) => ({
     act_number: a.act_number,
     type: a.type,
-    act_number: a.act_number,
-    type: a.type,
     status: a.status ?? "",
-    created_at: a.created_at,
     created_at: a.created_at,
   }));
 
