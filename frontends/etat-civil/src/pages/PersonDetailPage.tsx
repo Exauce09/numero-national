@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, type CitizenDetail, type PersonCivilEvent } from "../api";
 import { getSession } from "../auth";
+import FicheIdentificationForm from "../components/FicheIdentificationForm";
+import { buildFicheFromPerson } from "../ficheFromPerson";
 import { deletePerson, displayName, getActiveMarriage, getPerson, listActs, type Person } from "../registry";
 import { nationalHitToPerson } from "../nationalSearch";
 
@@ -184,6 +186,12 @@ export default function PersonDetailPage() {
           >
             Modifier
           </button>
+          <Link
+            className="btn-primary btn-sm"
+            to={`/fiche-identification?personId=${encodeURIComponent(id)}`}
+          >
+            Fiche d&apos;identification
+          </Link>
           <Link className="btn-secondary btn-sm" to="/corrections">
             Demande de correction
           </Link>
@@ -472,6 +480,20 @@ export default function PersonDetailPage() {
               </div>
             ) : null}
           </div>
+
+          {local ? (
+            <div className="panel fiche-ident-wrap" style={{ marginTop: "1rem" }}>
+              <div className="syn-toolbar no-print" style={{ justifyContent: "space-between" }}>
+                <h3 className="panel-title" style={{ margin: 0 }}>
+                  Fiche d&apos;identification (impression)
+                </h3>
+                <button type="button" className="btn-primary btn-sm" onClick={() => window.print()}>
+                  Imprimer / PDF
+                </button>
+              </div>
+              <FicheIdentificationForm data={buildFicheFromPerson(local)} />
+            </div>
+          ) : null}
         </>
       ) : null}
     </div>

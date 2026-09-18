@@ -1,15 +1,17 @@
-/** Saisie + impression Fiche d'identification (Justicia) — géo RDC sans District. */
+/** Saisie + impression Fiche d'identification — modèle officiel état civil RDC. */
 
-import { FormEvent, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import FicheIdentificationForm, {
   emptyFichePerson,
   type FicheIdentificationData,
   type FichePersonBlock,
 } from "../components/FicheIdentificationForm";
+import PersonPicker from "../components/PersonPicker";
 import { getOfficerCommune } from "../commune";
 import { getSession } from "../auth";
-import { provinceDigitsFromName } from "../registry";
+import { buildFicheFromPerson } from "../ficheFromPerson";
+import { getPerson, provinceDigitsFromName, type Person } from "../registry";
 
 function PersonFields({
   title,
@@ -37,7 +39,7 @@ function PersonFields({
             ["profession", "Profession"],
             ["secteur", "Secteur"],
             ["territoire", "Territoire"],
-            ["ville", "Ville"],
+            ["ville", "District"],
             ["province", "Province"],
             ["adresse", "Adresse"],
           ] as const
@@ -59,7 +61,9 @@ function PersonFields({
 export default function FicheIdentificationPage() {
   const officer = getOfficerCommune();
   const session = getSession();
+  const [searchParams] = useSearchParams();
   const [serieSuffix, setSerieSuffix] = useState("");
+  const [fromPerson, setFromPerson] = useState<Person | null>(null);
   const [interesse, setInteresse] = useState<FichePersonBlock>(() => ({
     ...emptyFichePerson(),
     province: officer.province,
@@ -80,6 +84,25 @@ export default function FicheIdentificationPage() {
     const tail = serieSuffix.trim() || "………";
     return `${pp}/INF001-TSL/${tail}`;
   }, [officer.province, serieSuffix]);
+
+  function applyPerson(p: Person | null) {
+    setFromPerson(p);
+    if (!p) return;
+    const built = buildFicheFromPerson(p, { serieSuffix });
+    setInteresse(built.interesse);
+    setConjoint(built.conjoint);
+    setPere(built.pere);
+    setMere(built.mere);
+    setReady(true);
+  }
+
+  useEffect(() => {
+    const pid = searchParams.get("personId");
+    if (!pid) return;
+    const p = getPerson(pid);
+    if (p) applyPerson(p);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const data: FicheIdentificationData = {
     communeName: officer.name,
@@ -106,8 +129,8 @@ export default function FicheIdentificationPage() {
           </p>
           <h2 className="page-title">Fiche d&apos;identification</h2>
           <p className="page-lead">
-            Attestation de naissance, célibataire, résidence, bonne vie et mœurs, nom fonctionnaire,
-            veuvage — modèle état civil (sans District : Ville / Territoire / Secteur).
+            Modèle officiel : attestation de naissance, célibataire, résidence, bonne vie et mœurs,
+            nom fonctionnaire, veuvage — intéressé(e), conjoint(e), père et mère.
             {session?.displayName ? ` Officier : ${session.displayName}.` : ""}
           </p>
         </div>
@@ -115,7 +138,15 @@ export default function FicheIdentificationPage() {
 
       <form className="no-print" onSubmit={onPreview}>
         <div className="panel" style={{ marginBottom: "1rem" }}>
-          <div className="form-grid">
+          <h3 className="panel-title">Remplir depuis le registre</h3>
+          <PersonPicker
+            label="Personne (préremplit la fiche)"
+            value={fromPerson}
+            onChange={applyPerson}
+            hideNic
+            allowClear
+          />
+          <div className="form-grid" style={{ marginTop: "0.75rem" }}>
             <div>
               <label className="form-label">Suffixe série</label>
               <input

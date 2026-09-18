@@ -512,6 +512,12 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                       <Link className="btn-add btn-sm" to={`/population/${p.id}`}>
                         Voir
                       </Link>
+                      <Link
+                        className="btn-secondary btn-sm"
+                        to={`/fiche-identification?personId=${encodeURIComponent(p.id)}`}
+                      >
+                        Fiche
+                      </Link>
                       <button
                         type="button"
                         className="btn-secondary btn-sm"

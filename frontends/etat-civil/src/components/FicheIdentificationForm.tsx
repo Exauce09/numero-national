@@ -94,7 +94,7 @@ function PersonColumn({ title, data }: { title?: string; data: FichePersonBlock 
       <Line label="Profession" value={data.profession} />
       <Line label="Secteur" value={data.secteur} />
       <Line label="Territoire" value={data.territoire} />
-      <Line label="Ville" value={data.ville} />
+      <Line label="District" value={data.ville} />
       <Line label="Province" value={data.province} />
       <Line label="Adresse" value={data.adresse} />
     </div>
@@ -172,15 +172,20 @@ export default function FicheIdentificationForm({ data }: Props) {
       <div
         style={{
           display: "flex",
-          gap: "1rem",
-          borderTop: "1px solid #90caf9",
-          paddingTop: "0.75rem",
+          gap: 0,
+          border: "1.5px solid #1e88e5",
+          borderRadius: 2,
           marginBottom: "1.25rem",
+          overflow: "hidden",
         }}
       >
-        <PersonColumn title="PERE" data={data.pere} />
-        <div style={{ width: 1, background: "#90caf9" }} />
-        <PersonColumn title="MERE" data={data.mere} />
+        <div style={{ flex: 1, padding: "0.65rem 0.75rem" }}>
+          <PersonColumn title="PERE" data={data.pere} />
+        </div>
+        <div style={{ width: 1.5, background: "#1e88e5" }} />
+        <div style={{ flex: 1, padding: "0.65rem 0.75rem" }}>
+          <PersonColumn title="MERE" data={data.mere} />
+        </div>
       </div>
 
       <footer

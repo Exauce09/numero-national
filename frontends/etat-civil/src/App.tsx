@@ -417,6 +417,12 @@ function Shell() {
             </NavLink>
           ) : null}
 
+          {canSeeNav("documents", roles) ? (
+            <NavLink to="/fiche-identification">
+              <IconFile size={18} /> Fiche d&apos;identification
+            </NavLink>
+          ) : null}
+
           {canSeeNav("naissances", roles) || canSeeNav("create_acts", roles) ? (
             <NavLink to="/manage/deplacement">
               <IconCar size={18} /> Déplacement
