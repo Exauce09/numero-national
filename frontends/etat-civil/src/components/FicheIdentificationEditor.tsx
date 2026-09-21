@@ -167,22 +167,31 @@ function PersonBlockFields({
       </FieldLine>
       <FieldLine label="Sexe">
         {showCodes ? (
-          <select
-            style={dottedSelect}
-            value={sexeLocked ?? value.sexe_code ?? "M"}
-            disabled={Boolean(sexeLocked)}
-            onChange={(e) => {
-              const code = e.target.value as Sexe;
-              onChange({
-                ...value,
-                sexe_code: code,
-                sexe: code === "F" ? "Féminin" : "Masculin",
-              });
-            }}
-          >
-            <option value="M">Masculin</option>
-            <option value="F">Féminin</option>
-          </select>
+          sexeLocked ? (
+            <input
+              style={{ ...dottedInput, cursor: "default", fontWeight: 700 }}
+              value={sexeLocked === "F" ? "Féminin" : "Masculin"}
+              readOnly
+              aria-readonly="true"
+              title="Sexe fixé pour ce rôle — seul ce champ est verrouillé"
+            />
+          ) : (
+            <select
+              style={dottedSelect}
+              value={value.sexe_code ?? "M"}
+              onChange={(e) => {
+                const code = e.target.value as Sexe;
+                onChange({
+                  ...value,
+                  sexe_code: code,
+                  sexe: code === "F" ? "Féminin" : "Masculin",
+                });
+              }}
+            >
+              <option value="M">Masculin</option>
+              <option value="F">Féminin</option>
+            </select>
+          )
         ) : (
           <TextInput value={value.sexe} onChange={(v) => set("sexe", v)} />
         )}
@@ -276,17 +285,20 @@ export default function FicheIdentificationEditor({
       sexe_code?: Sexe;
       etat_civil_code?: EtatCivil;
     },
-  ) =>
+  ) => {
+    const sexe_code = sexeLocked ?? interesse.sexe_code ?? value.interesse.sexe_code;
     onChange({
       ...value,
       interesse: {
         ...value.interesse,
         ...interesse,
         date_naissance: interesse.date_naissance ?? value.interesse.date_naissance,
-        sexe_code: interesse.sexe_code ?? value.interesse.sexe_code,
+        sexe_code,
+        sexe: sexe_code === "F" ? "Féminin" : "Masculin",
         etat_civil_code: interesse.etat_civil_code ?? value.interesse.etat_civil_code,
       },
     });
+  };
 
   return (
     <article className="fiche-ident-edit" style={{ background: "#fff", color: "#1e88e5", padding: "1rem 1.1rem" }}>
