@@ -789,7 +789,7 @@ function StatsTab({
   }
 
   return (
-    <div className="panel">
+      <div className="panel">
       <h2>Statistiques — {campaign.code}</h2>
       {loading ? <p className="muted">Chargement…</p> : null}
       {loadError ? <div className="login-error">{loadError}</div> : null}
