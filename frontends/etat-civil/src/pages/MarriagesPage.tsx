@@ -31,7 +31,6 @@ export default function MarriagesPage() {
   const [datePublications, setDatePublications] = useState("");
   const [consentEpoux, setConsentEpoux] = useState(false);
   const [consentEpouse, setConsentEpouse] = useState(false);
-  const [pieces, setPieces] = useState("");
   const [motif, setMotif] = useState("");
   const [dateMariage, setDateMariage] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +87,6 @@ export default function MarriagesPage() {
         date_publications: datePublications || null,
         consentement_epoux: true,
         consentement_epouse: true,
-        pieces_produites: pieces.trim() || null,
         receveur_dote_id: receveurDote?.id ?? null,
         receveur_dote_name: receveurDote ? displayName(receveurDote) : null,
         temoin1_id: temoin1.id,
@@ -201,16 +199,6 @@ export default function MarriagesPage() {
               <option value="oui">Oui</option>
             </select>
           </div>
-          <div className="full">
-            <label className="form-label">Pièces produites</label>
-            <input
-              className="form-control"
-              value={pieces}
-              onChange={(e) => setPieces(e.target.value)}
-              placeholder="Actes de naissance, pièces d'identité…"
-            />
-          </div>
-
           <div className="full">
             <h3 className="panel-title">Célébration</h3>
           </div>

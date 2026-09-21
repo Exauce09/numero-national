@@ -127,7 +127,7 @@ export default function DashboardPage() {
       if (!token) {
         if (!cancelled) {
           setApiLoaded(true);
-          setApiError("Non connecté à l’API — statistiques sur les actes locaux uniquement");
+          setApiError("Mode local — statistiques basées sur les actes de ce poste");
         }
         return;
       }
@@ -145,7 +145,13 @@ export default function DashboardPage() {
         setApiActs([...births, ...deaths, ...marriages, ...divorces, ...adoptions, ...recognitions]);
         setApiError(null);
       } catch (e) {
-        if (!cancelled) setApiError(e instanceof Error ? e.message : "Stats API indisponibles");
+        if (!cancelled) {
+          setApiError(
+            e instanceof Error
+              ? `Mode local — ${e.message}`
+              : "Mode local — statistiques basées sur les actes de ce poste",
+          );
+        }
       } finally {
         if (!cancelled) setApiLoaded(true);
       }
@@ -402,7 +408,7 @@ export default function DashboardPage() {
 
       {apiError ? (
         <p className="muted small" role="status">
-          Stats partielles — {apiError}
+          {apiError}
         </p>
       ) : null}
 
@@ -461,7 +467,7 @@ export default function DashboardPage() {
             <StatCard
               title="Dossiers en cours"
               value={drafts + submitted}
-              subtitle={`${drafts} brouillons · ${submitted} soumis`}
+              subtitle={`${drafts} brouillons · ${submitted} en attente de validation`}
               icon={<IconClipboard size={22} />}
               color={RDC.blueDeep}
               href="/declarations"

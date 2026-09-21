@@ -211,7 +211,10 @@ export default function ManageActsPage({
   const navigate = useNavigate();
   const session = getSession();
   const [q, setQ] = useState("");
-  const [monthFilter, setMonthFilter] = useState("");
+  const [monthFilter, setMonthFilter] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
   const [page, setPage] = useState(1);
   const [viewAct, setViewAct] = useState<Act | null>(null);
   const [tick, setTick] = useState(0);
@@ -243,6 +246,8 @@ export default function ManageActsPage({
 
   const monthOptions = useMemo(() => {
     const set = new Set<string>();
+    const now = new Date();
+    set.add(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
     for (const a of all) {
       const k = monthKey(a.created_at);
       if (k !== "—") set.add(k);
@@ -277,17 +282,9 @@ export default function ManageActsPage({
     () =>
       counted.filter((a) => {
         if (monthFilter && monthKey(a.created_at) !== monthFilter) return false;
-        const needle = q.trim().toLowerCase();
-        if (!needle) return true;
-        const parts = [
-          a.act_number,
-          a.national_id,
-          a.status ?? "",
-          ...config.summaryFields.map((f) => String(a.payload[f.key] ?? "")),
-        ];
-        return parts.join(" ").toLowerCase().includes(needle);
+        return true;
       }),
-    [counted, monthFilter, q, config.summaryFields],
+    [counted, monthFilter],
   );
 
   const last30 = useMemo(() => {
@@ -391,13 +388,36 @@ export default function ManageActsPage({
 
       {showAnalytics ? (
         <>
+          <div className="eg-filter-bar no-print" style={{ marginBottom: "0.75rem" }}>
+            <label className="muted small" htmlFor={`month-stat-${config.slug}`}>
+              Filtrer par mois :
+            </label>
+            <select
+              id={`month-stat-${config.slug}`}
+              className="form-control"
+              style={{ marginBottom: 0, width: "auto", minWidth: 140 }}
+              value={monthFilter}
+              onChange={(e) => setMonthFilter(e.target.value)}
+            >
+              <option value="">Tous les mois</option>
+              {monthOptions.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
           <SimpleStatBlocks
             title={config.listTitle}
             items={[
               { label: "TOTAL", value: counted.length, color: rdcColor(0) },
               { label: "30 DERNIERS JOURS", value: last30, color: rdcColor(1) },
               { label: "90 DERNIERS JOURS", value: last90, color: rdcColor(2) },
-              { label: "FILTRÉS", value: countedFiltered.length, color: rdcColor(3) },
+              {
+                label: monthFilter ? `MOIS ${monthFilter}` : "FILTRÉS (MOIS)",
+                value: countedFiltered.length,
+                color: rdcColor(3),
+              },
             ]}
           />
 

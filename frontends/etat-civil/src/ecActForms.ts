@@ -141,7 +141,6 @@ export const EC_ACT_FORMS: ActFormSchema[] = [
           { key: "date_publications", label: "Date des publications" },
           { key: "consentement_epoux", label: "Consentement de l'époux", required: true },
           { key: "consentement_epouse", label: "Consentement de l'épouse", required: true },
-          { key: "pieces", label: "Pièces produites" },
         ],
       },
       {

@@ -67,7 +67,10 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<ActType | "">("");
   const [q, setQ] = useState("");
-  const [monthFilter, setMonthFilter] = useState("");
+  const [monthFilter, setMonthFilter] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
   const [page, setPage] = useState(1);
   const [viewAct, setViewAct] = useState<Act | null>(null);
   const [editAct, setEditAct] = useState<Act | null>(null);
@@ -128,6 +131,8 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
 
   const monthOptions = useMemo(() => {
     const set = new Set<string>();
+    const now = new Date();
+    set.add(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
     for (const a of all) {
       const k = monthKey(a.created_at);
       if (k !== "—") set.add(k);
@@ -148,8 +153,12 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
   }, [all, filter, q, monthFilter]);
 
   const countedFiltered = useMemo(
-    () => acts.filter(isActCountedInTotals),
-    [acts],
+    () =>
+      counted.filter((a) => {
+        if (monthFilter && monthKey(a.created_at) !== monthFilter) return false;
+        return true;
+      }),
+    [counted, monthFilter],
   );
 
   useEffect(() => {
@@ -233,13 +242,36 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
 
       {showAnalytics ? (
         <>
+          <div className="eg-filter-bar no-print" style={{ marginBottom: "0.75rem" }}>
+            <label className="muted small" htmlFor="acts-month-stat">
+              Filtrer par mois :
+            </label>
+            <select
+              id="acts-month-stat"
+              className="form-control"
+              style={{ marginBottom: 0, width: "auto", minWidth: 140 }}
+              value={monthFilter}
+              onChange={(e) => setMonthFilter(e.target.value)}
+            >
+              <option value="">Tous les mois</option>
+              {monthOptions.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
           <SimpleStatBlocks
             title="LISTE DES ACTES & DOCUMENTS"
             items={[
               { label: "TOTAL ACTES", value: counted.length, color: rdcColor(0) },
               { label: "DOCUMENTS", value: docs, color: rdcColor(1) },
               { label: "AUTRES ACTES", value: counted.length - docs, color: rdcColor(2) },
-              { label: "FILTRÉS", value: countedFiltered.length, color: rdcColor(3) },
+              {
+                label: monthFilter ? `MOIS ${monthFilter}` : "FILTRÉS (MOIS)",
+                value: countedFiltered.length,
+                color: rdcColor(3),
+              },
             ]}
           />
 
