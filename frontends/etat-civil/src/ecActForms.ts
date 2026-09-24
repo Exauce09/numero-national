@@ -61,7 +61,7 @@ export const EC_ACT_FORMS: ActFormSchema[] = [
           { key: "mere", label: "Mère", required: true },
           { key: "adresse_mere", label: "Adresse de la mère", required: true },
           { key: "pere", label: "Père (le cas échéant)" },
-          { key: "originaire", label: "Originaire (province → territoire → secteur → village)" },
+          { key: "originaire", label: "Originaire" },
         ],
       },
       {

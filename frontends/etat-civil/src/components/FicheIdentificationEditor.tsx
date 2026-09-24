@@ -4,6 +4,11 @@ import { useMemo, useState } from "react";
 import { ETAT_CIVIL_OPTIONS, type EtatCivil, type Sexe } from "../registry";
 import { listKnownProfessions, PROFESSIONS_KEY, rememberNamed } from "../namedLists";
 import { emptyFichePerson, type FichePersonBlock } from "./FicheIdentificationForm";
+import GeoCascade, {
+  GEO_PRESETS,
+  ORIGIN_FIELD_LABELS,
+  type GeoSelection,
+} from "./GeoCascade";
 import RdcGeoWizard, { type RdcGeoValue } from "./RdcGeoWizard";
 
 export type FicheEditorConjoint = {
@@ -62,6 +67,62 @@ type Props = {
   compact?: boolean;
 };
 
+/** Province → Territoire → Secteur → Village (+ Ajouter si manquant). */
+function originFromGeo(geo: GeoSelection): Pick<
+  FichePersonBlock,
+  "province" | "ville" | "territoire" | "secteur"
+> {
+  const secteurParts = [geo.commune_name, geo.localite_name].filter(Boolean);
+  return {
+    province: geo.province_name || "",
+    ville: geo.ville_name || "",
+    territoire: geo.district_name || "",
+    secteur: secteurParts.join(" · "),
+  };
+}
+
+function originSummary(block: Pick<FichePersonBlock, "province" | "ville" | "territoire" | "secteur">) {
+  return [block.secteur, block.territoire, block.ville, block.province].filter(Boolean).join(" · ");
+}
+
+function OriginGeoField({
+  label,
+  help,
+  value,
+  onChange,
+}: {
+  label: string;
+  help?: string;
+  value: GeoSelection;
+  onChange: (geo: GeoSelection) => void;
+}) {
+  return (
+    <fieldset className="id-fieldset" style={{ margin: 0 }}>
+      <legend className="form-label" style={{ padding: "0 0.35rem" }}>
+        {label}
+      </legend>
+      {help ? (
+        <p className="muted small" style={{ margin: "0 0 0.65rem" }}>
+          {help}
+        </p>
+      ) : null}
+      <GeoCascade
+        embedded
+        allowAdd
+        levels={[...GEO_PRESETS.originRural]}
+        fieldLabels={ORIGIN_FIELD_LABELS}
+        value={value}
+        onChange={onChange}
+        label={label}
+      />
+      <p className="muted small" style={{ margin: "0.5rem 0 0" }}>
+        Si un territoire, secteur ou village manque dans la liste, utilisez{" "}
+        <strong>+ Ajouter</strong>.
+      </p>
+    </fieldset>
+  );
+}
+
 function ParentSection({
   title,
   value,
@@ -73,9 +134,11 @@ function ParentSection({
   onChange: (next: FichePersonBlock) => void;
   sexeFixed: "M" | "F";
 }) {
-  const [originGeo, setOriginGeo] = useState<RdcGeoValue>({});
+  const [originGeo, setOriginGeo] = useState<GeoSelection>({});
   const set = <K extends keyof FichePersonBlock>(key: K, v: FichePersonBlock[K]) =>
     onChange({ ...value, [key]: v, sexe: sexeFixed === "F" ? "Féminin" : "Masculin" });
+  const who = sexeFixed === "F" ? "mère" : "père";
+  const summary = originSummary(value);
 
   return (
     <>
@@ -142,32 +205,24 @@ function ParentSection({
         />
       </div>
       <div className="full">
-        <RdcGeoWizard
-          purpose="origine"
-          label={`Origine — ${sexeFixed === "F" ? "mère" : "père"} (Province / Territoire ou Ville / Secteur)`}
+        <OriginGeoField
+          label={`Origine — ${who}`}
+          help={`Lieu d’origine du ${who} (ancestral / natif).`}
           value={originGeo}
           onChange={(geo) => {
             setOriginGeo(geo);
             onChange({
               ...value,
               sexe: sexeFixed === "F" ? "Féminin" : "Masculin",
-              province: geo.province_name || "",
-              ville: geo.ville_name || "",
-              territoire: geo.district_name || geo.ville_name || "",
-              secteur: geo.commune_name || geo.village_name || "",
+              ...originFromGeo(geo),
             });
           }}
         />
-        {(value.province || value.territoire || value.secteur) && (
+        {summary ? (
           <p className="muted small" style={{ marginTop: 6 }}>
-            Origine :{" "}
-            <strong>
-              {[value.secteur, value.territoire, value.ville, value.province]
-                .filter(Boolean)
-                .join(" · ")}
-            </strong>
+            Origine : <strong>{summary}</strong>
           </p>
-        )}
+        ) : null}
       </div>
     </>
   );
@@ -181,7 +236,7 @@ export default function FicheIdentificationEditor({
 }: Props) {
   const i = value.interesse;
   const professions = useMemo(() => listKnownProfessions([i.profession]), [i.profession]);
-  const [originGeo, setOriginGeo] = useState<RdcGeoValue>({});
+  const [originGeo, setOriginGeo] = useState<GeoSelection>({});
   const [addressGeo, setAddressGeo] = useState<RdcGeoValue>({});
   const [adresseComplement, setAdresseComplement] = useState("");
 
@@ -198,14 +253,9 @@ export default function FicheIdentificationEditor({
     });
   }
 
-  function applyOrigin(geo: RdcGeoValue) {
+  function applyOrigin(geo: GeoSelection) {
     setOriginGeo(geo);
-    patchInteresse({
-      province: geo.province_name || "",
-      ville: geo.ville_name || "",
-      territoire: geo.district_name || geo.ville_name || "",
-      secteur: geo.commune_name || geo.village_name || "",
-    });
+    patchInteresse(originFromGeo(geo));
   }
 
   function applyAddress(geo: RdcGeoValue) {
@@ -221,6 +271,8 @@ export default function FicheIdentificationEditor({
     const full = [base, v.trim()].filter(Boolean).join(" — ");
     patchInteresse({ adresse: full });
   }
+
+  const interesseOrigin = originSummary(i);
 
   return (
     <div className="fiche-ident-edit fiche-ident-form-normal">
@@ -350,20 +402,17 @@ export default function FicheIdentificationEditor({
           </div>
 
           <div className="full">
-            <RdcGeoWizard
-              purpose="origine"
-              label="Origine — Province / Territoire ou Ville / Secteur"
+            <OriginGeoField
+              label="Origine"
+              help="Lieu d’origine de la personne (ancestral / natif) — distinct de l’adresse de résidence."
               value={originGeo}
               onChange={applyOrigin}
             />
-            {(i.province || i.territoire || i.secteur) && (
+            {interesseOrigin ? (
               <p className="muted small" style={{ marginTop: 6 }}>
-                Origine enregistrée :{" "}
-                <strong>
-                  {[i.secteur, i.territoire, i.ville, i.province].filter(Boolean).join(" · ")}
-                </strong>
+                Origine enregistrée : <strong>{interesseOrigin}</strong>
               </p>
-            )}
+            ) : null}
           </div>
 
           <div className="full">

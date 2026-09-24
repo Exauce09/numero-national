@@ -949,7 +949,7 @@ export default function BirthsPage() {
             />
           </div>
           <div className="full">
-            <label className="form-label">Originaire (Province → Territoire → Secteur → Village)</label>
+            <label className="form-label">Originaire</label>
             <GeoCascade
               embedded
               levels={[...GEO_PRESETS.originRural]}
@@ -958,6 +958,9 @@ export default function BirthsPage() {
               onChange={setGeoOrigine}
               label="Originaire"
             />
+            <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
+              Si un territoire, secteur ou village manque, utilisez <strong>+ Ajouter</strong>.
+            </p>
           </div>
           {father ? (
             <div className="full success-banner" style={{ margin: 0 }}>
