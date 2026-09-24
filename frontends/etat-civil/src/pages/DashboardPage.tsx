@@ -573,7 +573,7 @@ export default function DashboardPage() {
           labels={months.map((m) => m.label)}
           series={[
             { name: "Nouveau-nés", color: RDC.yellow, values: birthSeries },
-            { name: "Enregistrement de décès", color: RDC.red, values: deathSeries },
+            { name: "Décès", color: RDC.red, values: deathSeries },
           ]}
         />
         <div className="eg-chart-card eg-chart-card--compact">
