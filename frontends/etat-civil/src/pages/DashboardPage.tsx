@@ -129,6 +129,11 @@ function actProvince(a: {
   return "Non renseignée";
 }
 
+function actStatus(a: { status?: string; payload?: Record<string, unknown> }): string {
+  const raw = String(a.status ?? a.payload?.status ?? "DRAFT").toUpperCase().trim();
+  return raw || "DRAFT";
+}
+
 /** Tableau de bord bureau d'état civil — actes uniquement (pas de population / recensement). */
 export default function DashboardPage() {
   const navigate = useNavigate();
