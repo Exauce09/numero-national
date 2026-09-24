@@ -752,7 +752,15 @@ export default function GeoCascade({
 
       {addKind ? (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
-          <form className="modal-panel" onSubmit={(e) => void submitAdd(e)}>
+          <div
+            className="modal-panel"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !addBusy) {
+                e.preventDefault();
+                void submitAdd(e as unknown as FormEvent);
+              }
+            }}
+          >
             <h3>{addTitles[addKind]}</h3>
             <p className="muted small">
               Enregistrement en base. Un doublon (même nom, autre orthographe) est refusé.
@@ -766,17 +774,22 @@ export default function GeoCascade({
               onChange={(e) => setAddName(e.target.value)}
               placeholder="Ex. Nouveau quartier"
               autoFocus
-              required
             />
             <div className="modal-actions">
               <button type="button" className="btn-secondary" onClick={() => setAddKind(null)}>
                 Annuler
               </button>
-              <button type="submit" className="btn-primary" style={{ width: "auto", minWidth: 120 }} disabled={addBusy}>
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ width: "auto", minWidth: 120 }}
+                disabled={addBusy}
+                onClick={(e) => void submitAdd(e as unknown as FormEvent)}
+              >
                 {addBusy ? "Enregistrement…" : "Enregistrer"}
               </button>
             </div>
-          </form>
+          </div>
         </div>
       ) : null}
     </>

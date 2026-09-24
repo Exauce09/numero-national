@@ -8,10 +8,12 @@ import {
   addPerson,
   ageYears,
   displayName,
+  findDuplicatePerson,
   isDeceased,
   personOrigin,
   provinceDigitsFromName,
   searchPersons,
+  updatePerson,
   type Nationalite,
   type Person,
   type Sexe,
@@ -82,29 +84,46 @@ function tryAddRelative(
     adresse?: string;
   },
   sexe: Sexe,
-): string | undefined {
-  if (!block.nom.trim()) return undefined;
+): { id?: string; warning?: string } {
+  if (!block.nom.trim()) return {};
+  if (!block.prenom.trim()) {
+    return { warning: `Parent ${sexe === "M" ? "père" : "mère"} : prénom manquant — non enregistré.` };
+  }
   const lieu = block.lieu_date_naissance.trim();
   const dateMatch = /(\d{4}-\d{2}-\d{2}|\d{1,2}[/.]\d{1,2}[/.]\d{4})/.exec(lieu);
-  const date_naissance = dateMatch?.[1]?.includes("-")
+  if (!dateMatch) {
+    return {
+      warning: `Parent ${sexe === "M" ? "père" : "mère"} : date de naissance manquante — non enregistré (saisissez une date dans le lieu ou ignorez le parent).`,
+    };
+  }
+  const date_naissance = dateMatch[1].includes("-")
     ? dateMatch[1]
-    : dateMatch
-      ? (() => {
-          const m = /^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/.exec(dateMatch[1]);
-          return m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : "1970-01-01";
-        })()
-      : "1970-01-01";
+    : (() => {
+        const m = /^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/.exec(dateMatch[1]);
+        return m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : "";
+      })();
+  if (!date_naissance) {
+    return { warning: `Parent ${sexe === "M" ? "père" : "mère"} : date invalide — non enregistré.` };
+  }
   const originLabel = [block.secteur, block.territoire, block.ville, block.province]
     .filter(Boolean)
     .join(" · ");
+  const existing = findDuplicatePerson({
+    nom: block.nom.trim(),
+    postnom: block.postnom.trim(),
+    prenom: block.prenom.trim(),
+    date_naissance,
+    sexe,
+  });
+  if (existing) return { id: existing.id };
   try {
     const p = addPerson({
       nom: block.nom.trim(),
       postnom: block.postnom.trim(),
-      prenom: block.prenom.trim() || "—",
+      prenom: block.prenom.trim(),
       sexe,
       date_naissance,
-      lieu_naissance: lieu.replace(dateMatch?.[0] ?? "", "").replace(/[—\-–]/g, " ").trim() || originLabel,
+      lieu_naissance: lieu.replace(dateMatch[0] ?? "", "").replace(/[—\-–]/g, " ").trim() || originLabel,
       etat_civil: "UNKNOWN" as Person["etat_civil"],
       nationalite: natFromLabel(block.nationalite || "Congolaise"),
       parcours_professionnel: block.profession?.trim() || undefined,
@@ -115,10 +134,32 @@ function tryAddRelative(
       adresse: block.adresse?.trim() || undefined,
       situation_familiale: originLabel ? `Origine: ${originLabel}` : undefined,
     });
-    return p.id;
-  } catch {
-    return undefined;
+    return { id: p.id };
+  } catch (err) {
+    return {
+      warning: err instanceof Error ? err.message : `Parent ${sexe === "M" ? "père" : "mère"} non enregistré.`,
+    };
   }
+}
+
+function seedFromQuery(sexFilter: Sexe | undefined, query: string): FicheEditorState {
+  const seed = buildEditorSeed(sexFilter);
+  const q = query.trim();
+  if (!q) return seed;
+  const parts = q.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) {
+    seed.interesse = { ...seed.interesse, nom: parts[0], prenom: "" };
+  } else if (parts.length === 2) {
+    seed.interesse = { ...seed.interesse, nom: parts[0], prenom: parts[1] };
+  } else {
+    seed.interesse = {
+      ...seed.interesse,
+      nom: parts[0],
+      postnom: parts[1],
+      prenom: parts.slice(2).join(" "),
+    };
+  }
+  return seed;
 }
 
 export default function PersonPicker({
@@ -146,13 +187,19 @@ export default function PersonPicker({
   const [results, setResults] = useState<Person[]>([]);
   const [searching, setSearching] = useState(false);
 
+  const isPere =
+    label.toLowerCase().includes("papa") || label.toLowerCase().includes("père");
+  const isMere =
+    label.toLowerCase().includes("maman") || label.toLowerCase().includes("mère");
+
   useEffect(() => {
     if (forceAddOpen) {
-      setFiche(buildEditorSeed(sexFilter));
+      setFiche(seedFromQuery(sexFilter, query));
+      setOpen(false);
       setModal(true);
       onForceAddConsumed?.();
     }
-  }, [forceAddOpen, onForceAddConsumed, sexFilter]);
+  }, [forceAddOpen, onForceAddConsumed, sexFilter, query]);
 
   useEffect(() => {
     if (!open || value) return;
@@ -191,6 +238,14 @@ export default function PersonPicker({
     setQuery("");
   }
 
+  function openAddModal() {
+    setFiche(seedFromQuery(sexFilter, query));
+    setError(null);
+    setOpen(false);
+    setResults([]);
+    setModal(true);
+  }
+
   function onAdd(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -205,20 +260,23 @@ export default function PersonPicker({
     }
     try {
       const sexe = sexFilter ?? i.sexe_code;
-      const father_id = tryAddRelative(fiche.pere, "M");
-      const mother_id = tryAddRelative(fiche.mere, "F");
-      const situationParts = [
-        fiche.conjoint.nom.trim()
-          ? `Conjoint: ${fiche.conjoint.nom.trim()}${
-              fiche.conjoint.lieu_date_naissance ? ` (${fiche.conjoint.lieu_date_naissance})` : ""
-            }`
-          : "",
-        fiche.conjoint.profession.trim() ? `Prof. conjoint: ${fiche.conjoint.profession.trim()}` : "",
-        fiche.conjoint.adresse.trim() ? `Adr. conjoint: ${fiche.conjoint.adresse.trim()}` : "",
-        [i.secteur, i.territoire, i.ville, i.province].filter(Boolean).length
-          ? `Origine: ${[i.secteur, i.territoire, i.ville, i.province].filter(Boolean).join(" · ")}`
-          : "",
-      ].filter(Boolean);
+      const existing = findDuplicatePerson({
+        nom: i.nom.trim(),
+        postnom: i.postnom.trim(),
+        prenom: i.prenom.trim(),
+        date_naissance: i.date_naissance,
+        sexe,
+      });
+      if (existing) {
+        onChange(existing);
+        setQuery("");
+        setResults([]);
+        setOpen(false);
+        setFiche(buildEditorSeed(sexFilter));
+        setModal(false);
+        setError(null);
+        return;
+      }
 
       const person = addPerson({
         nom: i.nom.trim(),
@@ -235,10 +293,32 @@ export default function PersonPicker({
         territoire: i.territoire.trim() || undefined,
         ville: i.ville.trim() || undefined,
         province: i.province.trim() || undefined,
-        father_id,
-        mother_id,
-        situation_familiale: situationParts.length ? situationParts.join(" · ") : undefined,
       });
+
+      if (!isPere && !isMere) {
+        const fatherRes = tryAddRelative(fiche.pere, "M");
+        const motherRes = tryAddRelative(fiche.mere, "F");
+        const situationParts = [
+          fiche.conjoint.nom.trim()
+            ? `Conjoint: ${fiche.conjoint.nom.trim()}${
+                fiche.conjoint.lieu_date_naissance ? ` (${fiche.conjoint.lieu_date_naissance})` : ""
+              }`
+            : "",
+          fiche.conjoint.profession.trim() ? `Prof. conjoint: ${fiche.conjoint.profession.trim()}` : "",
+          fiche.conjoint.adresse.trim() ? `Adr. conjoint: ${fiche.conjoint.adresse.trim()}` : "",
+          [i.secteur, i.territoire, i.ville, i.province].filter(Boolean).length
+            ? `Origine: ${[i.secteur, i.territoire, i.ville, i.province].filter(Boolean).join(" · ")}`
+            : "",
+        ].filter(Boolean);
+        if (fatherRes.id || motherRes.id || situationParts.length) {
+          updatePerson(person.id, {
+            father_id: fatherRes.id ?? undefined,
+            mother_id: motherRes.id ?? undefined,
+            situation_familiale: situationParts.length ? situationParts.join(" · ") : undefined,
+          });
+        }
+      }
+
       if (i.profession.trim()) {
         rememberNamed(PROFESSIONS_KEY, i.profession);
       }
@@ -252,11 +332,6 @@ export default function PersonPicker({
       setError(err instanceof Error ? err.message : "Ajout impossible.");
     }
   }
-
-  const isPere =
-    label.toLowerCase().includes("papa") || label.toLowerCase().includes("père");
-  const isMere =
-    label.toLowerCase().includes("maman") || label.toLowerCase().includes("mère");
 
   return (
     <div className="person-picker">
@@ -314,30 +389,22 @@ export default function PersonPicker({
             onFocus={() => setOpen(true)}
           />
           {!hideAdd ? (
-            <button
-              type="button"
-              className="btn-add"
-              onClick={() => {
-                setFiche(buildEditorSeed(sexFilter));
-                setError(null);
-                setModal(true);
-              }}
-            >
+            <button type="button" className="btn-add" onClick={openAddModal}>
               {addButtonLabel}
             </button>
           ) : null}
         </div>
       )}
-      {open && !value ? (
+      {open && !value && !modal ? (
         <ul className="person-picker-list">
           {query.trim().length < 1 ? (
             <li className="muted">
               {originGeoFilter
                 ? "Tapez un nom ou un lieu (province, territoire, secteur, village)…"
-                : "Tapez pour chercher dans le registre national…"}
+                : "Tapez pour chercher dans le registre…"}
             </li>
           ) : searching ? (
-            <li className="muted">Recherche nationale…</li>
+            <li className="muted">Recherche…</li>
           ) : results.length === 0 ? (
             <li className="muted">
               {(() => {
@@ -351,9 +418,19 @@ export default function PersonPicker({
                     ? `« ${sample} » existe mais en sexe féminin — cherchez-la dans Mère, pas Père.`
                     : `« ${sample} » existe mais en sexe masculin — cherchez-le dans Père, pas Mère.`;
                 }
-                return sexFilter
-                  ? `Aucun résultat (${sexFilter === "F" ? "féminin" : "masculin"}) — vous pouvez « Ajouter ».`
-                  : "Aucun résultat — vous pouvez « Ajouter ».";
+                return (
+                  <>
+                    Aucun résultat
+                    {sexFilter ? ` (${sexFilter === "F" ? "féminin" : "masculin"})` : ""}.{" "}
+                    {!hideAdd ? (
+                      <button type="button" className="btn-add btn-sm" onClick={openAddModal}>
+                        Ajouter « {query.trim()} »
+                      </button>
+                    ) : (
+                      "— vous pouvez « Ajouter »."
+                    )}
+                  </>
+                );
               })()}
             </li>
           ) : (
@@ -395,10 +472,10 @@ export default function PersonPicker({
                 <h3>Ajouter une personne</h3>
                 <p className="muted small" style={{ margin: 0 }}>
                   {isPere
-                    ? "Saisie du père — sexe masculin verrouillé."
+                    ? "Saisie du père — sexe masculin verrouillé. Nom, prénom et date de naissance suffisent."
                     : isMere
-                      ? "Saisie de la mère — sexe féminin verrouillé."
-                      : "Identité, origine et adresse de résidence."}
+                      ? "Saisie de la mère — sexe féminin verrouillé. Nom, prénom et date de naissance suffisent."
+                      : "Nom, prénom et date de naissance sont obligatoires. Origine et adresse sont optionnels."}
                 </p>
               </div>
               <button
