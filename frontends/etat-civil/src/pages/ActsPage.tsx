@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import ActWorkflowPanel from "../components/ActWorkflowPanel";
 import ActsDocsNav from "../components/ActsDocsNav";
@@ -65,6 +65,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<ActType | "">("");
   const [statusFocus, setStatusFocus] = useState<"all" | "drafts" | "validated">("all");
+  const listRef = useRef<HTMLDivElement | null>(null);
   const [q, setQ] = useState("");
   const [monthFilter, setMonthFilter] = useState(() => {
     const d = new Date();
@@ -144,6 +145,18 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
       new Set(["DRAFT", "SUBMITTED", "UNDER_REVIEW", "PENDING_OFFICER", "CORRECTION_REQUIRED", ""]),
     [],
   );
+
+  function goToListFocus(focus: "all" | "drafts" | "validated") {
+    setStatusFocus(focus);
+    if (focus === "drafts" || focus === "validated") {
+      setMonthFilter("");
+      setQ("");
+    }
+    setPage(1);
+    window.requestAnimationFrame(() => {
+      listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
 
   const acts = useMemo(() => {
     const base = (filter ? all.filter((a) => a.type === filter) : all).filter(
@@ -276,7 +289,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
                 label: "TOTAL GÉNÉRAL",
                 value: all.filter((a) => !["CENSUS", "DISPLACEMENT"].includes(a.type)).length,
                 color: rdcColor(0),
-                onClick: () => setStatusFocus("all"),
+                onClick: () => goToListFocus("all"),
                 active: statusFocus === "all",
               },
               {
@@ -287,14 +300,14 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
                   return ["DRAFT", "SUBMITTED", "UNDER_REVIEW", "PENDING_OFFICER", "CORRECTION_REQUIRED", ""].includes(s);
                 }).length,
                 color: rdcColor(3),
-                onClick: () => setStatusFocus((s) => (s === "drafts" ? "all" : "drafts")),
+                onClick: () => goToListFocus("drafts"),
                 active: statusFocus === "drafts",
               },
               {
                 label: "VALIDÉS",
                 value: counted.length,
                 color: rdcColor(1),
-                onClick: () => setStatusFocus((s) => (s === "validated" ? "all" : "validated")),
+                onClick: () => goToListFocus("validated"),
                 active: statusFocus === "validated",
               },
               {
@@ -318,7 +331,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
         </>
       ) : null}
 
-      <div className="panel">
+      <div className="panel" ref={listRef} id="acts-list-panel">
         <div className="panel-head">
           <div className="eg-filter-bar">
             <label className="muted small" htmlFor="acts-search">

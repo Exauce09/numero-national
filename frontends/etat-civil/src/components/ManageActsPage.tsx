@@ -1,6 +1,6 @@
 /** Pages manage-* style Justicia : stats, graphiques, liste paginée, détail. */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ActWorkflowPanel from "./ActWorkflowPanel";
 import { BarChart, PieChart } from "./Charts";
@@ -230,6 +230,7 @@ export default function ManageActsPage({
   const session = getSession();
   const [q, setQ] = useState("");
   const [statusFocus, setStatusFocus] = useState<"all" | "drafts" | "validated">("all");
+  const listRef = useRef<HTMLDivElement | null>(null);
   const [monthFilter, setMonthFilter] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -238,6 +239,18 @@ export default function ManageActsPage({
   const [viewAct, setViewAct] = useState<Act | null>(null);
   const [tick, setTick] = useState(0);
   const [source, setSource] = useState<"api" | "cache">("cache");
+
+  function goToListFocus(focus: "all" | "drafts" | "validated") {
+    setStatusFocus(focus);
+    if (focus === "drafts" || focus === "validated") {
+      setMonthFilter("");
+      setQ("");
+    }
+    setPage(1);
+    window.requestAnimationFrame(() => {
+      listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
 
   const refresh = useCallback(async () => {
     const kind = ACT_KIND[config.actType];
@@ -448,21 +461,21 @@ export default function ManageActsPage({
                 label: "TOTAL GÉNÉRAL",
                 value: totalGeneral,
                 color: rdcColor(0),
-                onClick: () => setStatusFocus("all"),
+                onClick: () => goToListFocus("all"),
                 active: statusFocus === "all",
               },
               {
                 label: "BROUILLONS",
                 value: draftsCount,
                 color: rdcColor(3),
-                onClick: () => setStatusFocus((s) => (s === "drafts" ? "all" : "drafts")),
+                onClick: () => goToListFocus("drafts"),
                 active: statusFocus === "drafts",
               },
               {
                 label: "VALIDÉS",
                 value: counted.length,
                 color: rdcColor(1),
-                onClick: () => setStatusFocus((s) => (s === "validated" ? "all" : "validated")),
+                onClick: () => goToListFocus("validated"),
                 active: statusFocus === "validated",
               },
               {
@@ -490,7 +503,7 @@ export default function ManageActsPage({
         </>
       ) : null}
 
-      <div className="panel">
+      <div className="panel" ref={listRef} id={`acts-list-${config.slug}`}>
         <div className="panel-head">
           <div className="eg-filter-bar">
             <label className="muted small" htmlFor={`search-${config.slug}`}>
@@ -527,11 +540,26 @@ export default function ManageActsPage({
 
         <div className="eg-acts-table-wrap">
           <div className="eg-acts-table-caption">
-            <strong>Tableau des actes</strong>
+            <strong>
+              {statusFocus === "drafts"
+                ? "Brouillons"
+                : statusFocus === "validated"
+                  ? "Actes validés"
+                  : "Tableau des actes"}
+            </strong>
             <span className="muted small">
               {rows.length} enregistrement{rows.length > 1 ? "s" : ""}
+              {statusFocus === "drafts" ? " · brouillons uniquement" : ""}
             </span>
           </div>
+          {statusFocus === "drafts" ? (
+            <p className="muted small" style={{ margin: "0.5rem 0.85rem" }}>
+              Liste des dossiers en brouillon / en attente de validation.{" "}
+              <button type="button" className="btn-secondary btn-sm" onClick={() => goToListFocus("all")}>
+                Voir tout
+              </button>
+            </p>
+          ) : null}
           <div className="table-scroll eg-acts-table-scroll">
             <table className="data-table eg-table eg-acts-table">
               <thead>
