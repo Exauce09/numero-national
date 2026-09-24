@@ -387,6 +387,15 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
           </div>
         </div>
 
+        {statusFocus === "drafts" ? (
+          <p className="muted small" style={{ margin: "0 0 0.75rem" }}>
+            Affichage des <strong>brouillons</strong> uniquement.{" "}
+            <button type="button" className="btn-secondary btn-sm" onClick={() => goToListFocus("all")}>
+              Voir tout
+            </button>
+          </p>
+        ) : null}
+
         <div className="table-scroll">
           <table className="data-table eg-table">
             <thead>
