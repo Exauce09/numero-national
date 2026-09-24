@@ -287,10 +287,10 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
             items={[
               {
                 label: "TOTAL GÉNÉRAL",
-                value: all.filter((a) => !["CENSUS", "DISPLACEMENT"].includes(a.type)).length,
+                value: counted.length,
                 color: rdcColor(0),
-                onClick: () => goToListFocus("all"),
-                active: statusFocus === "all",
+                onClick: () => goToListFocus("validated"),
+                active: statusFocus === "validated" || statusFocus === "all",
               },
               {
                 label: "BROUILLONS",

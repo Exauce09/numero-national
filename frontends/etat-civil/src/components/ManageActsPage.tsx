@@ -337,7 +337,8 @@ export default function ManageActsPage({
     [all, draftStatuses],
   );
 
-  const totalGeneral = all.length;
+  /** Total officiel = actes validés uniquement (les brouillons ne comptent pas). */
+  const totalGeneral = counted.length;
 
   const last30 = useMemo(() => {
     const cut = Date.now() - 30 * 24 * 60 * 60 * 1000;
@@ -461,8 +462,8 @@ export default function ManageActsPage({
                 label: "TOTAL GÉNÉRAL",
                 value: totalGeneral,
                 color: rdcColor(0),
-                onClick: () => goToListFocus("all"),
-                active: statusFocus === "all",
+                onClick: () => goToListFocus("validated"),
+                active: statusFocus === "validated" || statusFocus === "all",
               },
               {
                 label: "BROUILLONS",
