@@ -132,16 +132,17 @@ export function nationalHitToPerson(hit: NationalCitizenHit): Person {
 
 /**
  * Recherche nationale (registre serveur) + fusion locale.
+ * Les fiches locales passent en premier (sinon l'API remplit le quota et masque un ajout récent).
  * @param limit max résultats (défaut 100 — anciennement plafonné à 12).
  */
 export async function searchEveryone(query: string, limit = SEARCH_PAGE_SIZE): Promise<Person[]> {
   const q = query.trim();
   const cap = Math.min(Math.max(limit, 1), SEARCH_PAGE_SIZE);
-  const local = searchPersons(q).slice(0, cap);
-  if (q.length < 1) return local;
+  const local = searchPersons(q);
+  if (q.length < 1) return local.slice(0, cap);
 
   const session = getSession();
-  if (!session?.accessToken) return local;
+  if (!session?.accessToken) return local.slice(0, cap);
 
   try {
     const all: NationalCitizenHit[] = [];
@@ -167,16 +168,29 @@ export async function searchEveryone(query: string, limit = SEARCH_PAGE_SIZE): P
     }
 
     const national = all.slice(0, cap).map(hitToPersonView);
-    const seen = new Set(national.map((p) => p.id));
+    const seen = new Set<string>();
+    const merged: Person[] = [];
+    const mark = (p: Person) => {
+      seen.add(p.id);
+      if (p.nic) seen.add(`nic:${p.nic}`);
+    };
+    const already = (p: Person) => seen.has(p.id) || (p.nic ? seen.has(`nic:${p.nic}`) : false);
+
     for (const p of local) {
-      if (!seen.has(p.id)) {
-        national.push(p);
-        seen.add(p.id);
-      }
+      if (already(p)) continue;
+      merged.push(p);
+      mark(p);
+      if (merged.length >= cap) return merged;
     }
-    return national.slice(0, cap);
+    for (const p of national) {
+      if (already(p)) continue;
+      merged.push(p);
+      mark(p);
+      if (merged.length >= cap) break;
+    }
+    return merged;
   } catch {
-    return local;
+    return local.slice(0, cap);
   }
 }
 

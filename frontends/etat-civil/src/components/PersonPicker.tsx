@@ -242,6 +242,9 @@ export default function PersonPicker({
         rememberNamed(PROFESSIONS_KEY, i.profession);
       }
       onChange(person);
+      setQuery("");
+      setResults([]);
+      setOpen(false);
       setFiche(buildEditorSeed(sexFilter));
       setModal(false);
     } catch (err) {
@@ -336,9 +339,21 @@ export default function PersonPicker({
             <li className="muted">Recherche nationale…</li>
           ) : results.length === 0 ? (
             <li className="muted">
-              {sexFilter
-                ? `Aucun résultat (${sexFilter === "F" ? "féminin" : "masculin"}) — vous pouvez « Ajouter ».`
-                : "Aucun résultat — vous pouvez « Ajouter »."}
+              {(() => {
+                const otherSexHits =
+                  sexFilter != null
+                    ? searchPersons(query).filter((p) => p.sexe && p.sexe !== sexFilter)
+                    : [];
+                if (otherSexHits.length > 0) {
+                  const sample = displayName(otherSexHits[0]);
+                  return sexFilter === "M"
+                    ? `« ${sample} » existe mais en sexe féminin — cherchez-la dans Mère, pas Père.`
+                    : `« ${sample} » existe mais en sexe masculin — cherchez-le dans Père, pas Mère.`;
+                }
+                return sexFilter
+                  ? `Aucun résultat (${sexFilter === "F" ? "féminin" : "masculin"}) — vous pouvez « Ajouter ».`
+                  : "Aucun résultat — vous pouvez « Ajouter ».";
+              })()}
             </li>
           ) : (
             results.map((p) => {
