@@ -551,6 +551,8 @@ function Shell() {
             <Route path="/manage/naissance" element={<RequireCivilBureau><ManageNaissancePage /></RequireCivilBureau>} />
             <Route path="/manage/deplacement" element={<Navigate to="/" replace />} />
             <Route path="/displacements" element={<Navigate to="/" replace />} />
+            <Route path="/census" element={<Navigate to="/population" replace />} />
+            <Route path="/census/scan-coupon" element={<Navigate to="/population" replace />} />
             <Route path="/lists/deces" element={<RequireCivilBureau><ManageActsPage config={MANAGE_CONFIGS.deces} showAnalytics /></RequireCivilBureau>} />
             <Route path="/lists/divorce" element={<ManageActsPage config={MANAGE_CONFIGS.divorce} showAnalytics />} />
             <Route path="/lists/adoption" element={<ManageActsPage config={MANAGE_CONFIGS.adoption} showAnalytics />} />

@@ -1,7 +1,7 @@
 /** Liste population / personnes — registre national (API) + fallback local. */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { BarChart, PieChart } from "../components/Charts";
 import DataToolbar from "../components/DataToolbar";
 import { PopulationStatBlocks } from "../components/StatBlocks";
@@ -15,7 +15,6 @@ import {
   displayName,
   getCivilStatusOverride,
   getPerson,
-  listActs,
   listPopulationPersons,
   isDeceased,
   personNationalite,
@@ -28,11 +27,10 @@ import {
 
 const PAGE_SIZE = 25;
 
-type PopView = "all" | "recenses" | "identification";
+type PopView = "all" | "identification";
 
 type PopRow = Person & {
   registryStatus?: string;
-  hasCensus?: boolean;
   biometricNote?: string;
 };
 
@@ -80,9 +78,9 @@ function civilStatusLabel(p: PopRow): string {
 }
 
 export default function PopulationPage({ showAnalytics = false }: { showAnalytics?: boolean }) {
-  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const view = (params.get("view") as PopView) || "all";
+  const viewRaw = params.get("view");
+  const view: PopView = viewRaw === "identification" ? "identification" : "all";
   const hasApi = Boolean(getSession()?.accessToken);
   const [q, setQ] = useState("");
   const [sexe, setSexe] = useState("");
@@ -108,23 +106,12 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
   });
   const [actionMsg, setActionMsg] = useState<string | null>(null);
 
-  const censusIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const a of listActs().filter((x) => x.type === "CENSUS")) {
-      const pid = String(a.payload.person_id ?? a.payload.citizen_id ?? "");
-      if (pid) ids.add(pid);
-      if (a.national_id) ids.add(a.national_id);
-    }
-    return ids;
-  }, [persons.length]);
-
   const load = useCallback(async () => {
     const token = hasApi ? await ensureAccessToken() : null;
     if (!token) {
       const local = listPopulationPersons().map((p) => ({
         ...p,
         registryStatus: "LOCAL",
-        hasCensus: Boolean(p.id && censusIds.has(p.id)) || Boolean(p.nic && censusIds.has(p.nic)),
         biometricNote: [p.fingerprint_note, p.iris_note].filter(Boolean).join(" · ") || "Non enrôlé",
       }));
       setPersons(local);
@@ -158,14 +145,8 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
       }
       const rows = allItems.map((c) => {
         const row = citizenToRow(c);
-        const status = (c.status || "").toUpperCase();
-        const linkedLocal =
-          Boolean(row.id && censusIds.has(row.id)) || Boolean(row.nic && censusIds.has(row.nic));
-        // Recensé national = fiche ACTIVE avec NIC (promue) ou acte local CENSUS
-        const hasCensus = linkedLocal || (status === "ACTIVE" && Boolean(row.nic));
         return {
           ...row,
-          hasCensus,
           biometricNote: [row.fingerprint_note, row.iris_note].filter(Boolean).join(" · ") || "Non enrôlé",
         };
       });
@@ -183,7 +164,7 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
     } finally {
       setBusy(false);
     }
-  }, [hasApi, q, censusIds]);
+  }, [hasApi, q]);
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), q ? 280 : 0);
@@ -209,12 +190,11 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
         if (dead) return false;
         if (civilStatus && p.etat_civil !== (civilStatus as EtatCivil)) return false;
       }
-      if (view === "recenses" && !p.hasCensus) return false;
       if (sexe && p.sexe !== sexe) return false;
       if (nat && personNationalite(p) !== nat) return false;
       return true;
     });
-  }, [persons, sexe, nat, civilStatus, view]);
+  }, [persons, sexe, nat, civilStatus]);
 
   useEffect(() => {
     setPage(1);
@@ -286,13 +266,11 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
   }
 
   const title =
-    view === "recenses"
-      ? "Personnes recensées"
-      : view === "identification"
-        ? "Identification biométrique"
-        : showAnalytics
-          ? "Liste de la population"
-          : "Population";
+    view === "identification"
+      ? "Identification biométrique"
+      : showAnalytics
+        ? "Liste de la population"
+        : "Population";
 
   return (
     <div>
@@ -305,10 +283,6 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
           <p className="page-lead">
             {view === "identification" ? (
               <>Données biométriques et statut civil de chaque personne du registre.</>
-            ) : view === "recenses" ? (
-              <>
-                Personnes recensées (registre national ou acte local). Total registre : {total}.
-              </>
             ) : source === "api" ? (
               <>
                 Registre national — <strong>{total}</strong> fiche(s) au total. Affichage {PAGE_SIZE}{" "}
@@ -317,15 +291,10 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
             ) : (
               <>
                 Mode local navigateur — <strong>{total}</strong> fiche(s) en cache seulement (ce n’est
-                pas le registre national à 110). Reconnectez-vous : officier / DemoCivil2026!
+                pas le registre national). Reconnectez-vous : officier / DemoCivil2026!
               </>
             )}
           </p>
-        </div>
-        <div className="toolbar" style={{ margin: 0, gap: "0.4rem", display: "flex", flexWrap: "wrap" }}>
-          <button type="button" className="btn-add" onClick={() => navigate("/census")}>
-            + Ajouter
-          </button>
         </div>
       </div>
 
@@ -339,13 +308,6 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
         </button>
         <button
           type="button"
-          className={`btn-secondary btn-sm${view === "recenses" ? " active" : ""}`}
-          onClick={() => setView("recenses")}
-        >
-          Recensement
-        </button>
-        <button
-          type="button"
           className={`btn-secondary btn-sm${view === "identification" ? " active" : ""}`}
           onClick={() => setView("identification")}
         >
@@ -353,9 +315,6 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
         </button>
         <Link className="btn-secondary btn-sm" to="/biometrie">
           Biométrie
-        </Link>
-        <Link className="btn-secondary btn-sm" to="/census/scan-coupon">
-          Scanner QR code
         </Link>
         <Link className="btn-secondary btn-sm" to="/cartes-livraison">
           Impression carte
@@ -446,9 +405,6 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
             </button>
           </div>
           <div className="toolbar" style={{ margin: 0, display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center" }}>
-            <button type="button" className="btn-primary btn-sm" onClick={() => navigate("/census")}>
-              Ajouter
-            </button>
             <DataToolbar filename="population" rows={exportRows} />
           </div>
         </div>
@@ -464,14 +420,13 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                 <th>Date</th>
                 <th>Situation</th>
                 {view === "identification" ? <th>Biométrie</th> : null}
-                {view === "recenses" ? <th>Recensement</th> : null}
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={view === "identification" || view === "recenses" ? 8 : 7} className="muted">
+                  <td colSpan={view === "identification" ? 8 : 7} className="muted">
                     {busy ? "Chargement…" : "Aucune personne trouvée."}
                   </td>
                 </tr>
@@ -492,11 +447,6 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                     {view === "identification" ? (
                       <td>
                         <span className="muted small">{p.biometricNote || "Non enrôlé"}</span>
-                      </td>
-                    ) : null}
-                    {view === "recenses" ? (
-                      <td>
-                        <span className="status-badge">Recensé</span>
                       </td>
                     ) : null}
                     <td className="table-actions">
