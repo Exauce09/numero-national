@@ -190,6 +190,9 @@ export default function PersonPicker({
           : "",
         fiche.conjoint.profession.trim() ? `Prof. conjoint: ${fiche.conjoint.profession.trim()}` : "",
         fiche.conjoint.adresse.trim() ? `Adr. conjoint: ${fiche.conjoint.adresse.trim()}` : "",
+        [i.secteur, i.territoire, i.ville, i.province].filter(Boolean).length
+          ? `Origine: ${[i.secteur, i.territoire, i.ville, i.province].filter(Boolean).join(" · ")}`
+          : "",
       ].filter(Boolean);
 
       const person = addPerson({
