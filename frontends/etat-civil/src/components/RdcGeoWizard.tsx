@@ -206,7 +206,7 @@ export default function RdcGeoWizard({ value, onChange, label = "Adresse / origi
       avenue_name: undefined,
     };
     emit(next);
-    setCommunes(id ? await fetchItems(`/geo/districts/${id}/communes`) : []);
+    setCommunes(id ? await fetchItems(`/geo/communes?district_id=${id}`) : []);
     setLocalites([]);
     setAvenues([]);
   }
@@ -235,10 +235,10 @@ export default function RdcGeoWizard({ value, onChange, label = "Adresse / origi
       return;
     }
     if (sel.zoneKind === "ville" || isKinshasa(sel.province_name)) {
-      setQuartiers(await fetchItems(`/geo/communes/${id}/quartiers`));
+      setQuartiers(await fetchItems(`/geo/quartiers?commune_id=${id}`));
       setLocalites([]);
     } else {
-      setLocalites(await fetchItems(`/geo/communes/${id}/localites`));
+      setLocalites(await fetchItems(`/geo/localites?commune_id=${id}`));
       setQuartiers([]);
     }
     setAvenues([]);
@@ -254,7 +254,7 @@ export default function RdcGeoWizard({ value, onChange, label = "Adresse / origi
       avenue_name: undefined,
     };
     emit(next);
-    setAvenues(id ? await fetchItems(`/geo/quartiers/${id}/avenues`) : []);
+    setAvenues(id ? await fetchItems(`/geo/voies?quartier_id=${id}`) : []);
   }
 
   function onVillage(id: string) {
