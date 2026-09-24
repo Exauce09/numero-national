@@ -5,11 +5,11 @@ import { ETAT_CIVIL_OPTIONS, type EtatCivil, type Sexe } from "../registry";
 import { listKnownProfessions, PROFESSIONS_KEY, rememberNamed } from "../namedLists";
 import { emptyFichePerson, type FichePersonBlock } from "./FicheIdentificationForm";
 import GeoCascade, {
+  ADDRESS_FIELD_LABELS,
   GEO_PRESETS,
   ORIGIN_FIELD_LABELS,
   type GeoSelection,
 } from "./GeoCascade";
-import RdcGeoWizard, { type RdcGeoValue } from "./RdcGeoWizard";
 
 export type FicheEditorConjoint = {
   nom: string;
@@ -237,7 +237,7 @@ export default function FicheIdentificationEditor({
   const i = value.interesse;
   const professions = useMemo(() => listKnownProfessions([i.profession]), [i.profession]);
   const [originGeo, setOriginGeo] = useState<GeoSelection>({});
-  const [addressGeo, setAddressGeo] = useState<RdcGeoValue>({});
+  const [addressGeo, setAddressGeo] = useState<GeoSelection>({});
   const [adresseComplement, setAdresseComplement] = useState("");
 
   function patchInteresse(patch: Partial<typeof i>) {
@@ -258,7 +258,7 @@ export default function FicheIdentificationEditor({
     patchInteresse(originFromGeo(geo));
   }
 
-  function applyAddress(geo: RdcGeoValue) {
+  function applyAddress(geo: GeoSelection) {
     setAddressGeo(geo);
     const base = geo.label || "";
     const full = [base, adresseComplement.trim()].filter(Boolean).join(" — ");
@@ -416,12 +416,29 @@ export default function FicheIdentificationEditor({
           </div>
 
           <div className="full">
-            <RdcGeoWizard
-              purpose="adresse"
-              label="Adresse de résidence (actuelle)"
-              value={addressGeo}
-              onChange={applyAddress}
-            />
+            <fieldset className="id-fieldset" style={{ margin: 0 }}>
+              <legend className="form-label" style={{ padding: "0 0.35rem" }}>
+                Adresse de résidence (actuelle)
+              </legend>
+              <p className="muted small" style={{ margin: "0 0 0.65rem" }}>
+                Ville ou Territoire, puis Commune/Secteur. Utilisez <strong>+ Ajouter</strong> si un
+                lieu manque.
+              </p>
+              <GeoCascade
+                embedded
+                allowAdd
+                zoneChoice
+                fieldLabels={{
+                  ...ADDRESS_FIELD_LABELS,
+                  commune: "Commune / Secteur",
+                  localite: "Village",
+                  avenue: "Avenue",
+                }}
+                value={addressGeo}
+                onChange={applyAddress}
+                label="Adresse de résidence"
+              />
+            </fieldset>
             <label className="form-label" style={{ marginTop: "0.65rem" }}>
               Complément d&apos;adresse
             </label>

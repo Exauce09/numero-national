@@ -100,18 +100,34 @@ export function SimpleStatBlocks({
   items,
 }: {
   title: string;
-  items: Array<{ label: string; value: number; color?: string }>;
+  items: Array<{
+    label: string;
+    value: number;
+    color?: string;
+    onClick?: () => void;
+    active?: boolean;
+  }>;
 }) {
   return (
     <div className="eg-list-stats">
       <h3 className="eg-list-stats-title">{title}</h3>
       <div className="eg-simple-stats">
-        {items.map((it) => (
-          <div key={it.label} className="eg-simple-stat" style={it.color ? { borderTopColor: it.color } : undefined}>
-            <span className="muted">{it.label}</span>
-            <strong>{it.value}</strong>
-          </div>
-        ))}
+        {items.map((it) => {
+          const clickable = Boolean(it.onClick);
+          const Tag = clickable ? "button" : "div";
+          return (
+            <Tag
+              key={it.label}
+              type={clickable ? "button" : undefined}
+              className={`eg-simple-stat${clickable ? " is-clickable" : ""}${it.active ? " is-active" : ""}`}
+              style={it.color ? { borderTopColor: it.color } : undefined}
+              onClick={it.onClick}
+            >
+              <span className="muted">{it.label}</span>
+              <strong>{it.value}</strong>
+            </Tag>
+          );
+        })}
       </div>
     </div>
   );

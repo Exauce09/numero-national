@@ -229,6 +229,7 @@ export default function ManageActsPage({
   const navigate = useNavigate();
   const session = getSession();
   const [q, setQ] = useState("");
+  const [statusFocus, setStatusFocus] = useState<"all" | "drafts" | "validated">("all");
   const [monthFilter, setMonthFilter] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -273,10 +274,19 @@ export default function ManageActsPage({
     return [...set].sort((a, b) => b.localeCompare(a));
   }, [all]);
 
+  const draftStatuses = useMemo(
+    () =>
+      new Set(["DRAFT", "SUBMITTED", "UNDER_REVIEW", "PENDING_OFFICER", "CORRECTION_REQUIRED", ""]),
+    [],
+  );
+
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return all.filter((act) => {
       if (monthFilter && monthKey(act.created_at) !== monthFilter) return false;
+      const st = String(act.status ?? "DRAFT").toUpperCase().trim();
+      if (statusFocus === "drafts" && !(draftStatuses.has(st) || !st)) return false;
+      if (statusFocus === "validated" && !isActCountedInTotals(act)) return false;
       if (!needle) return true;
       const parts = [
         act.act_number,
@@ -286,11 +296,11 @@ export default function ManageActsPage({
       ];
       return parts.join(" ").toLowerCase().includes(needle);
     });
-  }, [all, config.summaryFields, q, monthFilter]);
+  }, [all, config.summaryFields, q, monthFilter, statusFocus, draftStatuses]);
 
   useEffect(() => {
     setPage(1);
-  }, [q, monthFilter, config.slug]);
+  }, [q, monthFilter, statusFocus, config.slug]);
 
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
@@ -303,12 +313,6 @@ export default function ManageActsPage({
         return true;
       }),
     [counted, monthFilter],
-  );
-
-  const draftStatuses = useMemo(
-    () =>
-      new Set(["DRAFT", "SUBMITTED", "UNDER_REVIEW", "PENDING_OFFICER", "CORRECTION_REQUIRED", ""]),
-    [],
   );
 
   const draftsCount = useMemo(
@@ -324,11 +328,6 @@ export default function ManageActsPage({
 
   const last30 = useMemo(() => {
     const cut = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    return counted.filter((a) => new Date(a.created_at).getTime() >= cut).length;
-  }, [counted]);
-
-  const last90 = useMemo(() => {
-    const cut = Date.now() - 90 * 24 * 60 * 60 * 1000;
     return counted.filter((a) => new Date(a.created_at).getTime() >= cut).length;
   }, [counted]);
 
@@ -445,9 +444,27 @@ export default function ManageActsPage({
           <SimpleStatBlocks
             title={config.listTitle}
             items={[
-              { label: "TOTAL GÉNÉRAL", value: totalGeneral, color: rdcColor(0) },
-              { label: "BROUILLONS", value: draftsCount, color: rdcColor(3) },
-              { label: "VALIDÉS", value: counted.length, color: rdcColor(1) },
+              {
+                label: "TOTAL GÉNÉRAL",
+                value: totalGeneral,
+                color: rdcColor(0),
+                onClick: () => setStatusFocus("all"),
+                active: statusFocus === "all",
+              },
+              {
+                label: "BROUILLONS",
+                value: draftsCount,
+                color: rdcColor(3),
+                onClick: () => setStatusFocus((s) => (s === "drafts" ? "all" : "drafts")),
+                active: statusFocus === "drafts",
+              },
+              {
+                label: "VALIDÉS",
+                value: counted.length,
+                color: rdcColor(1),
+                onClick: () => setStatusFocus((s) => (s === "validated" ? "all" : "validated")),
+                active: statusFocus === "validated",
+              },
               {
                 label: monthFilter ? `MOIS ${monthFilter}` : "FILTRÉS (MOIS)",
                 value: countedFiltered.length,

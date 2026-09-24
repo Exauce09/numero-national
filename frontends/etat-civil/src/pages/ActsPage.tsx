@@ -64,6 +64,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
   const session = getSession();
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<ActType | "">("");
+  const [statusFocus, setStatusFocus] = useState<"all" | "drafts" | "validated">("all");
   const [q, setQ] = useState("");
   const [monthFilter, setMonthFilter] = useState(() => {
     const d = new Date();
@@ -138,19 +139,28 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
     return [...set].sort((a, b) => b.localeCompare(a));
   }, [all]);
 
+  const draftStatuses = useMemo(
+    () =>
+      new Set(["DRAFT", "SUBMITTED", "UNDER_REVIEW", "PENDING_OFFICER", "CORRECTION_REQUIRED", ""]),
+    [],
+  );
+
   const acts = useMemo(() => {
     const base = (filter ? all.filter((a) => a.type === filter) : all).filter(
       (a) => a.type !== "CENSUS" && a.type !== "DISPLACEMENT",
     );
     return base.filter((a) => {
       if (monthFilter && monthKey(a.created_at) !== monthFilter) return false;
+      const st = String(a.status ?? "DRAFT").toUpperCase().trim();
+      if (statusFocus === "drafts" && !(draftStatuses.has(st) || !st)) return false;
+      if (statusFocus === "validated" && !isActCountedInTotals(a)) return false;
       const needle = q.trim().toLowerCase();
       if (!needle) return true;
       return `${a.act_number} ${a.national_id} ${a.type} ${a.status ?? ""} ${JSON.stringify(a.payload)}`
         .toLowerCase()
         .includes(needle);
     });
-  }, [all, filter, q, monthFilter]);
+  }, [all, filter, q, monthFilter, statusFocus, draftStatuses]);
 
   const countedFiltered = useMemo(
     () =>
@@ -170,7 +180,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
 
   useEffect(() => {
     setPage(1);
-  }, [filter, q, monthFilter]);
+  }, [filter, q, monthFilter, statusFocus]);
 
   useEffect(() => {
     const editId = params.get("edit");
@@ -210,8 +220,6 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
       color: COLORS[i % COLORS.length],
     }));
   }, [counted]);
-
-  const docs = counted.filter((a) => a.type === "DOCUMENT").length;
 
   const exportRows = acts.map((a) => ({
     act_number: a.act_number,
@@ -264,7 +272,13 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
           <SimpleStatBlocks
             title="LISTE DES ACTES"
             items={[
-              { label: "TOTAL GÉNÉRAL", value: all.filter((a) => !["CENSUS", "DISPLACEMENT"].includes(a.type)).length, color: rdcColor(0) },
+              {
+                label: "TOTAL GÉNÉRAL",
+                value: all.filter((a) => !["CENSUS", "DISPLACEMENT"].includes(a.type)).length,
+                color: rdcColor(0),
+                onClick: () => setStatusFocus("all"),
+                active: statusFocus === "all",
+              },
               {
                 label: "BROUILLONS",
                 value: all.filter((a) => {
@@ -273,8 +287,16 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
                   return ["DRAFT", "SUBMITTED", "UNDER_REVIEW", "PENDING_OFFICER", "CORRECTION_REQUIRED", ""].includes(s);
                 }).length,
                 color: rdcColor(3),
+                onClick: () => setStatusFocus((s) => (s === "drafts" ? "all" : "drafts")),
+                active: statusFocus === "drafts",
               },
-              { label: "VALIDÉS", value: counted.length, color: rdcColor(1) },
+              {
+                label: "VALIDÉS",
+                value: counted.length,
+                color: rdcColor(1),
+                onClick: () => setStatusFocus((s) => (s === "validated" ? "all" : "validated")),
+                active: statusFocus === "validated",
+              },
               {
                 label: monthFilter ? `MOIS ${monthFilter}` : "FILTRÉS (MOIS)",
                 value: countedFiltered.length,

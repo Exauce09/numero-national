@@ -21,6 +21,8 @@ export type GeoSelection = {
   avenue_name?: string;
   rue_id?: string;
   rue_name?: string;
+  /** Numéro / parcelle (saisie libre). */
+  numero?: string;
   label?: string;
 };
 
@@ -167,7 +169,7 @@ export default function GeoCascade({
     ? zoneKind === "territoire"
       ? ["province", "district", "commune", "localite"]
       : zoneKind === "ville"
-        ? ["province", "ville", "commune", "quartier"]
+        ? ["province", "ville", "commune", "quartier", "avenue"]
         : ["province"]
     : levels;
 
@@ -287,6 +289,7 @@ export default function GeoCascade({
       next.quartier_name,
       next.avenue_name ? `Av. ${next.avenue_name}` : undefined,
       next.rue_name ? `Rue ${next.rue_name}` : undefined,
+      next.numero ? `n° ${next.numero}` : undefined,
     ].filter(Boolean);
     const full = { ...next, label: parts.join(" · ") };
     setSel(full);
@@ -640,7 +643,7 @@ export default function GeoCascade({
             </div>
             <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
               {zoneKind === "ville"
-                ? "Puis : Commune → Quartier"
+                ? "Puis : Commune → Quartier → Avenue → N°"
                 : zoneKind === "territoire"
                   ? "Puis : Secteur → Village"
                   : "Choisissez Ville (urbain) ou Territoire (rural)."}
@@ -708,6 +711,18 @@ export default function GeoCascade({
             }}
             addKindBtn="avenue"
           />
+        ) : null}
+        {show("avenue") || (zoneChoice && zoneKind === "ville" && Boolean(sel.quartier_id)) ? (
+          <div>
+            <label className="form-label">N° / parcelle</label>
+            <input
+              className="form-control"
+              value={sel.numero ?? ""}
+              disabled={!sel.quartier_id && !sel.avenue_id}
+              onChange={(e) => emit({ ...sel, numero: e.target.value })}
+              placeholder="Numéro, parcelle…"
+            />
+          </div>
         ) : null}
         {show("rue") ? (
           <Field

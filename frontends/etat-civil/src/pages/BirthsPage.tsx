@@ -25,11 +25,12 @@ import {
   getAct,
   inheritParentOrigin,
   listActs,
-  listPersons,
   NEWBORN_DELAI_JOURS,
   personNationalite,
+  personOrigin,
   suggestDelaiEnregistrement,
   updateAct,
+  updatePerson,
   type Act,
   type DelaiEnregistrement,
   type Person,
@@ -40,53 +41,6 @@ import { ISSUE_NAISSANCE_OPTIONS, type IssueNaissance } from "../deathType";
 import { listFacilityAccounts } from "../healthAuth";
 import { HOPITAUX_KEY, loadNamedList, rememberNamed } from "../namedLists";
 
-const emptyMotherForm = { nom: "", postnom: "", prenom: "", date_naissance: "" };
-
-function resolveMotherPerson(
-  data: typeof emptyMotherForm,
-  facilityHint: string,
-): Person {
-  const nomP = data.nom.trim();
-  const postnomP = data.postnom.trim();
-  const prenomP = data.prenom.trim();
-  const dob = data.date_naissance.trim();
-  if (dob) {
-    const dup = findDuplicatePerson({
-      nom: nomP,
-      postnom: postnomP,
-      prenom: prenomP,
-      date_naissance: dob,
-      sexe: "F",
-    });
-    if (dup) return dup;
-    return addPerson({
-      nom: nomP,
-      postnom: postnomP,
-      prenom: prenomP,
-      sexe: "F",
-      date_naissance: dob,
-      lieu_naissance: facilityHint,
-      etat_civil: "MARIE",
-    });
-  }
-  const existing = listPersons().find(
-    (p) =>
-      p.sexe === "F" &&
-      p.nom.trim().toLowerCase() === nomP.toLowerCase() &&
-      p.postnom.trim().toLowerCase() === postnomP.toLowerCase() &&
-      p.prenom.trim().toLowerCase() === prenomP.toLowerCase(),
-  );
-  if (existing) return existing;
-  return addPerson({
-    nom: nomP,
-    postnom: postnomP,
-    prenom: prenomP,
-    sexe: "F",
-    date_naissance: "1900-01-01",
-    lieu_naissance: facilityHint,
-    etat_civil: "MARIE",
-  });
-}
 const MODES_ENREGISTREMENT = [
   { value: "sans_procuration", label: "Sans procuration" },
   { value: "avec_procuration", label: "Avec procuration" },
@@ -148,10 +102,11 @@ export default function BirthsPage() {
   const [refJugement, setRefJugement] = useState("");
   const [hopitalNaissance, setHopitalNaissance] = useState("");
   const [hopitalAutre, setHopitalAutre] = useState("");
-  const [motherForm, setMotherForm] = useState(emptyMotherForm);
+  const [mother, setMother] = useState<Person | null>(null);
   const [father, setFather] = useState<Person | null>(null);
   const [adresseMere, setAdresseMere] = useState("");
   const [geoAdresseMere, setGeoAdresseMere] = useState<GeoSelection>({});
+  const [geoOrigineMere, setGeoOrigineMere] = useState<GeoSelection>({});
   const [geoOrigine, setGeoOrigine] = useState<GeoSelection>({});
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
@@ -184,8 +139,8 @@ export default function BirthsPage() {
     if (submitting) return;
     setError(null);
     setWarning(null);
-    if (!motherForm.nom.trim() || !motherForm.prenom.trim()) {
-      setError("Nom et prénom de la mère sont obligatoires.");
+    if (!mother) {
+      setError("La mère est obligatoire — recherchez ou ajoutez une personne déjà enregistrée.");
       return;
     }
     if (!nom.trim() || !prenom.trim() || !dateNaissance) {
@@ -200,11 +155,21 @@ export default function BirthsPage() {
       setError("L'état morphologique est obligatoire.");
       return;
     }
-    if (!geoNaissance.commune_name && !lieuNaissance.trim()) {
-      setError("Indiquez le lieu de naissance (commune) ou une saisie manuelle.");
+    if (
+      !geoNaissance.commune_name &&
+      !geoNaissance.district_name &&
+      !geoNaissance.localite_name &&
+      !lieuNaissance.trim()
+    ) {
+      setError("Indiquez le lieu de naissance (commune / secteur) ou une saisie manuelle.");
       return;
     }
-    if (geoNaissance.commune_name && !geoNaissance.quartier_name && !lieuNaissance.trim()) {
+    if (
+      geoNaissance.ville_name &&
+      geoNaissance.commune_name &&
+      !geoNaissance.quartier_name &&
+      !lieuNaissance.trim()
+    ) {
       setError(
         "Choisissez le quartier de naissance (ex. Batetela, Golf…) ou précisez le lieu manuellement.",
       );
@@ -231,10 +196,16 @@ export default function BirthsPage() {
 
     setSubmitting(true);
     try {
-      const mother = resolveMotherPerson(
-        motherForm,
-        hopitalResolved || geoNaissance.commune_name || officer.name,
-      );
+      if (geoOrigineMere.province_name || geoOrigineMere.district_name || geoOrigineMere.commune_name) {
+        updatePerson(mother.id, {
+          province: geoOrigineMere.province_name || mother.province,
+          territoire: geoOrigineMere.district_name || mother.territoire,
+          secteur: [geoOrigineMere.commune_name, geoOrigineMere.localite_name]
+            .filter(Boolean)
+            .join(" · ") || mother.secteur,
+          ville: geoOrigineMere.ville_name || mother.ville,
+        });
+      }
       const effectiveDeclarant = qualiteDeclarant === "MERE" ? mother : declarant;
       if (!effectiveDeclarant) {
         setError("Le déclarant est obligatoire.");
@@ -286,6 +257,26 @@ export default function BirthsPage() {
       };
       const link = inheritParentOrigin(father, mother);
       if (hopitalResolved) rememberNamed(HOPITAUX_KEY, hopitalResolved);
+      const effectiveOrigine: GeoSelection =
+        geoOrigine.province_name || geoOrigine.district_name || geoOrigine.commune_name
+          ? geoOrigine
+          : !father
+            ? geoOrigineMere
+            : geoOrigine;
+      const origineFromCascade = [
+        effectiveOrigine.localite_name,
+        effectiveOrigine.commune_name,
+        effectiveOrigine.district_name,
+        effectiveOrigine.province_name,
+      ]
+        .filter(Boolean)
+        .join(", ");
+      const origineFromParent = [link.geo.village, link.geo.secteur, link.geo.territoire, link.geo.province]
+        .filter(Boolean)
+        .join(", ");
+      const origineLabel =
+        effectiveOrigine.label || origineFromCascade || origineFromParent || "";
+
       const child = addPerson({
         nom: identity.nom,
         postnom: identity.postnom,
@@ -300,6 +291,12 @@ export default function BirthsPage() {
         nic: generateBirthDossierId(dateNaissance, {
           provinceName: geoNaissance.province_name || getOfficerCommune().province,
         }),
+        province: effectiveOrigine.province_name || link.geo.province || undefined,
+        territoire: effectiveOrigine.district_name || link.geo.territoire || undefined,
+        secteur:
+          [effectiveOrigine.commune_name, effectiveOrigine.localite_name].filter(Boolean).join(" · ") ||
+          link.geo.secteur ||
+          undefined,
       });
       const commune = getOfficerCommune();
       const session = getSession();
@@ -313,21 +310,13 @@ export default function BirthsPage() {
         adresseMere.trim() ||
         geoAdresseMere.label ||
         [
+          geoAdresseMere.numero ? `n° ${geoAdresseMere.numero}` : "",
           geoAdresseMere.avenue_name,
           geoAdresseMere.quartier_name,
           geoAdresseMere.commune_name,
           geoAdresseMere.ville_name,
+          geoAdresseMere.district_name,
           geoAdresseMere.province_name,
-        ]
-          .filter(Boolean)
-          .join(", ");
-      const origineLabel =
-        geoOrigine.label ||
-        [
-          geoOrigine.localite_name,
-          geoOrigine.commune_name,
-          geoOrigine.district_name,
-          geoOrigine.province_name,
         ]
           .filter(Boolean)
           .join(", ");
@@ -437,12 +426,14 @@ export default function BirthsPage() {
         father_snapshot: link.father_snapshot,
         inherited_from: link.source,
         inherited_geo: link.geo,
-        geo_origine: geoOrigine,
+        geo_origine: effectiveOrigine,
         originaire: origineLabel || null,
-        province_origine: geoOrigine.province_name || link.geo.province || null,
-        territoire_origine: geoOrigine.district_name || link.geo.territoire || null,
-        secteur_chefferie_commune: geoOrigine.commune_name || link.geo.secteur || null,
-        village_origine: geoOrigine.localite_name || link.geo.village || null,
+        province_origine: effectiveOrigine.province_name || link.geo.province || null,
+        territoire_origine: effectiveOrigine.district_name || link.geo.territoire || null,
+        secteur_chefferie_commune: effectiveOrigine.commune_name || link.geo.secteur || null,
+        village_origine: effectiveOrigine.localite_name || link.geo.village || null,
+        origine_source: father ? "father_or_manual" : "mother_or_manual",
+        geo_origine_mere: geoOrigineMere,
         note: `Nouveau-né — ${modeLabel}`,
         latitude: gpsLat,
         longitude: gpsLng,
@@ -482,9 +473,12 @@ export default function BirthsPage() {
       setRefJugement("");
       setHopitalNaissance("");
       setHopitalAutre("");
-      setMotherForm(emptyMotherForm);
+      setMother(null);
       setFather(null);
       setAdresseMere("");
+      setGeoAdresseMere({});
+      setGeoOrigineMere({});
+      setGeoOrigine({});
       setGeoAdresseMere({});
       setGeoOrigine({});
       setGpsLat(null);
@@ -917,46 +911,57 @@ export default function BirthsPage() {
             </p>
           </div>
           <div className="full">
-            <h3 className="panel-title" style={{ fontSize: "1rem" }}>
-              Mère *
-            </h3>
-            <p className="muted small" style={{ marginTop: 0 }}>
-              Saisissez directement l&apos;identité de la mère (pas de recherche registre).
+            <PersonPicker
+              label="Mère *"
+              value={mother}
+              onChange={(p) => {
+                setMother(p);
+                if (!p) {
+                  setGeoOrigineMere({});
+                  return;
+                }
+                const o = personOrigin(p);
+                if (o.province || o.territoire || o.secteur) {
+                  setGeoOrigineMere({
+                    province_name: o.province || undefined,
+                    district_name: o.territoire || undefined,
+                    commune_name: o.secteur || undefined,
+                    ville_name: o.ville || undefined,
+                    label: o.label || undefined,
+                  });
+                  if (!father) {
+                    setGeoOrigine({
+                      province_name: o.province || undefined,
+                      district_name: o.territoire || undefined,
+                      commune_name: o.secteur || undefined,
+                      ville_name: o.ville || undefined,
+                      label: o.label || undefined,
+                    });
+                  }
+                }
+              }}
+              sexFilter="F"
+              originGeoFilter
+              addButtonLabel="Saisir / Ajouter la mère"
+            />
+            <p className="muted small" style={{ marginTop: 6 }}>
+              Recherchez une personne déjà enregistrée, ou ajoutez-la. Si le père n&apos;est pas
+              reconnu, l&apos;origine de la mère sera reprise pour l&apos;enfant.
             </p>
           </div>
-          <div>
-            <label className="form-label">Nom *</label>
-            <input
-              className="form-control"
-              value={motherForm.nom}
-              onChange={(e) => setMotherForm({ ...motherForm, nom: e.target.value })}
-              required
-            />
-          </div>
-          <div>
-            <label className="form-label">Postnom</label>
-            <input
-              className="form-control"
-              value={motherForm.postnom}
-              onChange={(e) => setMotherForm({ ...motherForm, postnom: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="form-label">Prénom(s) *</label>
-            <input
-              className="form-control"
-              value={motherForm.prenom}
-              onChange={(e) => setMotherForm({ ...motherForm, prenom: e.target.value })}
-              required
-            />
-          </div>
-          <div>
-            <label className="form-label">Date de naissance (si connue)</label>
-            <input
-              className="form-control"
-              type="date"
-              value={motherForm.date_naissance}
-              onChange={(e) => setMotherForm({ ...motherForm, date_naissance: e.target.value })}
+          <div className="full">
+            <label className="form-label">Origine de la mère</label>
+            <GeoCascade
+              embedded
+              allowAdd
+              levels={[...GEO_PRESETS.originRural]}
+              fieldLabels={ORIGIN_FIELD_LABELS}
+              value={geoOrigineMere}
+              onChange={(g) => {
+                setGeoOrigineMere(g);
+                if (!father) setGeoOrigine(g);
+              }}
+              label="Origine de la mère"
             />
           </div>
           <div>
@@ -986,7 +991,7 @@ export default function BirthsPage() {
             </div>
           ) : (
             <div className="full muted small">
-              Qualité « Mère » : la mère saisie ci-dessus est automatiquement le déclarant.
+              Qualité « Mère » : la mère sélectionnée ci-dessus est automatiquement le déclarant.
             </div>
           )}
           <div className="full">
@@ -1039,7 +1044,8 @@ export default function BirthsPage() {
               Originaire
             </h3>
             <p className="muted small" style={{ marginTop: 0 }}>
-              Lieu d&apos;origine (ancestral) — Province → Territoire → Secteur → Village.
+              Lieu d&apos;origine de l&apos;enfant. Sans père reconnu, l&apos;origine de la mère est
+              reprise automatiquement (modifiable ci-dessous).
             </p>
           </div>
           <div className="full">

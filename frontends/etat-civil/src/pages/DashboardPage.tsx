@@ -451,7 +451,7 @@ export default function DashboardPage() {
 
       <div className="dash-kpi-grid">
         <StatCard
-          title="Enregistrement de nouveau-né"
+          title="Naissance"
           value={birthAll.length}
           subtitle={`${births.length} validés · ${pendingOf(birthAll).length} à valider`}
           icon={<IconBaby size={22} />}
@@ -467,7 +467,7 @@ export default function DashboardPage() {
           href="/lists/mariage"
         />
         <StatCard
-          title="Enregistrement de décès"
+          title="Décès"
           value={deathAll.length}
           subtitle={`${deaths.length} validés · ${pendingOf(deathAll).length} à valider`}
           icon={<IconCross size={22} />}
