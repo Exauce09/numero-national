@@ -452,7 +452,7 @@ export default function DashboardPage() {
       <div className="dash-kpi-grid">
         <StatCard
           title="Naissance"
-          value={birthAll.length}
+          value={births.length}
           subtitle={`${births.length} validés · ${pendingOf(birthAll).length} à valider`}
           icon={<IconBaby size={22} />}
           color={RDC.yellowDeep}
