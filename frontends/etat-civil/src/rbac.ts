@@ -160,6 +160,8 @@ export function canSeeNav(key: NavKey, roles: string[], permissions?: string[] |
   const isJudicial = isJudicialRole(r);
   const isAgent = role === "AGENT_ETAT_CIVIL";
   const isAuditeur = role === "AUDITEUR";
+  /** Super admin technique : pas d’autorité juridique (mentions / transcriptions). */
+  const isSuperAdminOnly = role === "SUPER_ADMIN_NATIONAL";
   const perms = permissions ?? [];
   const hasUserManage = can("users:manage", perms);
   const hasPersonnel = can("personnel:read", perms) || can("personnel:manage", perms);
@@ -231,8 +233,11 @@ export function canSeeNav(key: NavKey, roles: string[], permissions?: string[] |
     case "documents":
     case "acts_register":
     case "create_acts":
+      return isOfficier || isLead || isProvincial || isNational;
     case "mentions":
     case "transcriptions":
+      // Autorité juridique EC uniquement — pas le super admin technique.
+      if (isSuperAdminOnly) return false;
       return isOfficier || isLead || isProvincial || isNational;
     case "declarations":
     case "validation":

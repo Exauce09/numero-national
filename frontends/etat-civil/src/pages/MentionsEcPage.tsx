@@ -1,15 +1,19 @@
 /** Inscription de mention / rectification sur un acte. */
 
 import { FormEvent, useState } from "react";
+import { Link } from "react-router-dom";
 import ActFormShell from "../components/ActFormShell";
 import ActPrintCard from "../components/ActPrintCard";
 import OfficerSessionField from "../components/OfficerSessionField";
+import { getSession } from "../auth";
 import { getActFormSchema } from "../ecActForms";
-import { addAct, type Act } from "../registry";
 import { getLoggedOfficer } from "../officerContext";
-import { Link } from "react-router-dom";
+import { addAct, type Act } from "../registry";
+import { canSeeNav } from "../rbac";
 
 export default function MentionsEcPage() {
+  const roles = getSession()?.roles ?? [];
+  const allowed = canSeeNav("mentions", roles);
   const [typeActe, setTypeActe] = useState("NAISSANCE");
   const [referenceActe, setReferenceActe] = useState("");
   const [nature, setNature] = useState("MENTION");
@@ -18,6 +22,23 @@ export default function MentionsEcPage() {
   const [texte, setTexte] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Act | null>(null);
+
+  if (!allowed) {
+    return (
+      <div>
+        <h2 className="page-title">Mentions / rectifications</h2>
+        <div className="panel">
+          <p className="muted">
+            Réservé à l&apos;officier d&apos;état civil et aux autorités habilitées. Le super
+            administrateur n&apos;inscrit pas de mentions juridiques.
+          </p>
+          <Link className="btn-secondary btn-sm" to="/">
+            Retour
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

@@ -1,13 +1,22 @@
 /** Catalogue des missions d'état civil en RDC. */
 
 import { Link } from "react-router-dom";
+import { getSession } from "../auth";
 import {
   EC_OUT_OF_SCOPE,
   EC_RDC_MISSIONS,
   EC_REGISTRES,
 } from "../ecRdc";
+import { canSeeNav } from "../rbac";
 
 export default function MissionsEcPage() {
+  const roles = getSession()?.roles ?? [];
+  const missions = EC_RDC_MISSIONS.filter((m) => {
+    if (m.id === "rectification") return canSeeNav("mentions", roles);
+    if (m.id === "transcription") return canSeeNav("transcriptions", roles);
+    return true;
+  });
+
   return (
     <div>
       <h2 className="page-title">Missions de l&apos;état civil</h2>
@@ -59,7 +68,7 @@ export default function MissionsEcPage() {
           marginBottom: "1.5rem",
         }}
       >
-        {EC_RDC_MISSIONS.map((m) => (
+        {missions.map((m) => (
           <Link
             key={m.id}
             to={m.href}

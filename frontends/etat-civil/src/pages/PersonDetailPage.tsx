@@ -6,6 +6,7 @@ import FicheIdentificationForm from "../components/FicheIdentificationForm";
 import { buildFicheFromPerson } from "../ficheFromPerson";
 import { deletePerson, displayName, getActiveMarriage, getPerson, listActs, type Person } from "../registry";
 import { nationalHitToPerson } from "../nationalSearch";
+import { canSeeNav } from "../rbac";
 
 type TabId =
   | "identite"
@@ -20,7 +21,7 @@ type TabId =
   | "biometrie"
   | "historique";
 
-const TABS: { id: TabId; label: string }[] = [
+const ALL_TABS: { id: TabId; label: string }[] = [
   { id: "identite", label: "Identité" },
   { id: "etat_civil", label: "État civil" },
   { id: "filiation", label: "Filiation" },
@@ -49,9 +50,22 @@ function statusBadge(status: string, deceased: boolean): string {
 export default function PersonDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
-  const hasApi = Boolean(getSession()?.accessToken);
+  const session = getSession();
+  const hasApi = Boolean(session?.accessToken);
+  const tabs = useMemo(
+    () =>
+      ALL_TABS.filter((t) => {
+        if (t.id === "mentions") return canSeeNav("mentions", session?.roles ?? []);
+        return true;
+      }),
+    [session?.roles],
+  );
   const [tab, setTab] = useState<TabId>("identite");
   const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!tabs.some((t) => t.id === tab)) setTab("identite");
+  }, [tabs, tab]);
   const [citizen, setCitizen] = useState<CitizenDetail | null>(null);
   const [events, setEvents] = useState<PersonCivilEvent[]>([]);
   const [prints, setPrints] = useState<
@@ -223,7 +237,7 @@ export default function PersonDetailPage() {
         <>
           <div className="panel" style={{ marginBottom: "1rem" }}>
             <div className="action-row" style={{ flexWrap: "wrap", gap: "0.35rem" }}>
-              {TABS.map((t) => (
+              {tabs.map((t) => (
                 <button
                   key={t.id}
                   type="button"

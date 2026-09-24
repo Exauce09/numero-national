@@ -334,7 +334,7 @@ export const EC_ACTOR_MATRIX: EcActorRow[] = [
     id: "super_admin",
     title: "Super administrateur",
     loginStatus: "partial",
-    loginNote: "SUPER_ADMIN_NATIONAL — technique/fonctionnel, pas autorité juridique.",
+    loginNote: "Compte technique / fonctionnel — pas d'autorité juridique (mentions, validation d'actes).",
     restrictions: [
       "ADMINISTRATION DU SYSTÈME ≠ AUTORITÉ JURIDIQUE",
       "Actions authentifiées, journalisées, traçables",

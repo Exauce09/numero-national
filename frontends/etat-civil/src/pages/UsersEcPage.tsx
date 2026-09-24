@@ -22,6 +22,11 @@ import {
   type FacilityAccountPublic,
 } from "../healthAuth";
 import PasswordField from "../components/PasswordField";
+import { roleTitleFor } from "../rbac";
+
+function rolesLabel(roles: EcUserRole[]): string {
+  return roles.map((r) => roleTitleFor([r])).join(", ");
+}
 
 export default function UsersEcPage() {
   const session = getSession();
@@ -73,7 +78,7 @@ export default function UsersEcPage() {
         fullName,
         roles: [role],
       });
-      setMessage(`Compte créé : ${created.fullName} (${created.roles.join(", ")})`);
+      setMessage(`Compte créé : ${created.fullName} (${rolesLabel(created.roles)})`);
       setFullName("");
       setEmail("");
       setPassword("");
@@ -94,7 +99,7 @@ export default function UsersEcPage() {
           <p className="muted">
             Seul le <strong>responsable de bureau</strong> ou le{" "}
             <strong>super administrateur</strong> peut gérer les comptes bureau. Votre rôle :{" "}
-            {(session?.roles ?? []).join(", ") || "—"}.
+            {roleTitleFor(session?.roles) || "—"}.
           </p>
           <Link className="btn-secondary btn-sm" to="/roles">
             Voir qui fait quoi
@@ -209,7 +214,7 @@ export default function UsersEcPage() {
                     </>
                   ) : null}
                 </td>
-                <td>{u.roles.join(", ")}</td>
+                <td>{rolesLabel(u.roles)}</td>
                 <td>{u.active ? "Actif" : "Désactivé"}</td>
                 <td>
                   {actor && canActorManageUser(actor, u) ? (

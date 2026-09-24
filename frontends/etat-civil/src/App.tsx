@@ -678,8 +678,12 @@ function Shell() {
               )}
               <div>
                 <strong>{responsableLabel}</strong>
-                <p className="muted small" style={{ margin: "0.25rem 0 0.65rem" }}>
+                <p className="muted small" style={{ margin: "0.25rem 0 0" }}>
                   @{session?.username}
+                </p>
+                <p className="muted small" style={{ margin: "0.15rem 0 0.65rem" }}>
+                  {roleTitle}
+                  {communeLabel ? ` · ${communeLabel}` : ""}
                 </p>
                 <label className="btn-add btn-sm" style={{ cursor: "pointer" }}>
                   Ajouter / changer photo
