@@ -11,6 +11,7 @@ import {
   isDeceased,
   personOrigin,
   provinceDigitsFromName,
+  searchPersons,
   type Nationalite,
   type Person,
   type Sexe,
