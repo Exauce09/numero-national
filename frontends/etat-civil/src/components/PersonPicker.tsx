@@ -344,7 +344,7 @@ export default function PersonPicker({
       {modal ? (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setModal(false)}>
           <div
-            className="modal-panel modal-wide person-add-modal person-add-modal-fiche"
+            className="modal-panel modal-wide person-add-modal"
             onClick={(e) => e.stopPropagation()}
           >
             <header className="person-add-head">

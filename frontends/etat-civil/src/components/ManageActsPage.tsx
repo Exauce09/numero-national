@@ -20,6 +20,24 @@ import {
 } from "../registry";
 import { RDC_CHART_SERIES, rdcColor } from "../rdcColors";
 
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Brouillon",
+  SUBMITTED: "Soumis",
+  UNDER_REVIEW: "En révision",
+  PENDING_OFFICER: "En attente officier",
+  VALIDATED: "Validé",
+  AUTHENTICATED: "Authentifié",
+  REJECTED: "Rejeté",
+  ARCHIVED: "Archivé",
+  RECORDED: "Enregistré",
+  CORRECTION_REQUIRED: "Correction requise",
+};
+
+function statusLabel(raw?: string | null): string {
+  const s = String(raw ?? "DRAFT").toUpperCase().trim();
+  return STATUS_LABEL[s] || s || "Brouillon";
+}
+
 export type ManageConfig = {
   slug: string;
   title: string;
@@ -490,80 +508,96 @@ export default function ManageActsPage({
           <DataToolbar filename={`manage_${config.slug}`} rows={exportRows} />
         </div>
 
-        <div className="table-scroll">
-          <table className="data-table eg-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Photo</th>
-                <th>{actRefLabel(config.actType)}</th>
-                {primary ? <th>{primary.label}</th> : null}
-                {secondary ? <th>{secondary.label}</th> : null}
-                {tertiary ? <th>{tertiary.label}</th> : null}
-                <th>Statut</th>
-                <th>Enregistré le</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageRows.length === 0 ? (
+        <div className="eg-acts-table-wrap">
+          <div className="eg-acts-table-caption">
+            <strong>Tableau des actes</strong>
+            <span className="muted small">
+              {rows.length} enregistrement{rows.length > 1 ? "s" : ""}
+            </span>
+          </div>
+          <div className="table-scroll eg-acts-table-scroll">
+            <table className="data-table eg-table eg-acts-table">
+              <thead>
                 <tr>
-                  <td colSpan={9} className="muted">
-                    Aucun enregistrement. Cliquez « + Ajouter » pour créer.
-                  </td>
+                  <th>#</th>
+                  <th>Photo</th>
+                  <th>{actRefLabel(config.actType)}</th>
+                  {primary ? <th>{primary.label}</th> : null}
+                  {secondary ? <th>{secondary.label}</th> : null}
+                  {tertiary ? <th>{tertiary.label}</th> : null}
+                  <th>Statut</th>
+                  <th>Enregistré le</th>
+                  <th>Action</th>
                 </tr>
-              ) : (
-                pageRows.map((a, i) => {
-                  const person = a.national_id ? getPersonByNic(a.national_id) : undefined;
-                  const label = subjectLabel(a, config);
-                  return (
-                    <tr key={a.id}>
-                      <td>{(safePage - 1) * PAGE_SIZE + i + 1}</td>
-                      <td>
-                        {person?.photo_data_url ? (
-                          <img src={person.photo_data_url} alt="" className="eg-avatar-sm" />
-                        ) : (
-                          <span className="eg-avatar-sm eg-avatar-empty" aria-hidden>
-                            {label.slice(0, 1)}
+              </thead>
+              <tbody>
+                {pageRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={6 + (primary ? 1 : 0) + (secondary ? 1 : 0) + (tertiary ? 1 : 0)} className="muted">
+                      Aucun enregistrement. Cliquez « + Ajouter » pour créer.
+                    </td>
+                  </tr>
+                ) : (
+                  pageRows.map((a, i) => {
+                    const person = a.national_id ? getPersonByNic(a.national_id) : undefined;
+                    const label = subjectLabel(a, config);
+                    const st = String(a.status ?? "DRAFT").toUpperCase();
+                    const pending = ["DRAFT", "SUBMITTED", "UNDER_REVIEW", "PENDING_OFFICER", "CORRECTION_REQUIRED"].includes(st);
+                    return (
+                      <tr key={a.id} className={pending ? "eg-row-pending" : undefined}>
+                        <td>{(safePage - 1) * PAGE_SIZE + i + 1}</td>
+                        <td>
+                          {person?.photo_data_url ? (
+                            <img src={person.photo_data_url} alt="" className="eg-avatar-sm" />
+                          ) : (
+                            <span className="eg-avatar-sm eg-avatar-empty" aria-hidden>
+                              {label.slice(0, 1)}
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          <code className="eg-act-num">{a.act_number}</code>
+                        </td>
+                        {primary ? <td>{cell(a, primary.key)}</td> : null}
+                        {secondary ? <td>{cell(a, secondary.key)}</td> : null}
+                        {tertiary ? <td>{cell(a, tertiary.key)}</td> : null}
+                        <td>
+                          <span className={`status-badge${pending ? " is-warn" : " is-ok"}`}>
+                            {statusLabel(a.status)}
                           </span>
-                        )}
-                      </td>
-                      <td>{a.act_number}</td>
-                      {primary ? <td>{cell(a, primary.key)}</td> : null}
-                      {secondary ? <td>{cell(a, secondary.key)}</td> : null}
-                      {tertiary ? <td>{cell(a, tertiary.key)}</td> : null}
-                      <td>{a.status ?? "—"}</td>
-                      <td>{new Date(a.created_at).toLocaleString("fr-CD")}</td>
-                      <td className="table-actions">
-                        <button
-                          type="button"
-                          className="btn-add btn-sm"
-                          onClick={() => setViewAct(getAct(a.id) ?? a)}
-                        >
-                          Voir
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-secondary btn-sm"
-                          onClick={() => setViewAct(getAct(a.id) ?? a)}
-                        >
-                          Modifier
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-secondary btn-sm"
-                          title="Les actes validés se rectifient via Corrections"
-                          onClick={() => navigate("/corrections")}
-                        >
-                          Supprimer
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                        </td>
+                        <td>{new Date(a.created_at).toLocaleString("fr-CD")}</td>
+                        <td className="table-actions">
+                          <button
+                            type="button"
+                            className="btn-add btn-sm"
+                            onClick={() => setViewAct(getAct(a.id) ?? a)}
+                          >
+                            Voir
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-secondary btn-sm"
+                            onClick={() => setViewAct(getAct(a.id) ?? a)}
+                          >
+                            Modifier
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-secondary btn-sm"
+                            title="Les actes validés se rectifient via Corrections"
+                            onClick={() => navigate("/corrections")}
+                          >
+                            Supprimer
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div className="eg-pager">

@@ -2174,3 +2174,96 @@
     width: 2.25rem !important;
   }
 }
+
+/* Tableau des actes — lisible et structuré */
+.eg-acts-table-wrap {
+  margin-top: 0.75rem;
+  border: 1px solid var(--egouv-line, #d0d7e2);
+  border-radius: 10px;
+  background: var(--egouv-card, #fff);
+  overflow: hidden;
+}
+.eg-acts-table-caption {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--egouv-line, #d0d7e2);
+  background: rgba(0, 86, 179, 0.04);
+}
+.eg-acts-table-scroll {
+  overflow-x: auto;
+  max-height: min(70vh, 720px);
+}
+.eg-acts-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 0;
+}
+.eg-acts-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #0d47a1;
+  color: #fff;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.65rem 0.55rem;
+  border-bottom: 2px solid #08306b;
+  white-space: nowrap;
+}
+.eg-acts-table tbody td {
+  padding: 0.55rem;
+  border-bottom: 1px solid var(--egouv-line, #e2e8f0);
+  vertical-align: middle;
+  font-size: 0.88rem;
+  background: #fff;
+}
+.eg-acts-table tbody tr:nth-child(even) td {
+  background: #f7fafc;
+}
+.eg-acts-table tbody tr:hover td {
+  background: #eef5ff;
+}
+.eg-acts-table tr.eg-row-pending td {
+  background: #fff8e6;
+}
+.eg-acts-table tr.eg-row-pending:nth-child(even) td {
+  background: #fff3d6;
+}
+.eg-act-num {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #0d47a1;
+}
+.status-badge.is-warn {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffe69c;
+}
+.status-badge.is-ok {
+  background: #d1e7dd;
+  color: #0f5132;
+  border: 1px solid #a3cfbb;
+}
+.fiche-ident-form-normal .id-fieldset {
+  border: 1px solid var(--egouv-line, #d0d7e2);
+  border-radius: 8px;
+  padding: 0.75rem 0.85rem 0.35rem;
+  margin-bottom: 0.5rem;
+}
+.fiche-ident-form-normal .id-fieldset legend {
+  font-weight: 700;
+  padding: 0 0.35rem;
+  font-size: 0.9rem;
+}
+.sidebar-brand span {
+  display: block;
+  line-height: 1.35;
+  max-width: 100%;
+  word-break: break-word;
+}

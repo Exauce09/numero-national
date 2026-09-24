@@ -325,18 +325,24 @@ function Shell() {
   const badge = unreadCount();
   const photo = prefs.photoDataUrl || session?.photoDataUrl;
 
-  const brandSub =
+  const brandSub = [
     judicialOnly
       ? judicialKind === "JUGE"
         ? "Module judiciaire · tribunal"
         : "Module judiciaire · greffe"
       : role === "AGENT_ETAT_CIVIL"
-        ? "Espace agent · saisie"
+        ? "Agent préposé · bureau local"
         : role === "RESPONSABLE_BUREAU"
-            ? "Bureau · direction locale"
+          ? "Responsable de bureau"
+          : role === "OFFICIER_ETAT_CIVIL"
+            ? "Officier d'état civil"
             : role === "SUPER_ADMIN_NATIONAL"
-              ? "Administration nationale"
-              : "Bureau d'état civil · registres & actes";
+              ? "Super admin · national"
+              : roleTitle,
+    communeLabel || territoryLine || null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div className={`page-wrapper${navOpen ? " nav-open" : ""}`}>
@@ -352,7 +358,12 @@ function Shell() {
         <div className="sidebar-brand">
           <img src="/logo-rdc.jpg" alt="République démocratique du Congo" />
           <strong>État civil — RDC</strong>
-          <span>{brandSub}</span>
+          <span title={brandSub}>{brandSub}</span>
+          {responsableLabel && responsableLabel !== "—" ? (
+            <span className="muted small" style={{ display: "block", marginTop: 2 }}>
+              {responsableLabel}
+            </span>
+          ) : null}
           <button
             type="button"
             className="sidebar-close"

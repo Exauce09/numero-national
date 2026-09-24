@@ -195,31 +195,29 @@ export default function DashboardPage() {
     );
   }, [apiActs, localActs, nationalScope, officerCommune]);
 
-  const births = acts.filter(
-    (a) =>
-      (a.act_type === "BIRTH" || a.act_type === "births") &&
-      ["VALIDATED", "AUTHENTICATED", "ARCHIVED"].includes(actStatus(a)),
-  );
-  const deaths = acts.filter(
-    (a) =>
-      (a.act_type === "DEATH" || a.act_type === "deaths") &&
-      ["VALIDATED", "AUTHENTICATED", "ARCHIVED"].includes(actStatus(a)),
-  );
-  const marriages = acts.filter(
-    (a) =>
-      (a.act_type === "MARRIAGE" || a.act_type === "marriages") &&
-      ["VALIDATED", "AUTHENTICATED", "ARCHIVED"].includes(actStatus(a)),
-  );
-  const divorces = acts.filter(
-    (a) =>
-      (a.act_type === "DIVORCE" || a.act_type === "divorces") &&
-      ["VALIDATED", "AUTHENTICATED", "ARCHIVED"].includes(actStatus(a)),
-  );
-  const adoptions = acts.filter(
-    (a) =>
-      (a.act_type === "ADOPTION" || a.act_type === "adoptions") &&
-      ["VALIDATED", "AUTHENTICATED", "ARCHIVED"].includes(actStatus(a)),
-  );
+  const pendingStatuses = ["DRAFT", "SUBMITTED", "UNDER_REVIEW", "VERIFIED", "PENDING_OFFICER", "CORRECTION_REQUIRED"];
+
+  function ofType(types: string[]) {
+    return acts.filter((a) => types.includes(String(a.act_type || "").toUpperCase()));
+  }
+  function validatedOf(rows: typeof acts) {
+    return rows.filter((a) => ["VALIDATED", "AUTHENTICATED", "ARCHIVED"].includes(actStatus(a)));
+  }
+  function pendingOf(rows: typeof acts) {
+    return rows.filter((a) => pendingStatuses.includes(actStatus(a)));
+  }
+
+  const birthAll = ofType(["BIRTH", "BIRTHS"]);
+  const deathAll = ofType(["DEATH", "DEATHS"]);
+  const marriageAll = ofType(["MARRIAGE", "MARRIAGES"]);
+  const divorceAll = ofType(["DIVORCE", "DIVORCES"]);
+  const adoptionAll = ofType(["ADOPTION", "ADOPTIONS"]);
+
+  const births = validatedOf(birthAll);
+  const deaths = validatedOf(deathAll);
+  const marriages = validatedOf(marriageAll);
+  const divorces = validatedOf(divorceAll);
+  const adoptions = validatedOf(adoptionAll);
   const recognitions = acts.filter(
     (a) =>
       (a.act_type === "RECOGNITION" || a.act_type === "recognitions") &&
@@ -415,32 +413,32 @@ export default function DashboardPage() {
       <div className="dash-kpi-grid">
         <StatCard
           title="Enregistrement de nouveau-né"
-          value={births.length}
-          subtitle="Actes enregistrés"
+          value={birthAll.length}
+          subtitle={`${births.length} validés · ${pendingOf(birthAll).length} à valider`}
           icon={<IconBaby size={22} />}
           color={RDC.yellowDeep}
           href="/lists/naissance"
         />
         <StatCard
           title="Mariages"
-          value={marriages.length}
-          subtitle="Unions civiles"
+          value={marriageAll.length}
+          subtitle={`${marriages.length} validés · ${pendingOf(marriageAll).length} à valider`}
           icon={<IconRing size={22} />}
           color={RDC.yellow}
           href="/lists/mariage"
         />
         <StatCard
           title="Enregistrement de décès"
-          value={deaths.length}
-          subtitle="Actes de décès"
+          value={deathAll.length}
+          subtitle={`${deaths.length} validés · ${pendingOf(deathAll).length} à valider`}
           icon={<IconCross size={22} />}
           color={RDC.red}
           href="/lists/deces"
         />
         <StatCard
           title="Adoptions"
-          value={adoptions.length}
-          subtitle="Après jugement"
+          value={adoptionAll.length}
+          subtitle={`${adoptions.length} validés · ${pendingOf(adoptionAll).length} à valider`}
           icon={<IconHome size={22} />}
           color={RDC.blueMid}
           href="/lists/adoption"
@@ -455,24 +453,14 @@ export default function DashboardPage() {
             href="/acts"
           />
         ) : (
-          <>
-            <StatCard
-              title="Divorces"
-              value={divorces.length}
-              subtitle="Dissolutions"
-              icon={<IconSplit size={22} />}
-              color={RDC.redDeep}
-              href="/lists/divorce"
-            />
-            <StatCard
-              title="Dossiers en cours"
-              value={drafts + submitted}
-              subtitle={`${drafts} brouillons · ${submitted} en attente de validation`}
-              icon={<IconClipboard size={22} />}
-              color={RDC.blueDeep}
-              href="/declarations"
-            />
-          </>
+          <StatCard
+            title="Divorces"
+            value={divorceAll.length}
+            subtitle={`${divorces.length} validés · ${pendingOf(divorceAll).length} à valider`}
+            icon={<IconSplit size={22} />}
+            color={RDC.redDeep}
+            href="/lists/divorce"
+          />
         )}
       </div>
 
