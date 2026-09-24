@@ -6,13 +6,13 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import {
-  ACCOUNT_TYPE_OPTIONS,
   checkPasswordStrength,
   getAccountTypeOption,
   getLocalOtpHint,
   JURIDICTION_OPTIONS,
   listEcBureauOptions,
   maskPhone,
+  REGISTER_ACCOUNT_TYPE_OPTIONS,
   resendRegistrationOtp,
   submitAccountRegistration,
   TRIBUNAUX_BY_JURIDICTION,
@@ -300,7 +300,7 @@ export default function RegisterAccountPage() {
               <section className="register-section">
                 <h3 className="register-section-title">Type de compte</h3>
                 <div className="register-type-grid" role="radiogroup" aria-label="Type de compte">
-                  {ACCOUNT_TYPE_OPTIONS.map((opt) => (
+                  {REGISTER_ACCOUNT_TYPE_OPTIONS.map((opt) => (
                     <button
                       key={opt.code}
                       type="button"

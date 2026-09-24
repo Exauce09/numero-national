@@ -17,6 +17,7 @@ export type AccountRequestType =
   | "AGENT_ETAT_CIVIL"
   | "OFFICIER_ETAT_CIVIL"
   | "RESPONSABLE_BUREAU"
+  | "ADMIN_PROVINCIAL"
   | "HOPITAL_MATERNITE"
   | "AGENT_DELIVRANCE"
   | "AGENT_ARCHIVES"
@@ -41,8 +42,15 @@ export type AccountTypeOption = {
   portal: "civil" | "sante" | "none";
   /** Rôles EC attribués à l'activation (super admin). */
   assignRoles?: Array<
-    "AGENT_ETAT_CIVIL" | "OFFICIER_ETAT_CIVIL" | "RESPONSABLE_BUREAU" | "GREFFIER" | "JUGE"
+    | "AGENT_ETAT_CIVIL"
+    | "OFFICIER_ETAT_CIVIL"
+    | "RESPONSABLE_BUREAU"
+    | "ADMIN_PROVINCIAL"
+    | "GREFFIER"
+    | "JUGE"
   >;
+  /** Masqué sur le formulaire d'inscription (conservé pour demandes legacy). */
+  hiddenFromRegister?: boolean;
   institutionLabel?: string;
   showMatricule?: boolean;
   showFonction?: boolean;
@@ -187,6 +195,30 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     serviceOptions: ["Bureau d'état civil principal", "Bureau secondaire", "Officier intérimaire"],
   },
   {
+    code: "ADMIN_PROVINCIAL",
+    label: "Division provinciale",
+    summary:
+      "Pilote l'état civil au niveau provincial : supervision des bureaux, coordination et suivi",
+    institutional: true,
+    portal: "civil",
+    assignRoles: ["ADMIN_PROVINCIAL"],
+    institutionLabel: "Division provinciale de l'état civil",
+    institutionSelect: "free",
+    showMatricule: true,
+    showFonction: true,
+    fonctionOptions: [
+      "Directeur(trice) provincial(e) de l'état civil",
+      "Chef de division provinciale",
+      "Cadre de la division provinciale",
+    ],
+    showService: true,
+    serviceOptions: [
+      "Division provinciale de l'état civil",
+      "Coordination provinciale",
+      "Inspection provinciale",
+    ],
+  },
+  {
     code: "RESPONSABLE_BUREAU",
     label: "Responsable de bureau",
     summary:
@@ -205,6 +237,7 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     ],
     showService: true,
     serviceOptions: ["Direction du bureau", "Bureau d'état civil principal"],
+    hiddenFromRegister: true,
   },
   {
     code: "HOPITAL_MATERNITE",
@@ -237,6 +270,7 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     ],
     showService: true,
     serviceOptions: ["Guichet copies & extraits", "Délivrance documents"],
+    hiddenFromRegister: true,
   },
   {
     code: "AGENT_ARCHIVES",
@@ -252,6 +286,7 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     fonctionOptions: ["Archiviste", "Conservateur des registres", "Agent d'archives"],
     showService: true,
     serviceOptions: ["Archives centrales", "Archives du bureau"],
+    hiddenFromRegister: true,
   },
   {
     code: "GREFFIER",
@@ -266,6 +301,7 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     showFonction: false,
     showService: true,
     serviceOptions: ["Greffe civil", "Greffe du tribunal"],
+    hiddenFromRegister: true,
   },
   {
     code: "JUGE",
@@ -279,6 +315,7 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     showMatricule: true,
     showFonction: false,
     showService: false,
+    hiddenFromRegister: true,
   },
   {
     code: "MINISTERE_PUBLIC",
@@ -293,9 +330,12 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     showFonction: false,
     showService: true,
     serviceOptions: ["Parquet près le TGI", "Parquet près la Cour"],
+    hiddenFromRegister: true,
   },
 ];
 
+/** Types proposés à l'inscription (cartes visibles). */
+export const REGISTER_ACCOUNT_TYPE_OPTIONS = ACCOUNT_TYPE_OPTIONS.filter((o) => !o.hiddenFromRegister);
 /** Bureaux d'état civil dérivés du référentiel communes (sélection à l'inscription). */
 export function listEcBureauOptions(filter?: {
   province?: string;

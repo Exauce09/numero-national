@@ -579,54 +579,62 @@ export default function DashboardPage() {
             { name: "Enregistrement de décès", color: RDC.red, values: deathSeries },
           ]}
         />
-        <div className="eg-chart-card">
-          <h4 className="eg-chart-title">Enregistrements par province</h4>
+        <div className="eg-chart-card eg-chart-card--compact">
+          <h4 className="eg-chart-title">Top provinces</h4>
           <p className="muted small" style={{ marginTop: 0 }}>
-            Classement des provinces qui enregistrent le plus d&apos;actes.
+            Provinces les plus actives — cliquez pour ouvrir le synoptique.
           </p>
           {provinceRanking.length === 0 ? (
             <p className="muted">Aucun acte à classer pour votre périmètre.</p>
           ) : (
-            <ol className="dash-activity dash-province-rank" style={{ listStyle: "none", padding: 0, margin: 0 }}>
-              {provinceRanking.slice(0, 10).map((row, idx) => (
-                <li key={row.province} style={{ display: "grid", gap: "0.25rem", marginBottom: "0.65rem" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem", alignItems: "baseline" }}>
-                    <span>
-                      <strong>
-                        {idx + 1}. {row.province}
-                      </strong>
-                    </span>
-                    <span className="status-badge is-ok">{row.count.toLocaleString("fr-CD")}</span>
-                  </div>
-                  <div
-                    aria-hidden
-                    style={{
-                      height: 6,
-                      borderRadius: 99,
-                      background: "rgba(0, 86, 179, 0.12)",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: `${provinceMax ? Math.max(8, (row.count / provinceMax) * 100) : 0}%`,
-                        height: "100%",
-                        background: idx === 0 ? RDC.yellowDeep : RDC.blue,
-                        borderRadius: 99,
-                      }}
-                    />
-                  </div>
-                </li>
-              ))}
+            <ol className="dash-province-rank" style={{ listStyle: "none", padding: 0, margin: 0 }}>
+              {provinceRanking.slice(0, 5).map((row, idx) => {
+                const pct = provinceMax ? Math.max(12, (row.count / provinceMax) * 100) : 0;
+                return (
+                  <li key={row.province}>
+                    <button
+                      type="button"
+                      className="dash-province-rank-btn"
+                      onClick={() =>
+                        navigate(
+                          `/synoptique/naissances?province=${encodeURIComponent(row.province)}`,
+                        )
+                      }
+                      title={`Voir ${row.province}`}
+                    >
+                      <span className="dash-province-rank-meta">
+                        <span className="dash-province-rank-place">{idx + 1}</span>
+                        <span className="dash-province-rank-name">{row.province}</span>
+                        <span className="status-badge is-ok">
+                          {row.count.toLocaleString("fr-CD")}
+                        </span>
+                      </span>
+                      <span className="dash-province-rank-bar" aria-hidden>
+                        <span
+                          style={{
+                            width: `${pct}%`,
+                            background: idx === 0 ? RDC.yellowDeep : RDC.blue,
+                          }}
+                        />
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
             </ol>
           )}
+          {provinceRanking.length > 5 ? (
+            <p className="muted small" style={{ margin: "0.5rem 0 0" }}>
+              + {provinceRanking.length - 5} autre(s) province(s)
+            </p>
+          ) : null}
           <button
             type="button"
             className="btn-secondary btn-sm"
             style={{ marginTop: "0.75rem" }}
             onClick={() => navigate("/synoptique/naissances")}
           >
-            Voir le synoptique
+            Voir tout le synoptique
           </button>
         </div>
       </div>

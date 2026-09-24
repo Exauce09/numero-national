@@ -99,7 +99,7 @@ export default function UsersEcPage() {
           <p className="muted">
             Seul le <strong>responsable de bureau</strong> ou le{" "}
             <strong>super administrateur</strong> peut gérer les comptes bureau. Votre rôle :{" "}
-            {roleTitleFor(session?.roles) || "—"}.
+            {roleTitleFor(session?.roles ?? []) || "—"}.
           </p>
           <Link className="btn-secondary btn-sm" to="/roles">
             Voir qui fait quoi

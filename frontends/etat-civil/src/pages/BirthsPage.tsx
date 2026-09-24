@@ -10,7 +10,6 @@ import GeoCascade, {
   ADDRESS_FIELD_LABELS,
   GEO_PRESETS,
   ORIGIN_FIELD_LABELS,
-  type GeoLevel,
   type GeoSelection,
 } from "../components/GeoCascade";
 import GpsLocatePanel from "../components/GpsLocatePanel";
@@ -95,13 +94,20 @@ const MODES_ENREGISTREMENT = [
 ] as const;
 
 /** Lieu de naissance : jusqu'au quartier (Gombe → Batetela, etc.). */
-const BIRTH_PLACE_LEVELS: GeoLevel[] = ["province", "ville", "commune", "quartier"];
+const BIRTH_FORM_STEPS = [
+  { id: 1, title: "Enfant" },
+  { id: 2, title: "Lieu" },
+  { id: 3, title: "Filiation" },
+  { id: 4, title: "Origine" },
+] as const;
 
 function geoBirthLabel(geo: GeoSelection, manual: string): string {
   const parts = [
     geo.quartier_name,
+    geo.localite_name,
     geo.commune_name,
     geo.ville_name,
+    geo.district_name,
     geo.province_name,
   ].filter(Boolean);
   return manual.trim() || geo.label || parts.join(", ") || "";
@@ -109,6 +115,7 @@ function geoBirthLabel(geo: GeoSelection, manual: string): string {
 
 export default function BirthsPage() {
   const officer = getOfficerCommune();
+  const [formStep, setFormStep] = useState(1);
   const [nom, setNom] = useState("");
   const [postnom, setPostnom] = useState("");
   const [prenom, setPrenom] = useState("");
@@ -558,13 +565,45 @@ export default function BirthsPage() {
       />
 
       <div className="panel">
-        <form className="form-grid" onSubmit={onSubmit}>
+        <form
+          className="form-grid"
+          onSubmit={(e) => {
+            if (formStep < 4) {
+              e.preventDefault();
+              setFormStep((s) => Math.min(4, s + 1));
+              return;
+            }
+            void onSubmit(e);
+          }}
+          noValidate={formStep < 4}
+        >
+          <div className="full">
+            <div className="birth-form-steps" role="tablist" aria-label="Étapes d'enregistrement">
+              {BIRTH_FORM_STEPS.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={formStep === s.id}
+                  className={`birth-form-step${formStep === s.id ? " is-active" : ""}${
+                    formStep > s.id ? " is-done" : ""
+                  }`}
+                  onClick={() => setFormStep(s.id)}
+                >
+                  <span className="birth-form-step-num">{s.id}</span>
+                  <span>{s.title}</span>
+                </button>
+              ))}
+            </div>
+          </div>
           {error ? <div className="login-error full">{error}</div> : null}
           {warning ? (
             <div className="full muted small" style={{ color: "#b45309" }}>
               {warning}
             </div>
           ) : null}
+          {formStep === 1 ? (
+            <>
           <div className="full">
             <h3 className="panel-title" style={{ marginTop: 0 }}>
               Enfant
@@ -765,26 +804,43 @@ export default function BirthsPage() {
               </p>
             </div>
           ) : null}
+          <div className="full birth-form-nav">
+            <button type="button" className="btn-add" onClick={() => setFormStep(2)}>
+              Suivant — Lieu
+            </button>
+          </div>
+            </>
+          ) : null}
+          {formStep === 2 ? (
+            <>
+          <div className="full">
+            <h3 className="panel-title" style={{ marginTop: 0 }}>
+              Lieu de naissance
+            </h3>
+          </div>
           <div className="full">
             <GeoCascade
               embedded
-              label="Lieu de naissance (province → commune → quartier)"
-              levels={BIRTH_PLACE_LEVELS}
+              zoneChoice
+              allowAdd
+              label="Lieu de naissance"
               fieldLabels={{
                 ...ADDRESS_FIELD_LABELS,
-                quartier: "Quartier *",
+                commune: "Commune / Secteur",
+                quartier: "Quartier",
+                localite: "Village",
               }}
               value={geoNaissance}
               onChange={(g) => {
                 setGeoNaissance(g);
-                if (g.quartier_name || g.commune_name) {
+                if (g.quartier_name || g.commune_name || g.localite_name) {
                   setLieuNaissance(geoBirthLabel(g, ""));
                 }
               }}
             />
             <p className="muted small" style={{ marginTop: "0.35rem" }}>
-              Ex. Kinshasa → Gombe → Batetela / Golf / Lemera… (bouton + Ajouter sur le quartier si
-              besoin)
+              Choisissez <strong>Ville</strong> (Commune → Quartier) ou <strong>Territoire</strong>{" "}
+              (Secteur → Village). Utilisez <strong>+ Ajouter</strong> si un lieu manque.
             </p>
           </div>
           <div className="full">
@@ -840,6 +896,18 @@ export default function BirthsPage() {
               Une fois saisi, l&apos;hôpital est mémorisé pour sélection ultérieure.
             </div>
           </div>
+          <div className="full birth-form-nav">
+            <button type="button" className="btn-secondary" onClick={() => setFormStep(1)}>
+              Précédent
+            </button>
+            <button type="button" className="btn-add" onClick={() => setFormStep(3)}>
+              Suivant — Filiation
+            </button>
+          </div>
+            </>
+          ) : null}
+          {formStep === 3 ? (
+            <>
           <div className="full">
             <h3 className="panel-title">Filiation & déclaration</h3>
             <p className="muted small" style={{ marginTop: 0 }}>
@@ -925,8 +993,14 @@ export default function BirthsPage() {
             <label className="form-label">Adresse de la mère *</label>
             <GeoCascade
               embedded
+              zoneChoice
+              allowAdd
               levels={GEO_PRESETS.address}
-              fieldLabels={ADDRESS_FIELD_LABELS}
+              fieldLabels={{
+                ...ADDRESS_FIELD_LABELS,
+                commune: "Commune / Secteur",
+                localite: "Village",
+              }}
               value={geoAdresseMere}
               onChange={setGeoAdresseMere}
               label="Adresse de la mère"
@@ -948,10 +1022,30 @@ export default function BirthsPage() {
               sexFilter="M"
             />
           </div>
+          <div className="full birth-form-nav">
+            <button type="button" className="btn-secondary" onClick={() => setFormStep(2)}>
+              Précédent
+            </button>
+            <button type="button" className="btn-add" onClick={() => setFormStep(4)}>
+              Suivant — Origine
+            </button>
+          </div>
+            </>
+          ) : null}
+          {formStep === 4 ? (
+            <>
           <div className="full">
-            <label className="form-label">Originaire</label>
+            <h3 className="panel-title" style={{ marginTop: 0 }}>
+              Originaire
+            </h3>
+            <p className="muted small" style={{ marginTop: 0 }}>
+              Lieu d&apos;origine (ancestral) — Province → Territoire → Secteur → Village.
+            </p>
+          </div>
+          <div className="full">
             <GeoCascade
               embedded
+              allowAdd
               levels={[...GEO_PRESETS.originRural]}
               fieldLabels={ORIGIN_FIELD_LABELS}
               value={geoOrigine}
@@ -968,7 +1062,10 @@ export default function BirthsPage() {
               liée au père via le bloc Originaire ci-dessus.
             </div>
           ) : null}
-          <div className="full">
+          <div className="full birth-form-nav">
+            <button type="button" className="btn-secondary" onClick={() => setFormStep(3)}>
+              Précédent
+            </button>
             <button
               className="btn-primary"
               style={{ width: "auto", minWidth: 200 }}
@@ -978,6 +1075,8 @@ export default function BirthsPage() {
               {submitting ? "Enregistrement…" : "Enregistrer le nouveau-né"}
             </button>
           </div>
+            </>
+          ) : null}
         </form>
       </div>
 
@@ -999,59 +1098,74 @@ export default function BirthsPage() {
           <h3 className="panel-title">Enregistrement de nouveau-né</h3>
           <DataToolbar filename="naissances" rows={rows} />
         </div>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>N° d&apos;acte pour Naissances</th>
-              <th>Nom</th>
-              <th>Sexe</th>
-              <th>Date</th>
-              <th>Quartier</th>
-              <th>Enregistrement</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {acts.map((a) => (
-              <tr key={a.id}>
-                <td>{a.act_number}</td>
-                <td>
-                  {String(a.payload.nom ?? "")} {String(a.payload.prenom ?? "")}
-                </td>
-                <td>{String(a.payload.sexe ?? "")}</td>
-                <td>{String(a.payload.date_naissance ?? "")}</td>
-                <td>
-                  {String(
-                    a.payload.quartier_naissance ??
-                      (a.payload.geo_naissance as { quartier_name?: string } | undefined)
-                        ?.quartier_name ??
-                      "—",
-                  )}
-                </td>
-                <td>{String(a.payload.mode ?? a.payload.mode_naissance ?? "—")}</td>
-                <td>
-                  <button
-                    type="button"
-                    className="btn-secondary btn-sm"
-                    onClick={() => setViewAct(getAct(a.id) ?? a)}
-                  >
-                    Voir
-                  </button>{" "}
-                  <button
-                    type="button"
-                    className="btn-secondary btn-sm"
-                    onClick={() => {
-                      setEditAct(a);
-                      setEditJson(JSON.stringify(a.payload, null, 2));
-                    }}
-                  >
-                    Éditer
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="eg-acts-table-wrap">
+          <div className="eg-acts-table-caption">
+            <span className="muted small">{acts.length} enregistrement(s)</span>
+          </div>
+          <div className="table-scroll eg-acts-table-scroll">
+            <table className="data-table eg-table eg-acts-table">
+              <thead>
+                <tr>
+                  <th>N° d&apos;acte</th>
+                  <th>Nom</th>
+                  <th>Sexe</th>
+                  <th>Date</th>
+                  <th>Quartier</th>
+                  <th>Enregistrement</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {acts.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="muted">
+                      Aucun enregistrement pour le moment.
+                    </td>
+                  </tr>
+                ) : (
+                  acts.map((a) => (
+                    <tr key={a.id}>
+                      <td>{a.act_number}</td>
+                      <td>
+                        {String(a.payload.nom ?? "")} {String(a.payload.prenom ?? "")}
+                      </td>
+                      <td>{String(a.payload.sexe ?? "")}</td>
+                      <td>{String(a.payload.date_naissance ?? "")}</td>
+                      <td>
+                        {String(
+                          a.payload.quartier_naissance ??
+                            (a.payload.geo_naissance as { quartier_name?: string } | undefined)
+                              ?.quartier_name ??
+                            "—",
+                        )}
+                      </td>
+                      <td>{String(a.payload.mode ?? a.payload.mode_naissance ?? "—")}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-secondary btn-sm"
+                          onClick={() => setViewAct(getAct(a.id) ?? a)}
+                        >
+                          Voir
+                        </button>{" "}
+                        <button
+                          type="button"
+                          className="btn-secondary btn-sm"
+                          onClick={() => {
+                            setEditAct(a);
+                            setEditJson(JSON.stringify(a.payload, null, 2));
+                          }}
+                        >
+                          Éditer
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       {viewAct ? (

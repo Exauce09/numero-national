@@ -7,6 +7,7 @@ import { DEFAULT_OFFICER_COMMUNE, type OfficerCommune } from "./commune";
 
 export type EcUserRole =
   | "SUPER_ADMIN_NATIONAL"
+  | "ADMIN_PROVINCIAL"
   | "RESPONSABLE_BUREAU"
   | "OFFICIER_ETAT_CIVIL"
   | "AGENT_ETAT_CIVIL"
@@ -45,6 +46,14 @@ export const EC_ROLE_CATALOG: Array<{
       "Administration de la plateforme : crée les comptes (/register), ne s'attribue pas d'autorité juridique.",
     canCreateUsers: true,
     canValidateActs: false,
+  },
+  {
+    code: "ADMIN_PROVINCIAL",
+    label: "Division provinciale",
+    summary:
+      "Pilote l'état civil au niveau provincial : supervision des bureaux, coordination et suivi.",
+    canCreateUsers: true,
+    canValidateActs: true,
   },
   {
     code: "RESPONSABLE_BUREAU",

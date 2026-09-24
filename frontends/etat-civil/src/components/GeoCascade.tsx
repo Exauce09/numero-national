@@ -139,6 +139,11 @@ type Props = {
   /** Afficher les boutons + Ajouter (défaut true). */
   allowAdd?: boolean;
   fieldLabels?: Partial<Record<GeoLevel, string>>;
+  /**
+   * Après la province : choix Ville (urbain) ou Territoire (rural).
+   * Commune ↔ Secteur selon le mode. Ignore `levels` (sauf province).
+   */
+  zoneChoice?: boolean;
 };
 
 export default function GeoCascade({
@@ -149,9 +154,35 @@ export default function GeoCascade({
   embedded = false,
   allowAdd = true,
   fieldLabels,
+  zoneChoice = false,
 }: Props) {
-  const show = (level: GeoLevel) => levels.includes(level);
-  const lbl = (level: GeoLevel) => fieldLabels?.[level] ?? DEFAULT_FIELD_LABELS[level];
+  const [zoneKind, setZoneKind] = useState<"ville" | "territoire" | null>(() => {
+    if (!zoneChoice) return null;
+    if (value?.district_id || value?.district_name) return "territoire";
+    if (value?.ville_id || value?.ville_name) return "ville";
+    return null;
+  });
+
+  const activeLevels: GeoLevel[] = zoneChoice
+    ? zoneKind === "territoire"
+      ? ["province", "district", "commune", "localite"]
+      : zoneKind === "ville"
+        ? ["province", "ville", "commune", "quartier"]
+        : ["province"]
+    : levels;
+
+  const show = (level: GeoLevel) => activeLevels.includes(level);
+  const lbl = (level: GeoLevel) => {
+    if (zoneChoice && zoneKind === "territoire") {
+      if (level === "commune") return fieldLabels?.commune ?? "Secteur / Chefferie";
+      if (level === "localite") return fieldLabels?.localite ?? "Village";
+      if (level === "district") return fieldLabels?.district ?? "Territoire";
+    }
+    if (zoneChoice && zoneKind === "ville" && level === "commune") {
+      return fieldLabels?.commune ?? "Commune";
+    }
+    return fieldLabels?.[level] ?? DEFAULT_FIELD_LABELS[level];
+  };
 
   const [provinces, setProvinces] = useState<Item[]>([]);
   const [districts, setDistricts] = useState<Item[]>([]);
@@ -264,11 +295,36 @@ export default function GeoCascade({
 
   async function onProvince(id: string) {
     const p = provinces.find((x) => x.id === id);
+    const nextZone = zoneChoice ? zoneKind : null;
     emit({ province_id: id, province_name: p?.name });
     const markLocal = () =>
       setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
-    setDistricts(show("district") ? await fetchItems(`/geo/districts?province_id=${id}`, markLocal) : []);
-    setVilles(show("ville") ? await fetchItems(`/geo/villes?province_id=${id}`, markLocal) : []);
+    const loadDistrict =
+      show("district") || (zoneChoice && (!nextZone || nextZone === "territoire"));
+    const loadVille = show("ville") || (zoneChoice && (!nextZone || nextZone === "ville"));
+    setDistricts(loadDistrict ? await fetchItems(`/geo/districts?province_id=${id}`, markLocal) : []);
+    setVilles(loadVille ? await fetchItems(`/geo/villes?province_id=${id}`, markLocal) : []);
+    setCommunes([]);
+    setLocalites([]);
+    setQuartiers([]);
+    setAvenues([]);
+    setRues([]);
+  }
+
+  async function onZoneKind(kind: "ville" | "territoire") {
+    setZoneKind(kind);
+    const provinceId = sel.province_id;
+    if (!provinceId) return;
+    const markLocal = () =>
+      setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
+    emit({ province_id: provinceId, province_name: sel.province_name });
+    if (kind === "territoire") {
+      setDistricts(await fetchItems(`/geo/districts?province_id=${provinceId}`, markLocal));
+      setVilles([]);
+    } else {
+      setVilles(await fetchItems(`/geo/villes?province_id=${provinceId}`, markLocal));
+      setDistricts([]);
+    }
     setCommunes([]);
     setLocalites([]);
     setQuartiers([]);
@@ -560,6 +616,36 @@ export default function GeoCascade({
             options={provinces}
             onPick={(id) => void onProvince(id)}
           />
+        ) : null}
+        {zoneChoice && sel.province_id ? (
+          <div className="full">
+            <label className="form-label">Type de zone *</label>
+            <div className="action-row" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className={`btn-sm${zoneKind === "ville" ? " btn-add" : " btn-secondary"}`}
+                onClick={() => void onZoneKind("ville")}
+                aria-pressed={zoneKind === "ville"}
+              >
+                Ville
+              </button>
+              <button
+                type="button"
+                className={`btn-sm${zoneKind === "territoire" ? " btn-add" : " btn-secondary"}`}
+                onClick={() => void onZoneKind("territoire")}
+                aria-pressed={zoneKind === "territoire"}
+              >
+                Territoire
+              </button>
+            </div>
+            <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
+              {zoneKind === "ville"
+                ? "Puis : Commune → Quartier"
+                : zoneKind === "territoire"
+                  ? "Puis : Secteur → Village"
+                  : "Choisissez Ville (urbain) ou Territoire (rural)."}
+            </p>
+          </div>
         ) : null}
         {show("ville") ? (
           <Field
