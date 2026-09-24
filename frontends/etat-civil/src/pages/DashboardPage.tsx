@@ -102,9 +102,31 @@ function countByMonth(acts: Array<{ created_at: string }>, months: { key: string
   return months.map((m) => map.get(m.key) ?? 0);
 }
 
-function actStatus(a: { status?: string; payload?: Record<string, unknown> }): string {
-  const raw = String(a.status ?? a.payload?.status ?? "DRAFT").toUpperCase().trim();
-  return raw || "DRAFT";
+function actProvince(a: {
+  commune_code?: string;
+  payload?: Record<string, unknown> | null;
+}): string {
+  const p = a.payload ?? {};
+  const nested = (p.geo_actuelle ??
+    p.geo_origine ??
+    p.geo_naissance ??
+    p.geo_deces ??
+    p.geo ??
+    {}) as Record<string, unknown>;
+  const raw =
+    nested.province_name ??
+    nested.province ??
+    p.province ??
+    p.province_name ??
+    p.commune_province ??
+    p.lieu_province ??
+    "";
+  const name = String(raw || "").trim();
+  if (name) return name;
+  const code = String(a.commune_code ?? p.commune_code ?? "").toUpperCase();
+  if (code.startsWith("KIN")) return "Kinshasa";
+  if (code) return code.split("-")[0] || "Non renseignée";
+  return "Non renseignée";
 }
 
 /** Tableau de bord bureau d'état civil — actes uniquement (pas de population / recensement). */
@@ -238,6 +260,18 @@ export default function DashboardPage() {
   const months = useMemo(() => lastNMonths(6), []);
   const birthSeries = countByMonth(births, months);
   const deathSeries = countByMonth(deaths, months);
+
+  const provinceRanking = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const a of acts) {
+      const prov = actProvince(a);
+      map.set(prov, (map.get(prov) ?? 0) + 1);
+    }
+    return [...map.entries()]
+      .map(([province, count]) => ({ province, count }))
+      .sort((a, b) => b.count - a.count || a.province.localeCompare(b.province, "fr"));
+  }, [acts]);
+  const provinceMax = provinceRanking[0]?.count ?? 0;
 
   const helloName = session?.displayName || session?.username || "utilisateur";
   const rolePrimary = primaryRole(session?.roles ?? []);
@@ -541,32 +575,53 @@ export default function DashboardPage() {
           ]}
         />
         <div className="eg-chart-card">
-          <h4 className="eg-chart-title">Activité récente</h4>
-          {acts.length === 0 ? (
-            <p className="muted">Aucun acte à afficher pour votre périmètre.</p>
+          <h4 className="eg-chart-title">Enregistrements par province</h4>
+          <p className="muted small" style={{ marginTop: 0 }}>
+            Classement des provinces qui enregistrent le plus d&apos;actes.
+          </p>
+          {provinceRanking.length === 0 ? (
+            <p className="muted">Aucun acte à classer pour votre périmètre.</p>
           ) : (
-            <ul className="dash-activity">
-              {[...acts]
-                .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
-                .slice(0, 8)
-                .map((a) => (
-                  <li key={a.id}>
-                    <IconFile size={14} />
+            <ol className="dash-activity dash-province-rank" style={{ listStyle: "none", padding: 0, margin: 0 }}>
+              {provinceRanking.slice(0, 10).map((row, idx) => (
+                <li key={row.province} style={{ display: "grid", gap: "0.25rem", marginBottom: "0.65rem" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem", alignItems: "baseline" }}>
                     <span>
-                      <strong>{a.act_type}</strong> · {a.act_number || a.id.slice(0, 8)}
+                      <strong>
+                        {idx + 1}. {row.province}
+                      </strong>
                     </span>
-                    <span className="status-badge">{actStatus(a) || "—"}</span>
-                  </li>
-                ))}
-            </ul>
+                    <span className="status-badge is-ok">{row.count.toLocaleString("fr-CD")}</span>
+                  </div>
+                  <div
+                    aria-hidden
+                    style={{
+                      height: 6,
+                      borderRadius: 99,
+                      background: "rgba(0, 86, 179, 0.12)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${provinceMax ? Math.max(8, (row.count / provinceMax) * 100) : 0}%`,
+                        height: "100%",
+                        background: idx === 0 ? RDC.yellowDeep : RDC.blue,
+                        borderRadius: 99,
+                      }}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ol>
           )}
           <button
             type="button"
             className="btn-secondary btn-sm"
             style={{ marginTop: "0.75rem" }}
-            onClick={() => navigate("/acts")}
+            onClick={() => navigate("/synoptique/naissances")}
           >
-            Voir tous les actes
+            Voir le synoptique
           </button>
         </div>
       </div>
