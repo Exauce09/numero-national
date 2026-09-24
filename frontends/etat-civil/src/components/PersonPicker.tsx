@@ -16,6 +16,7 @@ import {
   type Sexe,
 } from "../registry";
 import { searchEveryone } from "../nationalSearch";
+import { PROFESSIONS_KEY, rememberNamed } from "../namedLists";
 
 type Props = {
   label: string;
@@ -210,6 +211,9 @@ export default function PersonPicker({
         mother_id,
         situation_familiale: situationParts.length ? situationParts.join(" · ") : undefined,
       });
+      if (i.profession.trim()) {
+        rememberNamed(PROFESSIONS_KEY, i.profession);
+      }
       onChange(person);
       setFiche(buildEditorSeed(sexFilter));
       setModal(false);

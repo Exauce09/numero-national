@@ -1,7 +1,13 @@
 /** Formulaire saisie calqué sur la fiche d'identification officielle (layout papier). */
 
-import type { CSSProperties, ReactNode } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { ETAT_CIVIL_OPTIONS, type EtatCivil, type Sexe } from "../registry";
+import { listKnownProfessions, PROFESSIONS_KEY, rememberNamed } from "../namedLists";
+import GeoCascade, {
+  GEO_PRESETS,
+  ORIGIN_FIELD_LABELS,
+  type GeoSelection,
+} from "./GeoCascade";
 import { emptyFichePerson, type FichePersonBlock } from "./FicheIdentificationForm";
 
 export type FicheEditorConjoint = {
@@ -66,6 +72,7 @@ const lineRow: CSSProperties = {
 const dottedInput: CSSProperties = {
   flex: 1,
   minWidth: 0,
+  width: "100%",
   border: "none",
   borderBottom: "1px dotted #1e88e5",
   borderRadius: 0,
@@ -85,12 +92,21 @@ const dottedSelect: CSSProperties = {
 function FieldLine({
   label,
   children,
+  stacked,
 }: {
   label: string;
   children: ReactNode;
+  stacked?: boolean;
 }) {
   return (
-    <div style={lineRow}>
+    <div
+      style={{
+        ...lineRow,
+        ...(stacked
+          ? { flexDirection: "column", alignItems: "stretch", gap: "0.25rem" }
+          : null),
+      }}
+    >
       <span style={{ whiteSpace: "nowrap", fontWeight: 600 }}>{label}</span>
       {children}
     </div>
@@ -104,6 +120,7 @@ function TextInput({
   autoFocus,
   type = "text",
   placeholder,
+  list,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -111,6 +128,7 @@ function TextInput({
   autoFocus?: boolean;
   type?: string;
   placeholder?: string;
+  list?: string;
 }) {
   return (
     <input
@@ -121,8 +139,32 @@ function TextInput({
       required={required}
       autoFocus={autoFocus}
       placeholder={placeholder}
+      list={list}
     />
   );
+}
+
+function geoFromPerson(value: FichePersonBlock): GeoSelection {
+  return {
+    province_name: value.province || undefined,
+    ville_name: value.ville || undefined,
+    district_name: value.territoire || undefined,
+    commune_name: value.secteur || undefined,
+    label: [value.province, value.ville, value.territoire, value.secteur].filter(Boolean).join(" · ") || undefined,
+  };
+}
+
+function applyGeoToPerson(
+  value: FichePersonBlock & { date_naissance?: string; sexe_code?: Sexe; etat_civil_code?: EtatCivil },
+  geo: GeoSelection,
+) {
+  return {
+    ...value,
+    province: geo.province_name || "",
+    ville: geo.ville_name || "",
+    territoire: geo.district_name || geo.ville_name || "",
+    secteur: geo.commune_name || geo.localite_name || "",
+  };
 }
 
 function PersonBlockFields({
@@ -140,6 +182,15 @@ function PersonBlockFields({
 }) {
   const set = <K extends keyof typeof value>(key: K, v: (typeof value)[K]) =>
     onChange({ ...value, [key]: v });
+
+  const professions = useMemo(() => listKnownProfessions([value.profession]), [value.profession]);
+  const professionListId = `professions-${title || "interesse"}`;
+  const [birthGeo, setBirthGeo] = useState<GeoSelection>(() =>
+    value.lieu_date_naissance
+      ? { label: value.lieu_date_naissance }
+      : {},
+  );
+  const [originGeo, setOriginGeo] = useState<GeoSelection>(() => geoFromPerson(value));
 
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
@@ -221,42 +272,120 @@ function PersonBlockFields({
           <TextInput value={value.etat_civil} onChange={(v) => set("etat_civil", v)} />
         )}
       </FieldLine>
-      <FieldLine label="Lieu et date de naissance">
-        <div style={{ flex: 1, display: "flex", gap: "0.35rem", minWidth: 0, flexWrap: "wrap" }}>
-          <TextInput
-            value={value.lieu_date_naissance}
-            onChange={(v) => set("lieu_date_naissance", v)}
-            placeholder="Lieu"
-          />
-          {showCodes ? (
+
+      {showCodes ? (
+        <>
+          <FieldLine label="Lieu de naissance" stacked>
+            <GeoCascade
+              embedded
+              allowAdd={false}
+              levels={[...GEO_PRESETS.place]}
+              label="Lieu de naissance (province → ville → commune)"
+              value={birthGeo}
+              onChange={(geo) => {
+                setBirthGeo(geo);
+                const full =
+                  geo.label ||
+                  [geo.commune_name, geo.ville_name, geo.province_name].filter(Boolean).join(", ");
+                onChange({ ...value, lieu_date_naissance: full });
+              }}
+            />
+            {value.lieu_date_naissance ? (
+              <div className="muted small" style={{ marginTop: 2, fontWeight: 600, color: "#1565c0" }}>
+                Lieu complet : {value.lieu_date_naissance}
+              </div>
+            ) : null}
+          </FieldLine>
+          <FieldLine label="Date de naissance">
             <input
-              style={{ ...dottedInput, flex: "0 0 9.5rem" }}
+              style={{ ...dottedInput, flex: "1 1 12rem", maxWidth: "14rem" }}
               type="date"
               value={value.date_naissance || ""}
               onChange={(e) => set("date_naissance", e.target.value)}
               required
             />
-          ) : null}
-        </div>
-      </FieldLine>
+          </FieldLine>
+        </>
+      ) : (
+        <FieldLine label="Lieu et date de naissance">
+          <TextInput
+            value={value.lieu_date_naissance}
+            onChange={(v) => set("lieu_date_naissance", v)}
+            placeholder="Lieu complet (commune, ville, province)"
+          />
+        </FieldLine>
+      )}
+
       <FieldLine label="Nationalité">
         <TextInput value={value.nationalite} onChange={(v) => set("nationalite", v)} />
       </FieldLine>
+
       <FieldLine label="Profession">
-        <TextInput value={value.profession} onChange={(v) => set("profession", v)} />
+        {showCodes ? (
+          <>
+            <input
+              style={dottedInput}
+              list={professionListId}
+              value={value.profession}
+              onChange={(e) => {
+                const v = e.target.value;
+                set("profession", v);
+                if (v.trim().length > 2) rememberNamed(PROFESSIONS_KEY, v);
+              }}
+              placeholder="Choisir ou saisir…"
+            />
+            <datalist id={professionListId}>
+              {professions.map((p) => (
+                <option key={p} value={p} />
+              ))}
+            </datalist>
+          </>
+        ) : (
+          <TextInput value={value.profession} onChange={(v) => set("profession", v)} />
+        )}
       </FieldLine>
-      <FieldLine label="Secteur">
-        <TextInput value={value.secteur} onChange={(v) => set("secteur", v)} />
-      </FieldLine>
-      <FieldLine label="Territoire">
-        <TextInput value={value.territoire} onChange={(v) => set("territoire", v)} />
-      </FieldLine>
-      <FieldLine label="Ville">
-        <TextInput value={value.ville} onChange={(v) => set("ville", v)} />
-      </FieldLine>
-      <FieldLine label="Province">
-        <TextInput value={value.province} onChange={(v) => set("province", v)} />
-      </FieldLine>
+
+      {showCodes ? (
+        <FieldLine label="Origine (Province → Territoire → Secteur → Ville)" stacked>
+          <GeoCascade
+            embedded
+            allowAdd={false}
+            levels={[...GEO_PRESETS.originRural]}
+            fieldLabels={ORIGIN_FIELD_LABELS}
+            label="Sélection territoriale"
+            value={originGeo}
+            onChange={(geo) => {
+              setOriginGeo(geo);
+              onChange(applyGeoToPerson(value, geo));
+            }}
+          />
+          <div
+            className="muted small"
+            style={{ display: "grid", gap: 2, marginTop: 4, color: "#1565c0", fontWeight: 600 }}
+          >
+            <span>Province : {value.province || "—"}</span>
+            <span>Territoire : {value.territoire || "—"}</span>
+            <span>Secteur : {value.secteur || "—"}</span>
+            <span>Ville : {value.ville || "—"}</span>
+          </div>
+        </FieldLine>
+      ) : (
+        <>
+          <FieldLine label="Secteur">
+            <TextInput value={value.secteur} onChange={(v) => set("secteur", v)} />
+          </FieldLine>
+          <FieldLine label="Territoire">
+            <TextInput value={value.territoire} onChange={(v) => set("territoire", v)} />
+          </FieldLine>
+          <FieldLine label="Ville">
+            <TextInput value={value.ville} onChange={(v) => set("ville", v)} />
+          </FieldLine>
+          <FieldLine label="Province">
+            <TextInput value={value.province} onChange={(v) => set("province", v)} />
+          </FieldLine>
+        </>
+      )}
+
       <FieldLine label="Adresse">
         <TextInput value={value.adresse} onChange={(v) => set("adresse", v)} />
       </FieldLine>
@@ -397,7 +526,13 @@ export default function FicheIdentificationEditor({
               <TextInput
                 value={value.conjoint.profession}
                 onChange={(v) => onChange({ ...value, conjoint: { ...value.conjoint, profession: v } })}
+                list="professions-conjoint"
               />
+              <datalist id="professions-conjoint">
+                {listKnownProfessions().map((p) => (
+                  <option key={p} value={p} />
+                ))}
+              </datalist>
             </FieldLine>
             <FieldLine label="Adresse :">
               <TextInput

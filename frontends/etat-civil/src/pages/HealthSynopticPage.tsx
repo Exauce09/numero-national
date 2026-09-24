@@ -15,7 +15,7 @@ const TABS = [
   { slug: "naissances", label: "Enregistrement de nouveau-né" },
   { slug: "matrimonial", label: "Liste des État-matrimoniaux" },
   { slug: "deces", label: "Enregistrement de décès" },
-  { slug: "documents", label: "Liste des Documents" },
+  { slug: "documents", label: "Liste des Actes" },
 ] as const;
 
 type TabSlug = (typeof TABS)[number]["slug"];

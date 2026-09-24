@@ -49,7 +49,7 @@ const TABS = [
   },
   {
     slug: "documents",
-    label: "Liste des Documents",
+    label: "Liste des Actes",
     createLabel: "Délivrer un document",
     createPath: "/documents",
     managePath: "/manage/document",
@@ -368,7 +368,7 @@ function DocumentsTable({ commune }: { commune: CommuneSel }) {
         <DataToolbar filename={`synoptique_documents_${d.commune.code}`} rows={rows} />
       </div>
       <h2 className="syn-official-title">
-        TABLEAU SYNOPTIQUE — DOCUMENTS
+        TABLEAU SYNOPTIQUE — ACTES
         <br />
         COMMUNE DE {d.commune.name.toUpperCase()} — {d.commune.ville.toUpperCase()} ({d.commune.code})
       </h2>
@@ -437,7 +437,7 @@ function ProvincesOverviewTable({
         ? "TABLEAU SYNOPTIQUE RÉCAPITULATIF DE L'ÉTAT MATRIMONIAL PAR PROVINCE"
         : tab === "deces"
           ? "TABLEAU SYNOPTIQUE RÉCAPITULATIF DES DÉCÈS PAR PROVINCE"
-          : "TABLEAU SYNOPTIQUE RÉCAPITULATIF DES DOCUMENTS PAR PROVINCE";
+          : "TABLEAU SYNOPTIQUE RÉCAPITULATIF DES ACTES PAR PROVINCE";
 
   const exportRows = rows.map((r) => {
     const base: Record<string, string | number> = {
@@ -488,7 +488,7 @@ function ProvincesOverviewTable({
                 </>
               ) : null}
               {tab === "deces" ? <th>DÉCÈS</th> : null}
-              {tab === "documents" ? <th>DOCUMENTS</th> : null}
+              {tab === "documents" ? <th>ACTES</th> : null}
               <th rowSpan={needsGft ? 2 : 1}>TOTAL</th>
             </tr>
             {needsGft ? (
@@ -615,7 +615,7 @@ function ProvinceDetailView({
           </>
         ) : null}
         {tab === "deces" ? <th>DÉCÈS</th> : null}
-        {tab === "documents" ? <th>DOCUMENTS</th> : null}
+        {tab === "documents" ? <th>ACTES</th> : null}
         <th rowSpan={rs}>TOTAL</th>
       </>
     );

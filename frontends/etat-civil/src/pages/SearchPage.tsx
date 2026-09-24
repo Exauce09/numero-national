@@ -4,6 +4,7 @@ import DataToolbar from "../components/DataToolbar";
 import { getSession } from "../auth";
 import { searchEveryone, searchFormDrafts, type DraftSearchHit } from "../nationalSearch";
 import {
+  getDeathInfo,
   personOrigin,
   type Person,
 } from "../registry";
@@ -78,8 +79,9 @@ export default function SearchPage() {
     <div>
       <h2 className="page-title">Recherche</h2>
       <p className="page-lead">
-        Registre national, fiches locales et brouillons partagés (APK / commune) : nom, titre…
+        Registre national et fiches locales : nom, prénom…
         {hasApi ? " · Connecté à l’API." : " · Sans jeton API : résultats locaux seulement."}
+        {" "}Les personnes décédées restent visibles avec une notice rouge.
       </p>
       <div className="panel">
         <form className="toolbar" onSubmit={onSubmit}>
@@ -111,14 +113,16 @@ export default function SearchPage() {
               <th>Province</th>
               <th>Ville</th>
               <th>Origine</th>
+              <th>Statut</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {hits.map((p) => {
               const origin = personOrigin(p);
+              const death = getDeathInfo(p.id, p.nic);
               return (
-                <tr key={p.id}>
+                <tr key={p.id} style={death ? { background: "rgba(198, 40, 40, 0.06)" } : undefined}>
                   <td>{p.nom}</td>
                   <td>{p.postnom}</td>
                   <td>{p.prenom}</td>
@@ -135,6 +139,15 @@ export default function SearchPage() {
                           : "—"}
                   </td>
                   <td>
+                    {death ? (
+                      <span style={{ color: "#c62828", fontWeight: 700 }}>
+                        Décédé{death.date ? ` — ${death.date}` : ""}
+                      </span>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                  </td>
+                  <td>
                     <Link className="btn-secondary btn-sm" to={`/population/${p.id}`}>
                       Voir
                     </Link>
@@ -144,7 +157,7 @@ export default function SearchPage() {
             })}
             {!hits.length ? (
               <tr>
-                <td colSpan={8} className="muted">
+                <td colSpan={9} className="muted">
                   Aucune personne trouvée.
                 </td>
               </tr>

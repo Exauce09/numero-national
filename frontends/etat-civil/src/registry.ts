@@ -359,25 +359,26 @@ export function listPersons(): Person[] {
   return [...load().persons].sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
-/** Personne marquée décédée (acte DEATH, recensement décédé, ou statut API). */
+/** Personne marquée décédée (acte DEATH ou statut API). */
 export function isDeceased(personId: string, nic?: string): boolean {
+  return Boolean(getDeathInfo(personId, nic));
+}
+
+/** Date / réf. de décès pour affichage (notice rouge). */
+export function getDeathInfo(
+  personId: string,
+  nic?: string,
+): { date: string; actNumber: string } | null {
   const acts = load().acts;
   for (const a of acts) {
-    if (a.type === "DEATH") {
-      if (String(a.payload.deceased_id ?? "") === personId) return true;
-      if (nic && a.national_id === nic) return true;
-    }
-    if (a.type === "CENSUS") {
-      const kind = String(a.payload.fiche_kind ?? "").toLowerCase();
-      const pid = String(a.payload.person_id ?? a.payload.citizen_id ?? "");
-      if (kind === "decede" || kind === "décédé" || kind === "deceased") {
-        if (pid === personId) return true;
-        if (nic && a.national_id === nic) return true;
-      }
-      if (a.payload.date_deces && pid === personId) return true;
-    }
+    if (a.type !== "DEATH") continue;
+    const match =
+      String(a.payload.deceased_id ?? "") === personId || (nic && a.national_id === nic);
+    if (!match) continue;
+    const date = String(a.payload.date_deces ?? a.payload.date_death ?? a.created_at ?? "").slice(0, 10);
+    return { date, actNumber: a.act_number };
   }
-  return false;
+  return null;
 }
 
 /** Nouveau-né : âge ≤ 90 jours. */

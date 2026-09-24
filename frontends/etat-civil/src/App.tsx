@@ -71,7 +71,6 @@ import TopbarSearch from "./components/TopbarSearch";
 import PasswordField from "./components/PasswordField";
 import {
   IconBaby,
-  IconCar,
   IconCross,
   IconDashboard,
   IconHome,
@@ -82,8 +81,6 @@ import {
 } from "./components/Icons";
 import PopulationPage from "./pages/PopulationPage";
 import PersonDetailPage from "./pages/PersonDetailPage";
-import DisplacementsPage from "./pages/DisplacementsPage";
-import ManageDeplacementPage from "./pages/ManageDeplacementPage";
 
 function RequireCivil({ children }: { children: ReactNode }) {
   if (!hasAnyEcUser()) return <Navigate to="/setup" replace />;
@@ -412,12 +409,6 @@ function Shell() {
             </NavLink>
           ) : null}
 
-          {canSeeNav("naissances", roles) || canSeeNav("create_acts", roles) ? (
-            <NavLink to="/manage/deplacement">
-              <IconCar size={18} /> Déplacement
-            </NavLink>
-          ) : null}
-
           {isSuperAdminNational(roles) ? (
             <NavCollapsibleGroup
               label="Administration"
@@ -469,6 +460,11 @@ function Shell() {
             >
               <strong className="topbar-responsable">{responsableLabel}</strong>
               <span className="topbar-role">{roleTitle}</span>
+              {communeLabel || territoryLine ? (
+                <span className="topbar-role" style={{ opacity: 0.85, fontWeight: 600 }}>
+                  {territoryLine || communeLabel}
+                </span>
+              ) : null}
             </div>
             <button
               type="button"
@@ -553,8 +549,8 @@ function Shell() {
             <Route path="/manage/document" element={<ManageDocumentPage />} />
             <Route path="/manage/mariage" element={<RequireCivilBureau><ManageMariagePage /></RequireCivilBureau>} />
             <Route path="/manage/naissance" element={<RequireCivilBureau><ManageNaissancePage /></RequireCivilBureau>} />
-            <Route path="/manage/deplacement" element={<RequireCivilBureau><ManageDeplacementPage /></RequireCivilBureau>} />
-            <Route path="/displacements" element={<RequireCivilBureau><DisplacementsPage /></RequireCivilBureau>} />
+            <Route path="/manage/deplacement" element={<Navigate to="/" replace />} />
+            <Route path="/displacements" element={<Navigate to="/" replace />} />
             <Route path="/lists/deces" element={<RequireCivilBureau><ManageActsPage config={MANAGE_CONFIGS.deces} showAnalytics /></RequireCivilBureau>} />
             <Route path="/lists/divorce" element={<ManageActsPage config={MANAGE_CONFIGS.divorce} showAnalytics />} />
             <Route path="/lists/adoption" element={<ManageActsPage config={MANAGE_CONFIGS.adoption} showAnalytics />} />

@@ -25,10 +25,8 @@ const TYPES: Array<ActType | ""> = [
   "",
   "BIRTH",
   "DEATH",
-  "CENSUS",
   "MARRIAGE",
   "ADOPTION",
-  "DISPLACEMENT",
   "DIVORCE",
   "DOCUMENT",
 ];
@@ -141,7 +139,9 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
   }, [all]);
 
   const acts = useMemo(() => {
-    const base = filter ? all.filter((a) => a.type === filter) : all;
+    const base = (filter ? all.filter((a) => a.type === filter) : all).filter(
+      (a) => a.type !== "CENSUS" && a.type !== "DISPLACEMENT",
+    );
     return base.filter((a) => {
       if (monthFilter && monthKey(a.created_at) !== monthFilter) return false;
       const needle = q.trim().toLowerCase();
@@ -225,13 +225,13 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
       <div className="eg-page-head">
         <div>
           <p className="eg-breadcrumb">
-            <Link to="/">Accueil</Link> / Actes & documents
+            <Link to="/">Accueil</Link> / Actes
           </p>
-          <h2 className="page-title">{showAnalytics ? "Liste des actes & documents" : "Actes & documents"}</h2>
+          <h2 className="page-title">{showAnalytics ? "Liste des actes" : "Actes"}</h2>
           <p className="page-lead">
             {showAnalytics
-              ? "Vue statistique depuis le tableau de bord — camembert, histogramme, recherche et pagination."
-              : "Registre opérationnel — filtre par type, recherche, export et fiche détail. Déclarations santé = naissances/décès hôpital à valider. Transcriptions = reprise d’actes papier. Corrections = rectification d’état civil. Vérifier document = contrôle d’authenticité."}
+              ? "Vue statistique — totaux, brouillons en attente de validation, graphiques mensuels."
+              : "Registre opérationnel — filtre par type, recherche, export et fiche détail. Déclarations santé = naissances/décès hôpital à valider. Transcriptions = reprise d’actes papier. Corrections = rectification d’état civil."}
           </p>
           <ActsDocsNav />
         </div>
@@ -262,15 +262,23 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
             </select>
           </div>
           <SimpleStatBlocks
-            title="LISTE DES ACTES & DOCUMENTS"
+            title="LISTE DES ACTES"
             items={[
-              { label: "TOTAL ACTES", value: counted.length, color: rdcColor(0) },
-              { label: "DOCUMENTS", value: docs, color: rdcColor(1) },
-              { label: "AUTRES ACTES", value: counted.length - docs, color: rdcColor(2) },
+              { label: "TOTAL GÉNÉRAL", value: all.filter((a) => !["CENSUS", "DISPLACEMENT"].includes(a.type)).length, color: rdcColor(0) },
+              {
+                label: "BROUILLONS",
+                value: all.filter((a) => {
+                  if (["CENSUS", "DISPLACEMENT"].includes(a.type)) return false;
+                  const s = String(a.status ?? "DRAFT").toUpperCase();
+                  return ["DRAFT", "SUBMITTED", "UNDER_REVIEW", "PENDING_OFFICER", "CORRECTION_REQUIRED", ""].includes(s);
+                }).length,
+                color: rdcColor(3),
+              },
+              { label: "VALIDÉS", value: counted.length, color: rdcColor(1) },
               {
                 label: monthFilter ? `MOIS ${monthFilter}` : "FILTRÉS (MOIS)",
                 value: countedFiltered.length,
-                color: rdcColor(3),
+                color: rdcColor(2),
               },
             ]}
           />

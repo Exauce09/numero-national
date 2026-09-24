@@ -287,6 +287,23 @@ export default function ManageActsPage({
     [counted, monthFilter],
   );
 
+  const draftStatuses = useMemo(
+    () =>
+      new Set(["DRAFT", "SUBMITTED", "UNDER_REVIEW", "PENDING_OFFICER", "CORRECTION_REQUIRED", ""]),
+    [],
+  );
+
+  const draftsCount = useMemo(
+    () =>
+      all.filter((a) => {
+        const s = String(a.status ?? "DRAFT").toUpperCase().trim();
+        return draftStatuses.has(s) || !s;
+      }).length,
+    [all, draftStatuses],
+  );
+
+  const totalGeneral = all.length;
+
   const last30 = useMemo(() => {
     const cut = Date.now() - 30 * 24 * 60 * 60 * 1000;
     return counted.filter((a) => new Date(a.created_at).getTime() >= cut).length;
@@ -410,13 +427,13 @@ export default function ManageActsPage({
           <SimpleStatBlocks
             title={config.listTitle}
             items={[
-              { label: "TOTAL", value: counted.length, color: rdcColor(0) },
-              { label: "30 DERNIERS JOURS", value: last30, color: rdcColor(1) },
-              { label: "90 DERNIERS JOURS", value: last90, color: rdcColor(2) },
+              { label: "TOTAL GÉNÉRAL", value: totalGeneral, color: rdcColor(0) },
+              { label: "BROUILLONS", value: draftsCount, color: rdcColor(3) },
+              { label: "VALIDÉS", value: counted.length, color: rdcColor(1) },
               {
                 label: monthFilter ? `MOIS ${monthFilter}` : "FILTRÉS (MOIS)",
                 value: countedFiltered.length,
-                color: rdcColor(3),
+                color: rdcColor(2),
               },
             ]}
           />
