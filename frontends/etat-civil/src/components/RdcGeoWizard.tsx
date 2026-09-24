@@ -1,4 +1,4 @@
-/** Cascade adresse RDC : Province → Ville|Territoire → … → Avenue/Rue. */
+/** Cascade géo RDC — origine ou adresse (sans groupement). */
 
 import { useEffect, useState } from "react";
 import { fallbackForGeoPath } from "../geoFallback";
@@ -16,8 +16,6 @@ export type RdcGeoValue = {
   commune_type?: string;
   quartier_id?: string;
   quartier_name?: string;
-  groupement_id?: string;
-  groupement_name?: string;
   village_id?: string;
   village_name?: string;
   avenue_id?: string;
@@ -43,7 +41,7 @@ async function fetchItems(path: string): Promise<Item[]> {
   return (fallbackForGeoPath(path) as Item[]) || [];
 }
 
-function isKinshasa(name?: string): boolean {
+export function isKinshasaProvince(name?: string): boolean {
   return (name || "").toLowerCase().includes("kinshasa");
 }
 
@@ -53,7 +51,6 @@ function buildLabel(v: RdcGeoValue): string {
     v.avenue_name,
     v.quartier_name,
     v.village_name,
-    v.groupement_name,
     v.commune_name,
     v.ville_name || v.district_name,
     v.province_name,
@@ -64,10 +61,22 @@ function buildLabel(v: RdcGeoValue): string {
 type Props = {
   value?: RdcGeoValue;
   onChange: (v: RdcGeoValue) => void;
+  /** Origine (lieu d'origine) vs adresse (résidence actuelle). */
+  purpose?: "origine" | "adresse";
   label?: string;
 };
 
-export default function RdcGeoWizard({ value, onChange, label = "Adresse / origine" }: Props) {
+export default function RdcGeoWizard({
+  value,
+  onChange,
+  purpose = "adresse",
+  label,
+}: Props) {
+  const title =
+    label ||
+    (purpose === "origine"
+      ? "Origine (Province → Territoire / Ville → Secteur)"
+      : "Adresse (résidence actuelle)");
   const [provinces, setProvinces] = useState<Item[]>([]);
   const [villes, setVilles] = useState<Item[]>([]);
   const [districts, setDistricts] = useState<Item[]>([]);
@@ -96,7 +105,7 @@ export default function RdcGeoWizard({ value, onChange, label = "Adresse / origi
 
   async function onProvince(id: string) {
     const p = provinces.find((x) => x.id === id);
-    const kin = isKinshasa(p?.name);
+    const kin = isKinshasaProvince(p?.name);
     const next: RdcGeoValue = {
       province_id: id || undefined,
       province_name: p?.name,
@@ -109,8 +118,6 @@ export default function RdcGeoWizard({ value, onChange, label = "Adresse / origi
       commune_name: undefined,
       quartier_id: undefined,
       quartier_name: undefined,
-      groupement_id: undefined,
-      groupement_name: undefined,
       village_id: undefined,
       village_name: undefined,
       avenue_id: undefined,
@@ -157,8 +164,6 @@ export default function RdcGeoWizard({ value, onChange, label = "Adresse / origi
       commune_name: undefined,
       quartier_id: undefined,
       quartier_name: undefined,
-      groupement_id: undefined,
-      groupement_name: undefined,
       village_id: undefined,
       village_name: undefined,
       avenue_id: undefined,
@@ -198,8 +203,6 @@ export default function RdcGeoWizard({ value, onChange, label = "Adresse / origi
       district_name: d?.name,
       commune_id: undefined,
       commune_name: undefined,
-      groupement_id: undefined,
-      groupement_name: undefined,
       village_id: undefined,
       village_name: undefined,
       avenue_id: undefined,
@@ -220,8 +223,6 @@ export default function RdcGeoWizard({ value, onChange, label = "Adresse / origi
       commune_type: c?.voie_type,
       quartier_id: undefined,
       quartier_name: undefined,
-      groupement_id: undefined,
-      groupement_name: undefined,
       village_id: undefined,
       village_name: undefined,
       avenue_id: undefined,
@@ -234,7 +235,7 @@ export default function RdcGeoWizard({ value, onChange, label = "Adresse / origi
       setAvenues([]);
       return;
     }
-    if (sel.zoneKind === "ville" || isKinshasa(sel.province_name)) {
+    if (sel.zoneKind === "ville" || isKinshasaProvince(sel.province_name)) {
       setQuartiers(await fetchItems(`/geo/quartiers?commune_id=${id}`));
       setLocalites([]);
     } else {
@@ -254,7 +255,9 @@ export default function RdcGeoWizard({ value, onChange, label = "Adresse / origi
       avenue_name: undefined,
     };
     emit(next);
-    setAvenues(id ? await fetchItems(`/geo/voies?quartier_id=${id}`) : []);
+    if (purpose === "adresse") {
+      setAvenues(id ? await fetchItems(`/geo/voies?quartier_id=${id}`) : []);
+    }
   }
 
   function onVillage(id: string) {
@@ -263,7 +266,6 @@ export default function RdcGeoWizard({ value, onChange, label = "Adresse / origi
       ...sel,
       village_id: id || undefined,
       village_name: v?.name,
-      groupement_name: sel.groupement_name,
     });
   }
 
@@ -276,14 +278,23 @@ export default function RdcGeoWizard({ value, onChange, label = "Adresse / origi
     });
   }
 
-  const kin = isKinshasa(sel.province_name);
+  const kin = isKinshasaProvince(sel.province_name);
   const showZoneStep = Boolean(sel.province_id) && !kin;
   const urban = sel.zoneKind === "ville" || kin;
   const rural = sel.zoneKind === "territoire";
+  const showStreet =
+    purpose === "adresse" && (urban || rural) && Boolean(sel.quartier_id || sel.village_id || sel.commune_id);
 
   return (
     <fieldset className="id-fieldset" style={{ margin: 0 }}>
-      <legend>{label}</legend>
+      <legend>{title}</legend>
+      <p className="muted small" style={{ margin: "0 0 0.65rem" }}>
+        {purpose === "origine"
+          ? "Lieu d’origine de la personne (ancestral / natif) — distinct de l’adresse de résidence."
+          : kin
+            ? "Adresse de résidence à Kinshasa : Commune → Quartier → Avenue."
+            : "Adresse de résidence actuelle (où la personne habite)."}
+      </p>
       <div className="form-grid">
         <div className="full">
           <label className="form-label">1. Province *</label>
@@ -301,7 +312,7 @@ export default function RdcGeoWizard({ value, onChange, label = "Adresse / origi
           </select>
           {kin ? (
             <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
-              Kinshasa détectée — passage direct aux communes (pas de territoire).
+              Kinshasa — pas de territoire ; communes urbaines uniquement.
             </p>
           ) : null}
         </div>
@@ -341,7 +352,7 @@ export default function RdcGeoWizard({ value, onChange, label = "Adresse / origi
               </div>
             ) : null}
             <div>
-              <label className="form-label">3. Commune *</label>
+              <label className="form-label">{kin ? "2. Commune *" : "3. Commune *"}</label>
               <select
                 className="form-control"
                 value={sel.commune_id || ""}
@@ -357,7 +368,7 @@ export default function RdcGeoWizard({ value, onChange, label = "Adresse / origi
               </select>
             </div>
             <div>
-              <label className="form-label">Quartier *</label>
+              <label className="form-label">Quartier{purpose === "adresse" ? " *" : ""}</label>
               <select
                 className="form-control"
                 value={sel.quartier_id || ""}
@@ -393,7 +404,7 @@ export default function RdcGeoWizard({ value, onChange, label = "Adresse / origi
               </select>
             </div>
             <div>
-              <label className="form-label">3. Commune rurale / Secteur / Chefferie *</label>
+              <label className="form-label">3. Secteur / Chefferie / Commune rurale *</label>
               <select
                 className="form-control"
                 value={sel.commune_id || ""}
@@ -408,15 +419,6 @@ export default function RdcGeoWizard({ value, onChange, label = "Adresse / origi
                   </option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label className="form-label">Groupement</label>
-              <input
-                className="form-control"
-                value={sel.groupement_name || ""}
-                onChange={(e) => emit({ ...sel, groupement_name: e.target.value })}
-                placeholder="Nom du groupement"
-              />
             </div>
             <div>
               <label className="form-label">Village *</label>
@@ -437,7 +439,7 @@ export default function RdcGeoWizard({ value, onChange, label = "Adresse / origi
           </>
         ) : null}
 
-        {(urban || rural) && (sel.quartier_id || sel.village_id || sel.commune_id) ? (
+        {showStreet ? (
           <>
             <div>
               <label className="form-label">4. Avenue / Rue</label>
@@ -447,7 +449,7 @@ export default function RdcGeoWizard({ value, onChange, label = "Adresse / origi
                   value={sel.avenue_id || ""}
                   onChange={(e) => onAvenue(e.target.value)}
                 >
-                  <option value="">— Choisir ou saisir ci-dessous —</option>
+                  <option value="">— Choisir ou saisir —</option>
                   {avenues.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.name}
@@ -477,7 +479,7 @@ export default function RdcGeoWizard({ value, onChange, label = "Adresse / origi
 
         {sel.label ? (
           <div className="full muted small">
-            Adresse complète : <strong>{sel.label}</strong>
+            {purpose === "origine" ? "Origine" : "Adresse"} : <strong>{sel.label}</strong>
           </div>
         ) : null}
       </div>

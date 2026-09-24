@@ -349,11 +349,13 @@ export default function PersonPicker({
           >
             <header className="person-add-head">
               <div>
-                <h3>
-                  {isPere ? "Ajouter le père" : isMere ? "Ajouter la mère" : "Fiche d'identification"}
-                </h3>
+                <h3>Ajouter une personne</h3>
                 <p className="muted small" style={{ margin: 0 }}>
-                  Saisie sur le modèle officiel — même présentation que la fiche papier.
+                  {isPere
+                    ? "Saisie du père — sexe masculin verrouillé."
+                    : isMere
+                      ? "Saisie de la mère — sexe féminin verrouillé."
+                      : "Identité, origine et adresse de résidence."}
                 </p>
               </div>
               <button

@@ -1,11 +1,10 @@
-/** Formulaire d'ajout personne — champs fiche d'identification, UI formulaire standard. */
+/** Formulaire d'ajout personne — champs standards + origine / adresse séparées. */
 
 import { useMemo, useState } from "react";
 import { ETAT_CIVIL_OPTIONS, type EtatCivil, type Sexe } from "../registry";
 import { listKnownProfessions, PROFESSIONS_KEY, rememberNamed } from "../namedLists";
 import { emptyFichePerson, type FichePersonBlock } from "./FicheIdentificationForm";
 import RdcGeoWizard, { type RdcGeoValue } from "./RdcGeoWizard";
-import GeoCascade, { GEO_PRESETS } from "./GeoCascade";
 
 export type FicheEditorConjoint = {
   nom: string;
@@ -72,6 +71,8 @@ export default function FicheIdentificationEditor({
   const i = value.interesse;
   const professions = useMemo(() => listKnownProfessions([i.profession]), [i.profession]);
   const [originGeo, setOriginGeo] = useState<RdcGeoValue>({});
+  const [addressGeo, setAddressGeo] = useState<RdcGeoValue>({});
+  const [adresseComplement, setAdresseComplement] = useState("");
 
   function patchInteresse(patch: Partial<typeof i>) {
     const sexe_code = sexeLocked ?? patch.sexe_code ?? i.sexe_code;
@@ -93,8 +94,21 @@ export default function FicheIdentificationEditor({
       ville: geo.ville_name || "",
       territoire: geo.district_name || geo.ville_name || "",
       secteur: geo.commune_name || geo.village_name || "",
-      adresse: geo.label || i.adresse,
     });
+  }
+
+  function applyAddress(geo: RdcGeoValue) {
+    setAddressGeo(geo);
+    const base = geo.label || "";
+    const full = [base, adresseComplement.trim()].filter(Boolean).join(" — ");
+    patchInteresse({ adresse: full });
+  }
+
+  function onComplement(v: string) {
+    setAdresseComplement(v);
+    const base = addressGeo.label || "";
+    const full = [base, v.trim()].filter(Boolean).join(" — ");
+    patchInteresse({ adresse: full });
   }
 
   return (
@@ -103,40 +117,15 @@ export default function FicheIdentificationEditor({
         <div className="panel-head" style={{ marginBottom: "0.75rem" }}>
           <div>
             <h3 className="panel-title" style={{ margin: 0 }}>
-              Fiche d&apos;identification
+              Ajouter une personne
             </h3>
             <p className="muted small" style={{ margin: "0.25rem 0 0" }}>
-              Commune de {value.communeName || "—"} · {value.villeProvince || "RDC"}
-              {value.serie ? ` · Série ${value.serie}` : ""}
+              Bureau : Commune de {value.communeName || "—"} · {value.villeProvince || "RDC"}
             </p>
           </div>
         </div>
 
         <div className="form-grid">
-          <div>
-            <label className="form-label">Série</label>
-            <input
-              className="form-control"
-              value={value.serie}
-              onChange={(e) => onChange({ ...value, serie: e.target.value })}
-              placeholder="Série…"
-            />
-          </div>
-          <div>
-            <label className="form-label">Date / lieu d&apos;établissement</label>
-            <input
-              className="form-control"
-              value={value.dateLieu}
-              onChange={(e) => onChange({ ...value, dateLieu: e.target.value })}
-            />
-          </div>
-
-          <div className="full">
-            <h4 className="panel-title" style={{ fontSize: "1rem", marginBottom: 0 }}>
-              Identité de l&apos;intéressé
-            </h4>
-          </div>
-
           <div>
             <label className="form-label">Nom *</label>
             <input
@@ -209,6 +198,16 @@ export default function FicheIdentificationEditor({
               onChange={(e) => patchInteresse({ nationalite: e.target.value })}
             />
           </div>
+
+          <div>
+            <label className="form-label">Lieu de naissance</label>
+            <input
+              className="form-control"
+              value={i.lieu_date_naissance}
+              onChange={(e) => patchInteresse({ lieu_date_naissance: e.target.value })}
+              placeholder="Lieu (commune, ville, province…)"
+            />
+          </div>
           <div>
             <label className="form-label">Date de naissance *</label>
             <input
@@ -219,7 +218,8 @@ export default function FicheIdentificationEditor({
               required
             />
           </div>
-          <div>
+
+          <div className="full">
             <label className="form-label">Profession</label>
             <input
               className="form-control"
@@ -239,101 +239,50 @@ export default function FicheIdentificationEditor({
           </div>
 
           <div className="full">
-            <label className="form-label">Lieu de naissance</label>
-            <GeoCascade
-              embedded
-              allowAdd={false}
-              levels={[...GEO_PRESETS.place]}
-              label="Lieu de naissance"
-              onChange={(geo) => {
-                const full =
-                  geo.label ||
-                  [geo.commune_name, geo.ville_name, geo.province_name].filter(Boolean).join(", ");
-                patchInteresse({ lieu_date_naissance: full });
-              }}
+            <RdcGeoWizard
+              purpose="origine"
+              label="Origine — Province / Territoire ou Ville / Secteur"
+              value={originGeo}
+              onChange={applyOrigin}
             />
-            {i.lieu_date_naissance ? (
-              <p className="muted small" style={{ marginTop: 4 }}>
-                Lieu complet : <strong>{i.lieu_date_naissance}</strong>
+            {(i.province || i.territoire || i.secteur) && (
+              <p className="muted small" style={{ marginTop: 6 }}>
+                Origine enregistrée :{" "}
+                <strong>
+                  {[i.secteur, i.territoire, i.ville, i.province].filter(Boolean).join(" · ")}
+                </strong>
               </p>
-            ) : null}
+            )}
           </div>
 
           <div className="full">
             <RdcGeoWizard
-              label="Origine / adresse (cascade RDC)"
-              value={originGeo}
-              onChange={applyOrigin}
+              purpose="adresse"
+              label="Adresse de résidence (actuelle)"
+              value={addressGeo}
+              onChange={applyAddress}
             />
-          </div>
-
-          <div className="full">
-            <label className="form-label">Adresse (complément)</label>
+            <label className="form-label" style={{ marginTop: "0.65rem" }}>
+              Complément d&apos;adresse
+            </label>
             <input
               className="form-control"
-              value={i.adresse}
-              onChange={(e) => patchInteresse({ adresse: e.target.value })}
-              placeholder="Parcelle, référence…"
+              value={adresseComplement}
+              onChange={(e) => onComplement(e.target.value)}
+              placeholder="Parcelle, référence, point de repère…"
             />
+            {i.adresse ? (
+              <p className="muted small" style={{ marginTop: 6 }}>
+                Adresse enregistrée : <strong>{i.adresse}</strong>
+              </p>
+            ) : null}
           </div>
 
           {!compact ? (
             <>
               <div className="full">
                 <h4 className="panel-title" style={{ fontSize: "1rem", marginBottom: 0 }}>
-                  Conjoint(e) (le cas échéant)
-                </h4>
-              </div>
-              <div>
-                <label className="form-label">Nom du conjoint(e)</label>
-                <input
-                  className="form-control"
-                  value={value.conjoint.nom}
-                  onChange={(e) =>
-                    onChange({ ...value, conjoint: { ...value.conjoint, nom: e.target.value } })
-                  }
-                />
-              </div>
-              <div>
-                <label className="form-label">Lieu et date de naissance</label>
-                <input
-                  className="form-control"
-                  value={value.conjoint.lieu_date_naissance}
-                  onChange={(e) =>
-                    onChange({
-                      ...value,
-                      conjoint: { ...value.conjoint, lieu_date_naissance: e.target.value },
-                    })
-                  }
-                />
-              </div>
-              <div>
-                <label className="form-label">Profession</label>
-                <input
-                  className="form-control"
-                  value={value.conjoint.profession}
-                  onChange={(e) =>
-                    onChange({
-                      ...value,
-                      conjoint: { ...value.conjoint, profession: e.target.value },
-                    })
-                  }
-                />
-              </div>
-              <div>
-                <label className="form-label">Adresse</label>
-                <input
-                  className="form-control"
-                  value={value.conjoint.adresse}
-                  onChange={(e) =>
-                    onChange({ ...value, conjoint: { ...value.conjoint, adresse: e.target.value } })
-                  }
-                />
-              </div>
-
-              <div className="full">
-                <h4 className="panel-title" style={{ fontSize: "1rem", marginBottom: 0 }}>
-                  Père
+                  Père (optionnel)
                 </h4>
               </div>
               <div>
@@ -369,7 +318,7 @@ export default function FicheIdentificationEditor({
 
               <div className="full">
                 <h4 className="panel-title" style={{ fontSize: "1rem", marginBottom: 0 }}>
-                  Mère
+                  Mère (optionnel)
                 </h4>
               </div>
               <div>
