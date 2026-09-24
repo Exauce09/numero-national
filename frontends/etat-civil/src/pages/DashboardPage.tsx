@@ -460,7 +460,7 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Mariages"
-          value={marriageAll.length}
+          value={marriages.length}
           subtitle={`${marriages.length} validés · ${pendingOf(marriageAll).length} à valider`}
           icon={<IconRing size={22} />}
           color={RDC.yellow}
@@ -468,7 +468,7 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Décès"
-          value={deathAll.length}
+          value={deaths.length}
           subtitle={`${deaths.length} validés · ${pendingOf(deathAll).length} à valider`}
           icon={<IconCross size={22} />}
           color={RDC.red}
@@ -476,7 +476,7 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Adoptions"
-          value={adoptionAll.length}
+          value={adoptions.length}
           subtitle={`${adoptions.length} validés · ${pendingOf(adoptionAll).length} à valider`}
           icon={<IconHome size={22} />}
           color={RDC.blueMid}
@@ -494,7 +494,7 @@ export default function DashboardPage() {
         ) : (
           <StatCard
             title="Divorces"
-            value={divorceAll.length}
+            value={divorces.length}
             subtitle={`${divorces.length} validés · ${pendingOf(divorceAll).length} à valider`}
             icon={<IconSplit size={22} />}
             color={RDC.redDeep}
