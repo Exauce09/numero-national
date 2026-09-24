@@ -66,7 +66,20 @@ function buildEditorSeed(sexFilter?: Sexe): FicheEditorState {
 }
 
 function tryAddRelative(
-  block: { nom: string; postnom: string; prenom: string; sexe: string; lieu_date_naissance: string },
+  block: {
+    nom: string;
+    postnom: string;
+    prenom: string;
+    sexe: string;
+    lieu_date_naissance: string;
+    nationalite?: string;
+    profession?: string;
+    province?: string;
+    ville?: string;
+    territoire?: string;
+    secteur?: string;
+    adresse?: string;
+  },
   sexe: Sexe,
 ): string | undefined {
   if (!block.nom.trim()) return undefined;
@@ -80,6 +93,9 @@ function tryAddRelative(
           return m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : "1970-01-01";
         })()
       : "1970-01-01";
+  const originLabel = [block.secteur, block.territoire, block.ville, block.province]
+    .filter(Boolean)
+    .join(" · ");
   try {
     const p = addPerson({
       nom: block.nom.trim(),
@@ -87,8 +103,16 @@ function tryAddRelative(
       prenom: block.prenom.trim() || "—",
       sexe,
       date_naissance,
-      lieu_naissance: lieu.replace(dateMatch?.[0] ?? "", "").replace(/[—\-–]/g, " ").trim(),
+      lieu_naissance: lieu.replace(dateMatch?.[0] ?? "", "").replace(/[—\-–]/g, " ").trim() || originLabel,
       etat_civil: "UNKNOWN" as Person["etat_civil"],
+      nationalite: natFromLabel(block.nationalite || "Congolaise"),
+      parcours_professionnel: block.profession?.trim() || undefined,
+      province: block.province?.trim() || undefined,
+      ville: block.ville?.trim() || undefined,
+      territoire: block.territoire?.trim() || undefined,
+      secteur: block.secteur?.trim() || undefined,
+      adresse: block.adresse?.trim() || undefined,
+      situation_familiale: originLabel ? `Origine: ${originLabel}` : undefined,
     });
     return p.id;
   } catch {

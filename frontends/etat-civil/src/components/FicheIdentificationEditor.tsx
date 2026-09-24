@@ -62,6 +62,117 @@ type Props = {
   compact?: boolean;
 };
 
+function ParentSection({
+  title,
+  value,
+  onChange,
+  sexeFixed,
+}: {
+  title: string;
+  value: FichePersonBlock;
+  onChange: (next: FichePersonBlock) => void;
+  sexeFixed: "M" | "F";
+}) {
+  const [originGeo, setOriginGeo] = useState<RdcGeoValue>({});
+  const set = <K extends keyof FichePersonBlock>(key: K, v: FichePersonBlock[K]) =>
+    onChange({ ...value, [key]: v, sexe: sexeFixed === "F" ? "Féminin" : "Masculin" });
+
+  return (
+    <>
+      <div className="full">
+        <h4 className="panel-title" style={{ fontSize: "1rem", marginBottom: 0 }}>
+          {title}
+        </h4>
+        <p className="muted small" style={{ margin: "0.2rem 0 0" }}>
+          Identité et origine — sexe {sexeFixed === "F" ? "féminin" : "masculin"} (verrouillé).
+        </p>
+      </div>
+      <div>
+        <label className="form-label">Nom</label>
+        <input className="form-control" value={value.nom} onChange={(e) => set("nom", e.target.value)} />
+      </div>
+      <div>
+        <label className="form-label">Post-nom</label>
+        <input
+          className="form-control"
+          value={value.postnom}
+          onChange={(e) => set("postnom", e.target.value)}
+        />
+      </div>
+      <div>
+        <label className="form-label">Prénom</label>
+        <input
+          className="form-control"
+          value={value.prenom}
+          onChange={(e) => set("prenom", e.target.value)}
+        />
+      </div>
+      <div>
+        <label className="form-label">Sexe</label>
+        <input
+          className="form-control"
+          value={sexeFixed === "F" ? "Féminin" : "Masculin"}
+          readOnly
+        />
+      </div>
+      <div>
+        <label className="form-label">Lieu de naissance</label>
+        <input
+          className="form-control"
+          value={value.lieu_date_naissance}
+          onChange={(e) => set("lieu_date_naissance", e.target.value)}
+          placeholder="Lieu de naissance"
+        />
+      </div>
+      <div>
+        <label className="form-label">Nationalité</label>
+        <input
+          className="form-control"
+          value={value.nationalite}
+          onChange={(e) => set("nationalite", e.target.value)}
+        />
+      </div>
+      <div className="full">
+        <label className="form-label">Profession</label>
+        <input
+          className="form-control"
+          value={value.profession}
+          onChange={(e) => set("profession", e.target.value)}
+          placeholder="Profession"
+        />
+      </div>
+      <div className="full">
+        <RdcGeoWizard
+          purpose="origine"
+          label={`Origine — ${sexeFixed === "F" ? "mère" : "père"} (Province / Territoire ou Ville / Secteur)`}
+          value={originGeo}
+          onChange={(geo) => {
+            setOriginGeo(geo);
+            onChange({
+              ...value,
+              sexe: sexeFixed === "F" ? "Féminin" : "Masculin",
+              province: geo.province_name || "",
+              ville: geo.ville_name || "",
+              territoire: geo.district_name || geo.ville_name || "",
+              secteur: geo.commune_name || geo.village_name || "",
+            });
+          }}
+        />
+        {(value.province || value.territoire || value.secteur) && (
+          <p className="muted small" style={{ marginTop: 6 }}>
+            Origine :{" "}
+            <strong>
+              {[value.secteur, value.territoire, value.ville, value.province]
+                .filter(Boolean)
+                .join(" · ")}
+            </strong>
+          </p>
+        )}
+      </div>
+    </>
+  );
+}
+
 export default function FicheIdentificationEditor({
   value,
   onChange,
@@ -280,77 +391,18 @@ export default function FicheIdentificationEditor({
 
           {!compact ? (
             <>
-              <div className="full">
-                <h4 className="panel-title" style={{ fontSize: "1rem", marginBottom: 0 }}>
-                  Père (optionnel)
-                </h4>
-              </div>
-              <div>
-                <label className="form-label">Nom</label>
-                <input
-                  className="form-control"
-                  value={value.pere.nom}
-                  onChange={(e) =>
-                    onChange({ ...value, pere: { ...value.pere, nom: e.target.value } })
-                  }
-                />
-              </div>
-              <div>
-                <label className="form-label">Post-nom</label>
-                <input
-                  className="form-control"
-                  value={value.pere.postnom}
-                  onChange={(e) =>
-                    onChange({ ...value, pere: { ...value.pere, postnom: e.target.value } })
-                  }
-                />
-              </div>
-              <div>
-                <label className="form-label">Prénom</label>
-                <input
-                  className="form-control"
-                  value={value.pere.prenom}
-                  onChange={(e) =>
-                    onChange({ ...value, pere: { ...value.pere, prenom: e.target.value } })
-                  }
-                />
-              </div>
-
-              <div className="full">
-                <h4 className="panel-title" style={{ fontSize: "1rem", marginBottom: 0 }}>
-                  Mère (optionnel)
-                </h4>
-              </div>
-              <div>
-                <label className="form-label">Nom</label>
-                <input
-                  className="form-control"
-                  value={value.mere.nom}
-                  onChange={(e) =>
-                    onChange({ ...value, mere: { ...value.mere, nom: e.target.value } })
-                  }
-                />
-              </div>
-              <div>
-                <label className="form-label">Post-nom</label>
-                <input
-                  className="form-control"
-                  value={value.mere.postnom}
-                  onChange={(e) =>
-                    onChange({ ...value, mere: { ...value.mere, postnom: e.target.value } })
-                  }
-                />
-              </div>
-              <div>
-                <label className="form-label">Prénom</label>
-                <input
-                  className="form-control"
-                  value={value.mere.prenom}
-                  onChange={(e) =>
-                    onChange({ ...value, mere: { ...value.mere, prenom: e.target.value } })
-                  }
-                />
-              </div>
+              <ParentSection
+                title="Père (optionnel)"
+                value={value.pere}
+                sexeFixed="M"
+                onChange={(pere) => onChange({ ...value, pere })}
+              />
+              <ParentSection
+                title="Mère (optionnel)"
+                value={value.mere}
+                sexeFixed="F"
+                onChange={(mere) => onChange({ ...value, mere })}
+              />
             </>
           ) : null}
         </div>
