@@ -54,9 +54,9 @@ export type ManageConfig = {
 export const MANAGE_CONFIGS: Record<string, ManageConfig> = {
   deces: {
     slug: "deces",
-    title: "Enregistrement de décès",
-    listTitle: "Enregistrement de décès",
-    breadcrumb: "Enregistrement de décès",
+    title: "Décès",
+    listTitle: "Décès",
+    breadcrumb: "Décès",
     justiciaUrl: "https://www.justicia.website/egouv/COMMUNE/manage-deces.php",
     justiciaFile: "manage-deces.php",
     actType: "DEATH",
@@ -166,9 +166,9 @@ export const MANAGE_CONFIGS: Record<string, ManageConfig> = {
   },
   naissance: {
     slug: "naissance",
-    title: "Enregistrement de nouveau-né",
-    listTitle: "Enregistrement de nouveau-né",
-    breadcrumb: "Enregistrement de nouveau-né",
+    title: "Naissance",
+    listTitle: "Naissance",
+    breadcrumb: "Naissance",
     justiciaUrl: "https://www.justicia.website/egouv/COMMUNE/manage-naissance.php",
     justiciaFile: "manage-naissance.php",
     actType: "BIRTH",

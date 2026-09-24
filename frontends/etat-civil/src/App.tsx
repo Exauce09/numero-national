@@ -392,7 +392,7 @@ function Shell() {
 
           {canSeeNav("naissances", roles) ? (
             <NavLink to="/manage/naissance">
-              <IconBaby size={18} /> Enregistrement de nouveau-né
+              <IconBaby size={18} /> Naissance
             </NavLink>
           ) : null}
 
@@ -416,7 +416,7 @@ function Shell() {
 
           {canSeeNav("deces", roles) ? (
             <NavLink to="/manage/deces">
-              <IconCross size={18} /> Enregistrement de décès
+              <IconCross size={18} /> Décès
             </NavLink>
           ) : null}
 

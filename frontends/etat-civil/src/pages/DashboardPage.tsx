@@ -245,11 +245,6 @@ export default function DashboardPage() {
   const marriages = validatedOf(marriageAll);
   const divorces = validatedOf(divorceAll);
   const adoptions = validatedOf(adoptionAll);
-  const recognitions = acts.filter(
-    (a) =>
-      (a.act_type === "RECOGNITION" || a.act_type === "recognitions") &&
-      ["VALIDATED", "AUTHENTICATED", "ARCHIVED"].includes(actStatus(a)),
-  );
 
   const drafts = acts.filter((a) => actStatus(a) === "DRAFT").length;
   const submitted = acts.filter((a) =>
@@ -268,7 +263,10 @@ export default function DashboardPage() {
 
   const provinceRanking = useMemo(() => {
     const map = new Map<string, number>();
-    for (const a of acts) {
+    const validatedActs = acts.filter((a) =>
+      ["VALIDATED", "AUTHENTICATED", "ARCHIVED"].includes(actStatus(a)),
+    );
+    for (const a of validatedActs) {
       const prov = actProvince(a);
       map.set(prov, (map.get(prov) ?? 0) + 1);
     }
@@ -517,7 +515,7 @@ export default function DashboardPage() {
           </button>
           <button type="button" className="dash-action-card" onClick={() => navigate("/missions")}>
             <span className="dash-action-label">Missions EC RDC</span>
-            <strong className="dash-action-value">{adoptions.length + recognitions.length}</strong>
+            <strong className="dash-action-value">{adoptions.length}</strong>
             <span className="btn-secondary btn-sm">Ouvrir</span>
           </button>
         </div>
@@ -528,15 +526,14 @@ export default function DashboardPage() {
       </h3>
       <div className="eg-charts-row dash-charts-main">
         <BarChart
-          title="Actes d'état civil par type"
+          title="Actes d'état civil par type (validés)"
           height={200}
           data={[
-            { label: "N.-nés", value: births.length, color: RDC.yellow },
+            { label: "Naissance", value: births.length, color: RDC.yellow },
             { label: "Mariages", value: marriages.length, color: RDC.yellowDeep },
             { label: "Divorces", value: divorces.length, color: RDC.redSoft },
-            { label: "Enregistrement de décès", value: deaths.length, color: RDC.red },
+            { label: "Décès", value: deaths.length, color: RDC.red },
             { label: "Adopt.", value: adoptions.length, color: RDC.blueMid },
-            { label: "Reconn.", value: recognitions.length, color: RDC.blueSoft },
           ]}
         />
       </div>
