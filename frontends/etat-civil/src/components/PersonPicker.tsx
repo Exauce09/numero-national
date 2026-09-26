@@ -261,8 +261,6 @@ export default function PersonPicker({
     setModal(true);
   }
 
-  const [saving, setSaving] = useState(false);
-
   async function saveNewPerson() {
     setError(null);
     const i = fiche.interesse;
