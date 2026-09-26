@@ -47,7 +47,7 @@ export default function RegisterAccountPage() {
   const allowed = isSuperAdminNational(session?.roles);
 
   const [step, setStep] = useState<Step>("form");
-  const [accountType, setAccountType] = useState<AccountRequestType>("CITOYEN");
+  const [accountType, setAccountType] = useState<AccountRequestType>("AGENT_ETAT_CIVIL");
   const typeOpt = getAccountTypeOption(accountType);
 
   const [nom, setNom] = useState("");
@@ -287,7 +287,7 @@ export default function RegisterAccountPage() {
             <p className="register-note muted small">
               Réservé au <strong>SUPER_ADMIN_NATIONAL</strong> ({session.username}). Après
               vérification du téléphone, le compte est activé avec le rôle correspondant au type
-              choisi (greffier, officier, hôpital → /sante, etc.).
+              choisi (greffier, officier, IT structure sanitaire → /sante, etc.).
             </p>
 
             <form className="register-form" onSubmit={(e) => void onSubmitForm(e)} autoComplete="off">
@@ -491,8 +491,10 @@ export default function RegisterAccountPage() {
                             disabled={busy}
                             placeholder={
                               accountType === "HOPITAL_MATERNITE"
-                                ? "ex. Hôpital Général de Référence de …"
-                                : undefined
+                                ? "ex. Hôpital / maternité / centre de santé de …"
+                                : accountType === "ADMIN_PROVINCIAL"
+                                  ? "ex. DIVINTER Kinshasa"
+                                  : undefined
                             }
                           />
                         )}
@@ -738,11 +740,11 @@ export default function RegisterAccountPage() {
             <h2 className="register-title">Compte enregistré</h2>
             {result.accountType === "HOPITAL_MATERNITE" && result.status === "ACTIVE" ? (
               <>
-                <div className="success-banner">Compte hôpital / maternité créé</div>
+                <div className="success-banner">Compte infirmier titulaire (IT) créé</div>
                 <p className="muted">
-                  La structure est disponible dans{" "}
+                  La structure sanitaire est disponible dans{" "}
                   <Link to="/declarations">Déclarations → Structures sanitaires</Link>. Connexion
-                  maternité : <Link to="/sante/login">/sante/login</Link> avec l&apos;identifiant{" "}
+                  portail santé : <Link to="/sante/login">/sante/login</Link> avec l&apos;identifiant{" "}
                   <code>{result.login_id}</code> et le mot de passe saisi.
                 </p>
               </>

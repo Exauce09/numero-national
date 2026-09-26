@@ -122,10 +122,10 @@ export default function AccountRequestsPage() {
         <div>
           <label className="form-label">Rôle demandé</label>
           <select className="form-control" value={role} onChange={(e) => setRole(e.target.value)}>
-            <option value="AGENT_ETAT_CIVIL">Agent d&apos;état civil</option>
+            <option value="AGENT_ETAT_CIVIL">Préposé à l&apos;état civil</option>
             <option value="OFFICIER_ETAT_CIVIL">Officier d&apos;état civil</option>
             <option value="RESPONSABLE_BUREAU">Responsable de bureau</option>
-            <option value="ADMIN_PROVINCIAL">Division provinciale</option>
+            <option value="ADMIN_PROVINCIAL">DIVINTER</option>
             <option value="CIVIL_OFFICER">Officier (compat)</option>
           </select>
         </div>

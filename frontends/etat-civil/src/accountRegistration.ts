@@ -146,10 +146,11 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     summary: "Compte personnel — consulter / suivre ses demandes, sans accès bureau",
     institutional: false,
     portal: "none",
+    hiddenFromRegister: true,
   },
   {
     code: "AGENT_ETAT_CIVIL",
-    label: "Agent d'état civil",
+    label: "Préposé à l'état civil",
     summary: "Saisie des dossiers au bureau ; soumet à l'officier pour validation",
     institutional: true,
     portal: "civil",
@@ -159,6 +160,7 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     showMatricule: true,
     showFonction: true,
     fonctionOptions: [
+      "Préposé à l'état civil",
       "Agent de saisie",
       "Agent d'accueil",
       "Agent guichet naissances",
@@ -196,24 +198,24 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
   },
   {
     code: "ADMIN_PROVINCIAL",
-    label: "Division provinciale",
+    label: "DIVINTER",
     summary:
-      "Pilote l'état civil au niveau provincial : supervision des bureaux, coordination et suivi",
+      "Division de l'intérieur / coordination provinciale : supervision des bureaux d'état civil et suivi",
     institutional: true,
     portal: "civil",
     assignRoles: ["ADMIN_PROVINCIAL"],
-    institutionLabel: "Division provinciale de l'état civil",
+    institutionLabel: "DIVINTER — division provinciale",
     institutionSelect: "free",
     showMatricule: true,
     showFonction: true,
     fonctionOptions: [
-      "Directeur(trice) provincial(e) de l'état civil",
-      "Chef de division provinciale",
-      "Cadre de la division provinciale",
+      "Directeur(trice) DIVINTER",
+      "Chef de division DIVINTER",
+      "Cadre DIVINTER",
     ],
     showService: true,
     serviceOptions: [
-      "Division provinciale de l'état civil",
+      "DIVINTER",
       "Coordination provinciale",
       "Inspection provinciale",
     ],
@@ -241,16 +243,23 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
   },
   {
     code: "HOPITAL_MATERNITE",
-    label: "Hôpital / Maternité",
-    summary: "Déclare naissances/décès sur /sante ; l'officier valide ensuite",
+    label: "Infirmier titulaire (IT)",
+    summary:
+      "Personnel soignant en structure sanitaire : déclare naissances/décès sur /sante ; l'officier valide ensuite",
     institutional: true,
     portal: "sante",
-    institutionLabel: "Nom de l'hôpital / maternité",
+    institutionLabel: "Structure sanitaire (hôpital / maternité / centre)",
     institutionSelect: "free",
-    showMatricule: false,
-    showFonction: false,
+    showMatricule: true,
+    showFonction: true,
+    fonctionOptions: [
+      "Infirmier titulaire (IT)",
+      "Infirmier(ère) de maternité",
+      "Sage-femme",
+      "Responsable maternité",
+    ],
     showService: true,
-    serviceOptions: ["Maternité", "Néonatalogie", "Urgences", "Direction médicale"],
+    serviceOptions: ["Maternité", "Néonatalogie", "Urgences", "Direction médicale", "Centre de santé"],
   },
   {
     code: "AGENT_DELIVRANCE",
@@ -440,7 +449,11 @@ export function listPendingInstitutionalRequests(): AccountRegistrationRequest[]
 }
 
 export function getAccountTypeOption(code: AccountRequestType): AccountTypeOption {
-  return ACCOUNT_TYPE_OPTIONS.find((o) => o.code === code) ?? ACCOUNT_TYPE_OPTIONS[0];
+  return (
+    ACCOUNT_TYPE_OPTIONS.find((o) => o.code === code) ??
+    ACCOUNT_TYPE_OPTIONS.find((o) => o.code === "AGENT_ETAT_CIVIL") ??
+    ACCOUNT_TYPE_OPTIONS[0]
+  );
 }
 
 export function normalizePhone(raw: string): string {

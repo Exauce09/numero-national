@@ -49,9 +49,9 @@ export const EC_ROLE_CATALOG: Array<{
   },
   {
     code: "ADMIN_PROVINCIAL",
-    label: "Division provinciale",
+    label: "DIVINTER",
     summary:
-      "Pilote l'état civil au niveau provincial : supervision des bureaux, coordination et suivi.",
+      "Division de l'intérieur / coordination provinciale : supervision des bureaux d'état civil et suivi.",
     canCreateUsers: true,
     canValidateActs: true,
   },
@@ -72,7 +72,7 @@ export const EC_ROLE_CATALOG: Array<{
   },
   {
     code: "AGENT_ETAT_CIVIL",
-    label: "Agent de l'état civil",
+    label: "Préposé à l'état civil",
     summary: "Saisie et préparation des dossiers ; soumet à l'officier pour validation.",
     canCreateUsers: false,
     canValidateActs: false,
