@@ -787,6 +787,65 @@ export function deletePerson(id: string): boolean {
   return true;
 }
 
+const WIPE_ADULTS_FLAG = "nn_civil_wipe_adults_v1";
+
+function isAdultPerson(p: Person): boolean {
+  if (!p.date_naissance) return true;
+  const birth = new Date(p.date_naissance);
+  if (Number.isNaN(birth.getTime())) return true;
+  return ageYears(p.date_naissance) >= 18;
+}
+
+/**
+ * Efface tous les majeurs (mariés ou non) du registre local,
+ * les liens de mariage et les actes MARRIAGE/DIVORCE.
+ * Conserve les mineurs. Une seule fois (flag localStorage).
+ */
+export function wipeAllAdultsOnce(): { removed: number; kept: number } {
+  if (typeof localStorage === "undefined") return { removed: 0, kept: 0 };
+  if (localStorage.getItem(WIPE_ADULTS_FLAG) === "1") {
+    const cur = load();
+    return { removed: 0, kept: cur.persons.length };
+  }
+
+  const registry = load();
+  const keep: Person[] = [];
+  const removedIds = new Set<string>();
+  for (const p of registry.persons) {
+    if (isAdultPerson(p)) removedIds.add(p.id);
+    else keep.push(p);
+  }
+
+  const cleanedMinors = keep.map((p) => ({
+    ...p,
+    mother_id: p.mother_id && removedIds.has(p.mother_id) ? undefined : p.mother_id,
+    father_id: p.father_id && removedIds.has(p.father_id) ? undefined : p.father_id,
+    etat_civil: "CELIBATAIRE" as EtatCivil,
+  }));
+
+  registry.persons = cleanedMinors;
+  registry.marriages = [];
+  registry.acts = registry.acts.filter((a) => a.type !== "MARRIAGE" && a.type !== "DIVORCE");
+  save(registry);
+
+  try {
+    const overrides = loadCivilStatusOverrides();
+    let changed = false;
+    for (const id of removedIds) {
+      if (id in overrides) {
+        delete overrides[id];
+        changed = true;
+      }
+    }
+    if (changed) localStorage.setItem("nn_civil_status_overrides", JSON.stringify(overrides));
+  } catch {
+    /* ignore */
+  }
+
+  localStorage.setItem(WIPE_ADULTS_FLAG, "1");
+  return { removed: removedIds.size, kept: cleanedMinors.length };
+}
+
 export function listActs(type?: ActType): Act[] {
   const acts = [...load().acts].sort((a, b) => b.created_at.localeCompare(a.created_at));
   if (!type) return acts;
