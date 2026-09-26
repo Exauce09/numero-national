@@ -1,7 +1,7 @@
 /** Pages manage-* style Justicia : stats, graphiques, liste paginée, détail. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import ActWorkflowPanel from "./ActWorkflowPanel";
 import { BarChart, PieChart } from "./Charts";
 import DataToolbar from "./DataToolbar";
@@ -227,21 +227,37 @@ export default function ManageActsPage({
   showAnalytics?: boolean;
 }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const session = getSession();
   const [q, setQ] = useState("");
-  const [statusFocus, setStatusFocus] = useState<"all" | "drafts" | "validated">("all");
+  const focusParam = searchParams.get("focus");
+  const [statusFocus, setStatusFocus] = useState<"all" | "drafts" | "validated">(() =>
+    focusParam === "drafts" ? "drafts" : "validated",
+  );
   const listRef = useRef<HTMLDivElement | null>(null);
-  const [monthFilter, setMonthFilter] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  });
+  const [monthFilter, setMonthFilter] = useState("");
   const [page, setPage] = useState(1);
   const [viewAct, setViewAct] = useState<Act | null>(null);
   const [tick, setTick] = useState(0);
   const [source, setSource] = useState<"api" | "cache">("cache");
 
+  useEffect(() => {
+    const f = searchParams.get("focus");
+    if (f === "drafts" || f === "validated" || f === "all") {
+      setStatusFocus(f);
+      if (f === "drafts" || f === "validated") {
+        setMonthFilter("");
+        setQ("");
+      }
+    }
+  }, [searchParams]);
+
   function goToListFocus(focus: "all" | "drafts" | "validated") {
     setStatusFocus(focus);
+    const next = new URLSearchParams(searchParams);
+    if (focus === "all") next.delete("focus");
+    else next.set("focus", focus);
+    setSearchParams(next, { replace: true });
     if (focus === "drafts" || focus === "validated") {
       setMonthFilter("");
       setQ("");
@@ -463,21 +479,14 @@ export default function ManageActsPage({
                 value: totalGeneral,
                 color: rdcColor(0),
                 onClick: () => goToListFocus("validated"),
-                active: statusFocus === "validated" || statusFocus === "all",
+                active: statusFocus === "validated",
               },
               {
-                label: "BROUILLONS",
+                label: "À VALIDER",
                 value: draftsCount,
                 color: rdcColor(3),
                 onClick: () => goToListFocus("drafts"),
                 active: statusFocus === "drafts",
-              },
-              {
-                label: "VALIDÉS",
-                value: counted.length,
-                color: rdcColor(1),
-                onClick: () => goToListFocus("validated"),
-                active: statusFocus === "validated",
               },
               {
                 label: monthFilter ? `MOIS ${monthFilter}` : "FILTRÉS (MOIS)",
@@ -550,14 +559,18 @@ export default function ManageActsPage({
             </strong>
             <span className="muted small">
               {rows.length} enregistrement{rows.length > 1 ? "s" : ""}
-              {statusFocus === "drafts" ? " · brouillons uniquement" : ""}
+              {statusFocus === "drafts"
+                ? " · à valider uniquement"
+                : statusFocus === "validated"
+                  ? " · validés uniquement (hors brouillons)"
+                  : ""}
             </span>
           </div>
           {statusFocus === "drafts" ? (
             <p className="muted small" style={{ margin: "0.5rem 0.85rem" }}>
-              Liste des dossiers en brouillon / en attente de validation.{" "}
-              <button type="button" className="btn-secondary btn-sm" onClick={() => goToListFocus("all")}>
-                Voir tout
+              Liste des dossiers en attente de validation.{" "}
+              <button type="button" className="btn-secondary btn-sm" onClick={() => goToListFocus("validated")}>
+                Voir les validés
               </button>
             </p>
           ) : null}

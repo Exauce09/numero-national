@@ -64,13 +64,13 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
   const session = getSession();
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<ActType | "">("");
-  const [statusFocus, setStatusFocus] = useState<"all" | "drafts" | "validated">("all");
+  const focusParam = params.get("focus");
+  const [statusFocus, setStatusFocus] = useState<"all" | "drafts" | "validated">(() =>
+    focusParam === "drafts" ? "drafts" : "validated",
+  );
   const listRef = useRef<HTMLDivElement | null>(null);
   const [q, setQ] = useState("");
-  const [monthFilter, setMonthFilter] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  });
+  const [monthFilter, setMonthFilter] = useState("");
   const [page, setPage] = useState(1);
   const [viewAct, setViewAct] = useState<Act | null>(null);
   const [editAct, setEditAct] = useState<Act | null>(null);
@@ -148,6 +148,10 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
 
   function goToListFocus(focus: "all" | "drafts" | "validated") {
     setStatusFocus(focus);
+    const next = new URLSearchParams(params);
+    if (focus === "all") next.delete("focus");
+    else next.set("focus", focus);
+    setParams(next, { replace: true });
     if (focus === "drafts" || focus === "validated") {
       setMonthFilter("");
       setQ("");
@@ -188,6 +192,14 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
     const type = params.get("type");
     if (type && TYPES.includes(type as ActType)) {
       setFilter(type as ActType);
+    }
+    const f = params.get("focus");
+    if (f === "drafts" || f === "validated" || f === "all") {
+      setStatusFocus(f);
+      if (f === "drafts" || f === "validated") {
+        setMonthFilter("");
+        setQ("");
+      }
     }
   }, [params]);
 
@@ -290,10 +302,10 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
                 value: counted.length,
                 color: rdcColor(0),
                 onClick: () => goToListFocus("validated"),
-                active: statusFocus === "validated" || statusFocus === "all",
+                active: statusFocus === "validated",
               },
               {
-                label: "BROUILLONS",
+                label: "À VALIDER",
                 value: all.filter((a) => {
                   if (["CENSUS", "DISPLACEMENT"].includes(a.type)) return false;
                   const s = String(a.status ?? "DRAFT").toUpperCase();
@@ -302,13 +314,6 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
                 color: rdcColor(3),
                 onClick: () => goToListFocus("drafts"),
                 active: statusFocus === "drafts",
-              },
-              {
-                label: "VALIDÉS",
-                value: counted.length,
-                color: rdcColor(1),
-                onClick: () => goToListFocus("validated"),
-                active: statusFocus === "validated",
               },
               {
                 label: monthFilter ? `MOIS ${monthFilter}` : "FILTRÉS (MOIS)",

@@ -350,7 +350,7 @@ export default function DashboardPage() {
             subtitle={isJuge ? "Dossiers juridiction" : "Transcriptions greffe"}
             icon={<IconSplit size={22} />}
             color={RDC.redDeep}
-            href="/lists/divorce"
+            href="/lists/divorce?focus=validated"
           />
           <StatCard
             title="Adoptions"
@@ -358,12 +358,12 @@ export default function DashboardPage() {
             subtitle="Après jugement"
             icon={<IconClipboard size={22} />}
             color={RDC.blueMid}
-            href="/lists/adoption"
+            href="/lists/adoption?focus=validated"
           />
           <StatCard
             title="Dossiers judiciaires"
             value={judicialActs.length}
-            subtitle="Divorce + adoption"
+            subtitle="Divorce + adoption (validés)"
             icon={<IconFile size={22} />}
             color={RDC.blue}
             href="/transcriptions"
@@ -378,7 +378,7 @@ export default function DashboardPage() {
             subtitle="Brouillons / soumis"
             icon={<IconClipboard size={22} />}
             color={RDC.yellowDeep}
-            href="/transcriptions"
+            href="/acts?focus=drafts"
           />
         </div>
 
@@ -451,34 +451,34 @@ export default function DashboardPage() {
         <StatCard
           title="Naissance"
           value={births.length}
-          subtitle={`${births.length} validés · ${pendingOf(birthAll).length} à valider`}
+          subtitle={`${pendingOf(birthAll).length} à valider`}
           icon={<IconBaby size={22} />}
           color={RDC.yellowDeep}
-          href="/lists/naissance"
+          href="/lists/naissance?focus=validated"
         />
         <StatCard
           title="Mariages"
           value={marriages.length}
-          subtitle={`${marriages.length} validés · ${pendingOf(marriageAll).length} à valider`}
+          subtitle={`${pendingOf(marriageAll).length} à valider`}
           icon={<IconRing size={22} />}
           color={RDC.yellow}
-          href="/lists/mariage"
+          href="/lists/mariage?focus=validated"
         />
         <StatCard
           title="Décès"
           value={deaths.length}
-          subtitle={`${deaths.length} validés · ${pendingOf(deathAll).length} à valider`}
+          subtitle={`${pendingOf(deathAll).length} à valider`}
           icon={<IconCross size={22} />}
           color={RDC.red}
-          href="/lists/deces"
+          href="/lists/deces?focus=validated"
         />
         <StatCard
           title="Adoptions"
           value={adoptions.length}
-          subtitle={`${adoptions.length} validés · ${pendingOf(adoptionAll).length} à valider`}
+          subtitle={`${pendingOf(adoptionAll).length} à valider`}
           icon={<IconHome size={22} />}
           color={RDC.blueMid}
-          href="/lists/adoption"
+          href="/lists/adoption?focus=validated"
         />
         {variant === "agent" || variant === "auditeur" ? (
           <StatCard
@@ -487,16 +487,16 @@ export default function DashboardPage() {
             subtitle="Dossiers en saisie"
             icon={<IconClipboard size={22} />}
             color={RDC.blueDeep}
-            href="/acts"
+            href="/acts?focus=drafts"
           />
         ) : (
           <StatCard
             title="Divorces"
             value={divorces.length}
-            subtitle={`${divorces.length} validés · ${pendingOf(divorceAll).length} à valider`}
+            subtitle={`${pendingOf(divorceAll).length} à valider`}
             icon={<IconSplit size={22} />}
             color={RDC.redDeep}
-            href="/lists/divorce"
+            href="/lists/divorce?focus=validated"
           />
         )}
       </div>
