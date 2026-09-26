@@ -1023,16 +1023,6 @@ export async function addAct(
   };
   registry.acts.unshift(act);
   save(registry);
-  const session = getSession();
-  const core: ActType[] = [
-    "BIRTH",
-    "MARRIAGE",
-    "DIVORCE",
-    "DEATH",
-    "ADOPTION",
-    "RECOGNITION",
-    "RECTIFICATION",
-  ];
   try {
     const server = await tryPostCivil(type, {
       ...payload,
@@ -1088,11 +1078,22 @@ export async function addAct(
       }
       return act;
     }
-    if (session?.accessToken && core.includes(type)) {
-      registry.acts = registry.acts.filter((a) => a.id !== id);
+    // Garder l'acte local : un échec API (bureau, 422, réseau…) ne doit pas annuler l'enregistrement.
+    const detail = err instanceof Error ? err.message : String(err);
+    const idx = registry.acts.findIndex((a) => a.id === id);
+    if (idx >= 0) {
+      registry.acts[idx] = {
+        ...registry.acts[idx],
+        payload: {
+          ...registry.acts[idx].payload,
+          sync_warning: `Sync API différée : ${detail.slice(0, 200)}`,
+        },
+        updated_at: new Date().toISOString(),
+      };
       save(registry);
-      throw err;
+      return registry.acts[idx];
     }
+    return act;
   }
   return act;
 }
@@ -1229,6 +1230,17 @@ function loadCivilStatusOverrides(): Record<string, EtatCivil> {
 export function getCivilStatusOverride(citizenId: string): EtatCivil | null {
   const v = loadCivilStatusOverrides()[citizenId];
   return v ?? null;
+}
+
+/**
+ * Situation civile effective pour formalités (mariage, etc.).
+ * UNKNOWN / non renseigné → traité comme célibataire (registre national sans ce champ).
+ */
+export function effectiveEtatCivil(p: Person): EtatCivil {
+  const override = getCivilStatusOverride(p.id);
+  const raw = override || p.etat_civil || "UNKNOWN";
+  if (raw === "UNKNOWN") return "CELIBATAIRE";
+  return raw;
 }
 
 export function setCivilStatusOverride(citizenId: string, etat: EtatCivil): void {

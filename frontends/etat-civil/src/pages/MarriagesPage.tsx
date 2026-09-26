@@ -10,7 +10,11 @@ import {
   addMarriageLink,
   ageYears,
   displayName,
+  effectiveEtatCivil,
+  getPerson,
+  setCivilStatusOverride,
   updatePerson,
+  upsertLocalPersonFromApi,
   type Act,
   type Person,
 } from "../registry";
@@ -19,6 +23,30 @@ import { geoFromOfficer, getLoggedOfficer } from "../officerContext";
 type Regime = "COMMUNAUTE" | "SEPARATION" | "DOT";
 
 const ALLOWED_ETAT = new Set(["CELIBATAIRE", "DIVORCE", "VEUF"]);
+
+/** Assure une fiche locale (les hits API n'écrivent pas toujours le registre). */
+function ensureLocalSpouse(p: Person): Person {
+  const existing = getPerson(p.id);
+  if (existing) {
+    const etat = effectiveEtatCivil(existing);
+    if (existing.etat_civil !== etat) {
+      return updatePerson(existing.id, { etat_civil: etat }) ?? { ...existing, etat_civil: etat };
+    }
+    return existing;
+  }
+  const etat = effectiveEtatCivil(p);
+  return upsertLocalPersonFromApi({
+    id: p.id,
+    nom: p.nom,
+    postnom: p.postnom,
+    prenom: p.prenom,
+    sexe: p.sexe,
+    date_naissance: p.date_naissance,
+    lieu_naissance: p.lieu_naissance,
+    nic: p.nic || `LOC-${p.id.replace(/-/g, "").slice(0, 12)}`,
+    etat_civil: etat,
+  });
+}
 
 export default function MarriagesPage() {
   const [conjoint, setConjoint] = useState<Person | null>(null);
@@ -35,6 +63,7 @@ export default function MarriagesPage() {
   const [dateMariage, setDateMariage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Act | null>(null);
+  const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -47,6 +76,10 @@ export default function MarriagesPage() {
       setError("Deux témoins sont obligatoires.");
       return;
     }
+    if (!dateMariage) {
+      setError("La date de célébration est obligatoire.");
+      return;
+    }
     if (!publications) {
       setError("Confirmez que les publications des bans ont été effectuées.");
       return;
@@ -55,18 +88,29 @@ export default function MarriagesPage() {
       setError("Le consentement des deux époux est obligatoire.");
       return;
     }
+    if (!conjoint.date_naissance || !conjointe.date_naissance) {
+      setError("Date de naissance manquante pour un des époux — complétez la fiche avant le mariage.");
+      return;
+    }
     if (ageYears(conjoint.date_naissance) < 18 || ageYears(conjointe.date_naissance) < 18) {
       setError("Les deux époux doivent avoir au moins 18 ans.");
       return;
     }
-    if (conjoint.etat_civil === "MARIE" || conjointe.etat_civil === "MARIE") {
+    if (conjoint.id === conjointe.id) {
+      setError("L'époux et l'épouse doivent être deux personnes distinctes.");
+      return;
+    }
+
+    const etatH = effectiveEtatCivil(conjoint);
+    const etatF = effectiveEtatCivil(conjointe);
+    if (etatH === "MARIE" || etatF === "MARIE") {
       setError("Un des époux est déjà marié — un divorce est requis avant un nouveau mariage.");
       return;
     }
-    if (!ALLOWED_ETAT.has(conjoint.etat_civil) || !ALLOWED_ETAT.has(conjointe.etat_civil)) {
+    if (!ALLOWED_ETAT.has(etatH) || !ALLOWED_ETAT.has(etatF)) {
       const bad = [conjoint, conjointe]
-        .filter((p) => !ALLOWED_ETAT.has(p.etat_civil))
-        .map((p) => `${displayName(p)} (${p.etat_civil})`)
+        .filter((p) => !ALLOWED_ETAT.has(effectiveEtatCivil(p)))
+        .map((p) => `${displayName(p)} (${effectiveEtatCivil(p)})`)
         .join(", ");
       setError(
         `État civil incompatible. Requis : célibataire, divorcé(e) ou veuf/veuve. Problème : ${bad}.`,
@@ -74,14 +118,17 @@ export default function MarriagesPage() {
       return;
     }
 
+    setBusy(true);
     try {
+      const epoux = ensureLocalSpouse({ ...conjoint, etat_civil: etatH });
+      const epouse = ensureLocalSpouse({ ...conjointe, etat_civil: etatF });
       const officer = getLoggedOfficer();
       const geo = geoFromOfficer();
       const payload = {
-        epoux_id: conjoint.id,
-        epoux_name: displayName(conjoint),
-        epouse_id: conjointe.id,
-        epouse_name: displayName(conjointe),
+        epoux_id: epoux.id,
+        epoux_name: displayName(epoux),
+        epouse_id: epouse.id,
+        epouse_name: displayName(epouse),
         regime_matrimonial: regime,
         publications_bans: true,
         date_publications: datePublications || null,
@@ -105,13 +152,29 @@ export default function MarriagesPage() {
         remarque: motif.trim() || null,
         date_mariage: dateMariage,
       };
-      const act = await addAct("MARRIAGE", payload, conjoint.nic);
-      addMarriageLink(act.act_number, conjoint.id, conjointe.id);
-      updatePerson(conjoint.id, { etat_civil: "MARIE" });
-      updatePerson(conjointe.id, { etat_civil: "MARIE" });
+      const subjectNic = epoux.nic || epouse.nic || `MAR-${epoux.id.slice(0, 8)}`;
+      const act = await addAct("MARRIAGE", payload, subjectNic);
+      addMarriageLink(act.act_number, epoux.id, epouse.id);
+      updatePerson(epoux.id, { etat_civil: "MARIE" });
+      updatePerson(epouse.id, { etat_civil: "MARIE" });
+      setCivilStatusOverride(epoux.id, "MARIE");
+      setCivilStatusOverride(epouse.id, "MARIE");
       setCreated(act);
+      setConjoint(null);
+      setConjointe(null);
+      setTemoin1(null);
+      setTemoin2(null);
+      setReceveurDote(null);
+      setPublications(false);
+      setConsentEpoux(false);
+      setConsentEpouse(false);
+      setDateMariage("");
+      setDatePublications("");
+      setMotif("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Enregistrement impossible.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -227,8 +290,13 @@ export default function MarriagesPage() {
             />
           </div>
           <div className="full">
-            <button className="btn-primary" style={{ width: "auto", minWidth: 220 }} type="submit">
-              Établir l&apos;acte de mariage
+            <button
+              className="btn-primary"
+              style={{ width: "auto", minWidth: 220 }}
+              type="submit"
+              disabled={busy}
+            >
+              {busy ? "Enregistrement…" : "Établir l&apos;acte de mariage"}
             </button>
           </div>
         </form>
@@ -237,6 +305,11 @@ export default function MarriagesPage() {
       {created ? (
         <div className="panel" style={{ marginTop: "1rem" }}>
           <div className="success-banner">Acte de mariage créé — {created.act_number}</div>
+          {typeof created.payload.sync_warning === "string" ? (
+            <div className="login-error" style={{ marginTop: "0.75rem" }}>
+              {created.payload.sync_warning}
+            </div>
+          ) : null}
           <ActPrintCard act={created} />
         </div>
       ) : null}
