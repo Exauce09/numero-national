@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import FicheIdentificationEditor, {
   emptyFicheEditorState,
   type FicheEditorState,
@@ -150,7 +151,8 @@ function seedFromQuery(sexFilter: Sexe | undefined, query: string): FicheEditorS
   if (!q) return seed;
   const parts = q.split(/\s+/).filter(Boolean);
   if (parts.length === 1) {
-    seed.interesse = { ...seed.interesse, nom: parts[0], prenom: "" };
+    // Un seul mot (ex. « exo ») → nom + prénom préremplis pour éviter un enregistrement incomplet
+    seed.interesse = { ...seed.interesse, nom: parts[0], prenom: parts[0] };
   } else if (parts.length === 2) {
     seed.interesse = { ...seed.interesse, nom: parts[0], prenom: parts[1] };
   } else {
@@ -188,6 +190,7 @@ export default function PersonPicker({
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<Person[]>([]);
   const [searching, setSearching] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const isPere =
     label.toLowerCase().includes("papa") || label.toLowerCase().includes("père");
@@ -208,21 +211,31 @@ export default function PersonPicker({
     const q = query.trim();
     if (q.length < 1) {
       setResults([]);
+      setSearching(false);
       return;
     }
+    const applyFilters = (hits: Person[]) =>
+      hits.filter((p) => {
+        if (sexFilter && p.sexe !== sexFilter) return false;
+        if (excludeDeceased && isDeceased(p.id, p.nic)) return false;
+        if (minAge != null) {
+          const age = ageYears(p.date_naissance);
+          // Sans date → on laisse passer (sinon les fiches API incomplètes disparaissent)
+          if (p.date_naissance && age < minAge) return false;
+        }
+        return true;
+      });
+
+    // Résultats locaux immédiats (ne dépendent pas de l'API)
+    setResults(applyFilters(searchPersons(q)).slice(0, 50));
+
     let cancelled = false;
     const timer = window.setTimeout(() => {
       setSearching(true);
       void searchEveryone(q)
         .then((hits) => {
           if (cancelled) return;
-          const filtered = hits.filter((p) => {
-            if (sexFilter && p.sexe !== sexFilter) return false;
-            if (excludeDeceased && isDeceased(p.id, p.nic)) return false;
-            if (minAge != null && ageYears(p.date_naissance) < minAge) return false;
-            return true;
-          });
-          setResults(filtered.slice(0, 50));
+          setResults(applyFilters(hits).slice(0, 50));
         })
         .finally(() => {
           if (!cancelled) setSearching(false);
@@ -248,8 +261,9 @@ export default function PersonPicker({
     setModal(true);
   }
 
-  async function onAdd(e: FormEvent) {
-    e.preventDefault();
+  const [saving, setSaving] = useState(false);
+
+  async function saveNewPerson() {
     setError(null);
     const i = fiche.interesse;
     if (!i.nom.trim() || !i.prenom.trim() || !i.date_naissance) {
@@ -260,6 +274,7 @@ export default function PersonPicker({
       setError(`La personne doit avoir au moins ${minAge} ans.`);
       return;
     }
+    setSaving(true);
     try {
       const sexe = sexFilter ?? i.sexe_code;
       const existing = findDuplicatePerson({
@@ -326,7 +341,8 @@ export default function PersonPicker({
         rememberNamed(PROFESSIONS_KEY, i.profession);
       }
 
-      person = await pushPersonToNationalRegistry(person);
+      // Sync API en arrière-plan — ne jamais bloquer ni effacer la fiche locale
+      void pushPersonToNationalRegistry(person).catch(() => undefined);
 
       onChange(person);
       setQuery("");
@@ -336,6 +352,8 @@ export default function PersonPicker({
       setModal(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ajout impossible.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -467,55 +485,77 @@ export default function PersonPicker({
         </ul>
       ) : null}
 
-      {modal ? (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setModal(false)}>
-          <div
-            className="modal-panel modal-wide person-add-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <header className="person-add-head">
-              <div>
-                <h3>Ajouter une personne</h3>
-                <p className="muted small" style={{ margin: 0 }}>
-                  {isPere
-                    ? "Saisie du père — sexe masculin verrouillé. Nom, prénom et date de naissance suffisent."
-                    : isMere
-                      ? "Saisie de la mère — sexe féminin verrouillé. Nom, prénom et date de naissance suffisent."
-                      : "Nom, prénom et date de naissance sont obligatoires. Origine et adresse sont optionnels."}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn-secondary btn-sm"
-                aria-label="Fermer"
-                onClick={() => setModal(false)}
+      {modal
+        ? createPortal(
+            <div
+              className="modal-backdrop"
+              role="dialog"
+              aria-modal="true"
+              onClick={() => !saving && setModal(false)}
+            >
+              <div
+                className="modal-panel modal-wide person-add-modal"
+                onClick={(e) => e.stopPropagation()}
               >
-                ×
-              </button>
-            </header>
+                <header className="person-add-head">
+                  <div>
+                    <h3>Ajouter une personne</h3>
+                    <p className="muted small" style={{ margin: 0 }}>
+                      {isPere
+                        ? "Saisie du père — sexe masculin verrouillé. Nom, prénom et date de naissance suffisent."
+                        : isMere
+                          ? "Saisie de la mère — sexe féminin verrouillé. Nom, prénom et date de naissance suffisent."
+                          : "Nom, prénom et date de naissance sont obligatoires. Origine et adresse sont optionnels."}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    aria-label="Fermer"
+                    disabled={saving}
+                    onClick={() => setModal(false)}
+                  >
+                    ×
+                  </button>
+                </header>
 
-            <form onSubmit={onAdd} className="person-add-form">
-              <FicheIdentificationEditor
-                value={fiche}
-                onChange={setFiche}
-                sexeLocked={sexFilter}
-                compact={isPere || isMere}
-              />
+                {/* Pas de <form> : le sélecteur est souvent dans un formulaire parent (mariage…) —
+                    un form imbriqué est ignoré par le navigateur et « Enregistrer » ne crée jamais la fiche. */}
+                <div className="person-add-form">
+                  <FicheIdentificationEditor
+                    value={fiche}
+                    onChange={setFiche}
+                    sexeLocked={sexFilter}
+                    compact={isPere || isMere}
+                  />
 
-              {error ? <div className="login-error">{error}</div> : null}
+                  {error ? <div className="login-error">{error}</div> : null}
 
-              <div className="modal-actions">
-                <button type="button" className="btn-secondary" onClick={() => setModal(false)}>
-                  Annuler
-                </button>
-                <button type="submit" className="btn-primary" style={{ width: "auto", minWidth: 180 }}>
-                  Enregistrer et lier
-                </button>
+                  <div className="modal-actions">
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      disabled={saving}
+                      onClick={() => setModal(false)}
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      style={{ width: "auto", minWidth: 180 }}
+                      disabled={saving}
+                      onClick={() => void saveNewPerson()}
+                    >
+                      {saving ? "Enregistrement…" : "Enregistrer et lier"}
+                    </button>
+                  </div>
+                </div>
               </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

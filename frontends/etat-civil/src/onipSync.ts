@@ -1,7 +1,6 @@
 import { api } from "./api";
 import { ensureAccessToken, getSession } from "./auth";
 import {
-  deletePerson,
   setCivilStatusOverride,
   updatePerson,
   upsertLocalPersonFromApi,
@@ -310,8 +309,8 @@ export async function pushCensusToOnip(input: {
 }
 
 /**
- * Publie une fiche locale (PersonPicker / ajout rapide) dans le registre national,
- * sinon elle n’apparaît que dans le cache navigateur.
+ * Publie une fiche locale (PersonPicker / ajout rapide) dans le registre national.
+ * Conserve toujours la fiche locale (même id) — ne fait que enrichir le NIC si l'API répond.
  */
 export async function pushPersonToNationalRegistry(person: Person): Promise<Person> {
   await ensureAccessToken();
@@ -350,45 +349,37 @@ export async function pushPersonToNationalRegistry(person: Person): Promise<Pers
     }
 
     if (person.etat_civil && person.etat_civil !== "UNKNOWN") {
+      setCivilStatusOverride(person.id, person.etat_civil);
       setCivilStatusOverride(citizen.id, person.etat_civil);
     }
 
-    const synced = upsertLocalPersonFromApi({
-      id: citizen.id,
-      nom: person.nom,
-      postnom: person.postnom,
-      prenom: person.prenom,
-      sexe: person.sexe,
-      date_naissance: person.date_naissance,
-      lieu_naissance: person.lieu_naissance,
-      nic: registryNic || person.nic,
-      etat_civil: person.etat_civil || "CELIBATAIRE",
-    });
+    const nextNic =
+      registryNic && !String(registryNic).toUpperCase().startsWith("REG-")
+        ? registryNic
+        : person.nic;
 
-    updatePerson(synced.id, {
-      nationalite: person.nationalite,
-      handicap_type: person.handicap_type,
-      mother_id: person.mother_id,
-      father_id: person.father_id,
-      photo_data_url: person.photo_data_url,
-      fingerprint_note: person.fingerprint_note,
-      iris_note: person.iris_note,
-      parcours_scolaire: person.parcours_scolaire,
-      parcours_universitaire: person.parcours_universitaire,
-      parcours_professionnel: person.parcours_professionnel,
-      situation_familiale: person.situation_familiale,
-      adresse: person.adresse,
-      secteur: person.secteur,
-      territoire: person.territoire,
-      ville: person.ville,
-      province: person.province,
-    });
+    const updated =
+      updatePerson(person.id, {
+        nic: nextNic || person.nic,
+        nationalite: person.nationalite,
+      }) ?? person;
 
-    if (person.id !== citizen.id) {
-      deletePerson(person.id);
+    // Miroir sous l'id API pour les recherches nationales (sans supprimer la fiche locale)
+    if (citizen.id !== person.id) {
+      upsertLocalPersonFromApi({
+        id: citizen.id,
+        nom: person.nom,
+        postnom: person.postnom,
+        prenom: person.prenom,
+        sexe: person.sexe,
+        date_naissance: person.date_naissance,
+        lieu_naissance: person.lieu_naissance,
+        nic: nextNic || person.nic,
+        etat_civil: person.etat_civil || "CELIBATAIRE",
+      });
     }
 
-    return synced;
+    return updated;
   } catch {
     return person;
   }
