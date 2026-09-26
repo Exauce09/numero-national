@@ -77,6 +77,47 @@ function civilStatusLabel(p: PopRow): string {
   return hit?.label || p.etat_civil || "—";
 }
 
+function identityKey(p: Pick<Person, "nom" | "postnom" | "prenom" | "date_naissance">): string {
+  return [p.nom, p.postnom, p.prenom, p.date_naissance]
+    .map((x) => (x || "").trim().toLowerCase())
+    .join("|");
+}
+
+function localPopulationRows(): PopRow[] {
+  return listPopulationPersons().map((p) => ({
+    ...p,
+    registryStatus: "LOCAL",
+    biometricNote: [p.fingerprint_note, p.iris_note].filter(Boolean).join(" · ") || "Non enrôlé",
+  }));
+}
+
+/** Fusionne le cache local (ajouts récents) avec le registre API. */
+function mergePopulationRows(apiRows: PopRow[]): PopRow[] {
+  const seen = new Set<string>();
+  const mark = (p: PopRow) => {
+    seen.add(p.id);
+    if (p.nic) seen.add(`nic:${p.nic}`);
+    seen.add(`id:${identityKey(p)}`);
+  };
+  const already = (p: Person) =>
+    seen.has(p.id) ||
+    (p.nic ? seen.has(`nic:${p.nic}`) : false) ||
+    seen.has(`id:${identityKey(p)}`);
+
+  const out: PopRow[] = [];
+  for (const p of localPopulationRows()) {
+    if (already(p)) continue;
+    out.push(p);
+    mark(p);
+  }
+  for (const r of apiRows) {
+    if (already(r)) continue;
+    out.push(r);
+    mark(r);
+  }
+  return out;
+}
+
 export default function PopulationPage({ showAnalytics = false }: { showAnalytics?: boolean }) {
   const [params, setParams] = useSearchParams();
   const viewRaw = params.get("view");
@@ -109,11 +150,7 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
   const load = useCallback(async () => {
     const token = hasApi ? await ensureAccessToken() : null;
     if (!token) {
-      const local = listPopulationPersons().map((p) => ({
-        ...p,
-        registryStatus: "LOCAL",
-        biometricNote: [p.fingerprint_note, p.iris_note].filter(Boolean).join(" · ") || "Non enrôlé",
-      }));
+      const local = localPopulationRows();
       setPersons(local);
       setSource("local");
       setTotal(local.length);
@@ -150,17 +187,18 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
           biometricNote: [row.fingerprint_note, row.iris_note].filter(Boolean).join(" · ") || "Non enrôlé",
         };
       });
-      setPersons(rows);
-      setTotal(total || rows.length);
+      const merged = mergePopulationRows(rows);
+      setPersons(merged);
+      setTotal(Math.max(total || rows.length, merged.length));
       setSource("api");
     } catch (e) {
       setError(
-        `${e instanceof Error ? e.message : "Erreur API"} — le registre national n’a pas pu être chargé (ne pas confondre avec le cache local).`,
+        `${e instanceof Error ? e.message : "Erreur API"} — affichage du cache local (dont ajouts récents).`,
       );
-      // Ne plus masquer l’échec API avec un faux total local : liste vide + message clair.
-      setPersons([]);
-      setTotal(0);
-      setSource("api");
+      const local = localPopulationRows();
+      setPersons(local);
+      setTotal(local.length);
+      setSource("local");
     } finally {
       setBusy(false);
     }

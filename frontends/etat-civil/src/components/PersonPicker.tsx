@@ -9,6 +9,7 @@ import {
   ageYears,
   displayName,
   findDuplicatePerson,
+  getPerson,
   isDeceased,
   personOrigin,
   provinceDigitsFromName,
@@ -19,6 +20,7 @@ import {
   type Sexe,
 } from "../registry";
 import { searchEveryone } from "../nationalSearch";
+import { pushPersonToNationalRegistry } from "../onipSync";
 import { PROFESSIONS_KEY, rememberNamed } from "../namedLists";
 
 type Props = {
@@ -246,7 +248,7 @@ export default function PersonPicker({
     setModal(true);
   }
 
-  function onAdd(e: FormEvent) {
+  async function onAdd(e: FormEvent) {
     e.preventDefault();
     setError(null);
     const i = fiche.interesse;
@@ -278,7 +280,7 @@ export default function PersonPicker({
         return;
       }
 
-      const person = addPerson({
+      let person = addPerson({
         nom: i.nom.trim(),
         postnom: i.postnom.trim(),
         prenom: i.prenom.trim(),
@@ -316,12 +318,16 @@ export default function PersonPicker({
             mother_id: motherRes.id ?? undefined,
             situation_familiale: situationParts.length ? situationParts.join(" · ") : undefined,
           });
+          person = getPerson(person.id) ?? person;
         }
       }
 
       if (i.profession.trim()) {
         rememberNamed(PROFESSIONS_KEY, i.profession);
       }
+
+      person = await pushPersonToNationalRegistry(person);
+
       onChange(person);
       setQuery("");
       setResults([]);

@@ -387,12 +387,16 @@ export function isNewbornPerson(p: Person): boolean {
 }
 
 /**
- * Population « carte-grid » : vivants uniquement, hors nouveaux-nés (≤ 90 j).
- * Toute déclaration de décès (acte ou recensement) retire la personne.
+ * Population « carte-grid » : vivants uniquement, hors nouveaux-nés d’acte (≤ 90 j + mère liée).
+ * Une fiche ajoutée manuellement (PersonPicker) reste visible même avec une date récente.
  * Au-delà de 90 jours, l'enfant entre dans la population.
  */
 export function listPopulationPersons(): Person[] {
-  return listPersons().filter((p) => !isDeceased(p.id, p.nic) && !isNewbornPerson(p));
+  return listPersons().filter((p) => {
+    if (isDeceased(p.id, p.nic)) return false;
+    if (isNewbornPerson(p) && p.mother_id) return false;
+    return true;
+  });
 }
 
 /** Vivants uniquement (y compris nouveau-nés) — pour totaux population. */

@@ -1,6 +1,12 @@
 import { api } from "./api";
 import { ensureAccessToken, getSession } from "./auth";
-import type { Person } from "./registry";
+import {
+  deletePerson,
+  setCivilStatusOverride,
+  updatePerson,
+  upsertLocalPersonFromApi,
+  type Person,
+} from "./registry";
 
 export type OnipCardQueueItem = {
   id: string;
@@ -300,5 +306,90 @@ export async function pushCensusToOnip(input: {
       queueId: item.id,
       message: `File locale OK — sync SIGPOP-RDC échouée : ${detail.slice(0, 160)}`,
     };
+  }
+}
+
+/**
+ * Publie une fiche locale (PersonPicker / ajout rapide) dans le registre national,
+ * sinon elle n’apparaît que dans le cache navigateur.
+ */
+export async function pushPersonToNationalRegistry(person: Person): Promise<Person> {
+  await ensureAccessToken();
+  const session = getSession();
+  if (!session?.accessToken) return person;
+
+  try {
+    const familyName = [person.nom, person.postnom].filter(Boolean).join(" ").trim();
+    const citizen = await api.createCitizen({
+      sex: sexForRegistry(person.sexe),
+      date_of_birth: person.date_naissance,
+      place_of_birth: person.lieu_naissance || null,
+      nationality: person.nationalite === "ETRANGER" ? "XXX" : "COD",
+      given_names: person.prenom.trim(),
+      family_name: familyName || person.nom,
+      addresses: person.adresse
+        ? [
+            {
+              address_type: "RESIDENTIAL",
+              line1: person.adresse,
+              city: person.ville || person.province || undefined,
+              province_code: undefined,
+              country_code: "COD",
+              is_primary: true,
+            },
+          ]
+        : [],
+    });
+
+    let registryNic = citizen.nic ?? person.nic;
+    try {
+      const validated = await api.validateCitizen(citizen.id);
+      registryNic = validated.nic || registryNic;
+    } catch {
+      /* NIC optionnel si validation bloquée */
+    }
+
+    if (person.etat_civil && person.etat_civil !== "UNKNOWN") {
+      setCivilStatusOverride(citizen.id, person.etat_civil);
+    }
+
+    const synced = upsertLocalPersonFromApi({
+      id: citizen.id,
+      nom: person.nom,
+      postnom: person.postnom,
+      prenom: person.prenom,
+      sexe: person.sexe,
+      date_naissance: person.date_naissance,
+      lieu_naissance: person.lieu_naissance,
+      nic: registryNic || person.nic,
+      etat_civil: person.etat_civil || "CELIBATAIRE",
+    });
+
+    updatePerson(synced.id, {
+      nationalite: person.nationalite,
+      handicap_type: person.handicap_type,
+      mother_id: person.mother_id,
+      father_id: person.father_id,
+      photo_data_url: person.photo_data_url,
+      fingerprint_note: person.fingerprint_note,
+      iris_note: person.iris_note,
+      parcours_scolaire: person.parcours_scolaire,
+      parcours_universitaire: person.parcours_universitaire,
+      parcours_professionnel: person.parcours_professionnel,
+      situation_familiale: person.situation_familiale,
+      adresse: person.adresse,
+      secteur: person.secteur,
+      territoire: person.territoire,
+      ville: person.ville,
+      province: person.province,
+    });
+
+    if (person.id !== citizen.id) {
+      deletePerson(person.id);
+    }
+
+    return synced;
+  } catch {
+    return person;
   }
 }
