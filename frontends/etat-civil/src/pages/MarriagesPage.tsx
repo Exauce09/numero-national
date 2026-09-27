@@ -304,7 +304,7 @@ export default function MarriagesPage() {
 
       {created ? (
         <div className="panel" style={{ marginTop: "1rem" }}>
-          <div className="success-banner">Acte de mariage créé — {created.act_number}</div>
+          <div className="success-banner">Mariages — acte enregistré — {created.act_number}</div>
           {typeof created.payload.sync_warning === "string" ? (
             <div className="login-error" style={{ marginTop: "0.75rem" }}>
               {created.payload.sync_warning}

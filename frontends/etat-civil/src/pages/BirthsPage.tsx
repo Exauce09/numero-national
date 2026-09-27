@@ -1091,7 +1091,7 @@ export default function BirthsPage() {
           <div className="success-banner no-print">
             {created.type === "DEATH"
               ? "Mort-né enregistré (registre des décès)"
-              : "Enregistrement de nouveau-né créé"}{" "}
+              : "Naissance enregistrée"}{" "}
             — n° {created.act_number}
           </div>
           <ActPrintCard act={created} />
@@ -1101,7 +1101,7 @@ export default function BirthsPage() {
 
       <div className="panel" style={{ marginTop: "1rem" }}>
         <div className="panel-head">
-          <h3 className="panel-title">Enregistrement de nouveau-né</h3>
+          <h3 className="panel-title">Naissance</h3>
           <DataToolbar filename="naissances" rows={rows} />
         </div>
         <div className="eg-acts-table-wrap">

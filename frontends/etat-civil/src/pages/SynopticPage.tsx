@@ -28,22 +28,22 @@ import { listActs } from "../registry";
 const TABS = [
   {
     slug: "naissances",
-    label: "Enregistrement de nouveau-né",
-    createLabel: "Enregistrement de nouveau-né",
+    label: "Naissance",
+    createLabel: "Naissance",
     createPath: "/births",
     managePath: "/manage/naissance",
   },
   {
     slug: "matrimonial",
-    label: "Liste des État-matrimoniaux",
-    createLabel: "Enregistrer un mariage",
+    label: "Mariages",
+    createLabel: "Mariages",
     createPath: "/marriages",
     managePath: "/manage/mariage",
   },
   {
     slug: "deces",
-    label: "Enregistrement de décès",
-    createLabel: "Enregistrement de décès",
+    label: "Décès",
+    createLabel: "Décès",
     createPath: "/deaths",
     managePath: "/manage/deces",
   },
@@ -246,7 +246,7 @@ function MatrimonialTable({ commune }: { commune: CommuneSel }) {
         <DataToolbar filename={`synoptique_matrimonial_${d.commune.code}`} rows={rows} />
       </div>
       <h2 className="syn-official-title">
-        TABLEAU SYNOPTIQUE RÉCAPITULATIF DES STATISTIQUES DE L&apos;ÉTAT CIVIL
+        TABLEAU SYNOPTIQUE RÉCAPITULATIF DES STATISTIQUES DES MARIAGES
         <br />
         COMMUNE DE {d.commune.name.toUpperCase()} — {d.commune.ville.toUpperCase()} ({d.commune.code})
       </h2>
@@ -432,9 +432,9 @@ function ProvincesOverviewTable({
 }) {
   const title =
     tab === "naissances"
-      ? "TABLEAU SYNOPTIQUE RÉCAPITULATIF DES NOUVEAU-NÉS PAR PROVINCE"
+      ? "TABLEAU SYNOPTIQUE RÉCAPITULATIF DES NAISSANCES PAR PROVINCE"
       : tab === "matrimonial"
-        ? "TABLEAU SYNOPTIQUE RÉCAPITULATIF DE L'ÉTAT MATRIMONIAL PAR PROVINCE"
+        ? "TABLEAU SYNOPTIQUE RÉCAPITULATIF DES MARIAGES PAR PROVINCE"
         : tab === "deces"
           ? "TABLEAU SYNOPTIQUE RÉCAPITULATIF DES DÉCÈS PAR PROVINCE"
           : "TABLEAU SYNOPTIQUE RÉCAPITULATIF DES ACTES PAR PROVINCE";
@@ -480,7 +480,7 @@ function ProvincesOverviewTable({
           <thead>
             <tr>
               <th rowSpan={needsGft ? 2 : 1}>PROVINCE</th>
-              {tab === "naissances" ? <th colSpan={3}>NOUVEAU-NÉS</th> : null}
+              {tab === "naissances" ? <th colSpan={3}>NAISSANCES</th> : null}
               {tab === "matrimonial" ? (
                 <>
                   <th>MARIAGES</th>
@@ -607,7 +607,7 @@ function ProvinceDetailView({
     return (
       <>
         <th rowSpan={rs}>{firstLabel}</th>
-        {tab === "naissances" ? <th colSpan={3}>NOUVEAU-NÉS</th> : null}
+        {tab === "naissances" ? <th colSpan={3}>NAISSANCES</th> : null}
         {tab === "matrimonial" ? (
           <>
             <th>MARIAGES</th>

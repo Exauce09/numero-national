@@ -28,7 +28,7 @@ export type ActFormSchema = {
 export const EC_ACT_FORMS: ActFormSchema[] = [
   {
     id: "naissance",
-    title: "Enregistrement de nouveau-né",
+    title: "Naissance",
     subtitle:
       "Inscription au registre. Délai ≤ 90 jours ou jugement supplétif.",
     href: "/births",
@@ -80,7 +80,7 @@ export const EC_ACT_FORMS: ActFormSchema[] = [
   },
   {
     id: "deces",
-    title: "Enregistrement de décès",
+    title: "Décès",
     subtitle: "Inscription au registre des décès sur déclaration régulière.",
     href: "/deaths",
     sections: [
@@ -120,7 +120,7 @@ export const EC_ACT_FORMS: ActFormSchema[] = [
   },
   {
     id: "mariage",
-    title: "Acte de mariage",
+    title: "Mariages",
     subtitle: "Célébration civile devant l'officier d'état civil après formalités.",
     href: "/marriages",
     sections: [
@@ -178,7 +178,7 @@ export const EC_ACT_FORMS: ActFormSchema[] = [
   },
   {
     id: "adoption",
-    title: "Adoption — enregistrement après jugement",
+    title: "Adoption",
     subtitle: "L'officier n'adopte pas : il enregistre / porte mention après décision judiciaire.",
     needsJudge: true,
     judgeBanner: "Le jugement d'adoption doit être transmis (greffe) avant inscription.",
@@ -208,7 +208,7 @@ export const EC_ACT_FORMS: ActFormSchema[] = [
   },
   {
     id: "divorce",
-    title: "Divorce — transcription du jugement",
+    title: "Divorce",
     subtitle: "Le divorce est prononcé par le tribunal ; l'officier transcrit et porte mentions.",
     needsJudge: true,
     judgeBanner: "Transcription uniquement après jugement transmis par le greffe.",
@@ -299,7 +299,7 @@ export const EC_ACT_FORMS: ActFormSchema[] = [
   },
   {
     id: "notif_naissance",
-    title: "Enregistrement de nouveau-né (structure sanitaire)",
+    title: "Naissance",
     subtitle:
       "Même identité enfant / mère / père que l'acte EC — transmis au bureau pour validation. Ce n'est pas l'acte officiel.",
     href: "/sante/births",
@@ -338,7 +338,7 @@ export const EC_ACT_FORMS: ActFormSchema[] = [
   },
   {
     id: "notif_deces",
-    title: "Enregistrement de décès (structure sanitaire)",
+    title: "Décès",
     subtitle: "Constat transmis au bureau EC — ne constitue pas l'acte officiel.",
     href: "/sante/deaths",
     sections: [

@@ -353,7 +353,7 @@ export default function DashboardPage() {
 
         <div className="dash-kpi-grid">
           <StatCard
-            title="Divorces"
+            title="Divorce"
             value={divorces.length}
             subtitle={isJuge ? "Dossiers juridiction" : "Transcriptions greffe"}
             icon={<IconSplit size={22} />}
@@ -361,7 +361,7 @@ export default function DashboardPage() {
             href="/lists/divorce?focus=validated"
           />
           <StatCard
-            title="Adoptions"
+            title="Adoption"
             value={adoptions.length}
             subtitle="Après jugement"
             icon={<IconClipboard size={22} />}
@@ -398,8 +398,8 @@ export default function DashboardPage() {
             title="Dossiers judiciaires par type"
             height={200}
             data={[
-              { label: "Divorces", value: divorces.length, color: RDC.redSoft },
-              { label: "Adoptions", value: adoptions.length, color: RDC.blueMid },
+              { label: "Divorce", value: divorces.length, color: RDC.redSoft },
+              { label: "Adoption", value: adoptions.length, color: RDC.blueMid },
             ]}
           />
           <LineChart
@@ -481,7 +481,7 @@ export default function DashboardPage() {
           href={statsOnly ? "/synoptique/deces" : "/lists/deces?focus=validated"}
         />
         <StatCard
-          title="Adoptions"
+          title="Adoption"
           value={adoptions.length}
           subtitle={`${pendingOf(adoptionAll).length} à valider`}
           icon={<IconHome size={22} />}
@@ -499,7 +499,7 @@ export default function DashboardPage() {
           />
         ) : (
           <StatCard
-            title="Divorces"
+            title="Divorce"
             value={divorces.length}
             subtitle={`${pendingOf(divorceAll).length} à valider`}
             icon={<IconSplit size={22} />}
@@ -539,9 +539,9 @@ export default function DashboardPage() {
           data={[
             { label: "Naissance", value: births.length, color: RDC.yellow },
             { label: "Mariages", value: marriages.length, color: RDC.yellowDeep },
-            { label: "Divorces", value: divorces.length, color: RDC.redSoft },
+            { label: "Divorce", value: divorces.length, color: RDC.redSoft },
             { label: "Décès", value: deaths.length, color: RDC.red },
-            { label: "Adopt.", value: adoptions.length, color: RDC.blueMid },
+            { label: "Adoption", value: adoptions.length, color: RDC.blueMid },
           ]}
         />
       </div>
@@ -577,10 +577,10 @@ export default function DashboardPage() {
           </ul>
         </div>
         <LineChart
-          title="Nouveau-nés vs décès"
+          title="Naissance vs décès"
           labels={months.map((m) => m.label)}
           series={[
-            { name: "Nouveau-nés", color: RDC.yellow, values: birthSeries },
+            { name: "Naissance", color: RDC.yellow, values: birthSeries },
             { name: "Décès", color: RDC.red, values: deathSeries },
           ]}
         />

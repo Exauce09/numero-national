@@ -82,7 +82,7 @@ export default function DocumentsPage() {
               onChange={(e) => setActeSource(e.target.value as ActeSource)}
             >
               <option value="ACTE_NAISSANCE">Acte de naissance</option>
-              <option value="ACTE_MARIAGE">Acte de mariage</option>
+              <option value="ACTE_MARIAGE">Mariages</option>
               <option value="ACTE_DECES">Acte de décès</option>
               <option value="ACTE_ADOPTION">Acte d&apos;adoption</option>
               <option value="AUTRE">Autre</option>

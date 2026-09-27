@@ -634,9 +634,9 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
                   value={mentionType}
                   onChange={(e) => setMentionType(e.target.value)}
                 >
-                  <option value="MARRIAGE">Mariage</option>
+                  <option value="MARRIAGE">Mariages</option>
                   <option value="DIVORCE">Divorce</option>
-                  <option value="DEATH">Enregistrement de décès</option>
+                  <option value="DEATH">Décès</option>
                   <option value="RECOGNITION">Reconnaissance</option>
                   <option value="ADOPTION">Adoption</option>
                   <option value="RECTIFICATION">Rectification</option>

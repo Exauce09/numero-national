@@ -47,7 +47,7 @@ export default function NewbornsPage() {
           <p className="eg-breadcrumb">
             <Link to="/">Accueil</Link> / Nouveaux-nés
           </p>
-          <h2 className="page-title">Gérer les nouveaux-nés</h2>
+          <h2 className="page-title">Naissance</h2>
           <p className="page-lead">
             Même logique que{" "}
             <a href="https://www.justicia.website/egouv/COMMUNE/manage-ne.php" target="_blank" rel="noreferrer">

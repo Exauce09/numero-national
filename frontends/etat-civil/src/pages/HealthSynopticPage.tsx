@@ -11,9 +11,9 @@ import {
 import type { Gft } from "../synoptic";
 
 const TABS = [
-  { slug: "naissances", label: "Enregistrement de nouveau-né" },
-  { slug: "deces", label: "Enregistrement de décès" },
-  { slug: "documents", label: "Liste des déclarations (naissances / décès)" },
+  { slug: "naissances", label: "Naissance" },
+  { slug: "deces", label: "Décès" },
+  { slug: "documents", label: "Naissance / Décès" },
 ] as const;
 
 type TabSlug = (typeof TABS)[number]["slug"];

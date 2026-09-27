@@ -198,6 +198,7 @@ export function canSeeNav(key: NavKey, roles: string[], permissions?: string[] |
       case "acts_register":
       case "naissances":
       case "mariages":
+      case "divorces":
       case "deces":
       case "procedure":
         return true;
@@ -217,6 +218,7 @@ export function canSeeNav(key: NavKey, roles: string[], permissions?: string[] |
       case "procedure":
       case "naissances":
       case "mariages":
+      case "divorces":
       case "deces":
       case "create_acts":
       case "documents":

@@ -370,7 +370,7 @@ export const EC_ROLE_CONFLICTS = [
 export const EC_WORKFLOWS = [
   {
     id: "naissance_sante",
-    title: "Enregistrement de nouveau-né via maternité",
+    title: "Naissance via structure sanitaire",
     steps: [
       "Infirmier titulaire : enregistrement de nouveau-né",
       "Transmission au bureau EC",
@@ -381,7 +381,7 @@ export const EC_WORKFLOWS = [
   },
   {
     id: "naissance_bureau",
-    title: "Enregistrement de nouveau-né au bureau",
+    title: "Naissance au bureau",
     steps: [
       "Déclarant / préposé : saisie",
       "Contrôle du délai (≤ 90 j. ou jugement supplétif)",

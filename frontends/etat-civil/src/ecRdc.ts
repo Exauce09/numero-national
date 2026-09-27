@@ -16,19 +16,19 @@ export type EcMission = {
 export const EC_REGISTRES = [
   {
     id: "naissances",
-    title: "Enregistrement de nouveau-né",
+    title: "Naissance",
     href: "/manage/naissance",
     summary: "Déclaration dans le délai, hors délai (jugement supplétif), procuration.",
   },
   {
     id: "mariages",
-    title: "Registre des mariages",
+    title: "Mariages",
     href: "/manage/mariage",
     summary: "Célébration civile devant l'officier, publications, régime matrimonial.",
   },
   {
     id: "deces",
-    title: "Registre des décès",
+    title: "Décès",
     href: "/manage/deces",
     summary: "Déclaration de décès, cause, lieux, inscription au registre.",
   },
@@ -43,13 +43,13 @@ export const EC_ACTES_LIES = [
   },
   {
     id: "adoption",
-    title: "Adoption (après jugement)",
+    title: "Adoption",
     href: "/manage/adoption",
     needsJudge: true,
   },
   {
     id: "divorce",
-    title: "Divorce — transcription du jugement",
+    title: "Divorce",
     href: "/manage/divorce",
     needsJudge: true,
   },
@@ -58,7 +58,7 @@ export const EC_ACTES_LIES = [
 export const EC_RDC_MISSIONS: EcMission[] = [
   {
     id: "naissance",
-    title: "Enregistrement de nouveau-né",
+    title: "Naissance",
     summary:
       "Canal maternité ou bureau EC. Adresse de la mère + originaire (province → territoire → secteur → village). Dans le délai ≤ 90 j. ; hors délai → jugement supplétif.",
     href: "/births",
@@ -66,14 +66,14 @@ export const EC_RDC_MISSIONS: EcMission[] = [
   },
   {
     id: "mariage",
-    title: "Acte de mariage",
+    title: "Mariages",
     summary:
       "Célébration et enregistrement du mariage civil devant l'officier, après formalités (âge, état civil, publications).",
     href: "/marriages",
   },
   {
     id: "deces",
-    title: "Enregistrement de décès",
+    title: "Décès",
     summary: "Déclaration et enregistrement du décès (cause, lieux, dates) au registre des décès.",
     href: "/deaths",
   },
@@ -93,7 +93,7 @@ export const EC_RDC_MISSIONS: EcMission[] = [
   },
   {
     id: "divorce",
-    title: "Divorce / dissolution",
+    title: "Divorce",
     summary: "Transcription du jugement de divorce et mentions sur l'acte de mariage.",
     href: "/divorces",
     needsJudge: true,

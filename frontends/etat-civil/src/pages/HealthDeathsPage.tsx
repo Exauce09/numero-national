@@ -73,7 +73,7 @@ export default function HealthDeathsPage() {
       },
     });
     pushHealthNotification({
-      title: "Enregistrement de décès transmis",
+      title: "Décès transmis",
       body: `${displayName(deceased)} — en attente de validation officier (réf. ${decl.id.slice(0, 8)}).`,
       href: "/sante/deaths",
     });

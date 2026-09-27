@@ -324,7 +324,7 @@ export default function DeathsPage() {
 
       {created ? (
         <div className="panel" style={{ marginTop: "1rem" }}>
-          <div className="success-banner">Enregistrement de décès créé</div>
+          <div className="success-banner">Décès enregistré</div>
           <ActPrintCard act={created} />
         </div>
       ) : null}

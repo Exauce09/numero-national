@@ -1317,10 +1317,10 @@ export function markMarriageDivorced(act_number: string): MarriageLink | undefin
 
 export function actTypeLabel(type: ActType): string {
   const labels: Record<ActType, string> = {
-    BIRTH: "Enregistrement de nouveau-né",
-    DEATH: "Enregistrement de décès",
+    BIRTH: "Naissance",
+    DEATH: "Décès",
     CENSUS: "Recensement",
-    MARRIAGE: "Mariage",
+    MARRIAGE: "Mariages",
     ADOPTION: "Adoption",
     DISPLACEMENT: "Déplacement",
     DIVORCE: "Divorce",

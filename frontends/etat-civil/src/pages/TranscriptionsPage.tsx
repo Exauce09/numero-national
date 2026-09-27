@@ -76,7 +76,7 @@ export default function TranscriptionsPage() {
               onChange={(e) => setTypeActe(e.target.value)}
             >
               <option value="NAISSANCE">Acte de naissance</option>
-              <option value="MARIAGE">Acte de mariage</option>
+              <option value="MARIAGE">Mariages</option>
               <option value="DECES">Acte de décès</option>
               <option value="AUTRE">Autre</option>
             </select>

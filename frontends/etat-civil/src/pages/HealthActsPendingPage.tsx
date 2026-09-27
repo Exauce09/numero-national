@@ -24,10 +24,10 @@ export default function HealthActsPendingPage() {
       <div className="panel" style={{ marginBottom: "1rem" }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
           <Link className="btn-primary" style={{ width: "auto" }} to="/sante/births">
-            + Enregistrement de nouveau-né
+            + Naissance
           </Link>
           <Link className="btn-secondary" style={{ width: "auto" }} to="/sante/deaths">
-            + Enregistrement de décès
+            + Décès
           </Link>
         </div>
       </div>
@@ -59,7 +59,7 @@ export default function HealthActsPendingPage() {
                       : String(p.deceased_name ?? p.nom ?? "Enregistrement de décès");
                   return (
                     <tr key={d.id}>
-                      <td>{d.declaration_type === "BIRTH" ? "Nouveau-né" : "Enregistrement de décès"}</td>
+                      <td>{d.declaration_type === "BIRTH" ? "Naissance" : "Décès"}</td>
                       <td>{label}</td>
                       <td>En cours — en attente officier</td>
                       <td>{new Date(d.created_at).toLocaleString("fr-FR")}</td>

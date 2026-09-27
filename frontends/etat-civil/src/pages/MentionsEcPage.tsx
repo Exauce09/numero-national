@@ -87,7 +87,7 @@ export default function MentionsEcPage() {
             <label className="form-label">Type d&apos;acte *</label>
             <select className="form-control" value={typeActe} onChange={(e) => setTypeActe(e.target.value)}>
               <option value="NAISSANCE">Acte de naissance</option>
-              <option value="MARIAGE">Acte de mariage</option>
+              <option value="MARIAGE">Mariages</option>
               <option value="DECES">Acte de décès</option>
               <option value="RECONNAISSANCE">Reconnaissance</option>
               <option value="AUTRE">Autre</option>
