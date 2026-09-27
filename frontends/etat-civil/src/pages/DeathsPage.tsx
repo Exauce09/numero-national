@@ -9,9 +9,11 @@ import { getOfficerCommune } from "../commune";
 import { CIMETIERES_RDC, cimetiereLabel } from "../data/cimetieresRdc";
 import { TYPE_DECES_OPTIONS, typeDecesLabel, type TypeDeces } from "../deathType";
 import { getActFormSchema } from "../ecActForms";
+import { notifyFromHealthForm, type HealthFormContext } from "../healthFormMode";
 import { addAct, displayName, type Act, type Person } from "../registry";
 
-export default function DeathsPage() {
+/** `health` : même formulaire chez l'infirmier titulaire — transmet une notification au bureau. */
+export default function DeathsPage({ health }: { health?: HealthFormContext } = {}) {
   const [deceased, setDeceased] = useState<Person | null>(null);
   const [declarant, setDeclarant] = useState<Person | null>(null);
   const [qualiteDeclarant, setQualiteDeclarant] = useState("PROCHE");
@@ -21,7 +23,18 @@ export default function DeathsPage() {
   const [heureDeces, setHeureDeces] = useState("");
   const [medecin, setMedecin] = useState("");
   const [certificatRef, setCertificatRef] = useState("");
-  const [geoDeces, setGeoDeces] = useState<GeoSelection>({});
+  const [geoDeces, setGeoDeces] = useState<GeoSelection>(
+    health
+      ? {
+          label: health.facilityName,
+          province_name: health.province,
+          ville_name: health.ville,
+          commune_name: health.commune_name,
+          commune_code: health.commune_code,
+        }
+      : {},
+  );
+  const [submitting, setSubmitting] = useState(false);
   const [geoEnterrement, setGeoEnterrement] = useState<GeoSelection>({});
   const [cimetiere, setCimetiere] = useState("");
   const [cimetiereAutre, setCimetiereAutre] = useState("");
@@ -54,6 +67,8 @@ export default function DeathsPage() {
       setError("Indiquez le lieu du décès (ex. Tshilenge, Nsele…).");
       return;
     }
+    if (submitting) return;
+    setSubmitting(true);
     try {
       const commune = getOfficerCommune();
       const lieuDeces =
@@ -96,16 +111,45 @@ export default function DeathsPage() {
         responsable_id: declarant.id,
         responsable_name: displayName(declarant),
       };
+      if (health) {
+        const decl = await notifyFromHealthForm(health, "DEATH", {
+          ...payload,
+          deceased_nic: deceased.nic,
+        });
+        health.onSubmitted({
+          declarationId: decl.id,
+          type: "DEATH",
+          personName: displayName(deceased),
+        });
+        return;
+      }
       // Pas de NIC — identifiant interne de la personne uniquement.
       const act = await addAct("DEATH", payload, deceased.id);
       setCreated(act);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Enregistrement impossible.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
   return (
-    <ActFormShell schema={getActFormSchema("deces")!}>
+    <ActFormShell
+      schema={getActFormSchema("deces")!}
+      extraLead={
+        health ? (
+          <>
+            <button type="button" className="btn-secondary btn-sm" onClick={health.onBack}>
+              ← Retour à la liste
+            </button>
+            <p className="muted small">
+              Même formulaire que l&apos;état civil : la saisie est transmise au bureau de{" "}
+              {health.commune_name}, l&apos;officier établit l&apos;acte officiel.
+            </p>
+          </>
+        ) : null
+      }
+    >
       <GpsLocatePanel
         title="GPS — lieu du décès"
         onResolved={(g) => setGeoDeces((prev) => applyGpsToGeo(prev, g))}
@@ -315,8 +359,17 @@ export default function DeathsPage() {
           </div>
 
           <div className="full">
-            <button className="btn-primary" style={{ width: "auto", minWidth: 200 }} type="submit">
-              Enregistrer le décès
+            <button
+              className="btn-primary"
+              style={{ width: "auto", minWidth: 200 }}
+              type="submit"
+              disabled={submitting}
+            >
+              {submitting
+                ? "Enregistrement…"
+                : health
+                  ? "Transmettre à l'état civil"
+                  : "Enregistrer le décès"}
             </button>
           </div>
         </form>

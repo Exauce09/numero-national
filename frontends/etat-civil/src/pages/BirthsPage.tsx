@@ -39,6 +39,7 @@ import {
 import { getOfficerCommune } from "../commune";
 import { ISSUE_NAISSANCE_OPTIONS, type IssueNaissance } from "../deathType";
 import { listFacilityAccounts } from "../healthAuth";
+import { notifyFromHealthForm, type HealthFormContext } from "../healthFormMode";
 import { HOPITAUX_KEY, loadNamedList, rememberNamed } from "../namedLists";
 
 const MODES_ENREGISTREMENT = [
@@ -67,8 +68,17 @@ function geoBirthLabel(geo: GeoSelection, manual: string): string {
   return manual.trim() || geo.label || parts.join(", ") || "";
 }
 
-export default function BirthsPage() {
-  const officer = getOfficerCommune();
+/** `health` : même formulaire chez l'infirmier titulaire — transmet une notification au bureau. */
+export default function BirthsPage({ health }: { health?: HealthFormContext } = {}) {
+  const officerCommune = getOfficerCommune();
+  const officer = health
+    ? {
+        code: health.commune_code,
+        name: health.commune_name,
+        ville: health.ville || officerCommune.ville,
+        province: health.province || officerCommune.province,
+      }
+    : officerCommune;
   const [formStep, setFormStep] = useState(1);
   const [nom, setNom] = useState("");
   const [postnom, setPostnom] = useState("");
@@ -100,7 +110,7 @@ export default function BirthsPage() {
   const [mandataireQualite, setMandataireQualite] = useState("");
   const [mandatairePiece, setMandatairePiece] = useState("");
   const [refJugement, setRefJugement] = useState("");
-  const [hopitalNaissance, setHopitalNaissance] = useState("");
+  const [hopitalNaissance, setHopitalNaissance] = useState(health?.facilityName ?? "");
   const [hopitalAutre, setHopitalAutre] = useState("");
   const [mother, setMother] = useState<Person | null>(null);
   const [father, setFather] = useState<Person | null>(null);
@@ -277,30 +287,79 @@ export default function BirthsPage() {
       const origineLabel =
         effectiveOrigine.label || origineFromCascade || origineFromParent || "";
 
-      const child = addPerson({
+      const childNic = generateBirthDossierId(dateNaissance, {
+        provinceName: geoNaissance.province_name || officer.province,
+      });
+      // Chez l'infirmier titulaire, l'enfant est créé au registre par l'officier à la validation.
+      const childPerson = health
+        ? null
+        : addPerson({
+            nom: identity.nom,
+            postnom: identity.postnom,
+            prenom: identity.prenom,
+            sexe,
+            date_naissance: dateNaissance,
+            lieu_naissance: lieu,
+            etat_civil: "CELIBATAIRE",
+            mother_id: mother.id,
+            father_id: father?.id,
+            nationalite: personNationalite(father ?? mother),
+            nic: childNic,
+            province: effectiveOrigine.province_name || link.geo.province || undefined,
+            territoire: effectiveOrigine.district_name || link.geo.territoire || undefined,
+            secteur:
+              [effectiveOrigine.commune_name, effectiveOrigine.localite_name].filter(Boolean).join(" · ") ||
+              link.geo.secteur ||
+              undefined,
+          });
+      const child = childPerson ?? {
+        id: null as string | null,
+        nic: childNic,
         nom: identity.nom,
         postnom: identity.postnom,
         prenom: identity.prenom,
         sexe,
         date_naissance: dateNaissance,
         lieu_naissance: lieu,
-        etat_civil: "CELIBATAIRE",
-        mother_id: mother.id,
-        father_id: father?.id,
-        nationalite: personNationalite(father ?? mother),
-        nic: generateBirthDossierId(dateNaissance, {
-          provinceName: geoNaissance.province_name || getOfficerCommune().province,
-        }),
-        province: effectiveOrigine.province_name || link.geo.province || undefined,
-        territoire: effectiveOrigine.district_name || link.geo.territoire || undefined,
-        secteur:
-          [effectiveOrigine.commune_name, effectiveOrigine.localite_name].filter(Boolean).join(" · ") ||
-          link.geo.secteur ||
-          undefined,
-      });
-      const commune = getOfficerCommune();
+      };
+      const childName = childPerson
+        ? displayName(childPerson)
+        : [identity.prenom, identity.postnom, identity.nom].filter(Boolean).join(" ");
+      const commune = officer;
       const session = getSession();
       const officerDisplay = session?.displayName?.trim() || "Officier de l'État civil";
+      const record = async (type: "BIRTH" | "DEATH", payload: Record<string, unknown>, key: string) => {
+        if (!health) {
+          const act = await addAct(type, payload, key);
+          const syncWarn = act.payload.sync_warning ? String(act.payload.sync_warning) : null;
+          if (syncWarn) setWarning(syncWarn);
+          setCreated(act);
+          return;
+        }
+        const decl = await notifyFromHealthForm(health, type, {
+          ...payload,
+          child_nom: identity.nom,
+          child_postnom: identity.postnom,
+          child_prenom: identity.prenom,
+          child_nic: childNic,
+          id_naissance: childNic,
+          lieu_naissance: lieu,
+        });
+        health.onSubmitted({
+          declarationId: decl.id,
+          type,
+          personName: childName,
+          idNaissance: childNic,
+          child: {
+            nom: identity.nom,
+            postnom: identity.postnom,
+            prenom: identity.prenom,
+            sexe,
+            date_naissance: dateNaissance,
+            mother_name: motherFull,
+          },
+        });
+      };
       const modeLabel =
         MODES_ENREGISTREMENT.find((m) => m.value === modeEnregistrement)?.label ??
         modeEnregistrement;
@@ -325,7 +384,7 @@ export default function BirthsPage() {
         const deathPayload = {
           deceased_id: child.id,
           citizen_id: child.id,
-          deceased_name: displayName(child),
+          deceased_name: childName,
           sexe: child.sexe,
           date_naissance: child.date_naissance,
           type_deces: "MORT_NE" as const,
@@ -359,10 +418,7 @@ export default function BirthsPage() {
           gps_captured_at: gpsLat != null ? new Date().toISOString() : null,
           officer_name: officerDisplay,
         };
-        const act = await addAct("DEATH", deathPayload, child.id);
-        const syncWarn = act.payload.sync_warning ? String(act.payload.sync_warning) : null;
-        if (syncWarn) setWarning(syncWarn);
-        setCreated(act);
+        await record("DEATH", deathPayload, child.id ?? childNic);
       } else {
       const payload = {
         child_id: child.id,
@@ -439,10 +495,7 @@ export default function BirthsPage() {
         longitude: gpsLng,
         gps_captured_at: gpsLat != null ? new Date().toISOString() : null,
       };
-      const act = await addAct("BIRTH", payload, child.nic);
-      const syncWarn = act.payload.sync_warning ? String(act.payload.sync_warning) : null;
-      if (syncWarn) setWarning(syncWarn);
-      setCreated(act);
+      await record("BIRTH", payload, child.nic);
       }
 
       setNom("");
@@ -471,7 +524,7 @@ export default function BirthsPage() {
       setMandataireQualite("");
       setMandatairePiece("");
       setRefJugement("");
-      setHopitalNaissance("");
+      setHopitalNaissance(health?.facilityName ?? "");
       setHopitalAutre("");
       setMother(null);
       setFather(null);
@@ -522,17 +575,35 @@ export default function BirthsPage() {
     <ActFormShell
       schema={getActFormSchema("naissance")!}
       extraLead={
-        <p className="page-lead" style={{ marginTop: 0 }}>
-          <Link to="/procedure">Procédure</Link> · <Link to="/juge">Juge</Link> ·{" "}
-          <Link to="/declarations">Déclarations santé</Link> · <Link to="/matrice">Matrice</Link>
-        </p>
+        health ? (
+          <button type="button" className="btn-secondary btn-sm" onClick={health.onBack}>
+            ← Retour à la liste
+          </button>
+        ) : (
+          <p className="page-lead" style={{ marginTop: 0 }}>
+            <Link to="/procedure">Procédure</Link> · <Link to="/juge">Juge</Link> ·{" "}
+            <Link to="/declarations">Déclarations santé</Link> · <Link to="/matrice">Matrice</Link>
+          </p>
+        )
       }
     >
       <div className="panel" style={{ marginBottom: "1rem" }}>
         <p className="muted" style={{ margin: 0, fontSize: "0.92rem" }}>
           <strong>Dans le délai (≤ {NEWBORN_DELAI_JOURS} j.)</strong> : enregistrement classique.{" "}
           <strong>Hors délai</strong> : jugement supplétif + référence du jugement obligatoire.
-          Maternité : notification via <Link to="/sante/login">/sante</Link> puis validation officier.
+          {health ? (
+            <>
+              {" "}
+              Même formulaire que l&apos;état civil : la saisie est transmise au bureau de{" "}
+              {health.commune_name}, l&apos;officier établit l&apos;acte officiel.
+            </>
+          ) : (
+            <>
+              {" "}
+              Maternité : notification via <Link to="/sante/login">/sante</Link> puis validation
+              officier.
+            </>
+          )}
         </p>
       </div>
       <GpsLocatePanel
@@ -704,23 +775,27 @@ export default function BirthsPage() {
               Terme médical : état morphologique du nouveau-né.
             </p>
           </div>
-          <div>
-            <label className="form-label">Année du registre</label>
-            <input
-              className="form-control"
-              value={anneeRegistre}
-              onChange={(e) => setAnneeRegistre(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="form-label">N° d&apos;ordre au registre</label>
-            <input
-              className="form-control"
-              value={numeroRegistre}
-              onChange={(e) => setNumeroRegistre(e.target.value)}
-              placeholder="Attribué à la validation si vide"
-            />
-          </div>
+          {!health ? (
+            <>
+              <div>
+                <label className="form-label">Année du registre</label>
+                <input
+                  className="form-control"
+                  value={anneeRegistre}
+                  onChange={(e) => setAnneeRegistre(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="form-label">N° d&apos;ordre au registre</label>
+                <input
+                  className="form-control"
+                  value={numeroRegistre}
+                  onChange={(e) => setNumeroRegistre(e.target.value)}
+                  placeholder="Attribué à la validation si vide"
+                />
+              </div>
+            </>
+          ) : null}
           <div>
             <label className="form-label">Type d&apos;enregistrement *</label>
             <select
@@ -794,7 +869,7 @@ export default function BirthsPage() {
               />
               <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
                 Le juge autorise l&apos;inscription ; l&apos;officier enregistre ensuite.{" "}
-                <Link to="/juge">Voir les cas juge</Link>
+                {!health ? <Link to="/juge">Voir les cas juge</Link> : null}
               </p>
             </div>
           ) : null}
@@ -1078,7 +1153,11 @@ export default function BirthsPage() {
               type="submit"
               disabled={submitting}
             >
-              {submitting ? "Enregistrement…" : "Enregistrer le nouveau-né"}
+              {submitting
+                ? "Enregistrement…"
+                : health
+                  ? "Transmettre à l'état civil"
+                  : "Enregistrer le nouveau-né"}
             </button>
           </div>
             </>
@@ -1086,6 +1165,8 @@ export default function BirthsPage() {
         </form>
       </div>
 
+      {health ? null : (
+        <>
       {created ? (
         <div className="panel" style={{ marginTop: "1rem" }}>
           <div className="success-banner no-print">
@@ -1210,6 +1291,8 @@ export default function BirthsPage() {
           </div>
         </div>
       ) : null}
+        </>
+      )}
     </ActFormShell>
   );
 }
