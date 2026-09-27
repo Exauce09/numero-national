@@ -115,6 +115,8 @@ export default function DeclarationsPage() {
         date_naissance: String(d.payload.date_naissance ?? ""),
         lieu_naissance: String(d.payload.lieu_naissance ?? d.payload.facility_name ?? ""),
         etat_civil: "CELIBATAIRE",
+        mother_id: d.payload.mother_id ? String(d.payload.mother_id) : undefined,
+        father_id: d.payload.father_id ? String(d.payload.father_id) : undefined,
       });
       await addAct(
         "BIRTH",

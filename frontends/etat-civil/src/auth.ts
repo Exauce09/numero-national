@@ -27,6 +27,12 @@ export type Session = {
 };
 
 const KEY = "nn_session_etat_civil";
+/** Le portail civil-officer (5176) monte les mêmes formulaires : sa session a la même forme. */
+const HOST_SESSION_KEYS = [KEY, "nn_session_civil_officer"];
+
+function activeSessionKey(): string {
+  return HOST_SESSION_KEYS.find((k) => sessionStorage.getItem(k)) ?? KEY;
+}
 
 export const MODULE_ROLE_TITLE = "Officier de l'état civil";
 
@@ -65,7 +71,7 @@ function sessionFromEcUser(user: EcUser, photoDataUrl?: string): Session {
 
 export function getSession(): Session | null {
   try {
-    const raw = sessionStorage.getItem(KEY);
+    const raw = sessionStorage.getItem(activeSessionKey());
     if (!raw) return null;
     return JSON.parse(raw) as Session;
   } catch {
@@ -81,7 +87,7 @@ export function updateSession(patch: Partial<Session>): Session | null {
   const cur = getSession();
   if (!cur) return null;
   const next = { ...cur, ...patch };
-  sessionStorage.setItem(KEY, JSON.stringify(next));
+  sessionStorage.setItem(activeSessionKey(), JSON.stringify(next));
   return next;
 }
 
