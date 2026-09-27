@@ -1,118 +1,130 @@
-import type { ReactNode } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconBaby, IconClipboard, IconCross, IconTable } from "../components/Icons";
-import { getHealthSession } from "../healthAuth";
+import { BarChart, LineChart, PieChart } from "../components/Charts";
+import { countByMonth, lastNMonths, StatCard } from "../components/DashKpi";
+import { IconBaby, IconCross } from "../components/Icons";
 import { listFacilityDeclarations } from "../civilDeclarations";
-import { healthSynopticBirths, healthSynopticDeaths } from "../healthSynoptic";
+import { getHealthSession, HEALTH_ROLE_TITLE } from "../healthAuth";
+import { RDC } from "../rdcColors";
 
-type Tone = "primary" | "success" | "danger" | "warning" | "info";
-
-type DashItem = {
-  id: string;
-  title: string;
-  value: number;
-  subtitle: string;
-  tone: Tone;
-  href: string;
-  icon: ReactNode;
-};
-
+/** Tableau de bord infirmier titulaire — même présentation que l'État civil national (naissance et décès). */
 export default function HealthDashboardPage() {
   const navigate = useNavigate();
   const session = getHealthSession()!;
   const rows = listFacilityDeclarations(session.facilityId);
-  const pending = rows.filter((d) => d.status === "PENDING_OFFICER").length;
-  const births = rows.filter((d) => d.declaration_type === "BIRTH").length;
-  const deaths = rows.filter((d) => d.declaration_type === "DEATH").length;
-  const validated = rows.filter((d) => d.status === "VALIDATED").length;
-  const synBirths = healthSynopticBirths().totalNaissances.t;
-  const synDeaths = healthSynopticDeaths().totalAB;
 
-  const items: DashItem[] = [
-    {
-      id: "birth",
-      title: "Naissance",
-      value: births,
-      subtitle: "Déclarations envoyées",
-      tone: "success",
-      href: "/sante/births",
-      icon: <IconBaby size={26} />,
-    },
-    {
-      id: "death",
-      title: "Décès",
-      value: deaths,
-      subtitle: "Déclarations envoyées",
-      tone: "danger",
-      href: "/sante/deaths",
-      icon: <IconCross size={26} />,
-    },
-    {
-      id: "pending",
-      title: "En attente",
-      value: pending,
-      subtitle: "Notifications état civil non validées",
-      tone: "warning",
-      href: "/sante/births",
-      icon: <IconClipboard size={26} />,
-    },
-    {
-      id: "ok",
-      title: "Validés",
-      value: validated,
-      subtitle: "Pris en compte par l'officier",
-      tone: "primary",
-      href: "/sante/synoptique/naissances",
-      icon: <IconClipboard size={26} />,
-    },
-    {
-      id: "syn-birth",
-      title: "Naissance",
-      value: synBirths,
-      subtitle: "Tableau synoptique",
-      tone: "info",
-      href: "/sante/synoptique/naissances",
-      icon: <IconTable size={26} />,
-    },
-    {
-      id: "syn-death",
-      title: "Décès",
-      value: synDeaths,
-      subtitle: "Tableau synoptique",
-      tone: "info",
-      href: "/sante/synoptique/deces",
-      icon: <IconTable size={26} />,
-    },
-  ];
+  const birthAll = rows.filter((d) => d.declaration_type === "BIRTH");
+  const deathAll = rows.filter((d) => d.declaration_type === "DEATH");
+  const validatedOf = (list: typeof rows) => list.filter((d) => d.status === "VALIDATED");
+  const pendingOf = (list: typeof rows) => list.filter((d) => d.status === "PENDING_OFFICER");
+
+  const births = validatedOf(birthAll);
+  const deaths = validatedOf(deathAll);
+  const pending = pendingOf(rows).length;
+  const validated = validatedOf(rows).length;
+  const rejected = rows.filter((d) => d.status === "REJECTED").length;
+
+  const months = useMemo(() => lastNMonths(6), []);
+  const birthSeries = countByMonth(births, months);
+  const deathSeries = countByMonth(deaths, months);
+
+  const territory = [session.commune_name].filter(Boolean).join(" · ");
 
   return (
-    <div>
-      <div className="eg-page-head">
+    <div className="dash-page">
+      <div className="dash-welcome">
         <div>
-          <h2 className="page-title">Tableau de bord</h2>
+          <h2 className="page-title">Bonjour, {session.displayName || session.username}</h2>
           <p className="page-lead">
-            {session.facilityName} · {session.commune_name}. Cliquez une carte pour gérer les enregistrements ou
-            ouvrir les tableaux synoptiques ; chaque saisie notifie l&apos;état civil.
+            {session.roleTitle || HEALTH_ROLE_TITLE}
+            {territory ? ` · Périmètre : ${territory}` : ""}
+            {" · "}
+            {session.facilityName}
           </p>
         </div>
       </div>
 
-      <div className="eg-widget-grid">
-        {items.map((item) => (
-          <button key={item.id} type="button" className="eg-widget" onClick={() => navigate(item.href)}>
-            <div className="eg-widget-body">
-              <div className="eg-widget-text">
-                <span className="eg-widget-value">{item.value}</span>
-                <span className="eg-widget-title">{item.title}</span>
-                <span className="eg-widget-sub">{item.subtitle}</span>
-              </div>
-              <span className={`eg-widget-icon tone-${item.tone}`}>{item.icon}</span>
-            </div>
-            <span className="eg-widget-foot">
-              Voir le détail <span aria-hidden="true">→</span>
-            </span>
-          </button>
-        ))}
+      <div className="dash-kpi-grid">
+        <StatCard
+          title="Naissance"
+          value={births.length}
+          subtitle={`${pendingOf(birthAll).length} à valider`}
+          icon={<IconBaby size={22} />}
+          color={RDC.yellowDeep}
+          href="/sante/births"
+        />
+        <StatCard
+          title="Décès"
+          value={deaths.length}
+          subtitle={`${pendingOf(deathAll).length} à valider`}
+          icon={<IconCross size={22} />}
+          color={RDC.red}
+          href="/sante/deaths"
+        />
+      </div>
+
+      <h3 className="dash-section-title">Statistiques de {session.facilityName}</h3>
+      <div className="eg-charts-row dash-charts-main">
+        <BarChart
+          title="Déclarations par type (validées)"
+          height={200}
+          data={[
+            { label: "Naissance", value: births.length, color: RDC.yellow },
+            { label: "Décès", value: deaths.length, color: RDC.red },
+          ]}
+        />
+      </div>
+
+      <div className="eg-charts-row">
+        <PieChart
+          title="Statut des déclarations"
+          data={[
+            { label: "En attente", value: pending, color: RDC.yellow },
+            { label: "Validé", value: validated, color: RDC.blue },
+            { label: "Rejeté", value: rejected, color: RDC.red },
+          ]}
+        />
+        <div className="eg-chart-card" style={{ padding: "0.85rem 1rem" }}>
+          <h3 className="panel-title" style={{ marginTop: 0, fontSize: "1rem" }}>
+            Que signifient ces statuts ?
+          </h3>
+          <ul className="muted small" style={{ margin: 0, paddingLeft: "1.1rem", lineHeight: 1.55 }}>
+            <li>
+              <strong>En attente</strong> — déclaration transmise à l&apos;état civil, en attente de
+              validation par l&apos;officier.
+            </li>
+            <li>
+              <strong>Validé</strong> — déclaration prise en compte par l&apos;officier.
+            </li>
+            <li>
+              <strong>Rejeté</strong> — déclaration à corriger.
+            </li>
+          </ul>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginTop: "0.75rem" }}>
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              onClick={() => navigate("/sante/actes-en-cours")}
+            >
+              En attente ({pending})
+            </button>
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              onClick={() => navigate("/sante/nos-valides")}
+            >
+              Validés ({validated})
+            </button>
+          </div>
+        </div>
+        <LineChart
+          title="Naissance vs décès"
+          labels={months.map((m) => m.label)}
+          series={[
+            { name: "Naissance", color: RDC.yellow, values: birthSeries },
+            { name: "Décès", color: RDC.red, values: deathSeries },
+          ]}
+        />
       </div>
     </div>
   );
