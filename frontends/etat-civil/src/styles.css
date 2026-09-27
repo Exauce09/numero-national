@@ -86,6 +86,22 @@
   width: auto;
 }
 
+.btn-secondary.btn-danger {
+  color: #b42318;
+  border-color: #f1b5ae;
+}
+
+.btn-secondary.btn-danger:hover {
+  color: #fff;
+  background: #b42318;
+  border-color: #b42318;
+}
+
+.btn-primary.btn-danger {
+  background: #b42318;
+  border-color: #b42318;
+}
+
 .dash-hero {
   margin-bottom: 1rem;
 }

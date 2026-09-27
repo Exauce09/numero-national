@@ -4,6 +4,7 @@ import {
   applyCurrentRoleRules,
   ensureBootstrapSuperAdmin,
   ensureCanonicalAccounts,
+  isEcLoginDeleted,
   permissionsForRoles,
   verifyEcUser,
   type EcUser,
@@ -90,7 +91,14 @@ export function migrateAccountsToCurrentRoles(): void {
   const cur = getSession();
   if (!cur?.username) return;
   const local = users.find((u) => u.email.toLowerCase() === cur.username.toLowerCase());
-  if (!local) return;
+  if (!local) {
+    if (isEcLoginDeleted(cur.username)) clearSession();
+    return;
+  }
+  if (!local.active) {
+    clearSession();
+    return;
+  }
   const roles = local.roles as string[];
   updateSession({
     roles,

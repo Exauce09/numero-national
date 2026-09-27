@@ -47,6 +47,43 @@ export type HealthSession = {
 
 const ACCOUNTS_KEY = "nn_health_facility_accounts";
 const SESSION_KEY = "nn_session_health_facility";
+/** Identifiants / demandes supprimés → date de suppression (pas de re-provisionnement automatique). */
+const DELETED_KEY = "nn_health_facility_deleted_v1";
+
+function loadDeleted(): Record<string, string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DELETED_KEY) || "{}") as unknown;
+    return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** `since` : date d'activation de la source — une activation postérieure à la suppression recrée le compte. */
+export function isFacilityDeleted(keys: Array<string | undefined>, since?: string): boolean {
+  const rows = loadDeleted();
+  return keys.some((k) => {
+    const at = k ? rows[k.trim().toLowerCase()] : undefined;
+    return Boolean(at) && (!since || since <= at!);
+  });
+}
+
+function setDeleted(keys: Array<string | undefined>, deleted: boolean): void {
+  const rows = loadDeleted();
+  const at = new Date().toISOString();
+  for (const k of keys) {
+    const key = k?.trim().toLowerCase();
+    if (!key) continue;
+    if (deleted) rows[key] = at;
+    else delete rows[key];
+  }
+  localStorage.setItem(DELETED_KEY, JSON.stringify(rows));
+}
+
+export function findFacilityByRequestId(requestId: string): FacilityAccountPublic | null {
+  const hit = ensureAccountsReady().find((a) => a.registration_request_id === requestId);
+  return hit ? toPublic(hit) : null;
+}
 
 export const HEALTH_ROLE_TITLE = "Infirmier titulaire — structure sanitaire";
 
@@ -267,6 +304,7 @@ export async function createFacilityAccount(input: {
     passwordHash: await hashPassword(input.password),
   });
   saveAccounts([account, ...list]);
+  setDeleted([account.username, account.email], false);
   return account;
 }
 
@@ -317,6 +355,7 @@ export async function updateFacilityAccount(
     localite_name?: string;
     geo_label?: string;
     geo_mode?: "kinshasa" | "province";
+    email?: string;
   },
 ): Promise<FacilityAccount> {
   ensureAccountsReady();
@@ -403,6 +442,7 @@ export function deleteFacilityAccount(id: string): void {
   if (loadAccounts().some((a) => a.id === id)) {
     throw new Error("Échec de la suppression.");
   }
+  setDeleted([hit.username, hit.email, hit.registration_request_id], true);
   const session = getHealthSession();
   if (session?.facilityId === id || session?.username === hit.username) {
     clearHealthSession();

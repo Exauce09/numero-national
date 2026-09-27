@@ -29,9 +29,59 @@ export type EcUser = {
   created_at: string;
   created_by?: string | null;
   active: boolean;
+  updated_at?: string;
+  /** Renseigné après une modification par l'État civil national. */
+  updated_by?: string;
 };
 
 const KEY = "nn_etat_civil_users_v1";
+/** E-mails / identifiants supprimés : ne pas les recréer (comptes nominatifs, inscriptions). */
+const DELETED_KEY = "nn_etat_civil_deleted_users_v1";
+
+function loadDeletedLogins(): Record<string, string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DELETED_KEY) || "{}") as unknown;
+    return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveDeletedLogins(rows: Record<string, string>): void {
+  localStorage.setItem(DELETED_KEY, JSON.stringify(rows));
+}
+
+/**
+ * Compte supprimé par l'État civil national.
+ * `since` : date de la source (ex. activation d'une inscription) — une activation postérieure recrée le compte.
+ */
+export function isEcLoginDeleted(login: string | undefined | null, since?: string): boolean {
+  const l = (login ?? "").trim().toLowerCase();
+  if (!l) return false;
+  const at = loadDeletedLogins()[l];
+  if (!at) return false;
+  return !since || since <= at;
+}
+
+function markDeletedLogins(logins: Array<string | undefined>): void {
+  const rows = loadDeletedLogins();
+  const at = new Date().toISOString();
+  for (const l of logins) if (l?.trim()) rows[l.trim().toLowerCase()] = at;
+  saveDeletedLogins(rows);
+}
+
+function forgetDeletedLogins(logins: Array<string | undefined>): void {
+  const rows = loadDeletedLogins();
+  let changed = false;
+  for (const l of logins) {
+    const k = l?.trim().toLowerCase();
+    if (k && rows[k]) {
+      delete rows[k];
+      changed = true;
+    }
+  }
+  if (changed) saveDeletedLogins(rows);
+}
 
 export const EC_ROLE_CATALOG: Array<{
   code: EcUserRole;
@@ -141,9 +191,11 @@ export async function ensureCanonicalAccounts(): Promise<void> {
   let rows = listEcUsers();
   let changed = false;
 
-  for (const seed of CANONICAL_EC_ACCOUNTS) {
+  for (const [seedIdx, seed] of CANONICAL_EC_ACCOUNTS.entries()) {
+    const isHerve = seedIdx === 0;
     const i = findCanonicalMatch(rows, seed);
     if (i < 0) {
+      if (!isHerve && isEcLoginDeleted(seed.email)) continue;
       rows = [
         {
           id: crypto.randomUUID(),
@@ -162,6 +214,7 @@ export async function ensureCanonicalAccounts(): Promise<void> {
       continue;
     }
     const cur = rows[i];
+    if (!isHerve && cur.updated_by) continue;
     const nextRoles = [...seed.roles];
     const sameRoles =
       nextRoles.length === cur.roles.length && nextRoles.every((r) => cur.roles.includes(r));
@@ -322,6 +375,7 @@ export async function createEcUser(
   const rows = listEcUsers();
   rows.unshift(user);
   saveEcUsers(rows);
+  forgetDeletedLogins([user.email]);
   return user;
 }
 
@@ -423,11 +477,19 @@ export function createEcUserFromHash(input: {
   roles: EcUserRole[];
   commune?: OfficerCommune;
   createdBy?: string;
-}): EcUser {
+  /** Date d'activation de la source : ignorée si le compte a été supprimé après. */
+  sourceUpdatedAt?: string;
+}): EcUser | null {
   const email = input.email.trim().toLowerCase();
   const username = input.username?.trim().toLowerCase() || undefined;
   const existing = getEcUserByEmail(email) || (username ? getEcUserByLogin(username) : undefined);
   if (existing) return existing;
+  if (
+    isEcLoginDeleted(email, input.sourceUpdatedAt) ||
+    isEcLoginDeleted(username, input.sourceUpdatedAt)
+  ) {
+    return null;
+  }
   if (!input.roles.length) throw new Error("Choisissez au moins un rôle.");
   if (!input.fullName.trim()) throw new Error("Le nom complet est obligatoire.");
   if (input.roles.includes("SUPER_ADMIN_NATIONAL")) {
@@ -486,6 +548,77 @@ export function setEcUserActive(
   }
   rows[i] = { ...target, active };
   saveEcUsers(rows);
+}
+
+/** Modification d'un compte bureau par l'État civil national. */
+export async function updateEcUser(
+  actor: Pick<EcUser, "email" | "roles">,
+  id: string,
+  input: {
+    fullName: string;
+    email: string;
+    roles: EcUserRole[];
+    active: boolean;
+    /** Nouveau mot de passe (facultatif). */
+    password?: string;
+    commune?: OfficerCommune;
+  },
+): Promise<EcUser> {
+  if (!isSuperAdminNational(actor.roles)) {
+    throw new Error("Seul l'État civil national peut modifier les comptes.");
+  }
+  const rows = listEcUsers();
+  const i = rows.findIndex((u) => u.id === id);
+  if (i < 0) throw new Error("Compte introuvable.");
+  const target = rows[i];
+  if (!canActorManageUser(actor, target)) {
+    throw new Error("Ce compte ne peut pas être modifié (État civil national ou votre propre compte).");
+  }
+  const email = input.email.trim().toLowerCase();
+  if (!email.includes("@")) throw new Error("Indiquez un e-mail valide.");
+  if (!input.fullName.trim()) throw new Error("Le nom complet est obligatoire.");
+  if (!input.roles.length) throw new Error("Choisissez au moins un rôle.");
+  if (input.roles.includes("SUPER_ADMIN_NATIONAL")) {
+    throw new Error("Le rôle État civil national est réservé au compte national.");
+  }
+  if (rows.some((u) => u.id !== id && (u.email === email || u.username === email))) {
+    throw new Error("Cet e-mail est déjà utilisé.");
+  }
+  if (input.password && input.password.length < 8) {
+    throw new Error("Mot de passe : au moins 8 caractères.");
+  }
+  const next: EcUser = withCurrentRoleRules({
+    ...target,
+    fullName: input.fullName.trim(),
+    email,
+    roles: [...new Set(input.roles)],
+    active: input.active,
+    commune: input.commune ? { ...input.commune } : target.commune,
+    passwordHash: input.password ? await hashPassword(input.password) : target.passwordHash,
+    updated_at: new Date().toISOString(),
+    updated_by: actor.email,
+  });
+  rows[i] = next;
+  saveEcUsers(rows);
+  forgetDeletedLogins([email]);
+  if (target.email !== email) markDeletedLogins([target.email]);
+  return next;
+}
+
+/** Suppression définitive d'un compte bureau (le compte ne sera pas recréé automatiquement). */
+export function deleteEcUser(actor: Pick<EcUser, "email" | "roles">, id: string): EcUser {
+  if (!isSuperAdminNational(actor.roles)) {
+    throw new Error("Seul l'État civil national peut supprimer les comptes.");
+  }
+  const rows = listEcUsers();
+  const target = rows.find((u) => u.id === id);
+  if (!target) throw new Error("Compte introuvable.");
+  if (!canActorManageUser(actor, target)) {
+    throw new Error("Ce compte ne peut pas être supprimé (État civil national ou votre propre compte).");
+  }
+  saveEcUsers(rows.filter((u) => u.id !== id));
+  markDeletedLogins([target.email, target.username]);
+  return target;
 }
 
 export async function changeEcUserPassword(

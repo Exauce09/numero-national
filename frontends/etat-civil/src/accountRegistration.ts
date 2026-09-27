@@ -10,7 +10,9 @@ import { roleTitleFor } from "./rbac";
 import {
   createFacilityAccountFromHash,
   findFacilityByIdentifier,
+  findFacilityByRequestId,
   findFacilityByUsername,
+  isFacilityDeleted,
   rememberFacilityEmail,
   type FacilityAccountPublic,
 } from "./healthAuth";
@@ -798,6 +800,9 @@ export function provisionHospitalFacilityFromRequest(
     rememberFacilityEmail(req.login_id, req.email);
     return findFacilityByUsername(req.login_id);
   }
+  const linked = findFacilityByRequestId(req.id);
+  if (linked) return linked;
+  if (isFacilityDeleted([req.id, req.login_id, req.email], req.updated_at)) return null;
 
   const province = (req.province || "Kinshasa").trim();
   const commune = (req.commune_secteur || req.ville_territoire || "Gombe").trim();
@@ -845,6 +850,7 @@ export function provisionCivilUserFromRequest(req: AccountRegistrationRequest): 
       province: req.province || "Kinshasa",
     },
     createdBy: req.created_by_super_admin || "system:registration",
+    sourceUpdatedAt: req.updated_at,
   });
 }
 
@@ -961,7 +967,9 @@ export function resolveHealthLogin(identifier: string): HealthLoginResolution {
           ? req.login_id !== id
             ? `Mot de passe incorrect (identifiant du compte : ${req.login_id}).`
             : `Mot de passe incorrect pour « ${facility.facilityName} ».`
-          : "Inscription active mais la structure n'a pas pu être créée (province ou commune manquante). Recréez le compte.",
+          : isFacilityDeleted([req.id, req.login_id, req.email], req.updated_at)
+            ? "Ce compte a été supprimé par l'État civil national. Demandez la création d'un nouveau compte."
+            : "Inscription active mais la structure n'a pas pu être créée (province ou commune manquante). Recréez le compte.",
       };
     }
   }

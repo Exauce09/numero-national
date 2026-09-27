@@ -8,17 +8,23 @@ import {
   canActorManageUser,
   canManageEcUsers,
   createEcUser,
+  deleteEcUser,
   EC_ROLE_CATALOG,
   getEcUserByEmail,
   isProtectedPlatformAdmin,
   isSuperAdminNational,
   listEcUsers,
   setEcUserActive,
+  updateEcUser,
+  type EcUser,
   type EcUserRole,
 } from "../ecUsers";
 import {
+  deleteFacilityAccount,
   listFacilityAccounts,
   setFacilityAccountActive,
+  updateFacilityAccount,
+  type FacilityAccount,
   type FacilityAccountPublic,
 } from "../healthAuth";
 import PasswordField from "../components/PasswordField";
@@ -27,6 +33,38 @@ import { roleTitleFor } from "../rbac";
 function rolesLabel(roles: EcUserRole[]): string {
   return [...new Set(roles.map((r) => roleTitleFor([r])))].join(", ");
 }
+
+const FACILITY_TYPES: { value: FacilityAccount["facilityType"]; label: string }[] = [
+  { value: "HOPITAL", label: "Hôpital" },
+  { value: "CLINIQUE", label: "Clinique" },
+  { value: "CS", label: "Centre de santé" },
+  { value: "MATERNITE", label: "Maternité" },
+];
+
+type UserForm = {
+  id: string;
+  fullName: string;
+  email: string;
+  role: EcUserRole;
+  active: boolean;
+  password: string;
+};
+
+type FacilityForm = {
+  id: string;
+  facilityName: string;
+  facilityType: FacilityAccount["facilityType"];
+  username: string;
+  email: string;
+  province: string;
+  ville: string;
+  commune_name: string;
+  password: string;
+};
+
+type PendingDelete =
+  | { kind: "user"; user: EcUser }
+  | { kind: "facility"; facility: FacilityAccountPublic };
 
 export default function UsersEcPage() {
   const session = getSession();
@@ -88,6 +126,131 @@ export default function UsersEcPage() {
       setError(err instanceof Error ? err.message : "Création impossible");
     } finally {
       setBusy(false);
+    }
+  }
+
+  const [userForm, setUserForm] = useState<UserForm | null>(null);
+  const [facilityForm, setFacilityForm] = useState<FacilityForm | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const editRoleOptions = roleOptions.filter((r) => r.code !== "SUPER_ADMIN_NATIONAL");
+
+  function openUserEdit(u: EcUser) {
+    setFormError(null);
+    setUserForm({
+      id: u.id,
+      fullName: u.fullName,
+      email: u.email,
+      role: u.roles.find((r) => r !== "SUPER_ADMIN_NATIONAL" && r !== "ADMIN_PROVINCIAL") ??
+        (u.roles.includes("ADMIN_PROVINCIAL") ? "RESPONSABLE_BUREAU" : "AGENT_ETAT_CIVIL"),
+      active: u.active,
+      password: "",
+    });
+  }
+
+  function openFacilityEdit(f: FacilityAccountPublic) {
+    setFormError(null);
+    setFacilityForm({
+      id: f.id,
+      facilityName: f.facilityName,
+      facilityType: f.facilityType,
+      username: f.username,
+      email: f.email ?? "",
+      province: f.province,
+      ville: f.ville,
+      commune_name: f.commune_name,
+      password: "",
+    });
+  }
+
+  async function saveUserEdit(e: FormEvent) {
+    e.preventDefault();
+    if (!actor || !userForm) return;
+    setFormError(null);
+    setBusy(true);
+    try {
+      const saved = await updateEcUser(actor, userForm.id, {
+        fullName: userForm.fullName,
+        email: userForm.email,
+        roles: [userForm.role],
+        active: userForm.active,
+        password: userForm.password || undefined,
+      });
+      setMessage(`Compte modifié : ${saved.fullName} (${rolesLabel(saved.roles)})`);
+      setError(null);
+      setUserForm(null);
+      setBump((n) => n + 1);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Modification impossible");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveFacilityEdit(e: FormEvent) {
+    e.preventDefault();
+    if (!facilityForm) return;
+    const prev = facilities.find((f) => f.id === facilityForm.id);
+    if (!prev) return;
+    setFormError(null);
+    setBusy(true);
+    try {
+      const geoChanged =
+        prev.province !== facilityForm.province.trim() ||
+        prev.ville !== facilityForm.ville.trim() ||
+        prev.commune_name !== facilityForm.commune_name.trim();
+      const commune = facilityForm.commune_name.trim();
+      const saved = await updateFacilityAccount(facilityForm.id, {
+        username: facilityForm.username,
+        password: facilityForm.password || undefined,
+        facilityName: facilityForm.facilityName,
+        facilityType: facilityForm.facilityType,
+        email: facilityForm.email || undefined,
+        province: facilityForm.province,
+        ville: facilityForm.ville,
+        commune_name: commune,
+        commune_code: geoChanged ? commune.toUpperCase().replace(/\s+/g, "-") : prev.commune_code,
+        quartier_name: geoChanged ? undefined : prev.quartier_name,
+        district_name: geoChanged ? undefined : prev.district_name,
+        localite_name: geoChanged ? undefined : prev.localite_name,
+        geo_label: geoChanged
+          ? [commune, facilityForm.ville.trim(), facilityForm.province.trim()].filter(Boolean).join(" · ")
+          : prev.geo_label,
+        geo_mode: geoChanged
+          ? /kinshasa/i.test(facilityForm.province)
+            ? "kinshasa"
+            : "province"
+          : prev.geo_mode,
+      });
+      setMessage(`Structure modifiée : ${saved.facilityName} (@${saved.username})`);
+      setError(null);
+      setFacilityForm(null);
+      setBump((n) => n + 1);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Modification impossible");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function confirmDelete() {
+    if (!pendingDelete || !actor) return;
+    try {
+      if (pendingDelete.kind === "user") {
+        const removed = deleteEcUser(actor, pendingDelete.user.id);
+        setMessage(`Compte supprimé : ${removed.fullName} (${removed.email})`);
+      } else {
+        deleteFacilityAccount(pendingDelete.facility.id);
+        setMessage(
+          `Structure supprimée : ${pendingDelete.facility.facilityName} (@${pendingDelete.facility.username})`,
+        );
+      }
+      setError(null);
+      setBump((n) => n + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Suppression impossible");
+    } finally {
+      setPendingDelete(null);
     }
   }
 
@@ -217,21 +380,37 @@ export default function UsersEcPage() {
                 <td>{u.active ? "Actif" : "Désactivé"}</td>
                 <td>
                   {actor && canActorManageUser(actor, u) ? (
-                    <button
-                      type="button"
-                      className="btn-secondary btn-sm"
-                      onClick={() => {
-                        try {
-                          setEcUserActive(u.email, !u.active, actor);
-                          setError(null);
-                          setBump((n) => n + 1);
-                        } catch (err) {
-                          setError(err instanceof Error ? err.message : "Action refusée.");
-                        }
-                      }}
-                    >
-                      {u.active ? "Désactiver" : "Réactiver"}
-                    </button>
+                    <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        className="btn-secondary btn-sm"
+                        onClick={() => openUserEdit(u)}
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary btn-sm"
+                        onClick={() => {
+                          try {
+                            setEcUserActive(u.email, !u.active, actor);
+                            setError(null);
+                            setBump((n) => n + 1);
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : "Action refusée.");
+                          }
+                        }}
+                      >
+                        {u.active ? "Désactiver" : "Réactiver"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary btn-sm btn-danger"
+                        onClick={() => setPendingDelete({ kind: "user", user: u })}
+                      >
+                        Supprimer
+                      </button>
+                    </div>
                   ) : u.email === session?.username ? (
                     <span className="muted small">Vous</span>
                   ) : (
@@ -280,21 +459,37 @@ export default function UsersEcPage() {
                   <td>{f.geo_label || [f.commune_name, f.ville, f.province].filter(Boolean).join(" · ")}</td>
                   <td>{f.active ? "Actif" : "Désactivé"}</td>
                   <td>
-                    <button
-                      type="button"
-                      className="btn-secondary btn-sm"
-                      onClick={() => {
-                        try {
-                          setFacilityAccountActive(f.id, !f.active);
-                          setError(null);
-                          setBump((n) => n + 1);
-                        } catch (err) {
-                          setError(err instanceof Error ? err.message : "Action refusée.");
-                        }
-                      }}
-                    >
-                      {f.active ? "Désactiver" : "Réactiver"}
-                    </button>
+                    <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        className="btn-secondary btn-sm"
+                        onClick={() => openFacilityEdit(f)}
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary btn-sm"
+                        onClick={() => {
+                          try {
+                            setFacilityAccountActive(f.id, !f.active);
+                            setError(null);
+                            setBump((n) => n + 1);
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : "Action refusée.");
+                          }
+                        }}
+                      >
+                        {f.active ? "Désactiver" : "Réactiver"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary btn-sm btn-danger"
+                        onClick={() => setPendingDelete({ kind: "facility", facility: f })}
+                      >
+                        Supprimer
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -308,6 +503,243 @@ export default function UsersEcPage() {
               ) : null}
             </tbody>
           </table>
+        </div>
+      ) : null}
+
+      {userForm ? (
+        <div className="modal-backdrop" onClick={() => !busy && setUserForm(null)}>
+          <form
+            className="modal-panel form-grid"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => void saveUserEdit(e)}
+          >
+            <h3 className="full">Modifier le compte</h3>
+            {formError ? <div className="login-error full">{formError}</div> : null}
+            <div>
+              <label className="form-label">Nom complet *</label>
+              <input
+                className="form-control"
+                value={userForm.fullName}
+                onChange={(e) => setUserForm({ ...userForm, fullName: e.target.value })}
+                required
+                disabled={busy}
+              />
+            </div>
+            <div>
+              <label className="form-label">E-mail *</label>
+              <input
+                className="form-control"
+                type="email"
+                value={userForm.email}
+                onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+                required
+                disabled={busy}
+              />
+            </div>
+            <div>
+              <label className="form-label">Rôle *</label>
+              <select
+                className="form-control"
+                value={userForm.role}
+                onChange={(e) => setUserForm({ ...userForm, role: e.target.value as EcUserRole })}
+                disabled={busy}
+              >
+                {editRoleOptions.map((r) => (
+                  <option key={r.code} value={r.code}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Statut</label>
+              <select
+                className="form-control"
+                value={userForm.active ? "1" : "0"}
+                onChange={(e) => setUserForm({ ...userForm, active: e.target.value === "1" })}
+                disabled={busy}
+              >
+                <option value="1">Actif</option>
+                <option value="0">Désactivé</option>
+              </select>
+            </div>
+            <div className="full">
+              <PasswordField
+                label="Nouveau mot de passe (laisser vide pour ne pas changer)"
+                value={userForm.password}
+                onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+                minLength={8}
+                disabled={busy}
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="modal-actions full">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={busy}
+                onClick={() => setUserForm(null)}
+              >
+                Annuler
+              </button>
+              <button type="submit" className="btn-primary" style={{ width: "auto" }} disabled={busy}>
+                {busy ? "Enregistrement…" : "Enregistrer"}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {facilityForm ? (
+        <div className="modal-backdrop" onClick={() => !busy && setFacilityForm(null)}>
+          <form
+            className="modal-panel modal-wide form-grid"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => void saveFacilityEdit(e)}
+          >
+            <h3 className="full">Modifier la structure sanitaire</h3>
+            {formError ? <div className="login-error full">{formError}</div> : null}
+            <div>
+              <label className="form-label">Nom de la structure *</label>
+              <input
+                className="form-control"
+                value={facilityForm.facilityName}
+                onChange={(e) => setFacilityForm({ ...facilityForm, facilityName: e.target.value })}
+                required
+                disabled={busy}
+              />
+            </div>
+            <div>
+              <label className="form-label">Type *</label>
+              <select
+                className="form-control"
+                value={facilityForm.facilityType}
+                onChange={(e) =>
+                  setFacilityForm({
+                    ...facilityForm,
+                    facilityType: e.target.value as FacilityAccount["facilityType"],
+                  })
+                }
+                disabled={busy}
+              >
+                {FACILITY_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Identifiant *</label>
+              <input
+                className="form-control"
+                value={facilityForm.username}
+                onChange={(e) => setFacilityForm({ ...facilityForm, username: e.target.value })}
+                required
+                disabled={busy}
+              />
+            </div>
+            <div>
+              <label className="form-label">E-mail</label>
+              <input
+                className="form-control"
+                type="email"
+                value={facilityForm.email}
+                onChange={(e) => setFacilityForm({ ...facilityForm, email: e.target.value })}
+                disabled={busy}
+              />
+            </div>
+            <div>
+              <label className="form-label">Province *</label>
+              <input
+                className="form-control"
+                value={facilityForm.province}
+                onChange={(e) => setFacilityForm({ ...facilityForm, province: e.target.value })}
+                required
+                disabled={busy}
+              />
+            </div>
+            <div>
+              <label className="form-label">Ville / territoire</label>
+              <input
+                className="form-control"
+                value={facilityForm.ville}
+                onChange={(e) => setFacilityForm({ ...facilityForm, ville: e.target.value })}
+                disabled={busy}
+              />
+            </div>
+            <div>
+              <label className="form-label">Commune / secteur *</label>
+              <input
+                className="form-control"
+                value={facilityForm.commune_name}
+                onChange={(e) => setFacilityForm({ ...facilityForm, commune_name: e.target.value })}
+                required
+                disabled={busy}
+              />
+            </div>
+            <div>
+              <PasswordField
+                label="Nouveau mot de passe (facultatif)"
+                value={facilityForm.password}
+                onChange={(e) => setFacilityForm({ ...facilityForm, password: e.target.value })}
+                minLength={8}
+                disabled={busy}
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="modal-actions full">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={busy}
+                onClick={() => setFacilityForm(null)}
+              >
+                Annuler
+              </button>
+              <button type="submit" className="btn-primary" style={{ width: "auto" }} disabled={busy}>
+                {busy ? "Enregistrement…" : "Enregistrer"}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {pendingDelete ? (
+        <div className="modal-backdrop" onClick={() => setPendingDelete(null)}>
+          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
+            <h3>{pendingDelete.kind === "user" ? "Supprimer le compte" : "Supprimer la structure"}</h3>
+            <p>
+              Cette action est irréversible : le compte ne pourra plus se connecter et ne sera pas recréé
+              automatiquement.
+            </p>
+            <p>
+              {pendingDelete.kind === "user" ? (
+                <>
+                  <strong>{pendingDelete.user.fullName}</strong> — {pendingDelete.user.email} (
+                  {rolesLabel(pendingDelete.user.roles)})
+                </>
+              ) : (
+                <>
+                  <strong>{pendingDelete.facility.facilityName}</strong> —{" "}
+                  <code>@{pendingDelete.facility.username}</code>
+                </>
+              )}
+            </p>
+            <div className="modal-actions">
+              <button type="button" className="btn-secondary" onClick={() => setPendingDelete(null)}>
+                Annuler
+              </button>
+              <button
+                type="button"
+                className="btn-primary btn-danger"
+                style={{ width: "auto" }}
+                onClick={confirmDelete}
+              >
+                Confirmer la suppression
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
     </div>
