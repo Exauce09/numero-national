@@ -493,7 +493,7 @@ export default function RegisterAccountPage() {
                               accountType === "HOPITAL_MATERNITE"
                                 ? "ex. Hôpital / maternité / centre de santé de …"
                                 : accountType === "ADMIN_PROVINCIAL"
-                                  ? "ex. DIVINTER Kinshasa"
+                                  ? "ex. Divinter Kinshasa"
                                   : undefined
                             }
                           />

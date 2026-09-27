@@ -49,7 +49,7 @@ export const EC_ROLE_CATALOG: Array<{
   },
   {
     code: "ADMIN_PROVINCIAL",
-    label: "DIVINTER",
+    label: "Divinter",
     summary:
       "Division de l'intérieur / coordination provinciale : supervision des bureaux d'état civil et suivi.",
     canCreateUsers: true,
@@ -72,7 +72,7 @@ export const EC_ROLE_CATALOG: Array<{
   },
   {
     code: "AGENT_ETAT_CIVIL",
-    label: "Préposé à l'état civil",
+    label: "Préposé de l'état civil",
     summary: "Saisie et préparation des dossiers ; soumet à l'officier pour validation.",
     canCreateUsers: false,
     canValidateActs: false,

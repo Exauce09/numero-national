@@ -150,7 +150,7 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
   },
   {
     code: "AGENT_ETAT_CIVIL",
-    label: "Préposé à l'état civil",
+    label: "Préposé de l'état civil",
     summary: "Saisie des dossiers au bureau ; soumet à l'officier pour validation",
     institutional: true,
     portal: "civil",
@@ -160,7 +160,7 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     showMatricule: true,
     showFonction: true,
     fonctionOptions: [
-      "Préposé à l'état civil",
+      "Préposé de l'état civil",
       "Agent de saisie",
       "Agent d'accueil",
       "Agent guichet naissances",
@@ -198,24 +198,24 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
   },
   {
     code: "ADMIN_PROVINCIAL",
-    label: "DIVINTER",
+    label: "Divinter",
     summary:
       "Division de l'intérieur / coordination provinciale : supervision des bureaux d'état civil et suivi",
     institutional: true,
     portal: "civil",
     assignRoles: ["ADMIN_PROVINCIAL"],
-    institutionLabel: "DIVINTER — division provinciale",
+    institutionLabel: "Divinter — division provinciale",
     institutionSelect: "free",
     showMatricule: true,
     showFonction: true,
     fonctionOptions: [
-      "Directeur(trice) DIVINTER",
-      "Chef de division DIVINTER",
-      "Cadre DIVINTER",
+      "Directeur(trice) Divinter",
+      "Chef de division Divinter",
+      "Cadre Divinter",
     ],
     showService: true,
     serviceOptions: [
-      "DIVINTER",
+      "Divinter",
       "Coordination provinciale",
       "Inspection provinciale",
     ],
