@@ -425,6 +425,13 @@ export function getHealthSession(): HealthSession | null {
   }
 }
 
+/** Session ouverte avant le renommage du rôle : applique le titre actuel. */
+export function refreshHealthSessionRoleTitle(): void {
+  const cur = getHealthSession();
+  if (!cur || cur.roleTitle === HEALTH_ROLE_TITLE) return;
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ ...cur, roleTitle: HEALTH_ROLE_TITLE }));
+}
+
 export function clearHealthSession() {
   sessionStorage.removeItem(SESSION_KEY);
 }

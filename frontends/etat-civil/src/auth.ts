@@ -1,6 +1,7 @@
 import { applyAccountCommune, assignOfficerAccount } from "./accounts";
-import { mapLoginError, roleTitleFor } from "./rbac";
+import { isDivinterViewer, mapLoginError, roleTitleFor } from "./rbac";
 import {
+  applyCurrentRoleRules,
   ensureBootstrapSuperAdmin,
   ensureCanonicalAccounts,
   permissionsForRoles,
@@ -81,6 +82,22 @@ export function updateSession(patch: Partial<Session>): Session | null {
   const next = { ...cur, ...patch };
   sessionStorage.setItem(KEY, JSON.stringify(next));
   return next;
+}
+
+/** Comptes créés avant les changements de rôles : attributions et session ouverte mises à jour. */
+export function migrateAccountsToCurrentRoles(): void {
+  const users = applyCurrentRoleRules();
+  const cur = getSession();
+  if (!cur?.username) return;
+  const local = users.find((u) => u.email.toLowerCase() === cur.username.toLowerCase());
+  if (!local) return;
+  const roles = local.roles as string[];
+  updateSession({
+    roles,
+    permissions: permissionsForRoles(roles),
+    roleTitle: roleTitleFor(roles),
+    displayName: cur.displayName || local.fullName,
+  });
 }
 
 async function fetchMe(accessToken: string): Promise<{
@@ -165,6 +182,10 @@ export async function login(username: string, password: string): Promise<Session
         if (me?.permissions?.length) session.permissions = me.permissions;
         if (me?.full_name) session.displayName = me.full_name;
         if (me?.id) session.userId = me.id;
+        if (isDivinterViewer(session.roles) || isDivinterViewer(local.roles)) {
+          session.roles = local.roles as string[];
+          session.permissions = permissionsForRoles(local.roles);
+        }
         session.roleTitle = roleTitleFor(session.roles ?? local.roles);
       }
     } else {

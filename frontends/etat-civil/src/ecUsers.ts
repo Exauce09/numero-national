@@ -182,6 +182,12 @@ export async function ensureCanonicalAccounts(): Promise<void> {
     }
   }
 
+  const migrated = rows.map(withCurrentRoleRules);
+  if (migrated.some((u, i) => u !== rows[i])) {
+    rows = migrated;
+    changed = true;
+  }
+
   // Hervé seul SUPER_ADMIN : retirer le rôle des autres comptes.
   const herveEmail = CANONICAL_EC_ACCOUNTS[0].email.toLowerCase();
   rows = rows.map((u) => {
@@ -195,6 +201,27 @@ export async function ensureCanonicalAccounts(): Promise<void> {
   });
 
   if (changed) saveEcUsers(rows);
+}
+
+const DIVINTER_ROLES: EcUserRole[] = ["RESPONSABLE_BUREAU", "ADMIN_PROVINCIAL"];
+
+/** Règles de rôle en vigueur : le divinter consulte seulement (pas de cumul officier / préposé). */
+function withCurrentRoleRules(user: EcUser): EcUser {
+  if (user.roles.includes("SUPER_ADMIN_NATIONAL")) return user;
+  if (!user.roles.some((r) => DIVINTER_ROLES.includes(r))) return user;
+  const next = Array.from(
+    new Set(user.roles.filter((r) => DIVINTER_ROLES.includes(r) || r === "AUDITEUR")),
+  ) as EcUserRole[];
+  if (next.length === user.roles.length && next.every((r) => user.roles.includes(r))) return user;
+  return { ...user, roles: next };
+}
+
+/** Applique les attributions actuelles aux comptes créés avant les changements de rôles. */
+export function applyCurrentRoleRules(): EcUser[] {
+  const rows = listEcUsers();
+  const next = rows.map(withCurrentRoleRules);
+  if (next.some((u, i) => u !== rows[i])) saveEcUsers(next);
+  return next;
 }
 
 export async function hashPassword(password: string): Promise<string> {
