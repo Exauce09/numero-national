@@ -232,7 +232,7 @@ export default function ManageActsPage({
   const [q, setQ] = useState("");
   const focusParam = searchParams.get("focus");
   const [statusFocus, setStatusFocus] = useState<"all" | "drafts" | "validated">(() =>
-    focusParam === "drafts" ? "drafts" : "validated",
+    focusParam === "validated" ? "validated" : focusParam === "all" ? "all" : "drafts",
   );
   const listRef = useRef<HTMLDivElement | null>(null);
   const [monthFilter, setMonthFilter] = useState("");
@@ -255,7 +255,7 @@ export default function ManageActsPage({
   function goToListFocus(focus: "all" | "drafts" | "validated") {
     setStatusFocus(focus);
     const next = new URLSearchParams(searchParams);
-    if (focus === "all") next.delete("focus");
+    if (focus === "all") next.set("focus", "all");
     else next.set("focus", focus);
     setSearchParams(next, { replace: true });
     if (focus === "drafts" || focus === "validated") {
@@ -593,7 +593,9 @@ export default function ManageActsPage({
                 {pageRows.length === 0 ? (
                   <tr>
                     <td colSpan={6 + (primary ? 1 : 0) + (secondary ? 1 : 0) + (tertiary ? 1 : 0)} className="muted">
-                      Aucun enregistrement. Cliquez « + Ajouter » pour créer.
+                      {statusFocus === "drafts"
+                        ? "Aucun dossier à valider pour le moment."
+                        : "Aucun enregistrement. Cliquez « + Ajouter » pour créer."}
                     </td>
                   </tr>
                 ) : (

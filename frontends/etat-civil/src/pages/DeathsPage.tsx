@@ -1,6 +1,8 @@
 import { FormEvent, useState } from "react";
+import { Link } from "react-router-dom";
 import ActFormShell from "../components/ActFormShell";
 import ActPrintCard from "../components/ActPrintCard";
+import ActWorkflowPanel from "../components/ActWorkflowPanel";
 import GeoCascade, { GEO_PRESETS, type GeoSelection } from "../components/GeoCascade";
 import GeoPlaceLookup from "../components/GeoPlaceLookup";
 import GpsLocatePanel, { applyGpsToGeo } from "../components/GpsLocatePanel";
@@ -461,7 +463,18 @@ export default function DeathsPage({ health }: { health?: HealthFormContext } = 
 
       {created ? (
         <div className="panel" style={{ marginTop: "1rem" }}>
-          <div className="success-banner">Décès enregistré</div>
+          <div className="success-banner">
+            Décès enregistré en brouillon — validez-le ci-dessous ou dans la liste Décès.
+          </div>
+          <p className="muted small">
+            Un acte d&apos;état civil n&apos;apparaît dans les totaux / indicateurs qu&apos;après
+            validation.{" "}
+            <Link to="/manage/deces?focus=drafts">Voir les décès à valider →</Link>
+          </p>
+          <ActWorkflowPanel
+            act={created}
+            onUpdated={(a) => setCreated(a)}
+          />
           <ActPrintCard act={created} />
         </div>
       ) : null}
