@@ -820,6 +820,77 @@ export function findDuplicateBirthAct(input: {
   });
 }
 
+function sameKey(a: unknown, b: unknown): boolean {
+  const x = String(a ?? "").trim();
+  return Boolean(x) && x === String(b ?? "").trim();
+}
+
+function sameText(a: unknown, b: unknown): boolean {
+  const x = normIdentity(String(a ?? ""));
+  return Boolean(x) && x === normIdentity(String(b ?? ""));
+}
+
+/** Clés métier d'unicité par type d'acte (hors actes rejetés). */
+export function findDuplicateAct(
+  type: ActType,
+  payload: Record<string, unknown>,
+  subjectNic?: string,
+): Act | undefined {
+  const p = payload;
+  const all = listActs();
+  const divorcedMarriageRefs = new Set(
+    all
+      .filter((a) => a.type === "DIVORCE" && String(a.status ?? "").toUpperCase() !== "REJECTED")
+      .flatMap((a) => [a.payload.numero_mariage, a.payload.acte_mariage_ref])
+      .map((v) => String(v ?? "").trim())
+      .filter(Boolean),
+  );
+  return all.find((a) => {
+    if (a.type !== type) return false;
+    if (String(a.status ?? "").toUpperCase() === "REJECTED") return false;
+    const q = a.payload ?? {};
+    if (sameKey(p.declaration_id, q.declaration_id)) return true;
+    switch (type) {
+      case "BIRTH":
+        if (sameKey(p.child_id, q.child_id)) return true;
+        return (
+          sameKey(p.mother_id, q.mother_id) &&
+          sameText(p.nom, q.nom) &&
+          sameText(p.prenom, q.prenom) &&
+          normIdentity(String(p.postnom ?? "")) === normIdentity(String(q.postnom ?? "")) &&
+          sameKey(p.date_naissance, q.date_naissance)
+        );
+      case "DEATH":
+        if (sameKey(p.deceased_id, q.deceased_id)) return true;
+        if (subjectNic && !subjectNic.startsWith("HOSP-") && sameKey(subjectNic, a.national_id)) {
+          return true;
+        }
+        return sameText(p.deceased_name, q.deceased_name) && sameKey(p.date_deces, q.date_deces);
+      case "MARRIAGE": {
+        const samePair =
+          (sameKey(p.epoux_id, q.epoux_id) && sameKey(p.epouse_id, q.epouse_id)) ||
+          (sameKey(p.epoux_id, q.epouse_id) && sameKey(p.epouse_id, q.epoux_id));
+        return samePair && !divorcedMarriageRefs.has(a.act_number);
+      }
+      case "DIVORCE":
+        return (
+          sameKey(p.numero_mariage ?? p.acte_mariage_ref, q.numero_mariage ?? q.acte_mariage_ref) ||
+          (sameText(p.tribunal, q.tribunal) && sameText(p.numero_jugement, q.numero_jugement))
+        );
+      case "ADOPTION":
+        return sameKey(p.enfant_id, q.enfant_id) && sameKey(p.adoptant_id, q.adoptant_id);
+      case "RECOGNITION":
+        return sameKey(p.enfant_id, q.enfant_id) && sameKey(p.declarant_id, q.declarant_id);
+      default:
+        return false;
+    }
+  });
+}
+
+export function duplicateActMessage(type: ActType, existing: Act): string {
+  return `Doublon refusé : un acte de ${actTypeLabel(type).toLowerCase()} existe déjà pour ces personnes (n° ${existing.act_number}, ${String(existing.status ?? "brouillon").toLowerCase()}).`;
+}
+
 export function updatePerson(id: string, patch: Partial<Person>): Person | undefined {
   const registry = load();
   const idx = registry.persons.findIndex((p) => p.id === id);
@@ -1130,6 +1201,23 @@ export class CivilAuthError extends Error {
   }
 }
 
+export class CivilDuplicateError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CivilDuplicateError";
+  }
+}
+
+function apiErrorDetail(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw) as { detail?: unknown };
+    if (typeof parsed.detail === "string") return parsed.detail;
+  } catch {
+    /* texte brut */
+  }
+  return raw;
+}
+
 async function tryPostCivil(
   type: ActType,
   payload: Record<string, unknown>
@@ -1160,6 +1248,9 @@ async function tryPostCivil(
   });
   if (!res.ok) {
     const detail = await res.text();
+    if (res.status === 409) {
+      throw new CivilDuplicateError(apiErrorDetail(detail) || "Doublon refusé par le serveur.");
+    }
     const authFail =
       res.status === 401 ||
       res.status === 403 ||
@@ -1184,7 +1275,21 @@ export async function addAct(
   payload: Record<string, unknown>,
   subjectNic: string
 ): Promise<Act> {
-  if (CIVIL_WORKFLOW_TYPES.has(type)) payload = withOfficerCommune(payload);
+  if (CIVIL_WORKFLOW_TYPES.has(type)) {
+    payload = withOfficerCommune(payload);
+    const dup = findDuplicateAct(type, payload, subjectNic);
+    if (dup) throw new Error(duplicateActMessage(type, dup));
+    if (type === "MARRIAGE") {
+      const busy = [payload.epoux_id, payload.epouse_id]
+        .map((pid) => (pid ? getActiveMarriage(String(pid)) : undefined))
+        .find(Boolean);
+      if (busy) {
+        throw new Error(
+          `Doublon refusé : un des époux est déjà marié (acte ${busy.act_number}). Un divorce est requis.`,
+        );
+      }
+    }
+  }
   const registry = load();
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
@@ -1251,6 +1356,11 @@ export async function addAct(
       }
     }
   } catch (err) {
+    if (err instanceof CivilDuplicateError) {
+      registry.acts = registry.acts.filter((a) => a.id !== id);
+      save(registry);
+      throw err;
+    }
     if (err instanceof CivilAuthError) {
       const idx = registry.acts.findIndex((a) => a.id === id);
       if (idx >= 0) {

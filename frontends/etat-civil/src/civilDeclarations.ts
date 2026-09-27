@@ -1,6 +1,7 @@
 /** Déclarations hôpital → état civil (API prioritaire, localStorage secours). */
 
-import { api } from "./api";
+import { api, ApiConflictError } from "./api";
+import { duplicateActMessage, findDuplicateAct } from "./registry";
 
 export type CivilDeclaration = {
   id: string;
@@ -117,11 +118,50 @@ export function declarationRef(d: { id: string; payload?: Record<string, unknown
   return String(n).padStart(10, "0").slice(0, 10);
 }
 
+function norm(v: unknown): string {
+  return String(v ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function sameVal(a: unknown, b: unknown): boolean {
+  const x = norm(a);
+  return Boolean(x) && x === norm(b);
+}
+
+/** Déclaration déjà transmise (en attente ou validée) pour la même personne. */
+export function findDuplicateDeclaration(
+  type: "BIRTH" | "DEATH",
+  payload: Record<string, unknown>,
+): CivilDeclaration | undefined {
+  return loadDemo().declarations.find((d) => {
+    if (d.declaration_type !== type || d.status === "REJECTED") return false;
+    const q = d.payload ?? {};
+    if (type === "DEATH") {
+      if (sameVal(payload.deceased_id, q.deceased_id)) return true;
+      return sameVal(payload.deceased_name, q.deceased_name) && sameVal(payload.date_deces, q.date_deces);
+    }
+    return (
+      sameVal(payload.mother_id, q.mother_id) &&
+      sameVal(payload.child_nom ?? payload.nom, q.child_nom ?? q.nom) &&
+      sameVal(payload.child_prenom ?? payload.prenom, q.child_prenom ?? q.prenom) &&
+      norm(payload.child_postnom ?? payload.postnom) === norm(q.child_postnom ?? q.postnom) &&
+      sameVal(payload.date_naissance, q.date_naissance)
+    );
+  });
+}
+
 export async function notifyEtatCivil(input: {
   type: "BIRTH" | "DEATH";
   payload: Record<string, unknown>;
   facilityName: string;
 }): Promise<CivilDeclaration> {
+  const dupDecl = findDuplicateDeclaration(input.type, input.payload);
+  if (dupDecl) {
+    throw new Error(
+      `Doublon refusé : cette ${input.type === "DEATH" ? "notification de décès" : "notification de naissance"} a déjà été transmise (réf. ${declarationRef(dupDecl)}).`,
+    );
+  }
+  const dupAct = findDuplicateAct(input.type, input.payload);
+  if (dupAct) throw new Error(duplicateActMessage(input.type, dupAct));
   const ref = String(input.payload.ref_notification ?? "").trim() || nextNotificationRef();
   const payload = {
     ...input.payload,
@@ -160,7 +200,8 @@ export async function notifyEtatCivil(input: {
       "/declarations",
     );
     return decl;
-  } catch {
+  } catch (err) {
+    if (err instanceof ApiConflictError) throw err;
     const decl: CivilDeclaration = {
       id: crypto.randomUUID(),
       source: "HOSPITAL",

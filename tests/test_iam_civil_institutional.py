@@ -343,6 +343,59 @@ async def test_divorce_does_not_delete_marriage(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_duplicate_death_act_refused(client: AsyncClient) -> None:
+    officer_h, _ = await _register_role(client, "CIVIL_OFFICER")
+    deceased_id = str(uuid.uuid4())
+    name = f"Dup Test {deceased_id[:8]}"
+    body = {
+        "commune_code": "KIN-GOMBE",
+        "payload": {"deceased_id": deceased_id, "deceased_name": name, "date_deces": "2026-09-01"},
+        "status": "DRAFT",
+    }
+    first = await client.post("/api/v1/civil/deaths", headers=officer_h, json=body)
+    assert first.status_code in {200, 201}, first.text
+    second = await client.post("/api/v1/civil/deaths", headers=officer_h, json=body)
+    assert second.status_code == 409, second.text
+    assert "Doublon" in second.text
+
+    renamed = {
+        **body,
+        "payload": {"deceased_name": f"  {name.upper()}  ", "date_deces": "2026-09-01"},
+    }
+    third = await client.post("/api/v1/civil/deaths", headers=officer_h, json=renamed)
+    assert third.status_code == 409, third.text
+
+
+@pytest.mark.asyncio
+async def test_duplicate_divorce_same_marriage_refused(client: AsyncClient) -> None:
+    officer_h, _ = await _register_role(client, "CIVIL_OFFICER")
+    ref = f"MAR-{uuid.uuid4().hex[:8]}"
+    body = {
+        "commune_code": "KIN-GOMBE",
+        "payload": {"numero_mariage": ref, "tribunal": "TGI Gombe", "numero_jugement": ref},
+        "status": "DRAFT",
+    }
+    first = await client.post("/api/v1/civil/divorces", headers=officer_h, json=body)
+    assert first.status_code in {200, 201}, first.text
+    second = await client.post("/api/v1/civil/divorces", headers=officer_h, json=body)
+    assert second.status_code == 409, second.text
+
+
+@pytest.mark.asyncio
+async def test_duplicate_hospital_declaration_refused(client: AsyncClient) -> None:
+    officer_h, _ = await _register_role(client, "CIVIL_OFFICER")
+    body = {
+        "source": "HOSPITAL",
+        "declaration_type": "DEATH",
+        "payload": {"deceased_id": str(uuid.uuid4()), "deceased_name": "Decl Dup"},
+    }
+    first = await client.post("/api/v1/civil/declarations", headers=officer_h, json=body)
+    assert first.status_code == 201, first.text
+    second = await client.post("/api/v1/civil/declarations", headers=officer_h, json=body)
+    assert second.status_code == 409, second.text
+
+
+@pytest.mark.asyncio
 async def test_deprecated_displacement_write_blocked(client: AsyncClient) -> None:
     officer_h, _ = await _register_role(client, "CIVIL_OFFICER")
     bad = await client.post(

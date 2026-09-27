@@ -162,9 +162,18 @@ async function request<T>(path: string, init?: RequestInit, retried = false): Pr
         "Acte introuvable sur le serveur (non synchronisé, recensement hors workflow civil, ou base réinitialisée).",
       );
     }
+    if (res.status === 409) throw new ApiConflictError(detail || "Doublon refusé par le serveur.");
     throw new Error(detail || `Erreur HTTP ${res.status}`);
   }
   return (await res.json()) as T;
+}
+
+/** 409 serveur (doublon, transition illégale) — ne jamais basculer en enregistrement local. */
+export class ApiConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ApiConflictError";
+  }
 }
 
 export const api = {

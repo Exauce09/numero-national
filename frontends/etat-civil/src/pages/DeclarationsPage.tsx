@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import ActsDocsNav from "../components/ActsDocsNav";
 import {
   api,
+  ApiConflictError,
   demoListDeclarations,
   demoValidateDeclaration,
   type Declaration,
@@ -230,12 +231,19 @@ export default function DeclarationsPage() {
           href: manageHref,
         });
       }
-    } catch {
+    } catch (apiErr) {
+      if (apiErr instanceof ApiConflictError) {
+        setError(apiErr.message);
+        setBusy(false);
+        return;
+      }
       if (!reject && d) {
         try {
           await applyToRegistry(d);
         } catch (err) {
-          setError(err instanceof Error ? err.message : "Validation locale partielle.");
+          setError(err instanceof Error ? err.message : "Validation locale impossible.");
+          setBusy(false);
+          return;
         }
       }
       demoValidateDeclaration(id, reject);

@@ -201,6 +201,157 @@ async def search_population(
     return hits
 
 
+# Clés métier d'unicité : (clés obligatoires, clés comparées vides incluses).
+_ACT_DUPLICATE_RULES: dict[str, list[tuple[tuple[str, ...], tuple[str, ...]]]] = {
+    "BIRTH": [
+        (("child_id",), ()),
+        (("mother_id", "nom", "prenom", "date_naissance"), ("postnom",)),
+    ],
+    "DEATH": [
+        (("deceased_id",), ()),
+        (("citizen_id",), ()),
+        (("deceased_name", "date_deces"), ()),
+    ],
+    "DIVORCE": [
+        (("numero_mariage",), ()),
+        (("acte_mariage_ref",), ()),
+        (("tribunal", "numero_jugement"), ()),
+    ],
+    "ADOPTION": [(("enfant_id", "adoptant_id"), ())],
+    "RECOGNITION": [(("enfant_id", "declarant_id"), ())],
+}
+
+_DECLARATION_DUPLICATE_RULES: dict[str, list[tuple[tuple[str, ...], tuple[str, ...]]]] = {
+    "DEATH": [
+        (("deceased_id",), ()),
+        (("deceased_name", "date_deces"), ()),
+    ],
+    "BIRTH": [
+        (("mother_id", "child_nom", "child_prenom", "date_naissance"), ("child_postnom",)),
+    ],
+}
+
+
+def _norm_key(v: Any) -> str:
+    return " ".join(str(v if v is not None else "").split()).lower()
+
+
+def _json_text(column: Any, key: str) -> Any:
+    return func.lower(func.trim(func.coalesce(column[key].astext, "")))
+
+
+def _rule_clauses(
+    column: Any,
+    payload: dict[str, Any],
+    rules: list[tuple[tuple[str, ...], tuple[str, ...]]],
+) -> list[Any]:
+    from sqlalchemy import and_
+
+    clauses = []
+    for required, optional in rules:
+        values = {k: _norm_key(payload.get(k)) for k in required}
+        if not all(values.values()):
+            continue
+        parts = [_json_text(column, k) == v for k, v in values.items()]
+        parts += [_json_text(column, k) == _norm_key(payload.get(k)) for k in optional]
+        clauses.append(and_(*parts))
+    return clauses
+
+
+async def find_duplicate_act(
+    db: AsyncSession,
+    act_type: str,
+    payload: dict[str, Any],
+    *,
+    citizen_id: uuid.UUID | None = None,
+    exclude_act_id: uuid.UUID | None = None,
+) -> CivilAct | None:
+    """Acte non rejeté portant la même clé métier (doublon refusé)."""
+    base = [
+        CivilAct.act_type == act_type,
+        CivilAct.deleted_at.is_(None),
+        CivilAct.status != ActStatus.REJECTED.value,
+    ]
+    if exclude_act_id is not None:
+        base.append(CivilAct.id != exclude_act_id)
+
+    if act_type == ActType.MARRIAGE.value:
+        epoux = _norm_key(payload.get("epoux_id"))
+        epouse = _norm_key(payload.get("epouse_id"))
+        if not (epoux and epouse):
+            return None
+        pair = or_(
+            (_json_text(CivilAct.payload, "epoux_id") == epoux)
+            & (_json_text(CivilAct.payload, "epouse_id") == epouse),
+            (_json_text(CivilAct.payload, "epoux_id") == epouse)
+            & (_json_text(CivilAct.payload, "epouse_id") == epoux),
+        )
+        marriages = (await db.execute(select(CivilAct).where(*base, pair))).scalars().all()
+        for m in marriages:
+            ref = m.act_number.strip().lower()
+            divorced = (
+                await db.execute(
+                    select(CivilAct.id)
+                    .where(
+                        CivilAct.act_type == ActType.DIVORCE.value,
+                        CivilAct.deleted_at.is_(None),
+                        CivilAct.status != ActStatus.REJECTED.value,
+                        or_(
+                            _json_text(CivilAct.payload, "numero_mariage") == ref,
+                            _json_text(CivilAct.payload, "acte_mariage_ref") == ref,
+                        ),
+                    )
+                    .limit(1)
+                )
+            ).scalar_one_or_none()
+            if divorced is None:
+                return m
+        return None
+
+    clauses = _rule_clauses(CivilAct.payload, payload, _ACT_DUPLICATE_RULES.get(act_type, []))
+    decl_id = _norm_key(payload.get("declaration_id"))
+    if decl_id:
+        clauses.append(_json_text(CivilAct.payload, "declaration_id") == decl_id)
+    if act_type == ActType.DEATH.value and citizen_id is not None:
+        clauses.append(CivilAct.citizen_id == citizen_id)
+    if not clauses:
+        return None
+    return (
+        await db.execute(select(CivilAct).where(*base, or_(*clauses)).limit(1))
+    ).scalar_one_or_none()
+
+
+async def find_duplicate_declaration(
+    db: AsyncSession,
+    declaration_type: str,
+    payload: dict[str, Any],
+) -> CivilDeclaration | None:
+    clauses = _rule_clauses(
+        CivilDeclaration.payload,
+        payload,
+        _DECLARATION_DUPLICATE_RULES.get(declaration_type, []),
+    )
+    if not clauses:
+        return None
+    return (
+        await db.execute(
+            select(CivilDeclaration)
+            .where(
+                CivilDeclaration.declaration_type == declaration_type,
+                CivilDeclaration.status != DeclarationStatus.REJECTED.value,
+                or_(*clauses),
+            )
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+
+def _duplicate_http_error(what: str, ref: str) -> Exception:
+    from fastapi import HTTPException
+
+    return HTTPException(status_code=409, detail=f"Doublon refusé : {what} existe déjà ({ref}).")
+
+
 async def create_act(
     db: AsyncSession,
     data: CivilActCreate,
@@ -233,6 +384,12 @@ async def create_act(
             status_code=400,
             detail="Acts must be created as DRAFT; use POST /civil/acts/{id}/transition to validate",
         )
+
+    dup = await find_duplicate_act(
+        db, data.act_type.value, dict(data.payload or {}), citizen_id=data.citizen_id
+    )
+    if dup is not None:
+        raise _duplicate_http_error("un acte identique", f"acte n° {dup.act_number}, {dup.status}")
 
     number = data.act_number or await allocate_act_number(
         db, commune_code=data.commune_code, act_type=data.act_type.value
@@ -818,6 +975,19 @@ async def create_declaration(
     data: DeclarationCreate,
 ) -> tuple[CivilDeclaration, dict[str, Any]]:
     """Receive hospital/commune declaration and emit notification workflow status."""
+    payload_in = dict(data.payload or {})
+    dup_decl = await find_duplicate_declaration(db, data.declaration_type.value, payload_in)
+    if dup_decl is not None:
+        ref = str((dup_decl.payload or {}).get("ref_notification") or dup_decl.id)
+        raise _duplicate_http_error("cette déclaration", f"réf. {ref}, {dup_decl.status}")
+    act_type = (
+        ActType.BIRTH.value
+        if data.declaration_type.value == DeclarationType.BIRTH.value
+        else ActType.DEATH.value
+    )
+    dup_act = await find_duplicate_act(db, act_type, payload_in)
+    if dup_act is not None:
+        raise _duplicate_http_error("un acte pour cette personne", f"acte n° {dup_act.act_number}")
     decl = CivilDeclaration(
         source=data.source.value,
         declaration_type=data.declaration_type.value,
@@ -1342,6 +1512,11 @@ async def validate_declaration(
         if act.status == ActStatus.DRAFT.value:
             act.status = ActStatus.SUBMITTED.value
     else:
+        dup = await find_duplicate_act(db, act_type.value, payload, citizen_id=citizen_id)
+        if dup is not None:
+            raise _duplicate_http_error(
+                "un acte pour cette personne", f"acte n° {dup.act_number}, {dup.status}"
+            )
         act = CivilAct(
             act_type=act_type.value,
             act_number=body.act_number
