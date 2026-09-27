@@ -128,21 +128,10 @@ export const EC_ROLE_CATALOG: Array<{
     canCreateUsers: false,
     canValidateActs: false,
   },
-  {
-    code: "GREFFIER",
-    label: "Greffier",
-    summary: "Greffe judiciaire — consultation et transcriptions liées aux jugements.",
-    canCreateUsers: false,
-    canValidateActs: false,
-  },
-  {
-    code: "JUGE",
-    label: "Juge",
-    summary: "Décisions judiciaires (supplétif, etc.) — consultation et références.",
-    canCreateUsers: false,
-    canValidateActs: false,
-  },
 ];
+
+/** Rôles retirés du portail : ôtés des comptes existants. */
+const RETIRED_ROLES: EcUserRole[] = ["GREFFIER", "JUGE"];
 
 /** Rôles du tout premier compte (legacy — préférer ensureCanonicalAccounts). */
 export const FIRST_USER_ROLES: EcUserRole[] = ["SUPER_ADMIN_NATIONAL"];
@@ -235,9 +224,9 @@ export async function ensureCanonicalAccounts(): Promise<void> {
     }
   }
 
-  const migrated = rows.map(withCurrentRoleRules);
-  if (migrated.some((u, i) => u !== rows[i])) {
-    rows = migrated;
+  const migrated = applyRulesToRows(rows);
+  if (migrated.changed) {
+    rows = migrated.rows;
     changed = true;
   }
 
@@ -260,21 +249,29 @@ const DIVINTER_ROLES: EcUserRole[] = ["RESPONSABLE_BUREAU", "ADMIN_PROVINCIAL"];
 
 /** Règles de rôle en vigueur : le divinter consulte seulement (pas de cumul officier / préposé). */
 function withCurrentRoleRules(user: EcUser): EcUser {
-  if (user.roles.includes("SUPER_ADMIN_NATIONAL")) return user;
-  if (!user.roles.some((r) => DIVINTER_ROLES.includes(r))) return user;
-  const next = Array.from(
-    new Set(user.roles.filter((r) => DIVINTER_ROLES.includes(r) || r === "AUDITEUR")),
-  ) as EcUserRole[];
+  let next = user.roles.filter((r) => !RETIRED_ROLES.includes(r));
+  if (!next.includes("SUPER_ADMIN_NATIONAL") && next.some((r) => DIVINTER_ROLES.includes(r))) {
+    next = next.filter((r) => DIVINTER_ROLES.includes(r) || r === "AUDITEUR");
+  }
+  next = Array.from(new Set(next));
   if (next.length === user.roles.length && next.every((r) => user.roles.includes(r))) return user;
   return { ...user, roles: next };
 }
 
+/** Règles appliquées à la liste ; les comptes sans rôle restant (ex. greffier, juge) sont retirés. */
+function applyRulesToRows(rows: EcUser[]): { rows: EcUser[]; changed: boolean } {
+  const mapped = rows.map(withCurrentRoleRules);
+  const removed = mapped.filter((u) => !u.roles.length);
+  if (removed.length) markDeletedLogins(removed.flatMap((u) => [u.email, u.username]));
+  const next = mapped.filter((u) => u.roles.length);
+  return { rows: next, changed: removed.length > 0 || mapped.some((u, i) => u !== rows[i]) };
+}
+
 /** Applique les attributions actuelles aux comptes créés avant les changements de rôles. */
 export function applyCurrentRoleRules(): EcUser[] {
-  const rows = listEcUsers();
-  const next = rows.map(withCurrentRoleRules);
-  if (next.some((u, i) => u !== rows[i])) saveEcUsers(next);
-  return next;
+  const { rows, changed } = applyRulesToRows(listEcUsers());
+  if (changed) saveEcUsers(rows);
+  return rows;
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -358,6 +355,9 @@ export async function createEcUser(
   }
   const email = input.email.trim().toLowerCase();
   if (getEcUserByEmail(email)) throw new Error("Cet e-mail est déjà utilisé.");
+  if (input.roles.some((r) => RETIRED_ROLES.includes(r))) {
+    throw new Error("Les rôles Greffier et Juge ne sont plus disponibles.");
+  }
   if (!input.roles.length) throw new Error("Choisissez au moins un rôle.");
   if (input.password.length < 8) throw new Error("Mot de passe : au moins 8 caractères.");
   if (!input.fullName.trim()) throw new Error("Le nom complet est obligatoire.");
@@ -490,7 +490,9 @@ export function createEcUserFromHash(input: {
   ) {
     return null;
   }
-  if (!input.roles.length) throw new Error("Choisissez au moins un rôle.");
+  const roles = input.roles.filter((r) => !RETIRED_ROLES.includes(r));
+  if (input.roles.length && !roles.length) return null;
+  if (!roles.length) throw new Error("Choisissez au moins un rôle.");
   if (!input.fullName.trim()) throw new Error("Le nom complet est obligatoire.");
   if (input.roles.includes("SUPER_ADMIN_NATIONAL")) {
     throw new Error("Le rôle État civil national ne peut pas être attribué ainsi.");
@@ -501,7 +503,7 @@ export function createEcUserFromHash(input: {
     username,
     fullName: input.fullName.trim(),
     passwordHash: input.passwordHash,
-    roles: input.roles,
+    roles,
     commune: { ...(input.commune ?? DEFAULT_OFFICER_COMMUNE) },
     created_at: new Date().toISOString(),
     created_by: input.createdBy ?? "system:registration",
@@ -578,6 +580,9 @@ export async function updateEcUser(
   if (!email.includes("@")) throw new Error("Indiquez un e-mail valide.");
   if (!input.fullName.trim()) throw new Error("Le nom complet est obligatoire.");
   if (!input.roles.length) throw new Error("Choisissez au moins un rôle.");
+  if (input.roles.some((r) => RETIRED_ROLES.includes(r))) {
+    throw new Error("Les rôles Greffier et Juge ne sont plus disponibles.");
+  }
   if (input.roles.includes("SUPER_ADMIN_NATIONAL")) {
     throw new Error("Le rôle État civil national est réservé au compte national.");
   }

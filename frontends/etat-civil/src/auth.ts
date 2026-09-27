@@ -163,7 +163,7 @@ export async function login(username: string, password: string): Promise<Session
   const local = await verifyEcUser(user, password);
   if (!local) {
     throw new Error(
-      "Identifiants incorrects. Compte infirmier titulaire (structure sanitaire) ? Utilisez /sante/login. Greffier : le compte doit être créé puis activé par l'État civil national (Inscription).",
+      "Identifiants incorrects. Compte infirmier titulaire (structure sanitaire) ? Utilisez /sante/login.",
     );
   }
 
