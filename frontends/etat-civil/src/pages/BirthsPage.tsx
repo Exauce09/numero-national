@@ -219,8 +219,12 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
       );
       return;
     }
-    if (qualiteDeclarant !== "MERE" && !declarant) {
-      setError("Indiquez le déclarant (ou choisissez la qualité « Mère »).");
+    if (qualiteDeclarant === "PERE" && !father) {
+      setError("Qualité « Père » : renseignez le père (il est le déclarant).");
+      return;
+    }
+    if (qualiteDeclarant !== "MERE" && qualiteDeclarant !== "PERE" && !declarant) {
+      setError("Indiquez le déclarant (ou choisissez la qualité « Mère » ou « Père »).");
       return;
     }
 
@@ -236,7 +240,8 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
           ville: geoOrigineMere.ville_name || mother.ville,
         });
       }
-      const effectiveDeclarant = qualiteDeclarant === "MERE" ? mother : declarant;
+      const effectiveDeclarant =
+        qualiteDeclarant === "MERE" ? mother : qualiteDeclarant === "PERE" ? father : declarant;
       if (!effectiveDeclarant) {
         setError("Le déclarant est obligatoire.");
         setSubmitting(false);
@@ -1000,17 +1005,66 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
           <div className="full">
             <h3 className="panel-title">Filiation & déclaration</h3>
             <p className="muted small" style={{ marginTop: 0 }}>
-              <strong>Mère</strong> = filiation de l&apos;enfant (identité parentale).{" "}
               <strong>Déclarant</strong> = personne qui se présente au bureau pour déclarer la
-              naissance (souvent la mère, sinon le père ou un mandataire).
+              naissance. Si c&apos;est la mère ou le père, ses informations ne sont saisies qu&apos;une
+              seule fois, dans le bloc du parent.
             </p>
           </div>
+          <div>
+            <label className="form-label">Qualité du déclarant *</label>
+            <select
+              className="form-control"
+              value={qualiteDeclarant}
+              onChange={(e) => {
+                setQualiteDeclarant(e.target.value);
+                if (e.target.value === "MERE" || e.target.value === "PERE") setDeclarant(null);
+              }}
+            >
+              <option value="MERE">Mère (elle-même déclare)</option>
+              <option value="PERE">Père (lui-même déclare)</option>
+              <option value="MANDATAIRE">Mandataire</option>
+              <option value="AUTRE">Autre personne</option>
+            </select>
+          </div>
+          <div className="muted small" style={{ alignSelf: "end" }}>
+            {qualiteDeclarant === "MERE"
+              ? "La mère renseignée ci-dessous est le déclarant."
+              : qualiteDeclarant === "PERE"
+                ? "Le père renseigné ci-dessous est le déclarant. La mère reste obligatoire (filiation)."
+                : "Renseignez le déclarant, puis les informations des parents (au minimum la mère)."}
+          </div>
+          {qualiteDeclarant !== "MERE" && qualiteDeclarant !== "PERE" ? (
+            <div className="full">
+              <PersonPicker
+                label="Déclarant *"
+                value={declarant}
+                onChange={(p) => {
+                  if (p && mother && p.id === mother.id) {
+                    setQualiteDeclarant("MERE");
+                    setDeclarant(null);
+                    return;
+                  }
+                  if (p && father && p.id === father.id) {
+                    setQualiteDeclarant("PERE");
+                    setDeclarant(null);
+                    return;
+                  }
+                  setDeclarant(p);
+                }}
+                addButtonLabel="Saisir / Ajouter le déclarant"
+              />
+            </div>
+          ) : null}
           <div className="full">
             <PersonPicker
-              label="Mère *"
+              label={qualiteDeclarant === "MERE" ? "Mère * (déclarante)" : "Mère *"}
               value={mother}
               onChange={(p) => {
                 setMother(p);
+                if (p && declarant && p.id === declarant.id) {
+                  setQualiteDeclarant("MERE");
+                  setDeclarant(null);
+                }
                 if (!p) {
                   setGeoOrigineMere({});
                   return;
@@ -1059,36 +1113,6 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
               label="Origine de la mère"
             />
           </div>
-          <div>
-            <label className="form-label">Qualité du déclarant *</label>
-            <select
-              className="form-control"
-              value={qualiteDeclarant}
-              onChange={(e) => setQualiteDeclarant(e.target.value)}
-            >
-              <option value="MERE">Mère (elle-même déclare)</option>
-              <option value="PERE">Père</option>
-              <option value="MANDATAIRE">Mandataire</option>
-              <option value="AUTRE">Autre</option>
-            </select>
-          </div>
-          {qualiteDeclarant !== "MERE" ? (
-            <div className="full">
-              <PersonPicker
-                label="Déclarant *"
-                value={declarant}
-                onChange={(p) => {
-                  setDeclarant(p);
-                  if (p && father && p.id === father.id) setQualiteDeclarant("PERE");
-                }}
-                addButtonLabel="Saisir / Ajouter"
-              />
-            </div>
-          ) : (
-            <div className="full muted small">
-              Qualité « Mère » : la mère sélectionnée ci-dessus est automatiquement le déclarant.
-            </div>
-          )}
           <div className="full">
             <label className="form-label">Adresse de la mère *</label>
             <GeoCascade
@@ -1114,9 +1138,15 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
           </div>
           <div className="full">
             <PersonPicker
-              label="Père (optionnel)"
+              label={qualiteDeclarant === "PERE" ? "Père * (déclarant)" : "Père (optionnel)"}
               value={father}
-              onChange={setFather}
+              onChange={(p) => {
+                setFather(p);
+                if (p && declarant && p.id === declarant.id) {
+                  setQualiteDeclarant("PERE");
+                  setDeclarant(null);
+                }
+              }}
               originGeoFilter
               sexFilter="M"
             />
