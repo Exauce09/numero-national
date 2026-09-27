@@ -200,7 +200,7 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     code: "ADMIN_PROVINCIAL",
     label: "Divinter",
     summary:
-      "Division de l'intérieur / coordination provinciale : supervision des bureaux d'état civil et suivi",
+      "Division provinciale : consulte les statistiques et les graphiques, sans enregistrer d'acte",
     institutional: true,
     portal: "civil",
     assignRoles: ["ADMIN_PROVINCIAL"],
@@ -224,10 +224,10 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     code: "RESPONSABLE_BUREAU",
     label: "Divinter — division provinciale",
     summary:
-      "Division provinciale : gère les utilisateurs, supervise les bureaux et valide les actes",
+      "Division provinciale : consulte les statistiques et les graphiques, sans enregistrer d'acte",
     institutional: true,
     portal: "civil",
-    assignRoles: ["RESPONSABLE_BUREAU", "OFFICIER_ETAT_CIVIL"],
+    assignRoles: ["RESPONSABLE_BUREAU"],
     institutionLabel: "Bureau d'état civil",
     institutionSelect: "bureau_ec",
     showMatricule: true,

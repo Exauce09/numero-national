@@ -97,8 +97,7 @@ export default function UsersEcPage() {
         <h2 className="page-title">Utilisateurs</h2>
         <div className="panel">
           <p className="muted">
-            Seuls le <strong>divinter</strong> (division provinciale) ou l&apos;
-            <strong>État civil national</strong> peuvent gérer les comptes bureau. Votre rôle :{" "}
+            Seul l&apos;<strong>État civil national</strong> peut gérer les comptes bureau. Votre rôle :{" "}
             {roleTitleFor(session?.roles ?? []) || "—"}.
           </p>
           <Link className="btn-secondary btn-sm" to="/roles">

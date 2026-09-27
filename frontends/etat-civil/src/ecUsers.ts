@@ -4,6 +4,7 @@
  */
 
 import { DEFAULT_OFFICER_COMMUNE, type OfficerCommune } from "./commune";
+import { isDivinterViewer } from "./rbac";
 
 export type EcUserRole =
   | "SUPER_ADMIN_NATIONAL"
@@ -51,17 +52,17 @@ export const EC_ROLE_CATALOG: Array<{
     code: "ADMIN_PROVINCIAL",
     label: "Divinter — division provinciale",
     summary:
-      "Division de l'intérieur / coordination provinciale : supervision des bureaux d'état civil et suivi.",
-    canCreateUsers: true,
-    canValidateActs: true,
+      "Division provinciale : consulte les statistiques et les graphiques de la province, sans enregistrer d'acte.",
+    canCreateUsers: false,
+    canValidateActs: false,
   },
   {
     code: "RESPONSABLE_BUREAU",
     label: "Divinter — division provinciale",
     summary:
-      "Division provinciale : crée les comptes (officier, préposé), supervise les bureaux, valide les actes.",
-    canCreateUsers: true,
-    canValidateActs: true,
+      "Division provinciale : consulte les statistiques et les graphiques, sans enregistrer ni valider d'acte.",
+    canCreateUsers: false,
+    canValidateActs: false,
   },
   {
     code: "OFFICIER_ETAT_CIVIL",
@@ -113,7 +114,7 @@ export const CANONICAL_EC_ACCOUNTS: Array<{
   {
     email: "tshidibi@etatcivil.gov.cd",
     fullName: "Tshidibi",
-    roles: ["RESPONSABLE_BUREAU", "OFFICIER_ETAT_CIVIL"],
+    roles: ["RESPONSABLE_BUREAU"],
     initialPassword: "TshidibiBureau2026!",
   },
 ];
@@ -269,8 +270,8 @@ export async function createEcUser(
     commune?: OfficerCommune;
   },
 ): Promise<EcUser> {
-  if (!actor.roles.includes("RESPONSABLE_BUREAU") && !actor.roles.includes("SUPER_ADMIN_NATIONAL")) {
-    throw new Error("Seuls l'État civil national ou le divinter peuvent créer des utilisateurs.");
+  if (!actor.roles.includes("SUPER_ADMIN_NATIONAL") || isDivinterViewer(actor.roles)) {
+    throw new Error("Seul l'État civil national peut créer des utilisateurs.");
   }
   if (input.roles.includes("SUPER_ADMIN_NATIONAL") && !actor.roles.includes("SUPER_ADMIN_NATIONAL")) {
     throw new Error("Seul l'État civil national peut attribuer ce rôle.");
@@ -306,6 +307,9 @@ export async function verifyEcUser(email: string, password: string): Promise<EcU
 }
 
 export function permissionsForRoles(roles: string[]): string[] {
+  if (isDivinterViewer(roles)) {
+    return ["civil:act:read", "civil:stats:read", "bureau:read"];
+  }
   const r = new Set(roles.map((x) => x.toUpperCase()));
   const perms = new Set<string>();
   if (r.has("AUDITEUR")) {
@@ -325,7 +329,7 @@ export function permissionsForRoles(roles: string[]): string[] {
     perms.add("bureau:read");
     perms.add("documents:read");
   }
-  if (r.has("OFFICIER_ETAT_CIVIL") || r.has("CIVIL_OFFICER") || r.has("RESPONSABLE_BUREAU")) {
+  if (r.has("OFFICIER_ETAT_CIVIL") || r.has("CIVIL_OFFICER")) {
     perms.add("civil:act:read");
     perms.add("civil:act:write");
     perms.add("civil:act:validate");
@@ -335,11 +339,6 @@ export function permissionsForRoles(roles: string[]): string[] {
     perms.add("bureau:read");
     perms.add("documents:read");
     perms.add("documents:write");
-  }
-  if (r.has("RESPONSABLE_BUREAU")) {
-    // Bureau : gestion locale des utilisateurs du bureau — pas d'admin plateforme.
-    perms.add("users:manage");
-    perms.add("personnel:read");
   }
   if (r.has("SUPER_ADMIN_NATIONAL")) {
     perms.add("users:manage");
@@ -384,10 +383,8 @@ export function ensureBootstrapSuperAdmin(): void {
 }
 
 export function canManageEcUsers(roles: string[] | undefined | null): boolean {
-  return (roles ?? []).some(
-    (x) =>
-      x.toUpperCase() === "RESPONSABLE_BUREAU" || x.toUpperCase() === "SUPER_ADMIN_NATIONAL",
-  );
+  if (isDivinterViewer(roles)) return false;
+  return (roles ?? []).some((x) => x.toUpperCase() === "SUPER_ADMIN_NATIONAL");
 }
 
 /** Crée un utilisateur EC à partir d'un hash déjà calculé (inscription plateforme). */

@@ -62,38 +62,14 @@ ROLE_PERMISSION_MAP: dict[str, tuple[str, ...]] = {
         "account_request:manage",
     ),
     "ADMIN_PROVINCIAL": (
-        "users:manage",
-        "personnel:read",
-        "personnel:manage",
-        "assignment:read",
-        "assignment:manage",
         "bureau:read",
-        "bureau:manage",
-        "account_request:create",
-        "account_request:manage",
         "civil:act:read",
-        "civil:act:write",
-        "civil:act:validate",
         "civil:stats:read",
-        "registry:citizen:read",
-        "census:sync",
-        "census:manage",
-        "audit:read",
     ),
     "RESPONSABLE_BUREAU": (
-        "personnel:read",
-        "assignment:read",
         "bureau:read",
-        "account_request:create",
         "civil:act:read",
-        "civil:act:write",
-        "civil:act:validate",
         "civil:stats:read",
-        "registry:citizen:read",
-        "registry:citizen:create",
-        "census:sync",
-        "census:manage",
-        "documents:read",
     ),
     "OFFICIER_ETAT_CIVIL": (
         "civil:act:read",
@@ -285,6 +261,18 @@ async def seed_roles_and_permissions(db: AsyncSession) -> None:
             wanted = set(perm_by_code.keys())
         else:
             wanted = set(ROLE_PERMISSION_MAP.get(role.code, ()))
+
+        if role.code in {"ADMIN_PROVINCIAL", "RESPONSABLE_BUREAU"}:
+            for perm in list(role.permissions):
+                if perm.code in wanted:
+                    continue
+                await db.execute(
+                    text(
+                        "DELETE FROM identity.role_permissions "
+                        "WHERE role_id = :rid AND permission_id = :pid"
+                    ),
+                    {"rid": role.id, "pid": perm.id},
+                )
 
         for code in wanted:
             if code not in perm_by_code:

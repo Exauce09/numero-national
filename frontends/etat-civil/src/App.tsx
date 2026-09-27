@@ -12,7 +12,7 @@ import {
   isSuperAdminNational,
   permissionsForRoles,
 } from "./ecUsers";
-import { canAccessPath, canSeeNav, isJudicialRole, primaryRole, roleTitleFor } from "./rbac";
+import { canAccessPath, canSeeNav, isDivinterViewer, isJudicialRole, primaryRole, roleTitleFor } from "./rbac";
 import {
   applyTheme,
   getPrefs,
@@ -464,7 +464,7 @@ function Shell() {
           </div>
 
           <div className="topbar-center">
-            <TopbarSearch />
+            {isDivinterViewer(roles) ? null : <TopbarSearch />}
             
           </div>
 

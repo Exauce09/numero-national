@@ -57,12 +57,19 @@ function StatCard({
   subtitle: string;
   icon: ReactNode;
   color: string;
-  href: string;
+  href?: string;
 }) {
   const shown = useCountUp(value);
   const navigate = useNavigate();
   return (
-    <button type="button" className="dash-kpi" onClick={() => navigate(href)}>
+    <button
+      type="button"
+      className="dash-kpi"
+      onClick={() => {
+        if (href) navigate(href);
+      }}
+      style={href ? undefined : { cursor: "default" }}
+    >
       <div className="dash-kpi-top">
         <span className="dash-kpi-icon" style={{ background: `${color}18`, color }}>
           {icon}
@@ -139,6 +146,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const session = getSession();
   const variant = dashboardVariant(session?.roles ?? ["OFFICIER_ETAT_CIVIL"]);
+  const statsOnly = variant === "provincial" || variant === "bureau";
   const nationalScope = isSuperAdminNational(session?.roles);
   const officerCommune = getOfficerCommune();
   const localActs = listActs();
@@ -454,7 +462,7 @@ export default function DashboardPage() {
           subtitle={`${pendingOf(birthAll).length} à valider`}
           icon={<IconBaby size={22} />}
           color={RDC.yellowDeep}
-          href="/lists/naissance?focus=validated"
+          href={statsOnly ? "/synoptique/naissances" : "/lists/naissance?focus=validated"}
         />
         <StatCard
           title="Mariages"
@@ -462,7 +470,7 @@ export default function DashboardPage() {
           subtitle={`${pendingOf(marriageAll).length} à valider`}
           icon={<IconRing size={22} />}
           color={RDC.yellow}
-          href="/lists/mariage?focus=validated"
+          href={statsOnly ? "/synoptique/matrimonial" : "/lists/mariage?focus=validated"}
         />
         <StatCard
           title="Décès"
@@ -470,7 +478,7 @@ export default function DashboardPage() {
           subtitle={`${pendingOf(deathAll).length} à valider`}
           icon={<IconCross size={22} />}
           color={RDC.red}
-          href="/lists/deces?focus=validated"
+          href={statsOnly ? "/synoptique/deces" : "/lists/deces?focus=validated"}
         />
         <StatCard
           title="Adoptions"
@@ -478,7 +486,7 @@ export default function DashboardPage() {
           subtitle={`${pendingOf(adoptionAll).length} à valider`}
           icon={<IconHome size={22} />}
           color={RDC.blueMid}
-          href="/lists/adoption?focus=validated"
+          href={statsOnly ? undefined : "/lists/adoption?focus=validated"}
         />
         {variant === "agent" || variant === "auditeur" ? (
           <StatCard
@@ -496,12 +504,12 @@ export default function DashboardPage() {
             subtitle={`${pendingOf(divorceAll).length} à valider`}
             icon={<IconSplit size={22} />}
             color={RDC.redDeep}
-            href="/lists/divorce?focus=validated"
+            href={statsOnly ? "/synoptique/matrimonial" : "/lists/divorce?focus=validated"}
           />
         )}
       </div>
 
-      {(variant === "officier" || variant === "bureau") && (
+      {variant === "officier" && (
         <div className="dash-action-row">
           <button type="button" className="dash-action-card" onClick={() => navigate("/declarations")}>
             <span className="dash-action-label">À vérifier / valider</span>

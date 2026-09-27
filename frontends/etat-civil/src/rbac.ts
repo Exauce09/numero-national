@@ -70,6 +70,12 @@ export function isAuditeurOnly(roles: string[] | undefined | null): boolean {
   return primaryRole(roles ?? []) === "AUDITEUR";
 }
 
+/** Divinter (province) : consultation des statistiques et graphiques, sans enregistrement. */
+export function isDivinterViewer(roles: string[] | undefined | null): boolean {
+  const role = primaryRole(roles ?? []);
+  return role === "ADMIN_PROVINCIAL" || role === "RESPONSABLE_BUREAU";
+}
+
 export function primaryRole(roles: string[]): AppRole {
   const r = normalizeRoles(roles);
   if (r.some((x) => NATIONAL.has(x))) return r.find((x) => NATIONAL.has(x))!;
@@ -120,6 +126,7 @@ export function canValidateActs(
   roles: string[] | undefined | null,
   permissions?: string[] | null,
 ): boolean {
+  if (isDivinterViewer(roles)) return false;
   const perms = permissions ?? [];
   if (perms.length > 0) {
     return can("civil:act:validate", perms) || can("*", perms);
@@ -128,15 +135,14 @@ export function canValidateActs(
   return r.some((x) => OFFICIER.has(x) || BUREAU_LEAD.has(x) || NATIONAL.has(x));
 }
 
-/** Création / saisie d'actes (pas l'auditeur ni le juge seul). */
+/** Création / saisie d'actes (pas l'auditeur, le divinter, ni le juge seul). */
 export function canCreateActs(roles: string[] | undefined | null): boolean {
+  if (isDivinterViewer(roles)) return false;
   const role = primaryRole(roles ?? []);
   return (
     role === "SUPER_ADMIN_NATIONAL" ||
     role === "ADMIN_NATIONAL" ||
     role === "CENTRAL_ADMIN" ||
-    role === "ADMIN_PROVINCIAL" ||
-    role === "RESPONSABLE_BUREAU" ||
     role === "OFFICIER_ETAT_CIVIL" ||
     role === "CIVIL_OFFICER" ||
     role === "AGENT_ETAT_CIVIL" ||
@@ -198,6 +204,10 @@ export function canSeeNav(key: NavKey, roles: string[], permissions?: string[] |
       default:
         return false;
     }
+  }
+
+  if (isDivinterViewer(r)) {
+    return key === "dashboard" || key === "synoptique";
   }
 
   if (isAgent) {
@@ -274,6 +284,10 @@ export function canSeeNav(key: NavKey, roles: string[], permissions?: string[] |
 export function canAccessPath(pathname: string, roles: string[] | undefined | null): boolean {
   const path = pathname.split("?")[0] || "/";
   const r = roles ?? [];
+
+  if (isDivinterViewer(r)) {
+    return path === "/" || path === "" || path.startsWith("/synoptique");
+  }
 
   if (path === "/" || path === "") return canSeeNav("dashboard", r);
   if (path.startsWith("/search")) return canSeeNav("search", r);

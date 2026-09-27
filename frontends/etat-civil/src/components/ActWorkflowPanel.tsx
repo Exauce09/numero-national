@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api, type CivilAct } from "../api";
 import { getSession } from "../auth";
-import { can, canValidateActs } from "../rbac";
+import { can, canValidateActs, isDivinterViewer } from "../rbac";
 import { actTypeLabel, replaceAct, updateAct, type Act, type ActType } from "../registry";
 import ActPrintActions from "./ActPrintActions";
 import ActPrintCard from "./ActPrintCard";
@@ -83,9 +83,14 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
   const session = getSession();
   const canValidate = canValidateActs(session?.roles, session?.permissions);
   const canSubmit =
-    can("civil:act:write", session?.permissions) ||
-    canValidate ||
-    Boolean(session?.roles?.some((r) => ["AGENT_ETAT_CIVIL", "OFFICIER_ETAT_CIVIL", "CIVIL_OFFICER", "RESPONSABLE_BUREAU"].includes(r)));
+    !isDivinterViewer(session?.roles) &&
+    (can("civil:act:write", session?.permissions) ||
+      canValidate ||
+      Boolean(
+        session?.roles?.some((r) =>
+          ["AGENT_ETAT_CIVIL", "OFFICIER_ETAT_CIVIL", "CIVIL_OFFICER"].includes(r),
+        ),
+      ));
 
   const [current, setCurrent] = useState<Act>(act);
   const [busy, setBusy] = useState(false);
@@ -252,7 +257,7 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
       return;
     }
     if ((target === "VALIDATED" || target === "UNDER_REVIEW") && !canValidate) {
-      setError("Seuls l'officier / le divinter peuvent valider.");
+      setError("Seul l'officier de l'état civil peut valider.");
       return;
     }
     setBusy(true);
@@ -573,7 +578,7 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
 
       {supportsCivilWorkflow && !canValidate && status === "SUBMITTED" ? (
         <p className="muted small">
-          Acte soumis — validation réservée à l&apos;officier ou au divinter.
+          Acte soumis — validation réservée à l&apos;officier de l&apos;état civil.
         </p>
       ) : null}
       {supportsCivilWorkflow && !canSubmit && nextSteps.length > 0 ? (
