@@ -568,6 +568,17 @@ export async function submitAccountRegistration(
   const strength = checkPasswordStrength(input.password);
   if (!strength.ok) throw new Error("Le mot de passe ne respecte pas les exigences de sécurité.");
 
+  // Une inscription abandonnée avant le code SMS ne doit pas bloquer l'e-mail indéfiniment.
+  const stale = loadRequests().filter(
+    (r) =>
+      r.status === "PENDING_OTP" &&
+      (r.email === email || r.login_id === loginId || r.telephone === phone),
+  );
+  if (stale.length) {
+    const staleIds = new Set(stale.map((r) => r.id));
+    saveRequests(loadRequests().filter((r) => !staleIds.has(r.id)));
+  }
+
   const taken = emailOrPhoneTaken(email, phone);
   if (taken.email) throw new Error("Cette adresse e-mail est déjà utilisée.");
   if (taken.phone) throw new Error("Ce numéro de téléphone est déjà utilisé.");
@@ -833,6 +844,102 @@ export function provisionCivilUserFromRequest(req: AccountRegistrationRequest): 
 function activateProvisionedAccess(req: AccountRegistrationRequest): void {
   provisionHospitalFacilityFromRequest(req);
   provisionCivilUserFromRequest(req);
+}
+
+export type HealthLoginResolution = {
+  /** Identifiant réel du compte /sante (login_id), à passer à loginHealth. */
+  loginId: string;
+  /** L'identifiant correspond à une structure sanitaire (compte ou inscription). */
+  isHealth: boolean;
+  /** Raison lisible à afficher si la connexion échoue. */
+  hint: string;
+};
+
+/**
+ * Accepte e-mail, identifiant ou téléphone pour l'espace santé et explique
+ * pourquoi un compte est refusé (inscription non terminée, mauvais portail…).
+ */
+export function resolveHealthLogin(identifier: string): HealthLoginResolution {
+  const id = identifier.trim().toLowerCase();
+  const phone = normalizePhone(identifier);
+
+  const direct = findFacilityByUsername(id);
+  if (direct) {
+    return {
+      loginId: direct.username,
+      isHealth: true,
+      hint: direct.active
+        ? `Mot de passe incorrect pour « ${direct.facilityName} ».`
+        : `Le compte « ${direct.facilityName} » est désactivé. Réactivez-le dans Déclarations → Structures sanitaires.`,
+    };
+  }
+
+  const statusRank: Record<AccountRequestStatus, number> = {
+    ACTIVE: 0,
+    PENDING_VALIDATION: 1,
+    PENDING_OTP: 2,
+    REJECTED: 3,
+  };
+  const matches = loadRequests()
+    .filter(
+      (r) =>
+        r.email === id ||
+        r.login_id === id ||
+        (phone.length >= 8 && normalizePhone(r.telephone) === phone),
+    )
+    .sort((a, b) => (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9));
+  const req = matches[0];
+
+  if (!req) {
+    return {
+      loginId: id,
+      isHealth: false,
+      hint: `Aucun compte structure sanitaire « ${identifier.trim()} » dans ce navigateur. Les comptes sont enregistrés localement : ils n'existent que dans le navigateur et à l'adresse où ils ont été créés (ex. http://localhost:5180). Recréez-le via Créer un compte → Infirmier titulaire (IT).`,
+    };
+  }
+
+  const type = getAccountTypeOption(req.accountType);
+  if (req.accountType !== "HOPITAL_MATERNITE") {
+    return {
+      loginId: req.login_id,
+      isHealth: false,
+      hint: `Ce compte est de type « ${type.label} » : ce n'est pas une structure sanitaire. Connectez-vous sur la page bureau (/login).`,
+    };
+  }
+
+  switch (req.status) {
+    case "PENDING_OTP":
+      return {
+        loginId: req.login_id,
+        isHealth: true,
+        hint: "Inscription non terminée : le code de vérification du téléphone n'a jamais été saisi, donc le compte n'a pas été activé. Refaites Créer un compte avec le même e-mail (l'ancienne demande sera remplacée) et saisissez le code jusqu'au bout.",
+      };
+    case "PENDING_VALIDATION":
+      return {
+        loginId: req.login_id,
+        isHealth: true,
+        hint: "Inscription en attente de validation par le super admin (Demandes de compte).",
+      };
+    case "REJECTED":
+      return {
+        loginId: req.login_id,
+        isHealth: true,
+        hint: "Cette inscription a été rejetée. Créez une nouvelle demande.",
+      };
+    default: {
+      activateProvisionedAccess(req);
+      const facility = findFacilityByUsername(req.login_id);
+      return {
+        loginId: req.login_id,
+        isHealth: true,
+        hint: facility
+          ? req.login_id !== id
+            ? `Mot de passe incorrect (identifiant du compte : ${req.login_id}).`
+            : `Mot de passe incorrect pour « ${facility.facilityName} ».`
+          : "Inscription active mais la structure n'a pas pu être créée (province ou commune manquante). Recréez le compte.",
+      };
+    }
+  }
 }
 
 /** Répare les inscriptions ACTIVE sans compte EC /sante (créations antérieures). */

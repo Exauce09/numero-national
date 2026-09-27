@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { clearSession, getSession } from "../auth";
 import PasswordField from "../components/PasswordField";
-import { syncHospitalFacilitiesFromRequests } from "../accountRegistration";
+import { resolveHealthLogin, syncHospitalFacilitiesFromRequests } from "../accountRegistration";
 import { getHealthSession, loginHealth } from "../healthAuth";
 
 export default function HealthLoginPage() {
@@ -24,12 +24,13 @@ export default function HealthLoginPage() {
     e.preventDefault();
     setError(null);
     setBusy(true);
+    const resolved = resolveHealthLogin(username);
     try {
       clearSession();
-      await loginHealth(username, password);
+      await loginHealth(resolved.loginId, password);
       navigate("/sante", { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Connexion impossible.");
+      setError(resolved.hint || (err instanceof Error ? err.message : "Connexion impossible."));
     } finally {
       setBusy(false);
     }
@@ -66,7 +67,7 @@ export default function HealthLoginPage() {
 
         <form onSubmit={(e) => void onLogin(e)} autoComplete="off">
           {error ? <div className="login-error">{error}</div> : null}
-          <label className="form-label">Identifiant</label>
+          <label className="form-label">Identifiant, e-mail ou téléphone</label>
           <input
             className="form-control"
             value={username}

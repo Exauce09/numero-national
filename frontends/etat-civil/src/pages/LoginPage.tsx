@@ -2,9 +2,9 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { clearSession, getSession, login } from "../auth";
 import PasswordField from "../components/PasswordField";
-import { syncHospitalFacilitiesFromRequests } from "../accountRegistration";
+import { resolveHealthLogin, syncHospitalFacilitiesFromRequests } from "../accountRegistration";
 import { ensureCanonicalAccounts, hasAnyEcUser } from "../ecUsers";
-import { findFacilityByUsername, loginHealth } from "../healthAuth";
+import { loginHealth } from "../healthAuth";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -30,16 +30,16 @@ export default function LoginPage() {
       await login(username, password);
       navigate("/", { replace: true });
     } catch (civilErr) {
+      const resolved = resolveHealthLogin(username);
       try {
         clearSession();
-        await loginHealth(username, password);
+        await loginHealth(resolved.loginId, password);
         navigate("/sante", { replace: true });
         return;
       } catch {
-        const looksHealth = Boolean(findFacilityByUsername(username));
         setError(
-          looksHealth
-            ? "Compte structure sanitaire : utilisez /sante/login (ou vérifiez le mot de passe)."
+          resolved.isHealth
+            ? resolved.hint
             : civilErr instanceof Error
               ? civilErr.message
               : "Identifiants incorrects.",
