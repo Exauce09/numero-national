@@ -8,7 +8,6 @@ import {
   getPerson,
   getPersonByNic,
   listActs,
-  listPersons,
   personNationalite,
   type Act,
   type Nationalite,
@@ -116,20 +115,6 @@ function birthNatFromAct(act: Act): Nationalite {
   return p ? personNationalite(p) : payloadNat(act.payload);
 }
 
-function resolvePersonNat(id: unknown, name: unknown): Nationalite {
-  if (typeof id === "string") {
-    const byId = getPerson(id);
-    if (byId) return personNationalite(byId);
-  }
-  const label = String(name ?? "").trim().toLowerCase();
-  if (!label) return "CONGOLAIS";
-  const hit = listPersons().find((p) => {
-    const n = `${p.nom} ${p.postnom} ${p.prenom}`.toLowerCase();
-    return n === label || n.includes(label) || label.includes(n);
-  });
-  return hit ? personNationalite(hit) : "CONGOLAIS";
-}
-
 /** Événements naissance de la structure : actes liés + déclarations non encore liées à un acte. */
 function facilityBirthEvents(scope: HealthScope): Array<{ sexe: string; nat: Nationalite; mode: "sans" | "avec" | "jugement" }> {
   const events: Array<{ sexe: string; nat: Nationalite; mode: "sans" | "avec" | "jugement" }> = [];
@@ -185,32 +170,6 @@ export function healthSynopticBirths() {
     dansDelai,
     totalNaissances: sum(dansDelai, totJug),
     count: events.length,
-  };
-}
-
-export function healthSynopticMarriagesDivorces() {
-  const scope = getScope();
-  const marriages = listActs("MARRIAGE").filter((a) => actBelongsToFacility(a.payload, scope));
-  const divorces = listActs("DIVORCE").filter((a) => actBelongsToFacility(a.payload, scope));
-
-  function classify(acts: Act[]) {
-    let nationaux = 0;
-    let etrangers = 0;
-    let mixtes = 0;
-    for (const act of acts) {
-      const n1 = resolvePersonNat(act.payload.epoux_id, act.payload.epoux_name);
-      const n2 = resolvePersonNat(act.payload.epouse_id, act.payload.epouse_name);
-      if (n1 === "CONGOLAIS" && n2 === "CONGOLAIS") nationaux += 1;
-      else if (n1 === "ETRANGER" && n2 === "ETRANGER") etrangers += 1;
-      else mixtes += 1;
-    }
-    return { nationaux, etrangers, mixtes, total: nationaux + etrangers + mixtes };
-  }
-
-  return {
-    scope,
-    mariage: classify(marriages),
-    divorce: classify(divorces),
   };
 }
 
@@ -285,14 +244,7 @@ export function healthSynopticDeaths() {
 
 export function healthSynopticDocuments() {
   const scope = getScope();
-  const acts = listActs("DOCUMENT").filter((a) => actBelongsToFacility(a.payload, scope));
   const byType = new Map<string, number>();
-  for (const act of acts) {
-    const t = String(act.payload.type_document ?? act.payload.nom_document ?? "Autre");
-    byType.set(t, (byType.get(t) ?? 0) + 1);
-  }
-
-  // Synthèse des déclarations sanitaires (équivalent « documents » côté structure).
   const decls = listFacilityDeclarations(scope.facilityId);
   const statusLabel = (d: CivilDeclaration) =>
     d.declaration_type === "BIRTH"

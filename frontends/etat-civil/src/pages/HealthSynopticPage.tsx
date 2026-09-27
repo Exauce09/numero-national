@@ -7,15 +7,13 @@ import {
   healthSynopticBirths,
   healthSynopticDeaths,
   healthSynopticDocuments,
-  healthSynopticMarriagesDivorces,
 } from "../healthSynoptic";
 import type { Gft } from "../synoptic";
 
 const TABS = [
   { slug: "naissances", label: "Enregistrement de nouveau-né" },
-  { slug: "matrimonial", label: "Liste des État-matrimoniaux" },
   { slug: "deces", label: "Enregistrement de décès" },
-  { slug: "documents", label: "Liste des Actes" },
+  { slug: "documents", label: "Liste des déclarations (naissances / décès)" },
 ] as const;
 
 type TabSlug = (typeof TABS)[number]["slug"];
@@ -146,82 +144,6 @@ function BirthsTable() {
   );
 }
 
-function MatrimonialTable() {
-  const d = healthSynopticMarriagesDivorces();
-  const rows = [
-    {
-      structure: d.scope.facilityName,
-      commune: d.scope.commune_name,
-      code: d.scope.commune_code,
-      mariage_nationaux: d.mariage.nationaux,
-      mariage_etrangers: d.mariage.etrangers,
-      mariage_mixtes: d.mariage.mixtes,
-      mariage_total: d.mariage.total,
-      divorce_nationaux: d.divorce.nationaux,
-      divorce_etrangers: d.divorce.etrangers,
-      divorce_mixtes: d.divorce.mixtes,
-      divorce_total: d.divorce.total,
-    },
-  ];
-
-  return (
-    <>
-      <div className="syn-toolbar no-print">
-        <DataToolbar filename={`synoptique_sante_matrimonial_${d.scope.commune_code}`} rows={rows} />
-      </div>
-      <h2 className="syn-official-title">
-        TABLEAU SYNOPTIQUE RÉCAPITULATIF DES STATISTIQUES DE L&apos;ÉTAT CIVIL
-        <br />
-        {d.scope.facilityName.toUpperCase()}
-        <br />
-        COMMUNE DE {d.scope.commune_name.toUpperCase()} ({d.scope.commune_code})
-      </h2>
-      <div className="table-scroll">
-        <table className="syn-official">
-          <thead>
-            <tr>
-              <th rowSpan={2}>STRUCTURE / COMMUNE</th>
-              <th colSpan={4}>MARIAGE</th>
-              <th colSpan={4}>DIVORCE</th>
-            </tr>
-            <tr>
-              <th>NATIONAUX</th>
-              <th>ÉTRANGERS</th>
-              <th>MIXTES</th>
-              <th>TOTAL</th>
-              <th>NATIONAUX</th>
-              <th>ÉTRANGERS</th>
-              <th>MIXTES</th>
-              <th>TOTAL</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td className="syn-commune-cell">
-                {d.scope.facilityName}
-                <br />
-                <span className="muted small">{d.scope.commune_name}</span>
-              </td>
-              <td>{d.mariage.nationaux}</td>
-              <td>{d.mariage.etrangers}</td>
-              <td>{d.mariage.mixtes}</td>
-              <td>{d.mariage.total}</td>
-              <td>{d.divorce.nationaux}</td>
-              <td>{d.divorce.etrangers}</td>
-              <td>{d.divorce.mixtes}</td>
-              <td>{d.divorce.total}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <p className="syn-legend muted small">
-        Habituellement vide pour une structure sanitaire (mariages / divorces sont enregistrés à l&apos;état
-        civil).
-      </p>
-    </>
-  );
-}
-
 function DeathsTable() {
   const d = healthSynopticDeaths();
   const rows = [
@@ -315,7 +237,7 @@ function DocumentsTable() {
         <DataToolbar filename={`synoptique_sante_documents_${d.scope.commune_code}`} rows={rows} />
       </div>
       <h2 className="syn-official-title">
-        TABLEAU SYNOPTIQUE DES DOCUMENTS / DÉCLARATIONS
+        TABLEAU SYNOPTIQUE DES DÉCLARATIONS DE NAISSANCE ET DE DÉCÈS
         <br />
         {d.scope.facilityName.toUpperCase()}
         <br />
@@ -334,7 +256,7 @@ function DocumentsTable() {
             {d.byType.length === 0 ? (
               <tr>
                 <td className="syn-commune-cell">{d.scope.facilityName}</td>
-                <td colSpan={2}>Aucun document / déclaration</td>
+                <td colSpan={2}>Aucune déclaration de naissance ou de décès</td>
               </tr>
             ) : (
               d.byType.map((r) => (
@@ -395,7 +317,6 @@ export default function HealthSynopticPage() {
 
       <div className="syn-official-wrap">
         {tab === "naissances" ? <BirthsTable /> : null}
-        {tab === "matrimonial" ? <MatrimonialTable /> : null}
         {tab === "deces" ? <DeathsTable /> : null}
         {tab === "documents" ? <DocumentsTable /> : null}
       </div>
