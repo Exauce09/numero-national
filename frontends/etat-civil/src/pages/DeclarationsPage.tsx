@@ -24,7 +24,6 @@ import GpsLocatePanel, { applyGpsToGeo } from "../components/GpsLocatePanel";
 import PasswordField from "../components/PasswordField";
 import GeoCascade, {
   ADDRESS_FIELD_LABELS,
-  ORIGIN_FIELD_LABELS,
   type GeoLevel,
   type GeoSelection,
 } from "../components/GeoCascade";
@@ -37,22 +36,14 @@ const FACILITY_TYPES: { value: FacilityAccount["facilityType"]; label: string }[
   { value: "MATERNITE", label: "Maternité" },
 ];
 
-function isKinshasaProvince(name?: string | null): boolean {
-  return (name ?? "").trim().toLowerCase().includes("kinshasa");
-}
-
-/** Kinshasa : Province → Ville → Commune → Quartier. Autres : Province → Territoire → Secteur → Village. */
-function facilityGeoLevels(provinceName?: string | null): GeoLevel[] {
-  return isKinshasaProvince(provinceName)
-    ? ["province", "ville", "commune", "quartier"]
-    : ["province", "district", "commune", "localite"];
-}
+/** Ville → Commune → Quartier, ou Territoire → Secteur → Village (liste unique Ville / Territoire). */
+const FACILITY_GEO_LEVELS: GeoLevel[] = ["province", "ville", "district", "commune", "quartier", "localite"];
 
 function facilityLocationLabel(a: FacilityAccountPublic): string {
   if (a.geo_label) return a.geo_label;
-  const parts = isKinshasaProvince(a.province)
-    ? [a.quartier_name, a.commune_name, a.ville, a.province]
-    : [a.localite_name, a.commune_name, a.district_name, a.province];
+  const parts = a.district_name
+    ? [a.localite_name, a.commune_name, a.district_name, a.province]
+    : [a.quartier_name, a.commune_name, a.ville, a.province];
   return parts.filter(Boolean).join(" · ") || a.commune_name || "—";
 }
 
@@ -285,22 +276,22 @@ export default function DeclarationsPage() {
 
     const province = (facilityGeo.province_name || "").trim();
     const communeName = (facilityGeo.commune_name || "").trim();
-    const kin = isKinshasaProvince(province);
+    const urban = !(facilityGeo.district_name || "").trim();
 
     if (!province) {
       setFormError("Sélectionnez la province.");
       return;
     }
+    if (!(facilityGeo.ville_name || "").trim() && !(facilityGeo.district_name || "").trim()) {
+      setFormError("Sélectionnez la ville ou le territoire.");
+      return;
+    }
     if (!communeName) {
-      setFormError(kin ? "Sélectionnez la commune." : "Sélectionnez le secteur / la commune.");
+      setFormError(urban ? "Sélectionnez la commune." : "Sélectionnez le secteur / la chefferie.");
       return;
     }
-    if (kin && !(facilityGeo.quartier_name || "").trim()) {
-      setFormError("Pour Kinshasa, le quartier est obligatoire.");
-      return;
-    }
-    if (!kin && !(facilityGeo.district_name || "").trim()) {
-      setFormError("Pour les autres provinces, le territoire est obligatoire.");
+    if (urban && !(facilityGeo.quartier_name || "").trim()) {
+      setFormError("Pour une ville, le quartier est obligatoire.");
       return;
     }
 
@@ -321,21 +312,21 @@ export default function DeclarationsPage() {
       commune_code: facilityGeo.commune_code || communeName.toUpperCase().replace(/\s+/g, "-"),
       commune_name: communeName,
       province,
-      ville: (facilityGeo.ville_name || "").trim() || (kin ? "Kinshasa" : province),
-      quartier_name: facilityGeo.quartier_name?.trim() || undefined,
-      district_name: facilityGeo.district_name?.trim() || undefined,
-      localite_name: facilityGeo.localite_name?.trim() || undefined,
+      ville: (facilityGeo.ville_name || "").trim() || province,
+      quartier_name: urban ? facilityGeo.quartier_name?.trim() || undefined : undefined,
+      district_name: urban ? undefined : facilityGeo.district_name?.trim() || undefined,
+      localite_name: urban ? undefined : facilityGeo.localite_name?.trim() || undefined,
       geo_label:
         facilityGeo.label ||
         [
-          kin ? facilityGeo.quartier_name : facilityGeo.localite_name,
+          urban ? facilityGeo.quartier_name : facilityGeo.localite_name,
           communeName,
-          kin ? facilityGeo.ville_name : facilityGeo.district_name,
+          urban ? facilityGeo.ville_name : facilityGeo.district_name,
           province,
         ]
           .filter(Boolean)
           .join(" · "),
-      geo_mode: (kin ? "kinshasa" : "province") as "kinshasa" | "province",
+      geo_mode: (urban ? "kinshasa" : "province") as "kinshasa" | "province",
     };
 
     try {
@@ -719,26 +710,12 @@ export default function DeclarationsPage() {
               </div>
               <div className="full">
                 <label className="form-label">
-                  Lieu de la structure *{" "}
-                  {isKinshasaProvince(facilityGeo.province_name)
-                    ? "(Kinshasa : jusqu'au quartier)"
-                    : facilityGeo.province_name
-                      ? "(province : territoire → secteur → village)"
-                      : "(choisissez d'abord la province)"}
+                  Lieu de la structure * (ville → commune → quartier, ou territoire → secteur → village)
                 </label>
                 <GeoCascade
-                  key={
-                    isKinshasaProvince(facilityGeo.province_name)
-                      ? `kin-${facilityGeo.province_id || facilityGeo.province_name || "x"}`
-                      : `prov-${facilityGeo.province_id || facilityGeo.province_name || "x"}`
-                  }
                   embedded
-                  levels={facilityGeoLevels(facilityGeo.province_name)}
-                  fieldLabels={
-                    isKinshasaProvince(facilityGeo.province_name)
-                      ? ADDRESS_FIELD_LABELS
-                      : ORIGIN_FIELD_LABELS
-                  }
+                  levels={FACILITY_GEO_LEVELS}
+                  fieldLabels={ADDRESS_FIELD_LABELS}
                   value={facilityGeo}
                   onChange={setFacilityGeo}
                   label="Lieu de la structure"

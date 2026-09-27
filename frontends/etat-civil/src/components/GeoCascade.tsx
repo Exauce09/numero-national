@@ -188,11 +188,25 @@ type Props = {
   allowAdd?: boolean;
   fieldLabels?: Partial<Record<GeoLevel, string>>;
   /**
-   * Après la province : choix Ville (urbain) ou Territoire (rural).
-   * Commune ↔ Secteur selon le mode. Ignore `levels` (sauf province).
+   * Après la province : une seule liste Ville / Territoire (défaut partout où la province est demandée).
+   * La profondeur de chaque branche suit `levels` (commune, quartier, avenue… / secteur, village).
    */
   zoneChoice?: boolean;
 };
+
+/** Branche ville : Commune → Quartier → Avenue → Rue, limitée aux niveaux demandés. */
+function villeBranch(levels: readonly GeoLevel[]): GeoLevel[] {
+  const tail: GeoLevel[] = ["commune", "quartier", "avenue", "rue"];
+  return ["province", "ville", ...tail.filter((l) => levels.includes(l))];
+}
+
+/** Branche territoire : Secteur → Village ; une adresse (quartier demandé) descend jusqu'au village. */
+function territoireBranch(levels: readonly GeoLevel[]): GeoLevel[] {
+  const out: GeoLevel[] = ["province", "district"];
+  if (levels.includes("commune")) out.push("commune");
+  if (levels.includes("localite") || levels.includes("quartier")) out.push("localite");
+  return out;
+}
 
 export default function GeoCascade({
   value,
@@ -202,8 +216,12 @@ export default function GeoCascade({
   embedded = false,
   allowAdd = true,
   fieldLabels,
-  zoneChoice = false,
+  zoneChoice: zoneChoiceProp = true,
 }: Props) {
+  const zoneChoice =
+    zoneChoiceProp &&
+    levels.includes("province") &&
+    (levels.includes("ville") || levels.includes("district"));
   const [zoneKind, setZoneKind] = useState<ZoneKind | null>(() => {
     if (!zoneChoice) return null;
     if (value?.district_id || value?.district_name) return "territoire";
@@ -214,22 +232,20 @@ export default function GeoCascade({
   const levelsFor = (kind: ZoneKind | null): GeoLevel[] =>
     zoneChoice
       ? kind === "territoire"
-        ? ["province", "district", "commune", "localite"]
+        ? territoireBranch(levels)
         : kind === "ville"
-          ? ["province", "ville", "commune", "quartier", "avenue"]
+          ? villeBranch(levels)
           : ["province"]
       : levels;
 
   const show = (level: GeoLevel, kind: ZoneKind | null = zoneKind) => levelsFor(kind).includes(level);
   const lbl = (level: GeoLevel) => {
     if (zoneChoice && zoneKind === "territoire") {
-      if (level === "commune") return fieldLabels?.commune ?? "Secteur / Chefferie";
-      if (level === "localite") return fieldLabels?.localite ?? "Village";
-      if (level === "district") return fieldLabels?.district ?? "Territoire";
+      if (level === "commune") return "Secteur / Chefferie";
+      if (level === "localite") return "Village";
+      if (level === "district") return "Territoire";
     }
-    if (zoneChoice && zoneKind === "ville" && level === "commune") {
-      return fieldLabels?.commune ?? "Commune";
-    }
+    if (zoneChoice && zoneKind === "ville" && level === "commune") return "Commune";
     return fieldLabels?.[level] ?? DEFAULT_FIELD_LABELS[level];
   };
 
@@ -697,7 +713,7 @@ export default function GeoCascade({
         {zoneChoice ? (
           <div>
             <div className="geo-field-head">
-              <label className="form-label">Ville / Territoire *</label>
+              <label className="form-label">Ville / Territoire</label>
               {allowAdd ? (
                 <button
                   type="button"
@@ -808,7 +824,7 @@ export default function GeoCascade({
             addKindBtn="avenue"
           />
         ) : null}
-        {show("avenue") || (zoneChoice && zoneKind === "ville" && Boolean(sel.quartier_id)) ? (
+        {show("avenue") ? (
           <div>
             <label className="form-label">N° / parcelle</label>
             <input

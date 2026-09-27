@@ -427,7 +427,7 @@ export default function FicheIdentificationEditor({
               <GeoCascade
                 embedded
                 allowAdd
-                zoneChoice
+                levels={GEO_PRESETS.address}
                 fieldLabels={{
                   ...ADDRESS_FIELD_LABELS,
                   commune: "Commune / Secteur",

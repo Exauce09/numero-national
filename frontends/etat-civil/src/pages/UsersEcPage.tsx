@@ -27,8 +27,16 @@ import {
   type FacilityAccount,
   type FacilityAccountPublic,
 } from "../healthAuth";
+import GeoCascade, {
+  ADDRESS_FIELD_LABELS,
+  resolveGeoByNames,
+  type GeoLevel,
+  type GeoSelection,
+} from "../components/GeoCascade";
 import PasswordField from "../components/PasswordField";
 import { roleTitleFor } from "../rbac";
+
+const FACILITY_GEO_LEVELS: GeoLevel[] = ["province", "ville", "district", "commune", "quartier", "localite"];
 
 function rolesLabel(roles: EcUserRole[]): string {
   return [...new Set(roles.map((r) => roleTitleFor([r])))].join(", ");
@@ -56,9 +64,8 @@ type FacilityForm = {
   facilityType: FacilityAccount["facilityType"];
   username: string;
   email: string;
-  province: string;
-  ville: string;
-  commune_name: string;
+  geo: GeoSelection;
+  geoTouched: boolean;
   password: string;
 };
 
@@ -156,10 +163,31 @@ export default function UsersEcPage() {
       facilityType: f.facilityType,
       username: f.username,
       email: f.email ?? "",
-      province: f.province,
-      ville: f.ville,
-      commune_name: f.commune_name,
+      geo: {
+        province_name: f.province,
+        ville_name: f.district_name ? undefined : f.ville,
+        district_name: f.district_name,
+        commune_name: f.commune_name,
+        commune_code: f.commune_code,
+        quartier_name: f.quartier_name,
+        localite_name: f.localite_name,
+        label: f.geo_label,
+      },
+      geoTouched: false,
       password: "",
+    });
+    void resolveGeoByNames({
+      province: f.province,
+      ville: f.district_name ? undefined : f.ville,
+      commune_code: f.commune_code,
+      commune_name: f.commune_name,
+    }).then((resolved) => {
+      if (!resolved) return;
+      setFacilityForm((cur) =>
+        cur && cur.id === f.id && !cur.geoTouched
+          ? { ...cur, geo: { ...cur.geo, ...resolved, label: cur.geo.label || resolved.label } }
+          : cur,
+      );
     });
   }
 
@@ -192,35 +220,37 @@ export default function UsersEcPage() {
     if (!facilityForm) return;
     const prev = facilities.find((f) => f.id === facilityForm.id);
     if (!prev) return;
+    const g = facilityForm.geo;
+    const geoChanged = facilityForm.geoTouched;
+    const province = (g.province_name || "").trim();
+    const commune = (g.commune_name || "").trim();
+    const urban = !(g.district_name || "").trim();
+    if (geoChanged && (!province || !commune)) {
+      setFormError("Choisissez la province, la ville ou le territoire, puis la commune ou le secteur.");
+      return;
+    }
     setFormError(null);
     setBusy(true);
     try {
-      const geoChanged =
-        prev.province !== facilityForm.province.trim() ||
-        prev.ville !== facilityForm.ville.trim() ||
-        prev.commune_name !== facilityForm.commune_name.trim();
-      const commune = facilityForm.commune_name.trim();
       const saved = await updateFacilityAccount(facilityForm.id, {
         username: facilityForm.username,
         password: facilityForm.password || undefined,
         facilityName: facilityForm.facilityName,
         facilityType: facilityForm.facilityType,
         email: facilityForm.email || undefined,
-        province: facilityForm.province,
-        ville: facilityForm.ville,
-        commune_name: commune,
-        commune_code: geoChanged ? commune.toUpperCase().replace(/\s+/g, "-") : prev.commune_code,
-        quartier_name: geoChanged ? undefined : prev.quartier_name,
-        district_name: geoChanged ? undefined : prev.district_name,
-        localite_name: geoChanged ? undefined : prev.localite_name,
+        province: geoChanged ? province : prev.province,
+        ville: geoChanged ? (g.ville_name || "").trim() || province : prev.ville,
+        commune_name: geoChanged ? commune : prev.commune_name,
+        commune_code: geoChanged
+          ? g.commune_code || commune.toUpperCase().replace(/\s+/g, "-")
+          : prev.commune_code,
+        quartier_name: geoChanged ? (urban ? g.quartier_name : undefined) : prev.quartier_name,
+        district_name: geoChanged ? (urban ? undefined : g.district_name) : prev.district_name,
+        localite_name: geoChanged ? (urban ? undefined : g.localite_name) : prev.localite_name,
         geo_label: geoChanged
-          ? [commune, facilityForm.ville.trim(), facilityForm.province.trim()].filter(Boolean).join(" · ")
+          ? g.label || [commune, g.ville_name || g.district_name, province].filter(Boolean).join(" · ")
           : prev.geo_label,
-        geo_mode: geoChanged
-          ? /kinshasa/i.test(facilityForm.province)
-            ? "kinshasa"
-            : "province"
-          : prev.geo_mode,
+        geo_mode: geoChanged ? (urban ? "kinshasa" : "province") : prev.geo_mode,
       });
       setMessage(`Structure modifiée : ${saved.facilityName} (@${saved.username})`);
       setError(null);
@@ -649,33 +679,16 @@ export default function UsersEcPage() {
                 disabled={busy}
               />
             </div>
-            <div>
-              <label className="form-label">Province *</label>
-              <input
-                className="form-control"
-                value={facilityForm.province}
-                onChange={(e) => setFacilityForm({ ...facilityForm, province: e.target.value })}
-                required
-                disabled={busy}
-              />
-            </div>
-            <div>
-              <label className="form-label">Ville / territoire</label>
-              <input
-                className="form-control"
-                value={facilityForm.ville}
-                onChange={(e) => setFacilityForm({ ...facilityForm, ville: e.target.value })}
-                disabled={busy}
-              />
-            </div>
-            <div>
-              <label className="form-label">Commune / secteur *</label>
-              <input
-                className="form-control"
-                value={facilityForm.commune_name}
-                onChange={(e) => setFacilityForm({ ...facilityForm, commune_name: e.target.value })}
-                required
-                disabled={busy}
+            <div className="full">
+              <GeoCascade
+                embedded
+                levels={FACILITY_GEO_LEVELS}
+                fieldLabels={ADDRESS_FIELD_LABELS}
+                value={facilityForm.geo}
+                onChange={(geo) =>
+                  setFacilityForm((cur) => (cur ? { ...cur, geo, geoTouched: true } : cur))
+                }
+                label="Lieu de la structure"
               />
             </div>
             <div>

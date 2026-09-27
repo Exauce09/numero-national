@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import ActsDocsNav from "../components/ActsDocsNav";
 import {
@@ -21,6 +21,14 @@ import {
   type FacilityAccountPublic,
 } from "../healthAuth";
 import GpsLocatePanel from "../components/GpsLocatePanel";
+import GeoCascade, {
+  ADDRESS_FIELD_LABELS,
+  GEO_PRESETS,
+  resolveGeoByNames,
+  type GeoSelection,
+} from "../components/GeoCascade";
+
+type FacilityPlace = { province: string; ville: string; communeName: string; communeCode: string };
 
 const FACILITY_TYPES: { value: FacilityAccount["facilityType"]; label: string }[] = [
   { value: "HOPITAL", label: "Hôpital" },
@@ -83,6 +91,49 @@ export default function DeclarationsPage() {
   const [formOk, setFormOk] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingAction>(null);
   const [actionBusy, setActionBusy] = useState(false);
+  const [facilityGeo, setFacilityGeo] = useState<GeoSelection>({});
+  const [geoKey, setGeoKey] = useState(0);
+  const geoLoadSeq = useRef(0);
+
+  function loadFacilityGeo(place: FacilityPlace) {
+    const base: GeoSelection = {
+      province_name: place.province,
+      ville_name: place.ville,
+      commune_name: place.communeName,
+      commune_code: place.communeCode,
+      label: [place.province, place.ville, place.communeName].filter(Boolean).join(" · "),
+    };
+    const seq = ++geoLoadSeq.current;
+    setFacilityGeo(base);
+    setGeoKey((k) => k + 1);
+    void resolveGeoByNames({
+      province: place.province,
+      ville: place.ville,
+      commune_code: place.communeCode,
+      commune_name: place.communeName,
+    }).then((resolved) => {
+      if (!resolved || seq !== geoLoadSeq.current) return;
+      setFacilityGeo({ ...base, ...resolved, commune_code: place.communeCode || resolved.commune_code });
+    });
+  }
+
+  function onFacilityGeo(g: GeoSelection) {
+    geoLoadSeq.current += 1;
+    setFacilityGeo(g);
+    setForm((f) => {
+      const communeName = g.commune_name || "";
+      const sameCommune = communeName && communeName === f.communeName;
+      return {
+        ...f,
+        province: g.province_name || "",
+        ville: g.ville_name || g.district_name || "",
+        communeName,
+        communeCode: sameCommune
+          ? f.communeCode
+          : g.commune_code || communeName.toUpperCase().replace(/\s+/g, "-"),
+      };
+    });
+  }
 
   async function refresh() {
     try {
@@ -201,6 +252,7 @@ export default function DeclarationsPage() {
   function openCreate() {
     setEditingId(null);
     setForm(emptyAccountForm);
+    loadFacilityGeo(emptyAccountForm);
     setFormError(null);
     setFormOk(null);
     setFormOpen(true);
@@ -209,7 +261,7 @@ export default function DeclarationsPage() {
   function startEdit(account: FacilityAccountPublic) {
     setPending(null);
     setEditingId(account.id);
-    setForm({
+    const next = {
       facilityName: account.facilityName,
       facilityType: account.facilityType,
       province: account.province || "Kinshasa",
@@ -219,7 +271,9 @@ export default function DeclarationsPage() {
       username: account.username,
       password: "",
       confirmPassword: "",
-    });
+    };
+    setForm(next);
+    loadFacilityGeo(next);
     setFormError(null);
     setFormOk(null);
     setFormOpen(true);
@@ -634,38 +688,27 @@ export default function DeclarationsPage() {
               <div className="full">
                 <GpsLocatePanel
                   title="GPS de la structure"
-                  onResolved={(g) =>
-                    setForm((f) => ({
-                      ...f,
-                      province: g.province || f.province,
-                      ville: g.ville || f.ville,
-                      communeName: g.commune || f.communeName,
-                    }))
-                  }
+                  onResolved={(g) => {
+                    const next = {
+                      ...form,
+                      province: g.province || form.province,
+                      ville: g.ville || form.ville,
+                      communeName: g.commune || form.communeName,
+                    };
+                    setForm(next);
+                    loadFacilityGeo(next);
+                  }}
                 />
               </div>
-              <div>
-                <label className="form-label">Province</label>
-                <input
-                  className="form-control"
-                  value={form.province}
-                  onChange={(e) => setForm({ ...form, province: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="form-label">Ville</label>
-                <input
-                  className="form-control"
-                  value={form.ville}
-                  onChange={(e) => setForm({ ...form, ville: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="form-label">Commune</label>
-                <input
-                  className="form-control"
-                  value={form.communeName}
-                  onChange={(e) => setForm({ ...form, communeName: e.target.value })}
+              <div className="full">
+                <GeoCascade
+                  key={geoKey}
+                  embedded
+                  levels={GEO_PRESETS.place}
+                  fieldLabels={ADDRESS_FIELD_LABELS}
+                  value={facilityGeo}
+                  onChange={onFacilityGeo}
+                  label="Lieu de la structure"
                 />
               </div>
               <div>

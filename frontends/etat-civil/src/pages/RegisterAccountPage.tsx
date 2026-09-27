@@ -24,7 +24,6 @@ import { getSession } from "../auth";
 import PasswordField from "../components/PasswordField";
 import GeoCascade, {
   ADDRESS_FIELD_LABELS,
-  ORIGIN_FIELD_LABELS,
   type GeoLevel,
   type GeoSelection,
 } from "../components/GeoCascade";
@@ -36,11 +35,8 @@ function isKinshasa(name?: string | null): boolean {
   return (name ?? "").toLowerCase().includes("kinshasa");
 }
 
-function registerGeoLevels(provinceName?: string | null): GeoLevel[] {
-  return isKinshasa(provinceName)
-    ? ["province", "ville", "commune", "quartier"]
-    : ["province", "district", "commune", "localite"];
-}
+/** Ville → Commune → Quartier, ou Territoire → Secteur → Village (liste unique Ville / Territoire). */
+const REGISTER_GEO_LEVELS: GeoLevel[] = ["province", "ville", "district", "commune", "quartier", "localite"];
 
 export default function RegisterAccountPage() {
   const session = getSession();
@@ -113,11 +109,7 @@ export default function RegisterAccountPage() {
   function onGeoChange(next: GeoSelection) {
     setGeo(next);
     setProvince(next.province_name || "");
-    const villeOrTerr =
-      isKinshasa(next.province_name)
-        ? next.ville_name || ""
-        : next.district_name || next.ville_name || "";
-    setVilleTerritoire(villeOrTerr);
+    setVilleTerritoire(next.district_name || next.ville_name || "");
     setCommuneSecteur(next.commune_name || "");
     if (
       typeOpt.institutionSelect === "bureau_ec" &&
@@ -504,24 +496,15 @@ export default function RegisterAccountPage() {
                       <GeoCascade
                         value={geo}
                         onChange={onGeoChange}
-                        levels={registerGeoLevels(geo.province_name)}
-                        fieldLabels={{
-                          ...ADDRESS_FIELD_LABELS,
-                          ...ORIGIN_FIELD_LABELS,
-                          district: "Territoire",
-                          commune: isKinshasa(geo.province_name) ? "Commune" : "Secteur / Commune",
-                          localite: "Village",
-                        }}
+                        levels={REGISTER_GEO_LEVELS}
+                        fieldLabels={ADDRESS_FIELD_LABELS}
                         embedded
                         label=""
                       />
                       {!province || !communeSecteur ? (
                         <p className="muted small">
-                          Sélectionnez province puis{" "}
-                          {isKinshasa(geo.province_name)
-                            ? "commune"
-                            : "territoire puis secteur / commune"}{" "}
-                          (obligatoire).
+                          Sélectionnez la province, la ville ou le territoire, puis la commune ou le
+                          secteur (obligatoire).
                         </p>
                       ) : null}
                     </div>

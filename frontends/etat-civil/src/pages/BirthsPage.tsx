@@ -910,8 +910,8 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
           <div className="full">
             <GeoCascade
               embedded
-              zoneChoice
               allowAdd
+              levels={GEO_PRESETS.address}
               label="Lieu de naissance"
               fieldLabels={{
                 ...ADDRESS_FIELD_LABELS,
@@ -1093,7 +1093,6 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
             <label className="form-label">Adresse de la mère *</label>
             <GeoCascade
               embedded
-              zoneChoice
               allowAdd
               levels={GEO_PRESETS.address}
               fieldLabels={{
