@@ -297,65 +297,6 @@ export const EC_ACT_FORMS: ActFormSchema[] = [
       },
     ],
   },
-  {
-    id: "notif_naissance",
-    title: "Naissance",
-    subtitle:
-      "Même identité enfant / mère / père que l'acte EC — transmis au bureau pour validation. Ce n'est pas l'acte officiel.",
-    href: "/sante/births",
-    sections: [
-      {
-        id: "enfant",
-        title: "Enfant",
-        fields: [
-          { key: "nom", label: "Nom", required: true },
-          { key: "postnom", label: "Postnom" },
-          { key: "prenom", label: "Prénom(s)", required: true },
-          { key: "sexe", label: "Sexe", required: true },
-          { key: "date_naissance", label: "Date de naissance", required: true },
-          { key: "heure_naissance", label: "Heure de naissance" },
-          { key: "issue_naissance", label: "Issue (né vivant / mort-né)", required: true },
-          { key: "jumeaux", label: "Naissance multiple (jumeaux…)" },
-          { key: "type_accouchement", label: "Type d'accouchement", required: true },
-          {
-            key: "etat_morphologique",
-            label: "État morphologique (bien formé / malformé)",
-            required: true,
-          },
-          { key: "lieu_naissance", label: "Lieu (structure)", required: true },
-        ],
-      },
-      {
-        id: "filiation",
-        title: "Filiation",
-        fields: [
-          { key: "mere", label: "Mère", required: true },
-          { key: "adresse_mere", label: "Adresse de la mère" },
-          { key: "pere", label: "Père (le cas échéant)" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "notif_deces",
-    title: "Décès",
-    subtitle: "Constat transmis au bureau EC — ne constitue pas l'acte officiel.",
-    href: "/sante/deaths",
-    sections: [
-      {
-        id: "defunt",
-        title: "Personne à enregistrer",
-        fields: [
-          { key: "defunt", label: "Identité de la personne", required: true },
-          { key: "type_deces", label: "Type de décès (Décès / Mort-né)", required: true },
-          { key: "date_deces", label: "Date du décès", required: true },
-          { key: "cause", label: "Cause du décès", required: true },
-          { key: "lieu_deces", label: "Lieu du décès", required: true },
-          { key: "declarant", label: "Déclarant / responsable de la déclaration" },
-        ],
-      },
-    ],
-  },
 ];
 
 export function getActFormSchema(id: string): ActFormSchema | undefined {

@@ -23,10 +23,10 @@ export default function HealthActsPendingPage() {
 
       <div className="panel" style={{ marginBottom: "1rem" }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
-          <Link className="btn-primary" style={{ width: "auto" }} to="/sante/births">
+          <Link className="btn-primary" style={{ width: "auto" }} to="/sante/births?nouveau=1">
             + Naissance
           </Link>
-          <Link className="btn-secondary" style={{ width: "auto" }} to="/sante/deaths">
+          <Link className="btn-secondary" style={{ width: "auto" }} to="/sante/deaths?nouveau=1">
             + Décès
           </Link>
         </div>
