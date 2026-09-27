@@ -2,18 +2,16 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
-import { wipeAllAdultsOnce } from "./registry";
-import { seedBatchBirths } from "./seedBatchBirths";
+import { purgeLocalDraftActsOnce, wipeAllAdultsOnce } from "./registry";
 import "./styles.css";
 
 wipeAllAdultsOnce();
+purgeLocalDraftActsOnce();
 
-void seedBatchBirths().finally(() => {
-  ReactDOM.createRoot(document.getElementById("root")!).render(
-    <React.StrictMode>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </React.StrictMode>,
-  );
-});
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </React.StrictMode>,
+);

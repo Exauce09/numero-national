@@ -850,6 +850,138 @@ export function wipeAllAdultsOnce(): { removed: number; kept: number } {
   return { removed: removedIds.size, kept: cleanedMinors.length };
 }
 
+const DRAFT_STATUSES = new Set([
+  "",
+  "DRAFT",
+  "SUBMITTED",
+  "UNDER_REVIEW",
+  "VERIFIED",
+  "PENDING_OFFICER",
+  "CORRECTION_REQUIRED",
+]);
+const NON_WORKFLOW_TYPES = new Set(["CENSUS", "DOCUMENT", "DISPLACEMENT"]);
+const DRAFT_PURGE_KINDS = [
+  "births",
+  "marriages",
+  "divorces",
+  "deaths",
+  "adoptions",
+  "recognitions",
+  "rectifications",
+];
+const PURGE_DRAFTS_LOCAL_FLAG = "nn_civil_purge_drafts_local_v1";
+const PURGE_DRAFTS_SERVER_FLAG = "nn_civil_purge_drafts_server_v1";
+
+/** Brouillon / en attente de validation (hors recensement, documents, déplacements). */
+export function isDraftAct(a: { type?: string; act_type?: string; status?: string | null }): boolean {
+  const type = String(a.type ?? a.act_type ?? "").toUpperCase();
+  if (NON_WORKFLOW_TYPES.has(type)) return false;
+  return DRAFT_STATUSES.has(String(a.status ?? "").toUpperCase().trim());
+}
+
+/** Retire les liens de mariage des actes supprimés ; les époux sans autre mariage redeviennent célibataires. */
+function dropMarriageLinks(registry: Registry, actNumbers: Set<string>): void {
+  if (actNumbers.size === 0) return;
+  const dropped = registry.marriages.filter((m) => actNumbers.has(m.act_number));
+  if (dropped.length === 0) return;
+  registry.marriages = registry.marriages.filter((m) => !actNumbers.has(m.act_number));
+  const touched = new Set(dropped.flatMap((m) => [m.epoux_id, m.epouse_id]));
+  for (const id of touched) {
+    const stillMarried = registry.marriages.some(
+      (m) => m.status === "ACTIVE" && (m.epoux_id === id || m.epouse_id === id),
+    );
+    if (stillMarried) continue;
+    const idx = registry.persons.findIndex((p) => p.id === id);
+    if (idx >= 0 && registry.persons[idx].etat_civil === "MARIE") {
+      registry.persons[idx] = { ...registry.persons[idx], etat_civil: "CELIBATAIRE" };
+    }
+    if (getCivilStatusOverride(id) === "MARIE") setCivilStatusOverride(id, "CELIBATAIRE");
+  }
+}
+
+/** Supprime tous les actes en brouillon du cache local. */
+export function purgeLocalDraftActs(): number {
+  const registry = load();
+  const drafts = registry.acts.filter(isDraftAct);
+  if (drafts.length === 0) return 0;
+  registry.acts = registry.acts.filter((a) => !isDraftAct(a));
+  dropMarriageLinks(
+    registry,
+    new Set(drafts.filter((a) => a.type === "MARRIAGE").map((a) => a.act_number)),
+  );
+  save(registry);
+  return drafts.length;
+}
+
+export function purgeLocalDraftActsOnce(): number {
+  if (typeof localStorage === "undefined") return 0;
+  if (localStorage.getItem(PURGE_DRAFTS_LOCAL_FLAG) === "1") return 0;
+  const n = purgeLocalDraftActs();
+  localStorage.setItem(PURGE_DRAFTS_LOCAL_FLAG, "1");
+  return n;
+}
+
+/**
+ * Supprime (soft delete) les actes brouillons côté API, sinon ils reviennent
+ * dans le cache à la prochaine synchronisation.
+ */
+export async function purgeServerDraftActs(): Promise<{ deleted: number; failed: number }> {
+  await ensureAccessToken();
+  const session = getSession();
+  if (!session?.accessToken) return { deleted: 0, failed: 0 };
+  const headers = {
+    Accept: "application/json",
+    Authorization: `Bearer ${session.accessToken}`,
+  };
+  let deleted = 0;
+  let failed = 0;
+  const marriageNumbers = new Set<string>();
+  for (const kind of DRAFT_PURGE_KINDS) {
+    for (let offset = 0; offset < 5000; offset += 200) {
+      const res = await fetch(`${API_BASE}/civil/${kind}?limit=200&offset=${offset}`, { headers });
+      if (!res.ok) {
+        failed += 1;
+        break;
+      }
+      const rows = (await res.json()) as Array<{
+        id: string;
+        act_type?: string;
+        act_number?: string;
+        status?: string;
+      }>;
+      for (const row of rows.filter(isDraftAct)) {
+        const del = await fetch(`${API_BASE}/civil/acts/${row.id}`, { method: "DELETE", headers });
+        if (del.ok || del.status === 404) {
+          deleted += 1;
+          if (kind === "marriages" && row.act_number) marriageNumbers.add(row.act_number);
+        } else {
+          failed += 1;
+        }
+      }
+      if (rows.length < 200) break;
+    }
+  }
+  purgeLocalDraftActs();
+  if (marriageNumbers.size) {
+    const registry = load();
+    dropMarriageLinks(registry, marriageNumbers);
+    save(registry);
+  }
+  return { deleted, failed };
+}
+
+export async function purgeServerDraftActsOnce(): Promise<void> {
+  if (typeof localStorage === "undefined") return;
+  if (localStorage.getItem(PURGE_DRAFTS_SERVER_FLAG) === "1") return;
+  if (!getSession()?.accessToken) return;
+  try {
+    const { failed } = await purgeServerDraftActs();
+    if (failed === 0) localStorage.setItem(PURGE_DRAFTS_SERVER_FLAG, "1");
+  } catch {
+    /* réessai au prochain chargement */
+  }
+}
+
 export function listActs(type?: ActType): Act[] {
   const acts = [...load().acts].sort((a, b) => b.created_at.localeCompare(a.created_at));
   if (!type) return acts;

@@ -27,6 +27,7 @@ import {
 } from "./prefs";
 import { api } from "./api";
 import { listPendingOfficerDeclarations } from "./civilDeclarations";
+import { purgeServerDraftActsOnce } from "./registry";
 import LoginPage from "./pages/LoginPage";
 import RegisterAccountPage from "./pages/RegisterAccountPage";
 import SetupFirstUserPage from "./pages/SetupFirstUserPage";
@@ -162,6 +163,7 @@ function Shell() {
     void (async () => {
       await ensureCanonicalAccounts();
       ensureBootstrapSuperAdmin();
+      await purgeServerDraftActsOnce();
       const s = getSession();
       if (!s?.username) return;
       const local = getEcUserByEmail(s.username);

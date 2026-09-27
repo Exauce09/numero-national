@@ -142,7 +142,7 @@ type CensusDraft = {
 
 export default function CensusPage() {
   const location = useLocation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [step, setStep] = useState<StepId>(1);
   const [ficheKind, setFicheKind] = useState<FicheKind>("personne");
   const [dateDeces, setDateDeces] = useState("");
