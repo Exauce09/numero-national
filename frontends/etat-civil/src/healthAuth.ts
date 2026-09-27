@@ -30,6 +30,8 @@ export type FacilityAccount = {
   updated_at?: string;
   /** Lien vers une demande d'inscription plateforme. */
   registration_request_id?: string;
+  /** E-mail de connexion (peut différer de l'identifiant). */
+  email?: string;
 };
 
 export type HealthSession = {
@@ -86,6 +88,7 @@ function normalizeAccount(
     registration_request_id: raw.registration_request_id
       ? String(raw.registration_request_id)
       : undefined,
+    email: raw.email ? String(raw.email).trim().toLowerCase() : undefined,
   };
 }
 
@@ -139,6 +142,35 @@ export function findFacilityByUsername(username: string): FacilityAccountPublic 
   return hit ? toPublic(hit) : null;
 }
 
+/** Identifiant, e-mail complet, ou partie avant @ (ex. exauce@gmail.com → exauce). */
+export function findFacilityByIdentifier(identifier: string): FacilityAccountPublic | null {
+  const id = identifier.trim().toLowerCase();
+  if (!id) return null;
+  const list = ensureAccountsReady();
+  const exact = list.find((a) => a.username === id || a.email === id);
+  if (exact) return toPublic(exact);
+  const local = id.includes("@") ? id.slice(0, id.indexOf("@")) : "";
+  if (local.length < 3) return null;
+  const byLocal = list.filter(
+    (a) =>
+      a.username === local ||
+      a.username.split("@")[0] === local ||
+      (a.email ? a.email.split("@")[0] === local : false),
+  );
+  return byLocal.length === 1 ? toPublic(byLocal[0]) : null;
+}
+
+export function rememberFacilityEmail(username: string, email: string): void {
+  const login = username.trim().toLowerCase();
+  const mail = email.trim().toLowerCase();
+  if (!login || !mail.includes("@")) return;
+  const list = ensureAccountsReady();
+  const idx = list.findIndex((a) => a.username === login);
+  if (idx < 0 || list[idx].email === mail) return;
+  list[idx] = { ...list[idx], email: mail, updated_at: new Date().toISOString() };
+  saveAccounts(list);
+}
+
 async function passwordMatches(account: FacilityAccount, password: string): Promise<boolean> {
   if (account.passwordHash) {
     const hash = await hashPassword(password);
@@ -165,6 +197,7 @@ function buildFacilityBase(
     facilityName: string;
     facilityType: FacilityAccount["facilityType"];
     registration_request_id?: string;
+    email?: string;
   } & FacilityGeoInput,
   secrets: { password?: string; passwordHash?: string },
   prev?: FacilityAccount,
@@ -191,6 +224,7 @@ function buildFacilityBase(
     created_at: prev?.created_at ?? new Date().toISOString(),
     updated_at: prev ? new Date().toISOString() : undefined,
     registration_request_id: input.registration_request_id ?? prev?.registration_request_id,
+    email: input.email?.trim().toLowerCase() || prev?.email,
   };
 }
 
@@ -209,6 +243,7 @@ export async function createFacilityAccount(input: {
   geo_label?: string;
   geo_mode?: "kinshasa" | "province";
   registration_request_id?: string;
+  email?: string;
 }): Promise<FacilityAccount> {
   const username = input.username.trim().toLowerCase();
   if (!username || !input.password || !input.facilityName.trim()) {
@@ -251,6 +286,7 @@ export function createFacilityAccountFromHash(input: {
   geo_label?: string;
   geo_mode?: "kinshasa" | "province";
   registration_request_id?: string;
+  email?: string;
 }): FacilityAccount {
   const username = input.username.trim().toLowerCase();
   if (!username || !input.passwordHash || !input.facilityName.trim()) {
@@ -396,7 +432,7 @@ export function clearHealthSession() {
 export async function loginHealth(username: string, password: string): Promise<HealthSession> {
   ensureAccountsReady();
   const user = username.trim().toLowerCase();
-  const account = loadAccounts().find((a) => a.username === user);
+  const account = loadAccounts().find((a) => a.username === user || a.email === user);
   if (!account || !(await passwordMatches(account, password))) {
     throw new Error(
       "Identifiants incorrects. Demandez un compte à l'officier d'état civil (Déclarations) ou à l'État civil national.",

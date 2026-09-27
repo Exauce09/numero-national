@@ -4,11 +4,14 @@
  * Exception : HOPITAL_MATERNITE → provisionne aussi le portail /sante.
  */
 
-import { hashPassword, createEcUserFromHash, type EcUserRole } from "./ecUsers";
+import { hashPassword, createEcUserFromHash, getEcUserByEmail, type EcUserRole } from "./ecUsers";
 import { listAllCommunesFlat } from "./geoFallback";
+import { roleTitleFor } from "./rbac";
 import {
   createFacilityAccountFromHash,
+  findFacilityByIdentifier,
   findFacilityByUsername,
+  rememberFacilityEmail,
   type FacilityAccountPublic,
 } from "./healthAuth";
 
@@ -791,7 +794,10 @@ export function provisionHospitalFacilityFromRequest(
   if (!req.password_hash) return null;
 
   const existing = findFacilityByUsername(req.login_id);
-  if (existing) return existing;
+  if (existing) {
+    rememberFacilityEmail(req.login_id, req.email);
+    return findFacilityByUsername(req.login_id);
+  }
 
   const province = (req.province || "Kinshasa").trim();
   const commune = (req.commune_secteur || req.ville_territoire || "Gombe").trim();
@@ -803,6 +809,7 @@ export function provisionHospitalFacilityFromRequest(
 
   const account = createFacilityAccountFromHash({
     username: req.login_id,
+    email: req.email,
     passwordHash: req.password_hash,
     facilityName,
     facilityType: "HOPITAL",
@@ -859,17 +866,24 @@ export type HealthLoginResolution = {
  * Accepte e-mail, identifiant ou téléphone pour l'espace santé et explique
  * pourquoi un compte est refusé (inscription non terminée, mauvais portail…).
  */
+function sameLogin(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
 export function resolveHealthLogin(identifier: string): HealthLoginResolution {
   const id = identifier.trim().toLowerCase();
   const phone = normalizePhone(identifier);
+  const local = id.includes("@") ? id.slice(0, id.indexOf("@")) : "";
 
-  const direct = findFacilityByUsername(id);
+  const direct = findFacilityByIdentifier(id);
   if (direct) {
     return {
       loginId: direct.username,
       isHealth: true,
       hint: direct.active
-        ? `Mot de passe incorrect pour « ${direct.facilityName} ».`
+        ? direct.username !== id
+          ? `Mot de passe incorrect pour « ${direct.facilityName} » (identifiant : ${direct.username}).`
+          : `Mot de passe incorrect pour « ${direct.facilityName} ».`
         : `Le compte « ${direct.facilityName} » est désactivé. Réactivez-le dans Déclarations → Structures sanitaires.`,
     };
   }
@@ -883,18 +897,29 @@ export function resolveHealthLogin(identifier: string): HealthLoginResolution {
   const matches = loadRequests()
     .filter(
       (r) =>
-        r.email === id ||
-        r.login_id === id ||
+        sameLogin(r.email, id) ||
+        sameLogin(r.login_id, id) ||
+        (local.length >= 3 &&
+          (sameLogin(r.login_id, local) ||
+            sameLogin(r.email.slice(0, r.email.indexOf("@")), local))) ||
         (phone.length >= 8 && normalizePhone(r.telephone) === phone),
     )
-    .sort((a, b) => (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9));
+    .sort((a, b) => {
+      const healthA = a.accountType === "HOPITAL_MATERNITE" ? 0 : 1;
+      const healthB = b.accountType === "HOPITAL_MATERNITE" ? 0 : 1;
+      if (healthA !== healthB) return healthA - healthB;
+      return (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9);
+    });
   const req = matches[0];
 
   if (!req) {
+    const bureau = getEcUserByEmail(id) || (local ? getEcUserByEmail(local) : undefined);
     return {
       loginId: id,
       isHealth: false,
-      hint: `Aucun compte structure sanitaire « ${identifier.trim()} » dans ce navigateur. Les comptes sont enregistrés localement : ils n'existent que dans le navigateur et à l'adresse où ils ont été créés (ex. http://localhost:5180). Recréez-le via Créer un compte → Infirmier titulaire.`,
+      hint: bureau
+        ? `« ${identifier.trim()} » est un compte bureau (${roleTitleFor(bureau.roles)}), pas un infirmier titulaire. Connectez-vous sur /login.`
+        : `Aucun compte infirmier titulaire « ${identifier.trim()} » dans ce navigateur. Ouvrez la même adresse que lors de la création (http://localhost:5180) ou faites recréer le compte par l'État civil national : Créer un compte → Infirmier titulaire.`,
     };
   }
 
