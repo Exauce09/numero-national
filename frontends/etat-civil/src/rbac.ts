@@ -215,6 +215,7 @@ export function canSeeNav(key: NavKey, roles: string[], permissions?: string[] |
     switch (key) {
       case "dashboard":
       case "search":
+      case "synoptique":
       case "procedure":
       case "naissances":
       case "mariages":
