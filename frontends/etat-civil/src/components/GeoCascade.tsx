@@ -78,6 +78,8 @@ export const ORIGIN_FIELD_LABELS: Partial<Record<GeoLevel, string>> = {
 
 type Item = { id: string; code: string; name: string; voie_type?: string; chef_lieu?: string };
 
+type ZoneKind = "ville" | "territoire";
+
 type AddKind = "district" | "commune" | "localite" | "quartier" | "avenue" | "rue";
 
 const BASE = import.meta.env.VITE_API_BASE ?? "/api/v1";
@@ -130,6 +132,50 @@ async function postJson(
   }
 }
 
+const normGeo = (s?: string) =>
+  (s ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "");
+
+/** Retrouve les identifiants province → ville → commune à partir des noms (ex. structure sanitaire). */
+export async function resolveGeoByNames(input: {
+  province?: string;
+  ville?: string;
+  commune_code?: string;
+  commune_name?: string;
+}): Promise<GeoSelection | null> {
+  const provinces = await fetchItems("/geo/provinces");
+  const p = provinces.find((x) => normGeo(x.name) === normGeo(input.province));
+  if (!p) return null;
+  const sel: GeoSelection = { province_id: p.id, province_name: p.name };
+  const villes = await fetchItems(`/geo/villes?province_id=${p.id}`);
+  const v = villes.find((x) => normGeo(x.name) === normGeo(input.ville));
+  if (v) {
+    sel.ville_id = v.id;
+    sel.ville_name = v.name;
+    let communes = await fetchItems(`/geo/communes?ville_id=${v.id}`);
+    if (communes.length === 0) communes = await fetchItems(`/geo/communes?province_id=${p.id}`);
+    const byName = normGeo(input.commune_name);
+    const code = normGeo(input.commune_code);
+    const codeTail = normGeo((input.commune_code ?? "").split(/[-_/]/).slice(1).join(""));
+    const c = communes.find(
+      (x) =>
+        (byName && normGeo(x.name) === byName) ||
+        (code && normGeo(x.code) === code) ||
+        (codeTail && normGeo(x.name) === codeTail),
+    );
+    if (c) {
+      sel.commune_id = c.id;
+      sel.commune_name = c.name;
+      sel.commune_code = c.code;
+    }
+  }
+  sel.label = [sel.province_name, sel.ville_name, sel.commune_name].filter(Boolean).join(" · ");
+  return sel;
+}
+
 type Props = {
   value?: GeoSelection;
   onChange: (v: GeoSelection) => void;
@@ -158,22 +204,23 @@ export default function GeoCascade({
   fieldLabels,
   zoneChoice = false,
 }: Props) {
-  const [zoneKind, setZoneKind] = useState<"ville" | "territoire" | null>(() => {
+  const [zoneKind, setZoneKind] = useState<ZoneKind | null>(() => {
     if (!zoneChoice) return null;
     if (value?.district_id || value?.district_name) return "territoire";
     if (value?.ville_id || value?.ville_name) return "ville";
     return null;
   });
 
-  const activeLevels: GeoLevel[] = zoneChoice
-    ? zoneKind === "territoire"
-      ? ["province", "district", "commune", "localite"]
-      : zoneKind === "ville"
-        ? ["province", "ville", "commune", "quartier", "avenue"]
-        : ["province"]
-    : levels;
+  const levelsFor = (kind: ZoneKind | null): GeoLevel[] =>
+    zoneChoice
+      ? kind === "territoire"
+        ? ["province", "district", "commune", "localite"]
+        : kind === "ville"
+          ? ["province", "ville", "commune", "quartier", "avenue"]
+          : ["province"]
+      : levels;
 
-  const show = (level: GeoLevel) => activeLevels.includes(level);
+  const show = (level: GeoLevel, kind: ZoneKind | null = zoneKind) => levelsFor(kind).includes(level);
   const lbl = (level: GeoLevel) => {
     if (zoneChoice && zoneKind === "territoire") {
       if (level === "commune") return fieldLabels?.commune ?? "Secteur / Chefferie";
@@ -238,31 +285,39 @@ export default function GeoCascade({
       const markLocal = () =>
         setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
       const next = { ...value };
+      const kind: ZoneKind | null = zoneChoice
+        ? value.district_id
+          ? "territoire"
+          : value.ville_id
+            ? "ville"
+            : zoneKind
+        : null;
+      if (zoneChoice) setZoneKind(kind);
       if (value.province_id) {
-        if (show("ville")) {
+        if (show("ville") || zoneChoice) {
           const vrows = await fetchItems(`/geo/villes?province_id=${value.province_id}`, markLocal);
           if (cancelled) return;
           setVilles(vrows);
         }
-        if (show("district")) {
+        if (show("district") || zoneChoice) {
           const drows = await fetchItems(`/geo/districts?province_id=${value.province_id}`, markLocal);
           if (cancelled) return;
           setDistricts(drows);
         }
       }
-      if (value.ville_id && show("commune")) {
+      if (value.ville_id && show("commune", kind)) {
         let crows = await fetchItems(`/geo/communes?ville_id=${value.ville_id}`, markLocal);
         if (crows.length === 0 && value.province_id) {
           crows = await fetchItems(`/geo/communes?province_id=${value.province_id}`, markLocal);
         }
         if (cancelled) return;
         setCommunes(crows);
-      } else if (value.district_id && show("commune")) {
+      } else if (value.district_id && show("commune", kind)) {
         const crows = await fetchItems(`/geo/communes?district_id=${value.district_id}`, markLocal);
         if (cancelled) return;
         setCommunes(crows);
       }
-      if (value.commune_id && show("quartier")) {
+      if (value.commune_id && show("quartier", kind)) {
         const qrows = await fetchItems(`/geo/quartiers?commune_id=${value.commune_id}`, markLocal);
         if (cancelled) return;
         setQuartiers(qrows);
@@ -298,13 +353,12 @@ export default function GeoCascade({
 
   async function onProvince(id: string) {
     const p = provinces.find((x) => x.id === id);
-    const nextZone = zoneChoice ? zoneKind : null;
+    if (zoneChoice) setZoneKind(null);
     emit({ province_id: id, province_name: p?.name });
     const markLocal = () =>
       setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
-    const loadDistrict =
-      show("district") || (zoneChoice && (!nextZone || nextZone === "territoire"));
-    const loadVille = show("ville") || (zoneChoice && (!nextZone || nextZone === "ville"));
+    const loadDistrict = show("district") || zoneChoice;
+    const loadVille = show("ville") || zoneChoice;
     setDistricts(loadDistrict ? await fetchItems(`/geo/districts?province_id=${id}`, markLocal) : []);
     setVilles(loadVille ? await fetchItems(`/geo/villes?province_id=${id}`, markLocal) : []);
     setCommunes([]);
@@ -314,28 +368,27 @@ export default function GeoCascade({
     setRues([]);
   }
 
-  async function onZoneKind(kind: "ville" | "territoire") {
-    setZoneKind(kind);
-    const provinceId = sel.province_id;
-    if (!provinceId) return;
-    const markLocal = () =>
-      setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
-    emit({ province_id: provinceId, province_name: sel.province_name });
-    if (kind === "territoire") {
-      setDistricts(await fetchItems(`/geo/districts?province_id=${provinceId}`, markLocal));
-      setVilles([]);
-    } else {
-      setVilles(await fetchItems(`/geo/villes?province_id=${provinceId}`, markLocal));
-      setDistricts([]);
+  /** Liste unique Ville / Territoire : `ville:<id>` ou `territoire:<id>`. */
+  async function onZonePick(raw: string) {
+    const sep = raw.indexOf(":");
+    const kind = raw.slice(0, sep) as ZoneKind;
+    const id = raw.slice(sep + 1);
+    if (!id || (kind !== "ville" && kind !== "territoire")) {
+      setZoneKind(null);
+      emit({ province_id: sel.province_id, province_name: sel.province_name });
+      setCommunes([]);
+      setLocalites([]);
+      setQuartiers([]);
+      setAvenues([]);
+      setRues([]);
+      return;
     }
-    setCommunes([]);
-    setLocalites([]);
-    setQuartiers([]);
-    setAvenues([]);
-    setRues([]);
+    setZoneKind(kind);
+    if (kind === "ville") await onVille(id, kind);
+    else await onDistrict(id, kind);
   }
 
-  async function onVille(id: string) {
+  async function onVille(id: string, kind: ZoneKind | null = zoneKind) {
     const v = villes.find((x) => x.id === id);
     const base = { ...sel };
     emit({
@@ -344,6 +397,7 @@ export default function GeoCascade({
       province_name: base.province_name,
       ville_id: id,
       ville_name: v?.name,
+      ...(zoneChoice ? { district_id: undefined, district_name: undefined } : {}),
       commune_id: undefined,
       commune_name: undefined,
       commune_code: undefined,
@@ -359,8 +413,8 @@ export default function GeoCascade({
     const markLocal = () =>
       setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
     // Prefer ville; if empty, also try province-wide so commune never disappears.
-    let rows = show("commune") ? await fetchItems(`/geo/communes?ville_id=${id}`, markLocal) : [];
-    if (show("commune") && rows.length === 0 && base.province_id) {
+    let rows = show("commune", kind) ? await fetchItems(`/geo/communes?ville_id=${id}`, markLocal) : [];
+    if (show("commune", kind) && rows.length === 0 && base.province_id) {
       rows = await fetchItems(`/geo/communes?province_id=${base.province_id}`, markLocal);
     }
     setCommunes(rows);
@@ -370,13 +424,25 @@ export default function GeoCascade({
     setLocalites([]);
   }
 
-  async function onDistrict(id: string) {
-    const d = districts.find((x) => x.id === id);
+  async function onDistrict(id: string, kind: ZoneKind | null = zoneKind, item?: Item) {
+    const d = item ?? districts.find((x) => x.id === id);
     const base = { ...sel };
     emit({
       ...base,
       district_id: id,
       district_name: d?.name,
+      ...(zoneChoice
+        ? {
+            ville_id: undefined,
+            ville_name: undefined,
+            quartier_id: undefined,
+            quartier_name: undefined,
+            avenue_id: undefined,
+            avenue_name: undefined,
+            rue_id: undefined,
+            rue_name: undefined,
+          }
+        : {}),
       commune_id: undefined,
       commune_name: undefined,
       commune_code: undefined,
@@ -385,15 +451,21 @@ export default function GeoCascade({
     });
     const markLocal = () =>
       setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
-    let byDist = show("commune") ? await fetchItems(`/geo/communes?district_id=${id}`, markLocal) : [];
-    if (show("commune") && byDist.length === 0 && base.ville_id) {
+    const withCommunes = show("commune", kind);
+    let byDist = withCommunes ? await fetchItems(`/geo/communes?district_id=${id}`, markLocal) : [];
+    if (withCommunes && !zoneChoice && byDist.length === 0 && base.ville_id) {
       byDist = await fetchItems(`/geo/communes?ville_id=${base.ville_id}`, markLocal);
     }
-    if (show("commune") && byDist.length === 0 && base.province_id) {
+    if (withCommunes && byDist.length === 0 && base.province_id) {
       byDist = await fetchItems(`/geo/communes?province_id=${base.province_id}`, markLocal);
     }
-    if (byDist.length) setCommunes(byDist);
-    setLocalites(show("localite") ? await fetchItems(`/geo/localites?district_id=${id}`, markLocal) : []);
+    if (byDist.length || zoneChoice) setCommunes(byDist);
+    setQuartiers([]);
+    setAvenues([]);
+    setRues([]);
+    setLocalites(
+      show("localite", kind) ? await fetchItems(`/geo/localites?district_id=${id}`, markLocal) : [],
+    );
   }
 
   async function onCommune(id: string) {
@@ -525,7 +597,9 @@ export default function GeoCascade({
     setAddOk(`Ajouté : ${created.name}`);
     if (addKind === "district") {
       setDistricts((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, "fr")));
-      await onDistrict(created.id);
+      const kind: ZoneKind | null = zoneChoice ? "territoire" : zoneKind;
+      if (zoneChoice) setZoneKind(kind);
+      await onDistrict(created.id, kind, created);
     } else if (addKind === "commune") {
       setCommunes((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, "fr")));
       await onCommune(created.id);
@@ -620,37 +694,59 @@ export default function GeoCascade({
             onPick={(id) => void onProvince(id)}
           />
         ) : null}
-        {zoneChoice && sel.province_id ? (
-          <div className="full">
-            <label className="form-label">Type de zone *</label>
-            <div className="action-row" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                className={`btn-sm${zoneKind === "ville" ? " btn-add" : " btn-secondary"}`}
-                onClick={() => void onZoneKind("ville")}
-                aria-pressed={zoneKind === "ville"}
-              >
-                Ville
-              </button>
-              <button
-                type="button"
-                className={`btn-sm${zoneKind === "territoire" ? " btn-add" : " btn-secondary"}`}
-                onClick={() => void onZoneKind("territoire")}
-                aria-pressed={zoneKind === "territoire"}
-              >
-                Territoire
-              </button>
+        {zoneChoice ? (
+          <div>
+            <div className="geo-field-head">
+              <label className="form-label">Ville / Territoire *</label>
+              {allowAdd ? (
+                <button
+                  type="button"
+                  className="btn-add btn-sm"
+                  disabled={!canAdd("district")}
+                  onClick={() => openAdd("district")}
+                  title={
+                    !canAdd("district") ? "Sélectionnez d'abord la province" : "Ajouter un territoire absent"
+                  }
+                >
+                  + Ajouter
+                </button>
+              ) : null}
             </div>
-            <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
-              {zoneKind === "ville"
-                ? "Puis : Commune → Quartier → Avenue → N°"
-                : zoneKind === "territoire"
-                  ? "Puis : Secteur → Village"
-                  : "Choisissez Ville (urbain) ou Territoire (rural)."}
-            </p>
+            <select
+              className="form-control"
+              value={
+                zoneKind === "ville" && sel.ville_id
+                  ? `ville:${sel.ville_id}`
+                  : zoneKind === "territoire" && sel.district_id
+                    ? `territoire:${sel.district_id}`
+                    : ""
+              }
+              disabled={!sel.province_id}
+              onChange={(e) => void onZonePick(e.target.value)}
+            >
+              <option value="">— Sélectionner —</option>
+              {villes.length ? (
+                <optgroup label="Villes">
+                  {villes.map((o) => (
+                    <option key={o.id} value={`ville:${o.id}`}>
+                      {o.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
+              {districts.length ? (
+                <optgroup label="Territoires / districts">
+                  {districts.map((o) => (
+                    <option key={o.id} value={`territoire:${o.id}`}>
+                      {o.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
+            </select>
           </div>
         ) : null}
-        {show("ville") ? (
+        {show("ville") && !zoneChoice ? (
           <Field
             labelText={lbl("ville")}
             value={sel.ville_id ?? ""}
@@ -659,7 +755,7 @@ export default function GeoCascade({
             onPick={(id) => void onVille(id)}
           />
         ) : null}
-        {show("district") ? (
+        {show("district") && !zoneChoice ? (
           <Field
             labelText={lbl("district")}
             value={sel.district_id ?? ""}

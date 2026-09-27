@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import ActPrintActions from "../components/ActPrintActions";
 import ActPrintCard from "../components/ActPrintCard";
@@ -10,6 +10,7 @@ import GeoCascade, {
   ADDRESS_FIELD_LABELS,
   GEO_PRESETS,
   ORIGIN_FIELD_LABELS,
+  resolveGeoByNames,
   type GeoSelection,
 } from "../components/GeoCascade";
 import GpsLocatePanel from "../components/GpsLocatePanel";
@@ -101,6 +102,25 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
     ville_name: officer.ville,
     province_name: officer.province,
   });
+
+  /** IT : l'enfant naît dans la structure — province, ville et commune déjà connues. */
+  useEffect(() => {
+    if (!health) return;
+    let cancelled = false;
+    void resolveGeoByNames({
+      province: officer.province,
+      ville: officer.ville,
+      commune_code: officer.code,
+      commune_name: officer.name,
+    }).then((resolved) => {
+      if (cancelled || !resolved) return;
+      setGeoNaissance((cur) => (cur.province_id ? cur : resolved));
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- une fois à l'ouverture du formulaire
+  }, []);
   const [modeEnregistrement, setModeEnregistrement] = useState<
     (typeof MODES_ENREGISTREMENT)[number]["value"]
   >("sans_procuration");
