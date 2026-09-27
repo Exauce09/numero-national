@@ -304,6 +304,20 @@ export default function PersonPicker({
         nationalite: natFromLabel(i.nationalite),
         parcours_professionnel: i.profession.trim() || undefined,
         adresse: i.adresse.trim() || undefined,
+        adresse_geo: i.adresse_geo
+          ? {
+              province_name: i.adresse_geo.province_name,
+              ville_name: i.adresse_geo.ville_name,
+              district_name: i.adresse_geo.district_name,
+              commune_name: i.adresse_geo.commune_name,
+              commune_code: i.adresse_geo.commune_code,
+              quartier_name: i.adresse_geo.quartier_name,
+              localite_name: i.adresse_geo.localite_name,
+              avenue_name: i.adresse_geo.avenue_name,
+              numero: i.adresse_geo.numero,
+              label: i.adresse_geo.label || i.adresse.trim() || undefined,
+            }
+          : undefined,
         secteur: i.secteur.trim() || undefined,
         territoire: i.territoire.trim() || undefined,
         ville: i.ville.trim() || undefined,

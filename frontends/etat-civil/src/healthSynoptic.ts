@@ -130,7 +130,7 @@ function facilityBirthEvents(scope: HealthScope): Array<{ sexe: string; nat: Nat
     });
   }
 
-  for (const d of listFacilityDeclarations(scope.facilityId)) {
+  for (const d of listFacilityDeclarations(scope.facilityId, scope.facilityName)) {
     if (d.declaration_type !== "BIRTH" || d.status === "REJECTED") continue;
     if (linkedDeclIds.has(d.id)) continue;
     events.push({
@@ -216,7 +216,7 @@ export function healthSynopticDeaths() {
     apply(act.payload);
   }
 
-  const decls = listFacilityDeclarations(scope.facilityId).filter(
+  const decls = listFacilityDeclarations(scope.facilityId, scope.facilityName).filter(
     (d) => d.declaration_type === "DEATH" && d.status !== "REJECTED",
   );
   for (const d of decls) {
@@ -245,7 +245,7 @@ export function healthSynopticDeaths() {
 export function healthSynopticDocuments() {
   const scope = getScope();
   const byType = new Map<string, number>();
-  const decls = listFacilityDeclarations(scope.facilityId);
+  const decls = listFacilityDeclarations(scope.facilityId, scope.facilityName);
   const statusLabel = (d: CivilDeclaration) =>
     d.declaration_type === "BIRTH"
       ? `Déclaration naissance (${d.status})`

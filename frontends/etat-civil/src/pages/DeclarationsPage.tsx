@@ -9,7 +9,12 @@ import {
 } from "../api";
 import { addAct, addPerson, getPersonByNic, listActs, type Sexe } from "../registry";
 import { pushNotification } from "../prefs";
-import { listFacilityDeclarations, setDeclarationStatus } from "../civilDeclarations";
+import {
+  declarationRef,
+  listFacilityDeclarations,
+  listLocalPendingDeclarations,
+  setDeclarationStatus,
+} from "../civilDeclarations";
 import { syncHospitalFacilitiesFromRequests } from "../accountRegistration";
 import {
   createFacilityAccount,
@@ -48,7 +53,7 @@ function facilityLocationLabel(a: FacilityAccountPublic): string {
 }
 
 function facilityBirthStats(facility: FacilityAccountPublic): { g: number; f: number; t: number } {
-  const decls = listFacilityDeclarations(facility.id).filter(
+  const decls = listFacilityDeclarations(facility.id, facility.facilityName).filter(
     (d) => d.declaration_type === "BIRTH" && d.status === "PENDING_OFFICER",
   );
   const acts = listActs("BIRTH").filter((a) => {
@@ -111,10 +116,22 @@ export default function DeclarationsPage() {
   const [actionBusy, setActionBusy] = useState(false);
 
   async function refresh() {
+    const local = listLocalPendingDeclarations().map((d) => ({
+      id: d.id,
+      source: d.source,
+      declaration_type: d.declaration_type,
+      payload: d.payload,
+      status: d.status,
+      created_at: d.created_at,
+    })) as Declaration[];
     try {
-      setRows(await api.listDeclarations("PENDING_OFFICER"));
+      const remote = await api.listDeclarations("PENDING_OFFICER");
+      const byId = new Map<string, Declaration>();
+      for (const d of local) byId.set(d.id, d);
+      for (const d of remote) byId.set(d.id, d);
+      setRows([...byId.values()].sort((a, b) => b.created_at.localeCompare(a.created_at)));
     } catch {
-      setRows(demoListDeclarations());
+      setRows(local.length ? local : demoListDeclarations());
     }
   }
 
@@ -546,6 +563,7 @@ export default function DeclarationsPage() {
         <table className="data-table">
           <thead>
             <tr>
+              <th>Réf.</th>
               <th>Type</th>
               <th>Structure</th>
               <th>Résumé</th>
@@ -563,6 +581,9 @@ export default function DeclarationsPage() {
             ) : (
               rows.map((d) => (
                 <tr key={d.id}>
+                  <td>
+                    <code>{declarationRef(d)}</code>
+                  </td>
                   <td>{d.declaration_type === "BIRTH" ? "Naissance" : "Décès"}</td>
                   <td>{String(d.payload.facility_name ?? d.source)}</td>
                   <td>

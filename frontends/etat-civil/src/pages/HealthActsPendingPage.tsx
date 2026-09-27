@@ -6,7 +6,7 @@ import { listFacilityDeclarations } from "../civilDeclarations";
 
 export default function HealthActsPendingPage() {
   const session = getHealthSession()!;
-  const rows = listFacilityDeclarations(session.facilityId).filter(
+  const rows = listFacilityDeclarations(session.facilityId, session.facilityName).filter(
     (d) => d.status === "PENDING_OFFICER",
   );
 

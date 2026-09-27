@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import HealthDeclarationList from "../components/HealthDeclarationList";
-import { listFacilityDeclarations } from "../civilDeclarations";
+import { declarationRef, listFacilityDeclarations } from "../civilDeclarations";
 import { findFacilityByUsername, getHealthSession } from "../healthAuth";
 import type { HealthFormContext } from "../healthFormMode";
 import { pushHealthNotification } from "../healthPrefs";
@@ -13,7 +13,11 @@ export default function HealthDeathsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const formOpen = searchParams.get("nouveau") === "1";
   const [message, setMessage] = useState<string | null>(null);
-  const rows = listFacilityDeclarations(session.facilityId).filter((d) => d.declaration_type === "DEATH");
+  const [listTick, setListTick] = useState(0);
+  const rows = listFacilityDeclarations(session.facilityId, session.facilityName).filter(
+    (d) => d.declaration_type === "DEATH",
+  );
+  void listTick;
 
   function setFormOpen(open: boolean) {
     const params = new URLSearchParams(searchParams);
@@ -25,20 +29,26 @@ export default function HealthDeathsPage() {
   const health: HealthFormContext = {
     facilityId: session.facilityId,
     facilityName: session.facilityName,
-    commune_code: session.commune_code,
-    commune_name: session.commune_name,
+    commune_code: facility?.commune_code || session.commune_code,
+    commune_name: facility?.commune_name || session.commune_name,
     ville: facility?.ville,
     province: facility?.province,
+    quartier_name: facility?.quartier_name,
+    district_name: facility?.district_name,
+    localite_name: facility?.localite_name,
+    geo_label: facility?.geo_label,
     onBack: () => setFormOpen(false),
     onSubmitted: (r) => {
+      const ref = r.refNotification || r.declarationId;
       pushHealthNotification({
         title: "Décès transmis",
-        body: `${r.personName} — en attente de validation officier (réf. ${r.declarationId.slice(0, 8)}).`,
+        body: `${r.personName} — en attente de validation officier (réf. ${ref}).`,
         href: "/sante/deaths",
       });
       setMessage(
-        `Notification transmise à l'état civil (réf. ${r.declarationId.slice(0, 8)}). Ce n'est pas un acte officiel.`,
+        `Notification transmise à l'état civil (réf. ${ref}). Ce n'est pas un acte officiel.`,
       );
+      setListTick((n) => n + 1);
       setFormOpen(false);
     },
   };
@@ -63,6 +73,7 @@ export default function HealthDeathsPage() {
       }}
       banner={message ? <div className="success-banner">{message}</div> : null}
       columns={[
+        { label: "Réf.", value: (d) => declarationRef(d) },
         { label: "Personne", value: (d) => String(d.payload.deceased_name ?? "") },
         {
           label: "Type",

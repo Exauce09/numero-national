@@ -95,32 +95,38 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
   const [numeroRegistre, setNumeroRegistre] = useState("");
   const [declarant, setDeclarant] = useState<Person | null>(null);
   const [qualiteDeclarant, setQualiteDeclarant] = useState("MERE");
-  const [lieuNaissance, setLieuNaissance] = useState("");
-  const [geoNaissance, setGeoNaissance] = useState<GeoSelection>({
-    commune_code: officer.code,
-    commune_name: officer.name,
-    ville_name: officer.ville,
-    province_name: officer.province,
-  });
-
-  /** IT : l'enfant naît dans la structure — province, ville et commune déjà connues. */
-  useEffect(() => {
-    if (!health) return;
-    let cancelled = false;
-    void resolveGeoByNames({
-      province: officer.province,
-      ville: officer.ville,
-      commune_code: officer.code,
-      commune_name: officer.name,
-    }).then((resolved) => {
-      if (cancelled || !resolved) return;
-      setGeoNaissance((cur) => (cur.province_id ? cur : resolved));
-    });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- une fois à l'ouverture du formulaire
-  }, []);
+  const [lieuNaissance, setLieuNaissance] = useState(() =>
+    health?.geo_label?.trim() || health?.facilityName || "",
+  );
+  const [geoNaissance, setGeoNaissance] = useState<GeoSelection>(() =>
+    health
+      ? {
+          commune_code: health.commune_code,
+          commune_name: health.commune_name,
+          ville_name: health.ville,
+          province_name: health.province,
+          quartier_name: health.quartier_name,
+          district_name: health.district_name,
+          localite_name: health.localite_name,
+          label:
+            health.geo_label ||
+            [
+              health.facilityName,
+              health.quartier_name || health.localite_name,
+              health.commune_name,
+              health.ville || health.district_name,
+              health.province,
+            ]
+              .filter(Boolean)
+              .join(" · "),
+        }
+      : {
+          commune_code: officer.code,
+          commune_name: officer.name,
+          ville_name: officer.ville,
+          province_name: officer.province,
+        },
+  );
   const [modeEnregistrement, setModeEnregistrement] = useState<
     (typeof MODES_ENREGISTREMENT)[number]["value"]
   >("sans_procuration");
@@ -138,6 +144,100 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
   const [geoAdresseMere, setGeoAdresseMere] = useState<GeoSelection>({});
   const [geoOrigineMere, setGeoOrigineMere] = useState<GeoSelection>({});
   const [geoOrigine, setGeoOrigine] = useState<GeoSelection>({});
+
+  /** IT : l'enfant naît dans la structure — adresse exacte de l'hôpital (inchangée). */
+  useEffect(() => {
+    if (!health) return;
+    let cancelled = false;
+    void resolveGeoByNames({
+      province: health.province || officer.province,
+      ville: health.ville || officer.ville,
+      commune_code: health.commune_code || officer.code,
+      commune_name: health.commune_name || officer.name,
+    }).then((resolved) => {
+      if (cancelled) return;
+      const locked: GeoSelection = {
+        ...(resolved ?? {}),
+        commune_code: health.commune_code || resolved?.commune_code,
+        commune_name: health.commune_name || resolved?.commune_name,
+        ville_name: health.ville || resolved?.ville_name,
+        province_name: health.province || resolved?.province_name,
+        quartier_name: health.quartier_name || resolved?.quartier_name,
+        district_name: health.district_name || resolved?.district_name,
+        localite_name: health.localite_name || resolved?.localite_name,
+        label:
+          health.geo_label ||
+          [
+            health.facilityName,
+            health.quartier_name || health.localite_name,
+            health.commune_name,
+            health.ville || health.district_name,
+            health.province,
+          ]
+            .filter(Boolean)
+            .join(" · ") ||
+          resolved?.label,
+      };
+      setGeoNaissance(locked);
+      setLieuNaissance(locked.label || health.facilityName);
+      setHopitalNaissance(health.facilityName);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- une fois à l'ouverture du formulaire
+  }, []);
+
+  function applyMotherPerson(p: Person | null) {
+    setMother(p);
+    if (p && declarant && p.id === declarant.id) {
+      setQualiteDeclarant("MERE");
+      setDeclarant(null);
+    }
+    if (!p) {
+      setGeoOrigineMere({});
+      setGeoAdresseMere({});
+      setAdresseMere("");
+      return;
+    }
+    const o = personOrigin(p);
+    if (o.province || o.territoire || o.secteur || o.ville) {
+      const originGeo: GeoSelection = {
+        province_name: o.province || undefined,
+        district_name: o.territoire || undefined,
+        commune_name: o.secteur || undefined,
+        ville_name: o.ville || undefined,
+        label: o.label || undefined,
+      };
+      setGeoOrigineMere(originGeo);
+      if (!father) setGeoOrigine(originGeo);
+    }
+    if (p.adresse_geo && (p.adresse_geo.label || p.adresse_geo.commune_name || p.adresse_geo.province_name)) {
+      setGeoAdresseMere({ ...p.adresse_geo });
+      setAdresseMere(p.adresse || p.adresse_geo.numero || "");
+    } else if (p.adresse?.trim()) {
+      setAdresseMere(p.adresse.trim());
+    }
+  }
+
+  function applyFatherPerson(p: Person | null) {
+    setFather(p);
+    if (p && declarant && p.id === declarant.id) {
+      setQualiteDeclarant("PERE");
+      setDeclarant(null);
+    }
+    if (!p) return;
+    const o = personOrigin(p);
+    if (o.province || o.territoire || o.secteur || o.ville) {
+      setGeoOrigine({
+        province_name: o.province || undefined,
+        district_name: o.territoire || undefined,
+        commune_name: o.secteur || undefined,
+        ville_name: o.ville || undefined,
+        label: o.label || undefined,
+      });
+    }
+  }
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [created, setCreated] = useState<Act | null>(null);
@@ -161,8 +261,11 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [created]);
 
-  const hopitalResolved =
-    hopitalNaissance === "__autre__" ? hopitalAutre.trim() : hopitalNaissance.trim();
+  const hopitalResolved = health
+    ? health.facilityName.trim()
+    : hopitalNaissance === "__autre__"
+      ? hopitalAutre.trim()
+      : hopitalNaissance.trim();
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -186,6 +289,7 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
       return;
     }
     if (
+      !health &&
       !geoNaissance.commune_name &&
       !geoNaissance.district_name &&
       !geoNaissance.localite_name &&
@@ -195,6 +299,7 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
       return;
     }
     if (
+      !health &&
       geoNaissance.ville_name &&
       geoNaissance.commune_name &&
       !geoNaissance.quartier_name &&
@@ -203,6 +308,10 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
       setError(
         "Choisissez le quartier de naissance (ex. Batetela, Golf…) ou précisez le lieu manuellement.",
       );
+      return;
+    }
+    if (health && !health.facilityName.trim()) {
+      setError("Structure sanitaire introuvable — reconnectez-vous.");
       return;
     }
     if (modeEnregistrement === "avec_procuration" && !mandataireNom.trim()) {
@@ -372,6 +481,7 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
         });
         health.onSubmitted({
           declarationId: decl.id,
+          refNotification: String(decl.payload.ref_notification ?? ""),
           type,
           personName: childName,
           idNaissance: childNic,
@@ -912,6 +1022,42 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
               Lieu de naissance
             </h3>
           </div>
+          {health ? (
+            <>
+              <div className="full">
+                <label className="form-label">Hôpital / structure *</label>
+                <input className="form-control" value={health.facilityName} readOnly disabled />
+                <p className="muted small" style={{ marginTop: "0.35rem" }}>
+                  Fixé à votre structure — non modifiable.
+                </p>
+              </div>
+              <div className="full">
+                <label className="form-label">Adresse exacte du lieu de naissance *</label>
+                <input
+                  className="form-control"
+                  value={
+                    geoNaissance.label ||
+                    health.geo_label ||
+                    [
+                      health.facilityName,
+                      health.quartier_name || health.localite_name,
+                      health.commune_name,
+                      health.ville || health.district_name,
+                      health.province,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")
+                  }
+                  readOnly
+                  disabled
+                />
+                <p className="muted small" style={{ marginTop: "0.35rem" }}>
+                  Adresse de la structure sanitaire (enfant né ici).
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
           <div className="full">
             <GeoCascade
               embedded
@@ -990,6 +1136,8 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
               Une fois saisi, l&apos;hôpital est mémorisé pour sélection ultérieure.
             </div>
           </div>
+            </>
+          )}
           <div className="full birth-form-nav">
             <button type="button" className="btn-secondary" onClick={() => setFormStep(1)}>
               Précédent
@@ -1059,43 +1207,15 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
             <PersonPicker
               label={qualiteDeclarant === "MERE" ? "Mère * (déclarante)" : "Mère *"}
               value={mother}
-              onChange={(p) => {
-                setMother(p);
-                if (p && declarant && p.id === declarant.id) {
-                  setQualiteDeclarant("MERE");
-                  setDeclarant(null);
-                }
-                if (!p) {
-                  setGeoOrigineMere({});
-                  return;
-                }
-                const o = personOrigin(p);
-                if (o.province || o.territoire || o.secteur) {
-                  setGeoOrigineMere({
-                    province_name: o.province || undefined,
-                    district_name: o.territoire || undefined,
-                    commune_name: o.secteur || undefined,
-                    ville_name: o.ville || undefined,
-                    label: o.label || undefined,
-                  });
-                  if (!father) {
-                    setGeoOrigine({
-                      province_name: o.province || undefined,
-                      district_name: o.territoire || undefined,
-                      commune_name: o.secteur || undefined,
-                      ville_name: o.ville || undefined,
-                      label: o.label || undefined,
-                    });
-                  }
-                }
-              }}
+              onChange={applyMotherPerson}
               sexFilter="F"
               originGeoFilter
               addButtonLabel="Saisir / Ajouter la mère"
             />
             <p className="muted small" style={{ marginTop: 6 }}>
-              Recherchez une personne déjà enregistrée, ou ajoutez-la. Si le père n&apos;est pas
-              reconnu, l&apos;origine de la mère sera reprise pour l&apos;enfant.
+              Recherchez une personne déjà enregistrée, ou ajoutez-la. À la sélection, origine et
+              adresse se remplissent automatiquement. Si le père n&apos;est pas reconnu, l&apos;origine
+              de la mère sera reprise pour l&apos;enfant.
             </p>
           </div>
           <div className="full">
@@ -1140,13 +1260,7 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
             <PersonPicker
               label={qualiteDeclarant === "PERE" ? "Père * (déclarant)" : "Père (optionnel)"}
               value={father}
-              onChange={(p) => {
-                setFather(p);
-                if (p && declarant && p.id === declarant.id) {
-                  setQualiteDeclarant("PERE");
-                  setDeclarant(null);
-                }
-              }}
+              onChange={applyFatherPerson}
               originGeoFilter
               sexFilter="M"
             />

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import HealthDeclarationList from "../components/HealthDeclarationList";
-import { listFacilityDeclarations } from "../civilDeclarations";
+import { declarationRef, listFacilityDeclarations } from "../civilDeclarations";
 import { findFacilityByUsername, getHealthSession } from "../healthAuth";
 import type { HealthFormContext, HealthFormResult } from "../healthFormMode";
 import { pushHealthNotification } from "../healthPrefs";
@@ -14,12 +14,14 @@ export default function HealthBirthsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const formOpen = searchParams.get("nouveau") === "1";
   const [result, setResult] = useState<HealthFormResult | null>(null);
-  const rows = listFacilityDeclarations(session.facilityId).filter(
+  const [listTick, setListTick] = useState(0);
+  const rows = listFacilityDeclarations(session.facilityId, session.facilityName).filter(
     (d) =>
       d.declaration_type === "BIRTH" ||
       (d.declaration_type === "DEATH" &&
         (d.payload.issue_naissance === "MORT_NE" || d.payload.mort_ne === true)),
   );
+  void listTick;
 
   function setFormOpen(open: boolean) {
     const params = new URLSearchParams(searchParams);
@@ -31,19 +33,25 @@ export default function HealthBirthsPage() {
   const health: HealthFormContext = {
     facilityId: session.facilityId,
     facilityName: session.facilityName,
-    commune_code: session.commune_code,
-    commune_name: session.commune_name,
+    commune_code: facility?.commune_code || session.commune_code,
+    commune_name: facility?.commune_name || session.commune_name,
     ville: facility?.ville,
     province: facility?.province,
+    quartier_name: facility?.quartier_name,
+    district_name: facility?.district_name,
+    localite_name: facility?.localite_name,
+    geo_label: facility?.geo_label,
     onBack: () => setFormOpen(false),
     onSubmitted: (r) => {
       const mortNe = r.type === "DEATH";
+      const ref = r.refNotification || r.declarationId;
       pushHealthNotification({
         title: mortNe ? "Notification de mort-né transmise" : "Notification de naissance transmise",
-        body: `${r.personName} — ${mortNe ? "Mort-né" : "Nouveau-né"} (réf. ${r.declarationId.slice(0, 8)}).`,
+        body: `${r.personName} — ${mortNe ? "Mort-né" : "Nouveau-né"} (réf. ${ref}).`,
         href: mortNe ? "/sante/deaths" : "/sante/births",
       });
       setResult(r);
+      setListTick((n) => n + 1);
       setFormOpen(false);
     },
   };
@@ -52,6 +60,7 @@ export default function HealthBirthsPage() {
 
   const mortNe = result?.type === "DEATH";
   const child = result?.child;
+  const refShown = result?.refNotification || (result ? declarationRef({ id: result.declarationId, payload: {} }) : "");
   const qrValue =
     result && child
       ? JSON.stringify({
@@ -63,6 +72,7 @@ export default function HealthBirthsPage() {
           sex: child.sexe,
           dob: child.date_naissance,
           declaration_id: result.declarationId,
+          ref_notification: refShown,
           facility: session.facilityName,
         })
       : "";
@@ -72,8 +82,8 @@ export default function HealthBirthsPage() {
       <>
         <div className="success-banner">
           {mortNe
-            ? `Mort-né transmis à l'état civil (réf. ${result.declarationId.slice(0, 8)}). Compté au registre des décès / morts-nés.`
-            : `Notification transmise à l'état civil (réf. ${result.declarationId.slice(0, 8)}). L'officier établira l'acte officiel.`}
+            ? `Mort-né transmis à l'état civil (réf. ${refShown}). Compté au registre des décès / morts-nés.`
+            : `Notification transmise à l'état civil (réf. ${refShown}). L'officier établira l'acte officiel.`}
         </div>
         <div className="panel print-area" style={{ marginBottom: "1rem" }}>
           <div className="act-print-card">
@@ -92,7 +102,7 @@ export default function HealthBirthsPage() {
               <div className="act-print-meta">
                 <div>
                   <span className="muted">Réf. notification</span>
-                  <strong>{result.declarationId.slice(0, 8)}</strong>
+                  <strong>{refShown}</strong>
                 </div>
                 <div>
                   <span className="muted">Enfant</span>
@@ -143,6 +153,10 @@ export default function HealthBirthsPage() {
       }}
       banner={banner}
       columns={[
+        {
+          label: "Réf.",
+          value: (d) => declarationRef(d),
+        },
         {
           label: "Enfant",
           value: (d) =>

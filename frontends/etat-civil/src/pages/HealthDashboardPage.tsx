@@ -11,7 +11,7 @@ import { RDC } from "../rdcColors";
 export default function HealthDashboardPage() {
   const navigate = useNavigate();
   const session = getHealthSession()!;
-  const rows = listFacilityDeclarations(session.facilityId);
+  const rows = listFacilityDeclarations(session.facilityId, session.facilityName);
 
   const birthAll = rows.filter((d) => d.declaration_type === "BIRTH");
   const deathAll = rows.filter((d) => d.declaration_type === "DEATH");

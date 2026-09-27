@@ -4,6 +4,8 @@ import { notifyEtatCivil } from "./civilDeclarations";
 
 export type HealthFormResult = {
   declarationId: string;
+  /** Référence numérique affichée (ex. 20260927000042). */
+  refNotification: string;
   type: "BIRTH" | "DEATH";
   /** Nom complet de l'enfant ou du défunt. */
   personName: string;
@@ -25,6 +27,11 @@ export type HealthFormContext = {
   commune_name: string;
   ville?: string;
   province?: string;
+  quartier_name?: string;
+  district_name?: string;
+  localite_name?: string;
+  /** Adresse exacte de la structure (geo_label). */
+  geo_label?: string;
   onBack: () => void;
   onSubmitted: (result: HealthFormResult) => void;
 };

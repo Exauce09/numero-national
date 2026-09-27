@@ -45,6 +45,19 @@ export type Person = {
   situation_familiale?: string;
   /** Adresse / géo saisie sur fiche d'identification (hors actes). */
   adresse?: string;
+  /** Adresse de résidence structurée (reprise à la sélection). */
+  adresse_geo?: {
+    province_name?: string;
+    ville_name?: string;
+    district_name?: string;
+    commune_name?: string;
+    commune_code?: string;
+    quartier_name?: string;
+    localite_name?: string;
+    avenue_name?: string;
+    numero?: string;
+    label?: string;
+  };
   secteur?: string;
   territoire?: string;
   ville?: string;

@@ -118,6 +118,7 @@ export default function DeathsPage({ health }: { health?: HealthFormContext } = 
         });
         health.onSubmitted({
           declarationId: decl.id,
+          refNotification: String(decl.payload.ref_notification ?? ""),
           type: "DEATH",
           personName: displayName(deceased),
         });

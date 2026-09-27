@@ -5,7 +5,7 @@ import { listFacilityDeclarations } from "../civilDeclarations";
 
 export default function HealthActsValidatedPage() {
   const session = getHealthSession()!;
-  const rows = listFacilityDeclarations(session.facilityId).filter((d) => d.status === "VALIDATED");
+  const rows = listFacilityDeclarations(session.facilityId, session.facilityName).filter((d) => d.status === "VALIDATED");
 
   return (
     <div>

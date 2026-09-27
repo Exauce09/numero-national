@@ -26,6 +26,8 @@ export type FicheEditorState = {
     date_naissance: string;
     sexe_code: Sexe;
     etat_civil_code: EtatCivil;
+    /** Adresse de résidence structurée (reprise à la sélection). */
+    adresse_geo?: GeoSelection;
   };
   conjoint: FicheEditorConjoint;
   pere: FichePersonBlock;
@@ -262,14 +264,17 @@ export default function FicheIdentificationEditor({
     setAddressGeo(geo);
     const base = geo.label || "";
     const full = [base, adresseComplement.trim()].filter(Boolean).join(" — ");
-    patchInteresse({ adresse: full });
+    patchInteresse({ adresse: full, adresse_geo: geo });
   }
 
   function onComplement(v: string) {
     setAdresseComplement(v);
     const base = addressGeo.label || "";
     const full = [base, v.trim()].filter(Boolean).join(" — ");
-    patchInteresse({ adresse: full });
+    patchInteresse({
+      adresse: full,
+      adresse_geo: { ...addressGeo, numero: v.trim() || addressGeo.numero },
+    });
   }
 
   const interesseOrigin = originSummary(i);
