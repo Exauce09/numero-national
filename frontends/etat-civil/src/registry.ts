@@ -1,4 +1,5 @@
 import { getSession, updateSession, ensureAccessToken } from "./auth";
+import { getOfficerCommune } from "./commune";
 
 const STORAGE_KEY = "nn_civil_registry_v1";
 const COMMUNE_CODE = "KIN-GOMBE";
@@ -139,16 +140,51 @@ function emptyRegistry(): Registry {
   return { persons: [], acts: [], marriages: [] };
 }
 
+const COMMUNE_BACKFILL_FLAG = "nn_civil_act_commune_backfill_v1";
+const CIVIL_WORKFLOW_TYPES = new Set([
+  "BIRTH",
+  "DEATH",
+  "MARRIAGE",
+  "DIVORCE",
+  "ADOPTION",
+  "RECOGNITION",
+  "RECTIFICATION",
+]);
+
+function hasCommune(payload: Record<string, unknown>): boolean {
+  return Boolean(
+    String(payload.commune_code ?? "").trim() || String(payload.commune_name ?? "").trim(),
+  );
+}
+
+/** Sans commune, l'acte est exclu des tableaux de bord communaux : on rattache au bureau de saisie. */
+function withOfficerCommune(payload: Record<string, unknown>): Record<string, unknown> {
+  if (hasCommune(payload)) return payload;
+  const c = getOfficerCommune();
+  return { ...payload, commune_code: c.code, commune_name: c.name };
+}
+
 function load(): Registry {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return emptyRegistry();
   try {
     const parsed = JSON.parse(raw) as Registry;
-    return {
+    const registry: Registry = {
       persons: parsed.persons ?? [],
       acts: parsed.acts ?? [],
       marriages: parsed.marriages ?? [],
     };
+    if (localStorage.getItem(COMMUNE_BACKFILL_FLAG) !== "1") {
+      let changed = false;
+      registry.acts = registry.acts.map((a) => {
+        if (!CIVIL_WORKFLOW_TYPES.has(a.type) || hasCommune(a.payload ?? {})) return a;
+        changed = true;
+        return { ...a, payload: withOfficerCommune(a.payload ?? {}) };
+      });
+      if (changed) save(registry);
+      localStorage.setItem(COMMUNE_BACKFILL_FLAG, "1");
+    }
+    return registry;
   } catch {
     return emptyRegistry();
   }
@@ -1116,7 +1152,11 @@ async function tryPostCivil(
   const res = await fetch(`${API_BASE}/civil/${ACT_ENDPOINT[type]}`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ commune_code: COMMUNE_CODE, payload, status: "DRAFT" }),
+    body: JSON.stringify({
+      commune_code: String(payload.commune_code ?? "").trim() || COMMUNE_CODE,
+      payload,
+      status: "DRAFT",
+    }),
   });
   if (!res.ok) {
     const detail = await res.text();
@@ -1144,6 +1184,7 @@ export async function addAct(
   payload: Record<string, unknown>,
   subjectNic: string
 ): Promise<Act> {
+  if (CIVIL_WORKFLOW_TYPES.has(type)) payload = withOfficerCommune(payload);
   const registry = load();
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
@@ -1173,7 +1214,7 @@ export async function addAct(
       ...payload,
       act_number,
       national_id: subjectNic,
-      commune_code: COMMUNE_CODE,
+      commune_code: String(payload.commune_code ?? "").trim() || COMMUNE_CODE,
     });
     if (server) {
       const serverId = String(server.id ?? id);

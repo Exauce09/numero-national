@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import ActFormShell from "../components/ActFormShell";
 import ActPrintCard from "../components/ActPrintCard";
+import ActWorkflowPanel from "../components/ActWorkflowPanel";
 import OfficerSessionField from "../components/OfficerSessionField";
 import PersonPicker from "../components/PersonPicker";
 import { getActFormSchema } from "../ecActForms";
@@ -179,7 +181,15 @@ export default function DivorcesPage() {
 
       {created ? (
         <div className="panel" style={{ marginTop: "1rem" }}>
-          <div className="success-banner">Transcription de divorce enregistrée</div>
+          <div className="success-banner">
+            Transcription de divorce enregistrée en brouillon — validez-la ci-dessous ou dans la
+            liste Divorce.
+          </div>
+          <p className="muted small">
+            Un acte n&apos;est compté dans les totaux du tableau de bord qu&apos;après validation.{" "}
+            <Link to="/manage/divorce?focus=drafts">Voir les divorces à valider →</Link>
+          </p>
+          <ActWorkflowPanel act={created} onUpdated={(a) => setCreated(a)} />
           <ActPrintCard act={created} />
         </div>
       ) : null}
