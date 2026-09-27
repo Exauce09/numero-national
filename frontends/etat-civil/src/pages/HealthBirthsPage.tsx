@@ -1,6 +1,8 @@
 import { FormEvent, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import ActFormShell from "../components/ActFormShell";
+import HealthDeclarationList from "../components/HealthDeclarationList";
 import { getActFormSchema } from "../ecActForms";
 import { ISSUE_NAISSANCE_OPTIONS, type IssueNaissance } from "../deathType";
 import { addPerson, displayName, findDuplicatePerson, generateBirthDossierId, listPersons } from "../registry";
@@ -42,12 +44,21 @@ export default function HealthBirthsPage() {
   const [error, setError] = useState<string | null>(null);
   const [coupon, setCoupon] = useState<BirthCoupon | null>(null);
   const [, bump] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const formOpen = searchParams.get("nouveau") === "1";
   const rows = listFacilityDeclarations(session.facilityId).filter(
     (d) =>
       d.declaration_type === "BIRTH" ||
       (d.declaration_type === "DEATH" &&
         (d.payload.issue_naissance === "MORT_NE" || d.payload.mort_ne === true)),
   );
+
+  function setFormOpen(open: boolean) {
+    const params = new URLSearchParams(searchParams);
+    if (open) params.set("nouveau", "1");
+    else params.delete("nouveau");
+    setSearchParams(params);
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -206,6 +217,7 @@ export default function HealthBirthsPage() {
       setMother(emptyParent);
       setFather(emptyParent);
       bump((n) => n + 1);
+      setFormOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Enregistrement impossible.");
     }
@@ -225,9 +237,114 @@ export default function HealthBirthsPage() {
       })
     : "";
 
+  const couponPanel = coupon ? (
+    <div className="panel print-area" style={{ marginBottom: "1rem" }}>
+      <div className="success-banner">Accusé de notification transmis</div>
+      <div className="act-print-card" style={{ marginTop: "0.75rem" }}>
+        <div className="act-print-header">
+          <img src="/logo-rdc.jpg" alt="RDC" />
+          <div>
+            <strong>République Démocratique du Congo</strong>
+            <div>État civil · Structure sanitaire</div>
+            <div>Notification de naissance (pas un acte officiel)</div>
+          </div>
+        </div>
+        <div className="act-print-body">
+          <div className="act-print-meta">
+            <div>
+              <span className="muted">Réf. notification</span>
+              <strong>{(coupon.declaration_id || coupon.id_naissance).slice(0, 8)}</strong>
+            </div>
+            <div>
+              <span className="muted">Enfant</span>
+              <strong>
+                {coupon.prenom} {coupon.postnom} {coupon.nom}
+              </strong>
+            </div>
+            <div>
+              <span className="muted">Date</span>
+              <strong>{coupon.date_naissance}</strong>
+            </div>
+            <div>
+              <span className="muted">Mère</span>
+              <strong>{coupon.mother_name}</strong>
+            </div>
+            <div>
+              <span className="muted">Structure</span>
+              <strong>{coupon.facility_name}</strong>
+            </div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "center", marginTop: "1rem" }}>
+            <QRCodeSVG value={qrValue} size={128} />
+          </div>
+        </div>
+      </div>
+      <button type="button" className="btn-secondary btn-sm" onClick={() => window.print()}>
+        Imprimer l&apos;accusé
+      </button>
+    </div>
+  ) : null;
+
+  if (!formOpen) {
+    return (
+      <HealthDeclarationList
+        title="Naissance"
+        listTitle="LISTE DES NAISSANCES"
+        lead={
+          <>
+            Notifications de naissance transmises à l&apos;état civil par {session.facilityName}.
+            Cliquez sur « + Ajouter » pour une nouvelle notification.
+          </>
+        }
+        rows={rows}
+        exportName="sante_naissances"
+        onAdd={() => {
+          setMessage(null);
+          setError(null);
+          setCoupon(null);
+          setFormOpen(true);
+        }}
+        banner={
+          <>
+            {message ? <div className="success-banner">{message}</div> : null}
+            {couponPanel}
+          </>
+        }
+        columns={[
+          {
+            label: "Enfant",
+            value: (d) =>
+              [d.payload.child_prenom, d.payload.child_postnom, d.payload.child_nom]
+                .filter(Boolean)
+                .map(String)
+                .join(" "),
+          },
+          {
+            label: "Sexe",
+            value: (d) => (d.payload.sexe === "F" ? "F" : d.payload.sexe === "M" ? "M" : ""),
+          },
+          { label: "Date de naissance", value: (d) => String(d.payload.date_naissance ?? "") },
+          {
+            label: "Issue",
+            value: (d) => (d.declaration_type === "DEATH" ? "Mort-né" : "Né vivant"),
+          },
+          { label: "Mère", value: (d) => String(d.payload.mother_name ?? "") },
+        ]}
+      />
+    );
+  }
+
   return (
     <ActFormShell schema={getActFormSchema("notif_naissance")!}>
       <div className="panel">
+        <button
+          type="button"
+          className="btn-secondary btn-sm"
+          style={{ marginBottom: "0.75rem" }}
+          onClick={() => setFormOpen(false)}
+        >
+          ← Retour à la liste
+        </button>
         <form className="form-grid" onSubmit={(e) => void onSubmit(e)}>
           {error ? <div className="login-error full">{error}</div> : null}
           {message ? <div className="success-banner full">{message}</div> : null}
@@ -444,86 +561,6 @@ export default function HealthBirthsPage() {
             </button>
           </div>
         </form>
-      </div>
-
-      {coupon ? (
-        <div className="panel print-area" style={{ marginTop: "1rem" }}>
-          <div className="success-banner">Accusé de notification transmis</div>
-          <div className="act-print-card" style={{ marginTop: "0.75rem" }}>
-            <div className="act-print-header">
-              <img src="/logo-rdc.jpg" alt="RDC" />
-              <div>
-                <strong>République Démocratique du Congo</strong>
-                <div>État civil · Structure sanitaire</div>
-                <div>Notification de naissance (pas un acte officiel)</div>
-              </div>
-            </div>
-            <div className="act-print-body">
-              <div className="act-print-meta">
-                <div>
-                  <span className="muted">Réf. notification</span>
-                  <strong>{(coupon.declaration_id || coupon.id_naissance).slice(0, 8)}</strong>
-                </div>
-                <div>
-                  <span className="muted">Enfant</span>
-                  <strong>
-                    {coupon.prenom} {coupon.postnom} {coupon.nom}
-                  </strong>
-                </div>
-                <div>
-                  <span className="muted">Date</span>
-                  <strong>{coupon.date_naissance}</strong>
-                </div>
-                <div>
-                  <span className="muted">Mère</span>
-                  <strong>{coupon.mother_name}</strong>
-                </div>
-                <div>
-                  <span className="muted">Structure</span>
-                  <strong>{coupon.facility_name}</strong>
-                </div>
-              </div>
-              <div style={{ display: "flex", justifyContent: "center", marginTop: "1rem" }}>
-                <QRCodeSVG value={qrValue} size={128} />
-              </div>
-            </div>
-          </div>
-          <button type="button" className="btn-secondary btn-sm" onClick={() => window.print()}>
-            Imprimer l&apos;accusé
-          </button>
-        </div>
-      ) : null}
-
-      <div className="panel" style={{ marginTop: "1rem" }}>
-        <h3 className="panel-title">Notifications envoyées ({rows.length})</h3>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Enfant</th>
-              <th>Date</th>
-              <th>Statut</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={3} className="muted">
-                  Aucune notification pour le moment.
-                </td>
-              </tr>
-            ) : (
-              rows.map((d) => (
-                <tr key={d.id}>
-                  <td>
-                    {String(d.payload.child_prenom ?? "")} {String(d.payload.child_nom ?? "")}
-                  </td>
-                  <td>{String(d.payload.date_naissance ?? "—")}</td>
-                  <td>{d.status}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
       </div>
     </ActFormShell>
   );

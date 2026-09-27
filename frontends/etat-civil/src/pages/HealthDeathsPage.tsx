@@ -1,5 +1,7 @@
 import { FormEvent, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import ActFormShell from "../components/ActFormShell";
+import HealthDeclarationList from "../components/HealthDeclarationList";
 import GeoPlaceLookup from "../components/GeoPlaceLookup";
 import PersonPicker from "../components/PersonPicker";
 import type { GeoSelection } from "../components/GeoCascade";
@@ -23,7 +25,16 @@ export default function HealthDeathsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, bump] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const formOpen = searchParams.get("nouveau") === "1";
   const rows = listFacilityDeclarations(session.facilityId).filter((d) => d.declaration_type === "DEATH");
+
+  function setFormOpen(open: boolean) {
+    const params = new URLSearchParams(searchParams);
+    if (open) params.set("nouveau", "1");
+    else params.delete("nouveau");
+    setSearchParams(params);
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -87,11 +98,58 @@ export default function HealthDeathsPage() {
     setCause("");
     setGeoDeces({ label: session.facilityName });
     bump((n) => n + 1);
+    setFormOpen(false);
+  }
+
+  if (!formOpen) {
+    return (
+      <HealthDeclarationList
+        title="Décès"
+        listTitle="LISTE DES DÉCÈS"
+        lead={
+          <>
+            Notifications de décès (et morts-nés) transmises à l&apos;état civil par{" "}
+            {session.facilityName}. Cliquez sur « + Ajouter » pour une nouvelle notification.
+          </>
+        }
+        rows={rows}
+        exportName="sante_deces"
+        onAdd={() => {
+          setMessage(null);
+          setError(null);
+          setFormOpen(true);
+        }}
+        banner={message ? <div className="success-banner">{message}</div> : null}
+        columns={[
+          { label: "Personne", value: (d) => String(d.payload.deceased_name ?? "") },
+          {
+            label: "Type",
+            value: (d) =>
+              String(d.payload.type_deces_label ?? (d.payload.mort_ne ? "Mort-né" : "Décès")),
+          },
+          { label: "Date", value: (d) => String(d.payload.date_deces ?? "") },
+          { label: "Cause", value: (d) => String(d.payload.cause_deces ?? "") },
+          { label: "Lieu", value: (d) => String(d.payload.lieu_deces ?? "") },
+          {
+            label: "Déclarant",
+            value: (d) => String(d.payload.declarant_name ?? d.payload.responsable_name ?? ""),
+          },
+        ]}
+      />
+    );
   }
 
   return (
     <ActFormShell schema={getActFormSchema("notif_deces")!}>
       <div className="panel">
+        <button
+          type="button"
+          className="btn-secondary btn-sm"
+          style={{ marginBottom: "0.75rem" }}
+          onClick={() => setFormOpen(false)}
+        >
+          ← Retour à la liste
+        </button>
         <form className="form-grid" onSubmit={(e) => void onSubmit(e)}>
           {error ? <div className="login-error full">{error}</div> : null}
           {message ? <div className="success-banner full">{message}</div> : null}
@@ -165,36 +223,6 @@ export default function HealthDeathsPage() {
             </button>
           </div>
         </form>
-      </div>
-
-      <div className="panel" style={{ marginTop: "1rem" }}>
-        <h3 className="panel-title">Notifications transmises</h3>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Personne</th>
-              <th>Type</th>
-              <th>Date</th>
-              <th>Cause</th>
-              <th>Lieu</th>
-              <th>Déclarant</th>
-              <th>Statut EC</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((d) => (
-              <tr key={d.id}>
-                <td>{String(d.payload.deceased_name ?? "—")}</td>
-                <td>{String(d.payload.type_deces_label ?? (d.payload.mort_ne ? "Mort-né" : "Décès"))}</td>
-                <td>{String(d.payload.date_deces ?? "—")}</td>
-                <td>{String(d.payload.cause_deces ?? "—")}</td>
-                <td>{String(d.payload.lieu_deces ?? "—")}</td>
-                <td>{String(d.payload.declarant_name ?? d.payload.responsable_name ?? "—")}</td>
-                <td>{d.status}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
     </ActFormShell>
   );

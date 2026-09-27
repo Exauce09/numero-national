@@ -51,7 +51,7 @@ export default function HealthDashboardPage() {
           subtitle={`${pendingOf(birthAll).length} à valider`}
           icon={<IconBaby size={22} />}
           color={RDC.yellowDeep}
-          href="/sante/births"
+          href="/sante/births?focus=validated"
         />
         <StatCard
           title="Décès"
@@ -59,7 +59,7 @@ export default function HealthDashboardPage() {
           subtitle={`${pendingOf(deathAll).length} à valider`}
           icon={<IconCross size={22} />}
           color={RDC.red}
-          href="/sante/deaths"
+          href="/sante/deaths?focus=validated"
         />
       </div>
 
