@@ -5,7 +5,7 @@ type Props = {
   showTerritory?: boolean;
 };
 
-/** Champ lecture seule : l'agent d'état civil connecté (pas une recherche population). */
+/** Champ lecture seule : le préposé / officier de l'état civil connecté (pas une recherche population). */
 export default function OfficerSessionField({ showTerritory = true }: Props) {
   const officer: LoggedOfficer | null = getLoggedOfficer();
 
@@ -13,7 +13,7 @@ export default function OfficerSessionField({ showTerritory = true }: Props) {
     return (
       <div>
         <label className="form-label">Officier d&apos;état civil</label>
-        <div className="muted small">Aucun agent connecté — reconnectez-vous.</div>
+        <div className="muted small">Aucun préposé / officier connecté — reconnectez-vous.</div>
       </div>
     );
   }
@@ -26,7 +26,7 @@ export default function OfficerSessionField({ showTerritory = true }: Props) {
         <div className="muted small">{officer.roleTitle}</div>
         <div className="muted small">Compte : {officer.username}</div>
         {officer.userId ? (
-          <div className="muted small">Id agent : {officer.userId}</div>
+          <div className="muted small">Id utilisateur : {officer.userId}</div>
         ) : null}
         {showTerritory ? (
           <div className="muted small" style={{ marginTop: 4 }}>

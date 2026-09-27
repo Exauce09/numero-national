@@ -6,6 +6,7 @@ import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "reac
 import {
   clearHealthSession,
   getHealthSession,
+  HEALTH_ROLE_TITLE,
   isHealthAccountActive,
   updateHealthPassword,
 } from "./healthAuth";
@@ -148,7 +149,7 @@ export default function HealthShell() {
             <h1 className="topbar-title">État civil · Structure sanitaire</h1>
           </div>
           <div className="topbar-center">
-            <span className="topbar-role">{session.roleTitle}</span>
+            <span className="topbar-role">{HEALTH_ROLE_TITLE}</span>
             <strong className="topbar-responsable">{session.facilityName}</strong>
             {session.commune_name ? (
               <span className="topbar-commune">Commune de {session.commune_name}</span>

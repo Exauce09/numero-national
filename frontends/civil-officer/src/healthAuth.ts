@@ -31,7 +31,7 @@ const SESSION_KEY = "nn_session_health_facility";
 
 export const HEALTH_DEMO_USER = "hopital";
 export const HEALTH_DEMO_PASSWORD = "DemoSante2026!";
-export const HEALTH_ROLE_TITLE = "Responsable — Structure sanitaire";
+export const HEALTH_ROLE_TITLE = "Infirmier titulaire — structure sanitaire";
 
 function normalizeAccount(raw: Partial<FacilityAccount> & {
   id?: string;

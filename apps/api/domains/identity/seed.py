@@ -11,12 +11,12 @@ from apps.api.domains.identity.models import Permission, Role
 
 SEED_ROLES: list[dict[str, str]] = [
     {"code": "CENTRAL_ADMIN", "name": "Administrateur central", "description": "Administration complète"},
-    {"code": "SUPER_ADMIN_NATIONAL", "name": "Super admin national", "description": "Configuration globale (exceptionnel)"},
+    {"code": "SUPER_ADMIN_NATIONAL", "name": "État civil national", "description": "Configuration globale (exceptionnel)"},
     {"code": "ADMIN_NATIONAL", "name": "Administrateur national", "description": "Gestion utilisateurs nationaux"},
-    {"code": "ADMIN_PROVINCIAL", "name": "Administrateur provincial", "description": "Périmètre une province"},
-    {"code": "RESPONSABLE_BUREAU", "name": "Responsable de bureau", "description": "Supervision d'un bureau d'état civil"},
+    {"code": "ADMIN_PROVINCIAL", "name": "Divinter — division provinciale", "description": "Périmètre une province"},
+    {"code": "RESPONSABLE_BUREAU", "name": "Divinter — division provinciale", "description": "Supervision des bureaux d'état civil de la province"},
     {"code": "OFFICIER_ETAT_CIVIL", "name": "Officier d'état civil", "description": "Validation/authentification d'actes"},
-    {"code": "AGENT_ETAT_CIVIL", "name": "Agent d'état civil", "description": "Préparation des dossiers (sans validation)"},
+    {"code": "AGENT_ETAT_CIVIL", "name": "Préposé de l'état civil", "description": "Préparation des dossiers (sans validation)"},
     {"code": "AUDITEUR", "name": "Auditeur", "description": "Consultation des journaux d'audit"},
     {"code": "CENSUS_AGENT", "name": "Agent de recensement", "description": "Recensement terrain"},
     {"code": "CENSUS_SUPERVISOR", "name": "Superviseur recensement", "description": "Validation fiches terrain"},
@@ -277,6 +277,9 @@ async def seed_roles_and_permissions(db: AsyncSession) -> None:
                 .options(selectinload(Role.permissions))
             )
             assert role is not None
+        elif role.name != item["name"] or role.description != item["description"]:
+            role.name = item["name"]
+            role.description = item["description"]
 
         if role.code in {"CENTRAL_ADMIN", "SUPER_ADMIN_NATIONAL"}:
             wanted = set(perm_by_code.keys())

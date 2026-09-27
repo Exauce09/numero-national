@@ -309,7 +309,9 @@ function Shell() {
   }
 
   const responsableLabel = session?.displayName ?? session?.username ?? "—";
-  const roleTitle = session?.roleTitle || "Officier de l'état civil";
+  const roleTitle = session?.roles?.length
+    ? roleTitleFor(session.roles)
+    : session?.roleTitle || "Officier de l'état civil";
   const communeLabel = session?.commune_name
     ? `Commune de ${session.commune_name}`
     : null;
@@ -333,13 +335,13 @@ function Shell() {
         ? "Module judiciaire · tribunal"
         : "Module judiciaire · greffe"
       : role === "AGENT_ETAT_CIVIL"
-        ? "Agent préposé · bureau local"
-        : role === "RESPONSABLE_BUREAU"
-          ? "Responsable de bureau"
+        ? "Préposé de l'état civil · bureau local"
+        : role === "RESPONSABLE_BUREAU" || role === "ADMIN_PROVINCIAL"
+          ? "Divinter · division provinciale"
           : role === "OFFICIER_ETAT_CIVIL"
             ? "Officier d'état civil"
             : role === "SUPER_ADMIN_NATIONAL"
-              ? "Super admin · national"
+              ? "État civil national"
               : roleTitle,
     communeLabel || territoryLine || null,
   ]

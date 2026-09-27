@@ -87,7 +87,7 @@ export default function HealthLoginPage() {
             {busy ? "Connexion…" : "Se connecter"}
           </button>
           <p className="muted small" style={{ marginTop: "0.85rem" }}>
-            Compte créé via <strong>Créer un compte</strong> (hôpital) ou{" "}
+            Compte créé via <strong>Créer un compte</strong> (infirmier titulaire) ou{" "}
             <strong>Déclarations → Créer une structure</strong>.
           </p>
           <p className="muted small" style={{ marginTop: "0.65rem" }}>

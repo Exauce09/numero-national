@@ -46,7 +46,7 @@ export type HealthSession = {
 const ACCOUNTS_KEY = "nn_health_facility_accounts";
 const SESSION_KEY = "nn_session_health_facility";
 
-export const HEALTH_ROLE_TITLE = "Responsable — Structure sanitaire";
+export const HEALTH_ROLE_TITLE = "Infirmier titulaire — structure sanitaire";
 
 function normalizeAccount(
   raw: Partial<FacilityAccount> & {
@@ -399,7 +399,7 @@ export async function loginHealth(username: string, password: string): Promise<H
   const account = loadAccounts().find((a) => a.username === user);
   if (!account || !(await passwordMatches(account, password))) {
     throw new Error(
-      "Identifiants incorrects. Demandez un compte à l'officier d'état civil (Déclarations) ou au super admin.",
+      "Identifiants incorrects. Demandez un compte à l'officier d'état civil (Déclarations) ou à l'État civil national.",
     );
   }
   if (!account.active) {

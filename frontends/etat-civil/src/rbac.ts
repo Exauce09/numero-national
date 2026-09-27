@@ -86,19 +86,18 @@ export function primaryRole(roles: string[]): AppRole {
 export function roleTitleFor(roles: string[]): string {
   switch (primaryRole(roles)) {
     case "SUPER_ADMIN_NATIONAL":
-      return "Super administrateur national";
+      return "État civil national";
     case "ADMIN_NATIONAL":
     case "CENTRAL_ADMIN":
       return "Administrateur national";
     case "ADMIN_PROVINCIAL":
-      return "Directrice de l'État civil général de la RDC";
     case "RESPONSABLE_BUREAU":
-      return "Responsable de bureau";
+      return "Divinter — division provinciale";
     case "OFFICIER_ETAT_CIVIL":
     case "CIVIL_OFFICER":
       return "Officier de l'état civil";
     case "AGENT_ETAT_CIVIL":
-      return "Agent de l'état civil";
+      return "Préposé de l'état civil";
     case "GREFFIER":
       return "Greffier";
     case "JUGE":

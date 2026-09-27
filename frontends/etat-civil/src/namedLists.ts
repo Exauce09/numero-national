@@ -34,7 +34,7 @@ export const DEFAULT_PROFESSIONS = [
   "Agriculteur / Agricultrice",
   "Fonctionnaire",
   "Officier d'état civil",
-  "Agent d'état civil",
+  "Préposé de l'état civil",
   "Policier / Policier",
   "Militaire",
   "Chauffeur",

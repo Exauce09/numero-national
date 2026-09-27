@@ -4,9 +4,9 @@ type Props = {
   label?: string;
 };
 
-/** Lieu d'acte = territoire attribué à l'agent (pas de re-sélection). */
+/** Lieu d'acte = territoire attribué au préposé / officier (pas de re-sélection). */
 export default function OfficerTerritoryField({
-  label = "Lieu d'état civil (bureau de l'agent)",
+  label = "Lieu d'état civil (bureau du préposé / officier)",
 }: Props) {
   const geo = geoFromOfficer();
 
@@ -24,7 +24,7 @@ export default function OfficerTerritoryField({
           {geo.commune_code ? ` (${geo.commune_code})` : ""}
         </div>
         <div className="muted small" style={{ marginTop: 4 }}>
-          Rempli automatiquement selon l&apos;affectation de l&apos;agent connecté.
+          Rempli automatiquement selon l&apos;affectation du préposé / officier connecté.
         </div>
       </div>
     </div>

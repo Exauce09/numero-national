@@ -35,7 +35,7 @@ export default function ProcedureEcPage() {
             <strong className="dash-action-value" style={{ fontSize: "1rem" }}>
               Saisie directe
             </strong>
-            <span className="muted small">Agent / officier enregistre au guichet de la commune</span>
+            <span className="muted small">Préposé / officier enregistre au guichet de la commune</span>
             <span className="btn-secondary btn-sm">Enregistrement de nouveau-né</span>
           </Link>
           <Link className="dash-action-card" to="/declarations" style={{ textDecoration: "none" }}>

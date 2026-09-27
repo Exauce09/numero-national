@@ -5,7 +5,7 @@ type Props = {
   showTerritory?: boolean;
 };
 
-/** Champ lecture seule : l'agent d'état civil connecté (pas une recherche population). */
+/** Champ lecture seule : le préposé / officier de l'état civil connecté (pas une recherche population). */
 export default function OfficerSessionField({ showTerritory = true }: Props) {
   const officer: LoggedOfficer | null = getLoggedOfficer();
 

@@ -68,12 +68,12 @@ export function resolveCommuneForUsername(username: string): OfficerCommune {
         user === "officier"
           ? "Hervé Kinkete"
           : user === "agent"
-            ? "Agent de l'état civil"
+            ? "Préposé de l'état civil"
             : user === "responsable"
-              ? "Responsable de bureau"
+              ? "Divinter — division provinciale"
               : user === "auditeur"
                 ? "Auditeur"
-                : "Directrice de l'État civil général de la RDC",
+                : "Divinter — coordination provinciale",
       commune: DEFAULT_OFFICER_COMMUNE,
     });
     return { ...demo.commune };

@@ -27,7 +27,7 @@ export default function AccountRequestsReviewPage() {
         <h2 className="page-title">Demandes de compte</h2>
         <div className="panel">
           <p className="muted">
-            Seul le <strong>super administrateur national</strong> peut valider les demandes de
+            Seul l&apos;<strong>État civil national</strong> peut valider les demandes de
             compte.
           </p>
           <Link className="btn-secondary btn-sm" to="/matrice">
@@ -47,7 +47,7 @@ export default function AccountRequestsReviewPage() {
         decision === "reject"
           ? `Demande rejetée (${row.email}).`
           : row.accountType === "HOPITAL_MATERNITE"
-            ? `Hôpital activé — structure visible dans Déclarations ; connexion /sante/login (${row.login_id}).`
+            ? `Infirmier titulaire activé — structure visible dans Déclarations ; connexion /sante/login (${row.login_id}).`
             : `Identité validée pour ${row.email} — attribuez le rôle séparément (Utilisateurs).`,
       );
       setBump((n) => n + 1);

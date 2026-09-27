@@ -211,7 +211,7 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
       return;
     }
     if ((target === "VALIDATED" || target === "UNDER_REVIEW") && !canValidate) {
-      setError("Seuls l'officier / responsable de bureau peuvent valider (civil:act:validate).");
+      setError("Seuls l'officier / le divinter peuvent valider (civil:act:validate).");
       return;
     }
     setBusy(true);

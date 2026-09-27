@@ -269,7 +269,7 @@ export default function DashboardPage() {
     (variant === "officier"
       ? "Officier de l'état civil — Hervé Kinkete"
       : variant === "provincial"
-        ? "Directrice de l'État civil général de la RDC"
+        ? "Divinter — division provinciale"
         : "Officier de l'état civil");
   const territory = [session?.commune_province, session?.commune_ville, session?.commune_name]
     .filter(Boolean)
@@ -421,12 +421,12 @@ export default function DashboardPage() {
           </h3>
           <ul className="muted small" style={{ margin: 0, paddingLeft: "1.1rem", lineHeight: 1.55 }}>
             <li>
-              <strong>Brouillon</strong> — l&apos;agent d&apos;état civil a commencé un acte (naissance,
+              <strong>Brouillon</strong> — le préposé de l&apos;état civil a commencé un acte (naissance,
               mariage…) sans le finaliser.
             </li>
             <li>
               <strong>Soumis / revue</strong> — l&apos;acte est transmis pour contrôle ; un officier /
-              responsable de bureau doit le vérifier.
+              le divinter doit le vérifier.
             </li>
             <li>
               <strong>Validé / auth.</strong> — l&apos;officier a validé (cachet / workflow) ; l&apos;acte

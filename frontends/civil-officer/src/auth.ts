@@ -53,8 +53,8 @@ export const CIVIL_DEMO_ACCOUNTS: Array<{
     uiPassword: "DemoAgentCivil2026!",
     email: "agent.etatcivil@example.gov",
     apiPassword: "AgentCivil123!",
-    displayName: "Agent de l'état civil",
-    label: "Agent (saisie)",
+    displayName: "Préposé de l'état civil",
+    label: "Préposé de l'état civil (saisie)",
     rolesHint: ["AGENT_ETAT_CIVIL"],
   },
   {
@@ -62,8 +62,8 @@ export const CIVIL_DEMO_ACCOUNTS: Array<{
     uiPassword: "DemoResponsable2026!",
     email: "responsable.bureau@example.gov",
     apiPassword: "ResponsableBureau123!",
-    displayName: "Responsable de bureau",
-    label: "Responsable de bureau",
+    displayName: "Divinter — division provinciale",
+    label: "Divinter",
     rolesHint: ["RESPONSABLE_BUREAU"],
   },
   {
@@ -80,8 +80,8 @@ export const CIVIL_DEMO_ACCOUNTS: Array<{
     uiPassword: "DemoAdminProv2026!",
     email: "admin.provincial@example.gov",
     apiPassword: "AdminProvincial123!",
-    displayName: "Directrice de l'État civil général de la RDC",
-    label: "Directrice État civil général RDC",
+    displayName: "Divinter — coordination provinciale",
+    label: "Divinter (coordination provinciale)",
     rolesHint: ["ADMIN_PROVINCIAL"],
   },
 ];

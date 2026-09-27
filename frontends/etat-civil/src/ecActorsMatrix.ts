@@ -62,9 +62,9 @@ export const EC_ACTOR_MATRIX: EcActorRow[] = [
   },
   {
     id: "hopital",
-    title: "Hôpital / maternité",
+    title: "Infirmier titulaire (structure sanitaire)",
     loginStatus: "implemented",
-    loginNote: "Portail /sante — comptes structure créés par l'officier.",
+    loginNote: "Portail /sante — comptes infirmier titulaire créés par l'État civil national ou l'officier.",
     restrictions: [
       "Ne crée pas d'acte officiel",
       "N'attribue pas de N° d'acte",
@@ -87,9 +87,9 @@ export const EC_ACTOR_MATRIX: EcActorRow[] = [
   },
   {
     id: "agent_ec",
-    title: "Agent d'état civil",
+    title: "Préposé de l'état civil",
     loginStatus: "implemented",
-    loginNote: "Compte local AGENT_ETAT_CIVIL.",
+    loginNote: "Compte local préposé de l'état civil (AGENT_ETAT_CIVIL).",
     restrictions: [
       "Pas de validation juridique finale automatique",
       "Ne contourne pas l'officier",
@@ -112,7 +112,7 @@ export const EC_ACTOR_MATRIX: EcActorRow[] = [
     id: "officier_ec",
     title: "Officier d'état civil",
     loginStatus: "implemented",
-    loginNote: "Compte OFFICIER_ETAT_CIVIL / RESPONSABLE_BUREAU (cumul 1er user).",
+    loginNote: "Compte officier (OFFICIER_ETAT_CIVIL) — cumul possible avec divinter.",
     restrictions: [
       "Modification d'acte validé uniquement selon procédure légale",
       "Pas de modification silencieuse",
@@ -134,16 +134,16 @@ export const EC_ACTOR_MATRIX: EcActorRow[] = [
   },
   {
     id: "responsable_bureau",
-    title: "Responsable de bureau",
+    title: "Divinter — division provinciale",
     loginStatus: "implemented",
-    loginNote: "Rôle local RESPONSABLE_BUREAU (hors liste 14 acteurs — nécessaire au bootstrap).",
+    loginNote: "Divinter (province) — rôle local RESPONSABLE_BUREAU / ADMIN_PROVINCIAL.",
     restrictions: [
-      "Administration du bureau ≠ autorité judiciaire",
+      "Administration provinciale ≠ autorité judiciaire",
       "Ne contourne pas la validation d'acte si non aussi officier",
     ],
     permissions: {
-      creer: { level: "OUI", detail: "Comptes du bureau ; actes s'il est aussi officier" },
-      consulter: { level: "OUI", detail: "Supervision du bureau" },
+      creer: { level: "OUI", detail: "Comptes des bureaux ; actes s'il est aussi officier" },
+      consulter: { level: "OUI", detail: "Supervision des bureaux de la province" },
       modifier: { level: "LIMITE", detail: "Paramètres locaux / comptes" },
       valider: { level: "SELON_HABILITATION", detail: "Oui s'il cumule officier (1er compte)" },
       transmettre: { level: "LIMITE", detail: "Supervision / orientation" },
@@ -201,7 +201,7 @@ export const EC_ACTOR_MATRIX: EcActorRow[] = [
     id: "admin_territorial",
     title: "Administrateur territorial",
     loginStatus: "missing",
-    loginNote: "Absent — proche fonctionnel : Responsable de bureau.",
+    loginNote: "Absent — proche fonctionnel : Divinter.",
     restrictions: ["Ne modifie pas arbitrairement les actes validés"],
     permissions: {
       creer: { level: "LIMITE", detail: "Paramètres locaux, utilisateurs du périmètre" },
@@ -219,9 +219,9 @@ export const EC_ACTOR_MATRIX: EcActorRow[] = [
   },
   {
     id: "admin_provincial",
-    title: "Administrateur provincial",
+    title: "Divinter — coordination provinciale (API)",
     loginStatus: "partial",
-    loginNote: "Rôle ADMIN_PROVINCIAL dans RBAC/API — UX EC limitée.",
+    loginNote: "Divinter côté API (ADMIN_PROVINCIAL) — UX EC limitée.",
     restrictions: [
       "Droits distincts de l'admin national",
       "Pas de modification silencieuse d'actes validés",
@@ -332,7 +332,7 @@ export const EC_ACTOR_MATRIX: EcActorRow[] = [
   },
   {
     id: "super_admin",
-    title: "Super administrateur",
+    title: "État civil national",
     loginStatus: "partial",
     loginNote: "Compte technique / fonctionnel — pas d'autorité juridique (mentions, validation d'actes).",
     restrictions: [
@@ -357,11 +357,11 @@ export const EC_ACTOR_MATRIX: EcActorRow[] = [
 ];
 
 export const EC_ROLE_CONFLICTS = [
-  "Hôpital ne valide pas l'acte qu'il notifie",
-  "Agent EC ne valide pas juridiquement à la place de l'officier",
+  "L'infirmier titulaire ne valide pas l'acte qu'il notifie",
+  "Le préposé de l'état civil ne valide pas juridiquement à la place de l'officier",
   "Juge ne transcrit pas lui-même au registre EC",
   "Greffier ne rend pas le jugement",
-  "Super admin ≠ officier d'état civil ni juge",
+  "État civil national ≠ officier d'état civil ni juge",
   "Celui qui crée n'est pas automatiquement celui qui valide",
   "Celui qui juge n'est pas automatiquement celui qui exécute à l'EC",
 ] as const;
@@ -371,9 +371,9 @@ export const EC_WORKFLOWS = [
     id: "naissance_sante",
     title: "Enregistrement de nouveau-né via maternité",
     steps: [
-      "Hôpital : enregistrement de nouveau-né",
+      "Infirmier titulaire : enregistrement de nouveau-né",
       "Transmission au bureau EC",
-      "Agent : vérification / brouillon",
+      "Préposé : vérification / brouillon",
       "Officier : validation → enregistrement de nouveau-né",
       "Délivrance : copie / extrait",
     ],
@@ -382,7 +382,7 @@ export const EC_WORKFLOWS = [
     id: "naissance_bureau",
     title: "Enregistrement de nouveau-né au bureau",
     steps: [
-      "Déclarant / agent : saisie",
+      "Déclarant / préposé : saisie",
       "Contrôle du délai (≤ 90 j. ou jugement supplétif)",
       "Officier : validation → registre des nouveau-nés",
     ],

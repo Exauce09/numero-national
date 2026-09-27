@@ -1,5 +1,5 @@
 /**
- * Création de compte — réservé au SUPER_ADMIN_NATIONAL.
+ * Création de compte — réservé à l'État civil national (SUPER_ADMIN_NATIONAL).
  * Crée l'identité ; n'attribue jamais un rôle privilégié automatiquement.
  */
 
@@ -136,8 +136,7 @@ export default function RegisterAccountPage() {
         <div className="register-shell">
           <h2 className="register-title">Accès réservé</h2>
           <p className="register-subtitle">
-            Seul le <strong>super administrateur national</strong> (SUPER_ADMIN_NATIONAL) peut créer
-            des comptes via cet écran.
+            Seul l&apos;<strong>État civil national</strong> peut créer des comptes via cet écran.
           </p>
           <Link className="btn-primary register-submit" to="/" style={{ display: "block", textAlign: "center" }}>
             Retour au tableau de bord
@@ -285,9 +284,9 @@ export default function RegisterAccountPage() {
               Créez un compte pour un utilisateur de la plateforme nationale de l&apos;état civil.
             </p>
             <p className="register-note muted small">
-              Réservé au <strong>SUPER_ADMIN_NATIONAL</strong> ({session.username}). Après
+              Réservé à l&apos;<strong>État civil national</strong> ({session.username}). Après
               vérification du téléphone, le compte est activé avec le rôle correspondant au type
-              choisi (greffier, officier, IT structure sanitaire → /sante, etc.).
+              choisi (préposé, officier, divinter, infirmier titulaire → /sante, etc.).
             </p>
 
             <form className="register-form" onSubmit={(e) => void onSubmitForm(e)} autoComplete="off">
@@ -451,7 +450,7 @@ export default function RegisterAccountPage() {
                           />
                         )}
                         <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
-                          Poste occupé dans le bureau (ex. agent de saisie, officier titulaire).
+                          Poste occupé dans le bureau (ex. préposé de l&apos;état civil, officier titulaire).
                         </p>
                       </div>
                     ) : null}
@@ -478,7 +477,7 @@ export default function RegisterAccountPage() {
                               ))}
                             </select>
                             <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
-                              Bureau d&apos;affectation de l&apos;agent ou de l&apos;officier. Sélectionnez
+                              Bureau d&apos;affectation du préposé ou de l&apos;officier. Sélectionnez
                               d&apos;abord le lieu ci-dessous pour filtrer la liste.
                             </p>
                           </>
@@ -740,7 +739,7 @@ export default function RegisterAccountPage() {
             <h2 className="register-title">Compte enregistré</h2>
             {result.accountType === "HOPITAL_MATERNITE" && result.status === "ACTIVE" ? (
               <>
-                <div className="success-banner">Compte infirmier titulaire (IT) créé</div>
+                <div className="success-banner">Compte infirmier titulaire créé</div>
                 <p className="muted">
                   La structure sanitaire est disponible dans{" "}
                   <Link to="/declarations">Déclarations → Structures sanitaires</Link>. Connexion
@@ -754,12 +753,12 @@ export default function RegisterAccountPage() {
                 <p className="muted">
                   L&apos;utilisateur peut se connecter sur <Link to="/login">/login</Link> avec{" "}
                   <code>{result.login_id}</code> — rôle{" "}
-                  {getAccountTypeOption(result.accountType).assignRoles?.join(", ") || "agent"}.
+                  {getAccountTypeOption(result.accountType).label}.
                 </p>
               </>
             ) : result.created_by_super_admin ? (
               <>
-                <div className="success-banner">Identité créée par le super administrateur</div>
+                <div className="success-banner">Identité créée par l&apos;État civil national</div>
                 <p className="muted">
                   Téléphone vérifié. Attribuez ensuite le rôle via{" "}
                   <Link to="/users">Utilisateurs</Link> ou le module d&apos;habilitation — aucun rôle

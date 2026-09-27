@@ -1,6 +1,7 @@
 import { getSession } from "./auth";
 import { getOfficerCommune, type OfficerCommune } from "./commune";
 import type { GeoSelection } from "./components/GeoCascade";
+import { roleTitleFor } from "./rbac";
 
 export type LoggedOfficer = {
   userId?: string;
@@ -10,7 +11,7 @@ export type LoggedOfficer = {
   commune: OfficerCommune;
 };
 
-/** Agent d'état civil connecté (session), pas une personne du registre population. */
+/** Préposé / officier de l'état civil connecté (session), pas une personne du registre population. */
 export function getLoggedOfficer(): LoggedOfficer | null {
   const session = getSession();
   if (!session) return null;
@@ -19,7 +20,9 @@ export function getLoggedOfficer(): LoggedOfficer | null {
     userId: session.userId,
     username: session.username,
     displayName: session.displayName || session.username,
-    roleTitle: session.roleTitle || "Officier de l'état civil",
+    roleTitle: session.roles?.length
+      ? roleTitleFor(session.roles)
+      : session.roleTitle || "Officier de l'état civil",
     commune: {
       code: session.commune_code || commune.code,
       name: session.commune_name || commune.name,
@@ -29,7 +32,7 @@ export function getLoggedOfficer(): LoggedOfficer | null {
   };
 }
 
-/** Lieu d'enregistrement = bureau / territoire de l'agent connecté. */
+/** Lieu d'enregistrement = bureau / territoire du préposé / officier connecté. */
 export function geoFromOfficer(): GeoSelection {
   const officer = getLoggedOfficer();
   const c = officer?.commune ?? getOfficerCommune();

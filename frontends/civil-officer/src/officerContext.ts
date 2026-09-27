@@ -10,7 +10,7 @@ export type LoggedOfficer = {
   commune: OfficerCommune;
 };
 
-/** Agent d'état civil connecté (session), pas une personne du registre population. */
+/** Préposé / officier de l'état civil connecté (session), pas une personne du registre population. */
 export function getLoggedOfficer(): LoggedOfficer | null {
   const session = getSession();
   if (!session) return null;

@@ -14,7 +14,7 @@ import {
   IconRing,
   IconSplit,
 } from "../components/Icons";
-import { dashboardVariant, primaryRole } from "../rbac";
+import { dashboardVariant, primaryRole, roleTitleFor } from "../rbac";
 import { RDC } from "../rdcColors";
 import { listActs } from "../registry";
 
@@ -279,9 +279,9 @@ export default function DashboardPage() {
   const helloName = session?.displayName || session?.username || "utilisateur";
   const rolePrimary = primaryRole(session?.roles ?? []);
   const roleTitle =
-    session?.roleTitle ||
+    (session?.roles?.length ? roleTitleFor(session.roles) : session?.roleTitle) ||
     (variant === "provincial"
-      ? "Directrice de l'État civil général de la RDC"
+      ? "Divinter — division provinciale"
       : variant === "judiciaire"
         ? rolePrimary === "JUGE"
           ? "Juge"

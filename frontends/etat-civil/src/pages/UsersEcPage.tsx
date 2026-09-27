@@ -1,4 +1,4 @@
-/** Gestion des utilisateurs du bureau — après le 1er responsable. */
+/** Gestion des utilisateurs du bureau — après le 1er divinter. */
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -25,7 +25,7 @@ import PasswordField from "../components/PasswordField";
 import { roleTitleFor } from "../rbac";
 
 function rolesLabel(roles: EcUserRole[]): string {
-  return roles.map((r) => roleTitleFor([r])).join(", ");
+  return [...new Set(roles.map((r) => roleTitleFor([r])))].join(", ");
 }
 
 export default function UsersEcPage() {
@@ -34,12 +34,12 @@ export default function UsersEcPage() {
   const canManage = canManageEcUsers(session?.roles);
   const isSuper = isSuperAdminNational(session?.roles);
   const roleOptions = EC_ROLE_CATALOG.filter(
-    (r) => isSuper || r.code !== "SUPER_ADMIN_NATIONAL",
+    (r) => (isSuper || r.code !== "SUPER_ADMIN_NATIONAL") && r.code !== "ADMIN_PROVINCIAL",
   );
   const [bump, setBump] = useState(0);
   const users = useMemo(() => {
     const all = listEcUsers();
-    // Responsable : ne voit pas le super admin (Hervé) dans sa liste de gestion.
+    // Divinter : ne voit pas l'État civil national (Hervé) dans sa liste de gestion.
     if (!isSuper) return all.filter((u) => !isProtectedPlatformAdmin(u));
     return all;
   }, [bump, isSuper]);
@@ -97,8 +97,8 @@ export default function UsersEcPage() {
         <h2 className="page-title">Utilisateurs</h2>
         <div className="panel">
           <p className="muted">
-            Seul le <strong>responsable de bureau</strong> ou le{" "}
-            <strong>super administrateur</strong> peut gérer les comptes bureau. Votre rôle :{" "}
+            Seuls le <strong>divinter</strong> (division provinciale) ou l&apos;
+            <strong>État civil national</strong> peuvent gérer les comptes bureau. Votre rôle :{" "}
             {roleTitleFor(session?.roles ?? []) || "—"}.
           </p>
           <Link className="btn-secondary btn-sm" to="/roles">
@@ -254,9 +254,9 @@ export default function UsersEcPage() {
 
       {isSuper ? (
         <div className="panel" style={{ marginTop: "1rem" }}>
-          <h3 className="panel-title">Structures sanitaires (portail /sante)</h3>
+          <h3 className="panel-title">Infirmiers titulaires — structures sanitaires (portail /sante)</h3>
           <p className="muted small" style={{ marginTop: 0 }}>
-            Les hôpitaux / maternités ne se connectent pas ici : utilisez{" "}
+            Les infirmiers titulaires ne se connectent pas ici : utilisez{" "}
             <Link to="/sante/login">/sante/login</Link>. Ils sont listés pour le suivi national.
           </p>
           <table className="data-table">
@@ -302,7 +302,7 @@ export default function UsersEcPage() {
               {!facilities.length ? (
                 <tr>
                   <td colSpan={6} className="muted">
-                    Aucune structure sanitaire — créez-en via Inscription (type Hôpital) ou
+                    Aucune structure sanitaire — créez-en via Inscription (type Infirmier titulaire) ou
                     Déclarations.
                   </td>
                 </tr>

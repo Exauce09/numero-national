@@ -8,7 +8,8 @@ export default function RolesEcPage() {
     <div>
       <h2 className="page-title">Qui fait quoi</h2>
       <p className="page-lead">
-        Répartition des rôles : déclarant, maternité, agent, officier, juge. L&apos;officier
+        Répartition des rôles : déclarant, infirmier titulaire, préposé de l&apos;état civil,
+        officier, divinter, État civil national, juge. L&apos;officier
         enregistre ; le juge décide dans les cas exceptionnels.
       </p>
 

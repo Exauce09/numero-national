@@ -252,7 +252,7 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
       return;
     }
     if ((target === "VALIDATED" || target === "UNDER_REVIEW") && !canValidate) {
-      setError("Seuls l'officier / responsable de bureau peuvent valider.");
+      setError("Seuls l'officier / le divinter peuvent valider.");
       return;
     }
     setBusy(true);
@@ -573,7 +573,7 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
 
       {supportsCivilWorkflow && !canValidate && status === "SUBMITTED" ? (
         <p className="muted small">
-          Acte soumis — validation réservée à l&apos;officier ou au responsable de bureau.
+          Acte soumis — validation réservée à l&apos;officier ou au divinter.
         </p>
       ) : null}
       {supportsCivilWorkflow && !canSubmit && nextSteps.length > 0 ? (
@@ -582,7 +582,7 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
 
       {supportsCivilWorkflow ? (
         <p className="muted small" style={{ marginBottom: "0.75rem" }}>
-          Circuit : <strong>Agent</strong> saisit / soumet → <strong>Officier</strong> valide. Impossible
+          Circuit : <strong>Préposé</strong> saisit / soumet → <strong>Officier</strong> valide. Impossible
           de passer directement de Brouillon à Validé sans soumission.
         </p>
       ) : null}

@@ -221,7 +221,7 @@ export default function FicheIdentificationForm({ data }: Props) {
               textAlign: "center",
             }}
           >
-            Signature de l&apos;Agent et Visa
+            Signature du Préposé et Visa
           </div>
         </div>
         <div style={{ fontWeight: 700, ...ink }}>

@@ -149,7 +149,7 @@ export const EC_ROLES: EcRole[] = [
   },
   {
     id: "sante",
-    title: "Structure sanitaire / maternité",
+    title: "Infirmier titulaire (structure sanitaire)",
     does: [
       "Constate l'accouchement ou le décès",
       "Enregistre la déclaration (même hors ligne puis sync)",
@@ -159,7 +159,7 @@ export const EC_ROLES: EcRole[] = [
   },
   {
     id: "agent",
-    title: "Agent du bureau d'état civil",
+    title: "Préposé de l'état civil",
     does: ["Accueille", "Saisit", "Prépare le dossier", "Oriente vers l'officier"],
     doesNot: ["Ne remplace pas l'authentification de l'officier"],
   },

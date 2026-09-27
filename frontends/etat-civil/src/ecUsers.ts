@@ -1,6 +1,6 @@
 /**
  * Comptes bureau d'état civil (local) — pas de comptes démo.
- * 1er utilisateur = Super admin national (+ responsable / officier) ; création comptes plateforme via /register.
+ * 1er utilisateur = État civil national (+ divinter / officier) ; création comptes plateforme via /register.
  */
 
 import { DEFAULT_OFFICER_COMMUNE, type OfficerCommune } from "./commune";
@@ -41,7 +41,7 @@ export const EC_ROLE_CATALOG: Array<{
 }> = [
   {
     code: "SUPER_ADMIN_NATIONAL",
-    label: "Super administrateur national",
+    label: "État civil national",
     summary:
       "Administration de la plateforme : crée les comptes (/register), ne s'attribue pas d'autorité juridique.",
     canCreateUsers: true,
@@ -49,7 +49,7 @@ export const EC_ROLE_CATALOG: Array<{
   },
   {
     code: "ADMIN_PROVINCIAL",
-    label: "Divinter",
+    label: "Divinter — division provinciale",
     summary:
       "Division de l'intérieur / coordination provinciale : supervision des bureaux d'état civil et suivi.",
     canCreateUsers: true,
@@ -57,9 +57,9 @@ export const EC_ROLE_CATALOG: Array<{
   },
   {
     code: "RESPONSABLE_BUREAU",
-    label: "Responsable de bureau",
+    label: "Divinter — division provinciale",
     summary:
-      "Dirige le bureau : crée les comptes (officier, agent), supervise, valide les actes.",
+      "Division provinciale : crée les comptes (officier, préposé), supervise les bureaux, valide les actes.",
     canCreateUsers: true,
     canValidateActs: true,
   },
@@ -96,7 +96,7 @@ export const EC_ROLE_CATALOG: Array<{
 /** Rôles du tout premier compte (legacy — préférer ensureCanonicalAccounts). */
 export const FIRST_USER_ROLES: EcUserRole[] = ["SUPER_ADMIN_NATIONAL"];
 
-/** Comptes nominatifs plateforme — Hervé = super admin, Tshidibi = responsable bureau. */
+/** Comptes nominatifs plateforme — Hervé = État civil national, Tshidibi = divinter. */
 export const CANONICAL_EC_ACCOUNTS: Array<{
   email: string;
   fullName: string;
@@ -270,10 +270,10 @@ export async function createEcUser(
   },
 ): Promise<EcUser> {
   if (!actor.roles.includes("RESPONSABLE_BUREAU") && !actor.roles.includes("SUPER_ADMIN_NATIONAL")) {
-    throw new Error("Seul le super administrateur national ou le responsable de bureau peut créer des utilisateurs.");
+    throw new Error("Seuls l'État civil national ou le divinter peuvent créer des utilisateurs.");
   }
   if (input.roles.includes("SUPER_ADMIN_NATIONAL") && !actor.roles.includes("SUPER_ADMIN_NATIONAL")) {
-    throw new Error("Seul le super administrateur national peut attribuer ce rôle.");
+    throw new Error("Seul l'État civil national peut attribuer ce rôle.");
   }
   const email = input.email.trim().toLowerCase();
   if (getEcUserByEmail(email)) throw new Error("Cet e-mail est déjà utilisé.");
@@ -407,7 +407,7 @@ export function createEcUserFromHash(input: {
   if (!input.roles.length) throw new Error("Choisissez au moins un rôle.");
   if (!input.fullName.trim()) throw new Error("Le nom complet est obligatoire.");
   if (input.roles.includes("SUPER_ADMIN_NATIONAL")) {
-    throw new Error("Le rôle super administrateur ne peut pas être attribué ainsi.");
+    throw new Error("Le rôle État civil national ne peut pas être attribué ainsi.");
   }
   const user: EcUser = {
     id: crypto.randomUUID(),
@@ -427,14 +427,14 @@ export function createEcUserFromHash(input: {
   return user;
 }
 
-/** Compte plateforme protégé (Hervé / SUPER_ADMIN) — hors autorité du responsable de bureau. */
+/** Compte plateforme protégé (Hervé / État civil national) — hors autorité du divinter. */
 export function isProtectedPlatformAdmin(user: Pick<EcUser, "email" | "roles">): boolean {
   const email = user.email.trim().toLowerCase();
   if (email === CANONICAL_EC_ACCOUNTS[0].email.toLowerCase()) return true;
   return user.roles.some((r) => r.toUpperCase() === "SUPER_ADMIN_NATIONAL");
 }
 
-/** Le responsable de bureau ne peut ni voir en gestion ni modifier le super admin. */
+/** Le divinter ne peut ni voir en gestion ni modifier l'État civil national. */
 export function canActorManageUser(
   actor: Pick<EcUser, "email" | "roles">,
   target: Pick<EcUser, "email" | "roles">,
@@ -454,11 +454,11 @@ export function setEcUserActive(
   if (i < 0) return;
   const target = rows[i];
   if (actor && !canActorManageUser(actor, target)) {
-    throw new Error("Vous n'avez pas le droit de modifier ce compte (super administrateur).");
+    throw new Error("Vous n'avez pas le droit de modifier ce compte (État civil national).");
   }
   if (!actor && isProtectedPlatformAdmin(target) && !active) {
-    // Sécurité : ne jamais désactiver le super admin sans acteur habilité.
-    throw new Error("Le compte super administrateur ne peut pas être désactivé ainsi.");
+    // Sécurité : ne jamais désactiver l'État civil national sans acteur habilité.
+    throw new Error("Le compte État civil national ne peut pas être désactivé ainsi.");
   }
   rows[i] = { ...target, active };
   saveEcUsers(rows);

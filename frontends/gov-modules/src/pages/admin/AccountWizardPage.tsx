@@ -18,9 +18,9 @@ const STEPS = [
 ] as const;
 
 const FUNCTIONS = [
-  { value: "AGENT_ETAT_CIVIL", label: "Agent d'état civil" },
+  { value: "AGENT_ETAT_CIVIL", label: "Préposé de l'état civil" },
   { value: "OFFICIER_ETAT_CIVIL", label: "Officier de l'état civil" },
-  { value: "RESPONSABLE_BUREAU", label: "Responsable de bureau" },
+  { value: "RESPONSABLE_BUREAU", label: "Divinter — division provinciale" },
   { value: "AUTRE", label: "Autre fonction autorisée" },
 ];
 

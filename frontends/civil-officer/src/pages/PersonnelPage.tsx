@@ -21,7 +21,7 @@ export default function PersonnelPage() {
       const msg = e instanceof Error ? e.message : "Chargement impossible";
       if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("personnel")) {
         setError(
-          "Accès refusé : permission personnel insuffisante. Un officier ne gère pas le personnel — utilisez un compte admin / responsable de bureau.",
+          "Accès refusé : permission personnel insuffisante. Un officier ne gère pas le personnel — utilisez un compte État civil national / divinter.",
         );
       } else {
         setError(msg);

@@ -40,7 +40,7 @@ export type AccountTypeOption = {
   needsJudgeFields?: boolean;
   /** Portail après activation. */
   portal: "civil" | "sante" | "none";
-  /** Rôles EC attribués à l'activation (super admin). */
+  /** Rôles EC attribués à l'activation (État civil national). */
   assignRoles?: Array<
     | "AGENT_ETAT_CIVIL"
     | "OFFICIER_ETAT_CIVIL"
@@ -222,9 +222,9 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
   },
   {
     code: "RESPONSABLE_BUREAU",
-    label: "Responsable de bureau",
+    label: "Divinter — division provinciale",
     summary:
-      "Dirige le bureau : gère les utilisateurs locaux, supervise et valide les actes",
+      "Division provinciale : gère les utilisateurs, supervise les bureaux et valide les actes",
     institutional: true,
     portal: "civil",
     assignRoles: ["RESPONSABLE_BUREAU", "OFFICIER_ETAT_CIVIL"],
@@ -233,17 +233,17 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     showMatricule: true,
     showFonction: true,
     fonctionOptions: [
-      "Responsable de bureau d'état civil",
-      "Chef de bureau",
-      "Responsable adjoint",
+      "Directeur(trice) Divinter",
+      "Chef de division Divinter",
+      "Cadre Divinter",
     ],
     showService: true,
-    serviceOptions: ["Direction du bureau", "Bureau d'état civil principal"],
+    serviceOptions: ["Divinter", "Coordination provinciale"],
     hiddenFromRegister: true,
   },
   {
     code: "HOPITAL_MATERNITE",
-    label: "Infirmier titulaire (IT)",
+    label: "Infirmier titulaire",
     summary:
       "Personnel soignant en structure sanitaire : déclare naissances/décès sur /sante ; l'officier valide ensuite",
     institutional: true,
@@ -253,7 +253,7 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     showMatricule: true,
     showFonction: true,
     fonctionOptions: [
-      "Infirmier titulaire (IT)",
+      "Infirmier titulaire",
       "Infirmier(ère) de maternité",
       "Sage-femme",
       "Responsable maternité",
@@ -630,7 +630,7 @@ export async function submitAccountRegistration(
           ? "REGISTRATION_BY_SUPER_ADMIN"
           : "REGISTRATION_SUBMITTED",
         detail: input.createdBySuperAdminEmail
-          ? `Créé par SUPER_ADMIN ${input.createdBySuperAdminEmail} — type demandé : ${type.label} — aucun rôle attribué`
+          ? `Créé par l'État civil national ${input.createdBySuperAdminEmail} — type demandé : ${type.label} — aucun rôle attribué`
           : `Type demandé : ${type.label} — aucun rôle attribué`,
       },
     ],
@@ -728,7 +728,7 @@ export async function verifyRegistrationOtp(code: string): Promise<AccountRegist
             ? "AWAITING_AUTHORITY_VALIDATION"
             : "CITIZEN_IDENTITY_CREATED",
         detail: bySuperAdmin
-          ? "Identité activée par super admin — attribuer le rôle séparément (habilitation)"
+          ? "Identité activée par l'État civil national — attribuer le rôle séparément (habilitation)"
           : type.institutional
             ? "Compte en attente de validation — aucun rôle attribué"
             : "Identité citoyenne créée — pas de rôle institutionnel",
@@ -894,7 +894,7 @@ export function resolveHealthLogin(identifier: string): HealthLoginResolution {
     return {
       loginId: id,
       isHealth: false,
-      hint: `Aucun compte structure sanitaire « ${identifier.trim()} » dans ce navigateur. Les comptes sont enregistrés localement : ils n'existent que dans le navigateur et à l'adresse où ils ont été créés (ex. http://localhost:5180). Recréez-le via Créer un compte → Infirmier titulaire (IT).`,
+      hint: `Aucun compte structure sanitaire « ${identifier.trim()} » dans ce navigateur. Les comptes sont enregistrés localement : ils n'existent que dans le navigateur et à l'adresse où ils ont été créés (ex. http://localhost:5180). Recréez-le via Créer un compte → Infirmier titulaire.`,
     };
   }
 
@@ -918,7 +918,7 @@ export function resolveHealthLogin(identifier: string): HealthLoginResolution {
       return {
         loginId: req.login_id,
         isHealth: true,
-        hint: "Inscription en attente de validation par le super admin (Demandes de compte).",
+        hint: "Inscription en attente de validation par l'État civil national (Demandes de compte).",
       };
     case "REJECTED":
       return {

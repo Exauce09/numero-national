@@ -649,7 +649,7 @@ export default function CensusPage() {
       })
       .then(() => {
         setDraftNotice(
-          "Brouillon synchronisé — un autre agent / système peut le reprendre et le terminer.",
+          "Brouillon synchronisé — un autre préposé / système peut le reprendre et le terminer.",
         );
       })
       .catch(() => {

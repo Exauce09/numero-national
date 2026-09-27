@@ -43,7 +43,7 @@ export default function IdentiteAdministrativeForm({ value, onChange }: Props) {
             />
           </div>
           <div>
-            <label className="form-label">Référence agent / matricule</label>
+            <label className="form-label">Référence préposé / matricule</label>
             <input
               className="form-control"
               value={value.agent_reference}

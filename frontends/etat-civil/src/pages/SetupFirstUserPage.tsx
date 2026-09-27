@@ -1,4 +1,4 @@
-/** Initialisation : Hervé (super admin) + Tshidibi (responsable de bureau). */
+/** Initialisation : Hervé (État civil national) + Tshidibi (divinter). */
 
 import { FormEvent, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
@@ -45,8 +45,8 @@ export default function SetupFirstUserPage() {
         <img className="login-logo" src="/logo-rdc.jpg" alt="RDC" />
         <h1 className="login-title">Comptes plateforme</h1>
         <p className="login-subtitle">
-          Initialisation nominative : <strong>Hervé</strong> = super administrateur national,{" "}
-          <strong>Tshidibi</strong> = responsable de bureau.
+          Initialisation nominative : <strong>Hervé</strong> = État civil national,{" "}
+          <strong>Tshidibi</strong> = divinter (division provinciale).
         </p>
 
         <div className="panel" style={{ marginBottom: "1rem", textAlign: "left" }}>
@@ -55,12 +55,12 @@ export default function SetupFirstUserPage() {
           </h3>
           <ul className="muted" style={{ margin: 0, paddingLeft: "1.2rem", fontSize: "0.9rem" }}>
             <li>
-              <strong>{herve.fullName}</strong> — SUPER_ADMIN_NATIONAL
+              <strong>{herve.fullName}</strong> — État civil national
               <br />
               <code>{herve.email}</code>
             </li>
             <li style={{ marginTop: "0.65rem" }}>
-              <strong>{tshidibi.fullName}</strong> — RESPONSABLE_BUREAU (+ officier)
+              <strong>{tshidibi.fullName}</strong> — Divinter (+ officier)
               <br />
               <code>{tshidibi.email}</code>
             </li>
@@ -77,10 +77,10 @@ export default function SetupFirstUserPage() {
             disabled={busy}
           >
             <option value="herve">
-              {herve.fullName} (super admin)
+              {herve.fullName} (État civil national)
             </option>
             <option value="tshidibi">
-              {tshidibi.fullName} (responsable bureau)
+              {tshidibi.fullName} (divinter)
             </option>
           </select>
           <button className="btn-primary" type="submit" disabled={busy} style={{ marginTop: "0.75rem" }}>
