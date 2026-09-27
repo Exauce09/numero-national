@@ -66,6 +66,7 @@ import ManageDocumentPage from "./pages/ManageDocumentPage";
 import ManageMariagePage from "./pages/ManageMariagePage";
 import ManageNaissancePage from "./pages/ManageNaissancePage";
 import SynopticPage from "./pages/SynopticPage";
+import EacIndicatorsPage from "./pages/EacIndicatorsPage";
 import ManageActsPage, { MANAGE_CONFIGS } from "./components/ManageActsPage";
 import TerritoryPage from "./pages/TerritoryPage";
 import TopbarSearch from "./components/TopbarSearch";
@@ -394,6 +395,15 @@ function Shell() {
             </NavLink>
           ) : null}
 
+          {canSeeNav("indicateurs_eac", roles) ? (
+            <NavLink
+              to="/indicateurs-eac"
+              className={({ isActive }) => (isActive ? "active" : undefined)}
+            >
+              <IconTable size={18} /> Indicateurs EAC
+            </NavLink>
+          ) : null}
+
           {canSeeNav("naissances", roles) ? (
             <NavLink to="/manage/naissance">
               <IconBaby size={18} /> Naissance
@@ -553,6 +563,16 @@ function Shell() {
               element={
                 canSeeNav("synoptique", getSession()?.roles ?? []) ? (
                   <SynopticPage />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route
+              path="/indicateurs-eac"
+              element={
+                canSeeNav("indicateurs_eac", getSession()?.roles ?? []) ? (
+                  <EacIndicatorsPage />
                 ) : (
                   <Navigate to="/" replace />
                 )

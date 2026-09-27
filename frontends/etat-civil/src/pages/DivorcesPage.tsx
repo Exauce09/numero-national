@@ -25,6 +25,7 @@ export default function DivorcesPage() {
   const [numeroJugement, setNumeroJugement] = useState("");
   const [dispositif, setDispositif] = useState("");
   const [dateDivorce, setDateDivorce] = useState("");
+  const [nombreEnfants, setNombreEnfants] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Act | null>(null);
 
@@ -74,6 +75,8 @@ export default function DivorcesPage() {
         officier_username: officer?.username ?? null,
         date_divorce: dateDivorce,
         date_jugement: dateDivorce,
+        nombre_enfants: nombreEnfants.trim() === "" ? null : Number(nombreEnfants),
+        enfants_a_charge: nombreEnfants.trim() === "" ? null : Number(nombreEnfants),
       };
       const act = await addAct("DIVORCE", payload, epoux.nic);
       markMarriageDivorced(numeroMariage);
@@ -125,6 +128,17 @@ export default function DivorcesPage() {
               value={dateDivorce}
               onChange={(e) => setDateDivorce(e.target.value)}
               required
+            />
+          </div>
+          <div>
+            <label className="form-label">Enfants à charge (EAC 5.8)</label>
+            <input
+              className="form-control"
+              type="number"
+              min={0}
+              value={nombreEnfants}
+              onChange={(e) => setNombreEnfants(e.target.value)}
+              placeholder="0"
             />
           </div>
           <div className="full">

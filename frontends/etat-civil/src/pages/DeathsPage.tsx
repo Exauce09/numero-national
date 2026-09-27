@@ -8,9 +8,17 @@ import PersonPicker from "../components/PersonPicker";
 import { getOfficerCommune } from "../commune";
 import { CIMETIERES_RDC, cimetiereLabel } from "../data/cimetieresRdc";
 import { TYPE_DECES_OPTIONS, typeDecesLabel, type TypeDeces } from "../deathType";
+import { CAUSE_DECES_OPTIONS, causeByCode, gbdFromCauseCode } from "../eacCauses";
 import { getActFormSchema } from "../ecActForms";
 import { notifyFromHealthForm, type HealthFormContext } from "../healthFormMode";
-import { addAct, displayName, type Act, type Person } from "../registry";
+import {
+  addAct,
+  displayName,
+  suggestDelaiEnregistrement,
+  type Act,
+  type DelaiEnregistrement,
+  type Person,
+} from "../registry";
 
 /** `health` : même formulaire chez l'infirmier titulaire — transmet une notification au bureau. */
 export default function DeathsPage({ health }: { health?: HealthFormContext } = {}) {
@@ -20,6 +28,10 @@ export default function DeathsPage({ health }: { health?: HealthFormContext } = 
   const [typeDeces, setTypeDeces] = useState<TypeDeces>("DECES");
   const [etatMatrimonial, setEtatMatrimonial] = useState("");
   const [cause, setCause] = useState("");
+  const [causeCode, setCauseCode] = useState("");
+  const [mccodComplet, setMccodComplet] = useState(false);
+  const [delaiEnregistrement, setDelaiEnregistrement] = useState<DelaiEnregistrement>("DANS_DELAI");
+  const [survenuHorsRdc, setSurvenuHorsRdc] = useState(false);
   const [heureDeces, setHeureDeces] = useState("");
   const [medecin, setMedecin] = useState("");
   const [certificatRef, setCertificatRef] = useState("");
@@ -63,6 +75,10 @@ export default function DeathsPage({ health }: { health?: HealthFormContext } = 
       setError("La date du décès est obligatoire.");
       return;
     }
+    if (!causeCode && !cause.trim()) {
+      setError("Indiquez la cause du décès (code EAC / texte).");
+      return;
+    }
     if (!geoDeces.province_name && !geoDeces.label) {
       setError("Indiquez le lieu du décès (ex. Tshilenge, Nsele…).");
       return;
@@ -76,17 +92,33 @@ export default function DeathsPage({ health }: { health?: HealthFormContext } = 
         [geoDeces.commune_name, geoDeces.ville_name, geoDeces.province_name]
           .filter(Boolean)
           .join(" · ");
+      const ageAuDeces = (() => {
+        if (!deceased.date_naissance || !dateDeces) return null;
+        const birth = new Date(deceased.date_naissance);
+        const at = new Date(dateDeces);
+        if (Number.isNaN(birth.getTime()) || Number.isNaN(at.getTime())) return null;
+        let age = at.getFullYear() - birth.getFullYear();
+        const m = at.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && at.getDate() < birth.getDate())) age -= 1;
+        return age;
+      })();
       const payload = {
         deceased_id: deceased.id,
         citizen_id: deceased.id,
         deceased_name: displayName(deceased),
         sexe: deceased.sexe,
         date_naissance: deceased.date_naissance,
+        age_au_deces: ageAuDeces,
         type_deces: typeDeces,
         type_deces_label: typeDecesLabel(typeDeces),
         mort_ne: typeDeces === "MORT_NE",
         etat_matrimonial_defunt: etatMatrimonial || deceased.etat_civil || null,
-        cause_deces: cause.trim(),
+        cause_deces: cause.trim() || causeByCode(causeCode)?.label || "",
+        cause_code: causeCode || null,
+        cause_gbd: causeCode ? gbdFromCauseCode(causeCode) : null,
+        mccod_complet: mccodComplet || Boolean(certificatRef.trim() && medecin.trim() && causeCode),
+        delai_enregistrement: delaiEnregistrement || suggestDelaiEnregistrement(dateDeces),
+        survenu_hors_rdc: survenuHorsRdc,
         heure_deces: heureDeces || null,
         medecin_constatant: medecin.trim() || null,
         certificat_deces_ref: certificatRef.trim() || null,
@@ -226,15 +258,66 @@ export default function DeathsPage({ health }: { health?: HealthFormContext } = 
               onChange={(e) => setHeureDeces(e.target.value)}
             />
           </div>
-          <div className="full">
-            <label className="form-label">Cause du décès *</label>
+          <div>
+            <label className="form-label">Cause (code EAC / GBD) *</label>
+            <select
+              className="form-control"
+              value={causeCode}
+              onChange={(e) => {
+                setCauseCode(e.target.value);
+                const opt = causeByCode(e.target.value);
+                if (opt && !cause.trim()) setCause(opt.label);
+              }}
+              required
+            >
+              <option value="">— Choisir —</option>
+              {CAUSE_DECES_OPTIONS.map((o) => (
+                <option key={o.code} value={o.code}>
+                  {o.code} — {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="form-label">Cause (texte / précision)</label>
             <input
               className="form-control"
               value={cause}
               onChange={(e) => setCause(e.target.value)}
               placeholder="Selon certificat / déclaration"
-              required
             />
+          </div>
+          <div>
+            <label className="form-label">Délai d&apos;enregistrement</label>
+            <select
+              className="form-control"
+              value={delaiEnregistrement}
+              onChange={(e) => setDelaiEnregistrement(e.target.value as DelaiEnregistrement)}
+            >
+              <option value="DANS_DELAI">Dans le délai (≤ 30 j)</option>
+              <option value="HORS_DELAI">Hors délai</option>
+            </select>
+          </div>
+          <div className="full">
+            <label className="form-label" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={mccodComplet}
+                onChange={(e) => setMccodComplet(e.target.checked)}
+              />
+              Cause médicalement certifiée (MCCOD complet — indicateur EAC 3.12)
+            </label>
+            <label
+              className="form-label"
+              style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}
+            >
+              <input
+                type="checkbox"
+                checked={survenuHorsRdc}
+                onChange={(e) => setSurvenuHorsRdc(e.target.checked)}
+              />
+              Décès survenu à l&apos;extérieur du pays (indicateur EAC 2.13)
+            </label>
           </div>
           <div className="full">
             <GeoPlaceLookup

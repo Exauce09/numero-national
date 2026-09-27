@@ -246,6 +246,7 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
   const [editJson, setEditJson] = useState("");
   const [gpsLat, setGpsLat] = useState<number | null>(null);
   const [gpsLng, setGpsLng] = useState<number | null>(null);
+  const [survenuHorsRdc, setSurvenuHorsRdc] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [, bump] = useState(0);
 
@@ -594,6 +595,19 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
         ville_naissance: geoNaissance.ville_name || null,
         province_naissance: geoNaissance.province_name || null,
         commune_code: geoNaissance.commune_code || commune.code,
+        survenu_hors_rdc: survenuHorsRdc,
+        age_mere: (() => {
+          if (!mother.date_naissance || !dateNaissance) return null;
+          const birth = new Date(mother.date_naissance);
+          const at = new Date(dateNaissance);
+          if (Number.isNaN(birth.getTime()) || Number.isNaN(at.getTime())) return null;
+          let age = at.getFullYear() - birth.getFullYear();
+          const m = at.getMonth() - birth.getMonth();
+          if (m < 0 || (m === 0 && at.getDate() < birth.getDate())) age -= 1;
+          return age;
+        })(),
+        mother_etat_civil: mother.etat_civil || null,
+        mother_education: mother.parcours_scolaire || null,
         mother_id: mother.id,
         mother_name: motherFull,
         mere_nom: motherFull,
@@ -1055,6 +1069,16 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
                   Adresse de la structure sanitaire (enfant né ici).
                 </p>
               </div>
+              <div className="full">
+                <label className="form-label" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    type="checkbox"
+                    checked={survenuHorsRdc}
+                    onChange={(e) => setSurvenuHorsRdc(e.target.checked)}
+                  />
+                  Naissance survenue à l&apos;extérieur du pays (indicateur EAC 1.14)
+                </label>
+              </div>
             </>
           ) : (
             <>
@@ -1135,6 +1159,16 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
             <div className="muted small" style={{ marginTop: 4 }}>
               Une fois saisi, l&apos;hôpital est mémorisé pour sélection ultérieure.
             </div>
+          </div>
+          <div className="full">
+            <label className="form-label" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={survenuHorsRdc}
+                onChange={(e) => setSurvenuHorsRdc(e.target.checked)}
+              />
+              Naissance survenue à l&apos;extérieur du pays (indicateur EAC 1.14)
+            </label>
           </div>
             </>
           )}

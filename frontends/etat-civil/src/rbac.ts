@@ -18,6 +18,7 @@ export type AppRole =
 export type NavKey =
   | "dashboard"
   | "synoptique"
+  | "indicateurs_eac"
   | "population"
   | "naissances"
   | "deces"
@@ -195,6 +196,7 @@ export function canSeeNav(key: NavKey, roles: string[], permissions?: string[] |
       case "dashboard":
       case "search":
       case "synoptique":
+      case "indicateurs_eac":
       case "acts_register":
       case "naissances":
       case "mariages":
@@ -208,7 +210,7 @@ export function canSeeNav(key: NavKey, roles: string[], permissions?: string[] |
   }
 
   if (isDivinterViewer(r)) {
-    return key === "dashboard" || key === "synoptique";
+    return key === "dashboard" || key === "synoptique" || key === "indicateurs_eac";
   }
 
   if (isAgent) {
@@ -216,6 +218,7 @@ export function canSeeNav(key: NavKey, roles: string[], permissions?: string[] |
       case "dashboard":
       case "search":
       case "synoptique":
+      case "indicateurs_eac":
       case "procedure":
       case "naissances":
       case "mariages":
@@ -237,6 +240,7 @@ export function canSeeNav(key: NavKey, roles: string[], permissions?: string[] |
     case "procedure":
       return true;
     case "synoptique":
+    case "indicateurs_eac":
       return isNational || isProvincial || isLead || isOfficier;
     case "naissances":
     case "deces":
@@ -289,7 +293,12 @@ export function canAccessPath(pathname: string, roles: string[] | undefined | nu
   const r = roles ?? [];
 
   if (isDivinterViewer(r)) {
-    return path === "/" || path === "" || path.startsWith("/synoptique");
+    return (
+      path === "/" ||
+      path === "" ||
+      path.startsWith("/synoptique") ||
+      path.startsWith("/indicateurs-eac")
+    );
   }
 
   if (path === "/" || path === "") return canSeeNav("dashboard", r);
@@ -307,6 +316,7 @@ export function canAccessPath(pathname: string, roles: string[] | undefined | nu
     return canSeeNav("naissances", r) || canSeeNav("create_acts", r);
   }
   if (path.startsWith("/synoptique")) return canSeeNav("synoptique", r);
+  if (path.startsWith("/indicateurs-eac")) return canSeeNav("indicateurs_eac", r);
   if (path.startsWith("/declarations")) return canSeeNav("declarations", r);
   if (path.startsWith("/corrections")) return canSeeNav("corrections", r);
   if (path.startsWith("/births") || path.startsWith("/manage/naissance") || path.startsWith("/lists/naissance")) {
