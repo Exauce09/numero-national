@@ -134,7 +134,9 @@ export function syncDeclarationNotifications(
           : "Déclaration de décès en attente de validation",
         body: isBirth
           ? `${facility} a déclaré un nouveau-né${child ? ` (${child})` : ""}. Validation officier requise.`
-          : `${facility} a déclaré un décès. Validation officier requise.`,
+          : `${facility} a déclaré un décès${
+              d.payload?.deceased_name ? ` (${String(d.payload.deceased_name)})` : ""
+            }. Validation officier requise.`,
         created_at: d.created_at || new Date().toISOString(),
         read: prevRead.get(id) === true,
         href: "/declarations",

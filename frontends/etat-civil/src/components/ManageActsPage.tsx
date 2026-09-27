@@ -8,6 +8,7 @@ import DataToolbar from "./DataToolbar";
 import { SimpleStatBlocks } from "./StatBlocks";
 import { api } from "../api";
 import { getSession } from "../auth";
+import { listPendingOfficerDeclarations } from "../civilDeclarations";
 import {
   actRefLabel,
   getAct,
@@ -353,6 +354,12 @@ export default function ManageActsPage({
     [all, draftStatuses],
   );
 
+  const pendingHospital = useMemo(() => {
+    if (config.actType !== "DEATH" && config.actType !== "BIRTH") return 0;
+    return listPendingOfficerDeclarations().filter((d) => d.declaration_type === config.actType)
+      .length;
+  }, [config.actType, tick]);
+
   /** Total officiel = actes validés uniquement (les brouillons ne comptent pas). */
   const totalGeneral = counted.length;
 
@@ -449,6 +456,15 @@ export default function ManageActsPage({
           + Ajouter
         </button>
       </div>
+
+      {pendingHospital > 0 ? (
+        <div className="success-banner no-print" style={{ marginBottom: "0.75rem" }}>
+          <strong>{pendingHospital}</strong>{" "}
+          {config.actType === "DEATH" ? "notification(s) de décès" : "notification(s) de naissance"}{" "}
+          transmise(s) par les structures sanitaires (IT) en attente de votre validation.{" "}
+          <Link to="/declarations">Ouvrir la file Déclarations →</Link>
+        </div>
+      ) : null}
 
       {showAnalytics ? (
         <>

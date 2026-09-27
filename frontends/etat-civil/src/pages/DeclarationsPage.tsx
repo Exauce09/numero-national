@@ -7,7 +7,7 @@ import {
   demoValidateDeclaration,
   type Declaration,
 } from "../api";
-import { addAct, addPerson, getPersonByNic, listActs, type Sexe } from "../registry";
+import { addAct, addPerson, getPerson, getPersonByNic, listActs, type Sexe } from "../registry";
 import { pushNotification } from "../prefs";
 import {
   declarationRef,
@@ -184,18 +184,20 @@ export default function DeclarationsPage() {
     }
     if (d.declaration_type === "DEATH") {
       const name = String(d.payload.deceased_name ?? "INCONNU");
-      const existing = getPersonByNic(String(d.payload.deceased_nic ?? ""));
+      const existing =
+        (d.payload.deceased_id ? getPerson(String(d.payload.deceased_id)) : undefined) ??
+        getPersonByNic(String(d.payload.deceased_nic ?? ""));
       await addAct(
         "DEATH",
         {
           ...d.payload,
-          deceased_id: existing?.id ?? null,
+          deceased_id: existing?.id ?? d.payload.deceased_id ?? null,
           deceased_name: name,
           commune_code: commune,
           source: "HOSPITAL",
           declaration_id: d.id,
         },
-        existing?.nic ?? `HOSP-${d.id.slice(0, 8)}`,
+        existing?.id ?? `HOSP-${d.id.slice(0, 8)}`,
       );
       return name;
     }
@@ -206,15 +208,29 @@ export default function DeclarationsPage() {
     setBusy(true);
     setMessage(null);
     setError(null);
+    const d = rows.find((x) => x.id === id);
+    const manageHref =
+      d?.declaration_type === "DEATH" ? "/manage/deces?focus=drafts" : "/manage/naissance?focus=drafts";
+    const nextStep =
+      d?.declaration_type === "DEATH"
+        ? "L'acte de décès est créé en brouillon : finalisez-le dans Décès → À valider."
+        : "L'acte de naissance est créé en brouillon : finalisez-le dans Naissance → À valider.";
     try {
       await api.validateDeclaration(id, {
-        commune_code: String(rows.find((r) => r.id === id)?.payload.commune_code ?? "KIN-GOMBE"),
+        commune_code: String(d?.payload.commune_code ?? "KIN-GOMBE"),
         reject,
         rejection_reason: reject ? "Rejeté par l'officier" : undefined,
       });
-      setMessage(reject ? "Déclaration rejetée." : "Déclaration validée via API.");
+      setDeclarationStatus(id, reject ? "REJECTED" : "VALIDATED");
+      setMessage(reject ? "Déclaration rejetée." : `Déclaration acceptée. ${nextStep}`);
+      if (!reject) {
+        pushNotification({
+          title: "Déclaration acceptée",
+          body: nextStep,
+          href: manageHref,
+        });
+      }
     } catch {
-      const d = rows.find((x) => x.id === id);
       if (!reject && d) {
         try {
           await applyToRegistry(d);
@@ -225,16 +241,12 @@ export default function DeclarationsPage() {
       demoValidateDeclaration(id, reject);
       setDeclarationStatus(id, reject ? "REJECTED" : "VALIDATED");
       setMessage(
-        reject
-          ? "Déclaration rejetée (mode local)."
-          : "Déclaration validée — registre mis à jour (naissance/décès).",
+        reject ? "Déclaration rejetée (mode local)." : `Déclaration acceptée (mode local). ${nextStep}`,
       );
       pushNotification({
-        title: reject ? "Déclaration rejetée" : "Déclaration validée",
-        body: reject
-          ? "La structure sanitaire a été informée du rejet (statut local)."
-          : "Le registre communal a été mis à jour suite à la validation hôpital.",
-        href: d?.declaration_type === "DEATH" ? "/deaths" : "/births",
+        title: reject ? "Déclaration rejetée" : "Déclaration acceptée",
+        body: reject ? "La structure sanitaire a été informée du rejet (statut local)." : nextStep,
+        href: reject ? "/declarations" : manageHref,
       });
     }
     setSelected(null);
