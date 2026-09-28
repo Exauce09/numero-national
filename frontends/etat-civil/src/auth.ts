@@ -4,6 +4,7 @@ import {
   applyCurrentRoleRules,
   ensureBootstrapSuperAdmin,
   ensureCanonicalAccounts,
+  getEcUserByEmail,
   isEcLoginDeleted,
   permissionsForRoles,
   verifyEcUser,
@@ -168,6 +169,10 @@ export async function login(username: string, password: string): Promise<Session
 
   const local = await verifyEcUser(user, password);
   if (!local) {
+    const known = getEcUserByEmail(user);
+    if (known) {
+      throw new Error("Mot de passe incorrect.");
+    }
     throw new Error(
       "Identifiants incorrects. Compte infirmier titulaire (structure sanitaire) ? Utilisez /sante/login.",
     );

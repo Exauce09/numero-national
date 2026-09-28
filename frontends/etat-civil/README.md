@@ -12,8 +12,8 @@ npm run dev
 
 | Accès | URL | Compte |
 |-------|-----|--------|
-| Officier / agent | http://localhost:5180/login | `officier` / `DemoCivil2026!` |
-| Maternité / santé | http://localhost:5180/sante/login | `hopital` / `DemoSante2026!` |
+| État civil national (Hervé) | http://localhost:5180/login | `hervekinkete@gmail.com` ou `herve.kinkete@etatcivil.gov.cd` / `HerveSuper2026!` |
+| Maternité / santé | http://localhost:5180/sante/login | compte structure créé dans Déclarations |
 
 ## Ordre à suivre pour enregistrer
 

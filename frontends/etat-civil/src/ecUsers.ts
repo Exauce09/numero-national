@@ -139,6 +139,8 @@ export const FIRST_USER_ROLES: EcUserRole[] = ["SUPER_ADMIN_NATIONAL"];
 /** Comptes nominatifs plateforme — Hervé = État civil national, Tshidibi = divinter. */
 export const CANONICAL_EC_ACCOUNTS: Array<{
   email: string;
+  /** Autres identifiants acceptés à la connexion (e-mail Gmail, login court…). */
+  aliases?: string[];
   fullName: string;
   roles: EcUserRole[];
   /** Mot de passe initial si le compte n'existe pas encore. */
@@ -146,25 +148,47 @@ export const CANONICAL_EC_ACCOUNTS: Array<{
 }> = [
   {
     email: "herve.kinkete@etatcivil.gov.cd",
+    aliases: [
+      "hervekinkete@gmail.com",
+      "herve.kinkete@gmail.com",
+      "hervekinkete",
+      "herve.kinkete",
+    ],
     fullName: "Hervé Kinkete",
     roles: ["SUPER_ADMIN_NATIONAL"],
     initialPassword: "HerveSuper2026!",
   },
   {
     email: "tshidibi@etatcivil.gov.cd",
+    aliases: ["tshidibi", "tshidibi@gmail.com"],
     fullName: "Tshidibi",
     roles: ["RESPONSABLE_BUREAU"],
     initialPassword: "TshidibiBureau2026!",
   },
 ];
 
+function normalizeLoginKey(s: string): string {
+  return s.trim().toLowerCase();
+}
+
+/** Tous les identifiants reconnus pour un compte nominatif (e-mail principal + alias). */
+export function canonicalLoginKeys(
+  seed: (typeof CANONICAL_EC_ACCOUNTS)[number],
+): string[] {
+  return [seed.email, ...(seed.aliases ?? [])].map(normalizeLoginKey);
+}
+
 function findCanonicalMatch(
   rows: EcUser[],
   seed: (typeof CANONICAL_EC_ACCOUNTS)[number],
 ): number {
-  const email = seed.email.toLowerCase();
-  const byEmail = rows.findIndex((u) => u.email === email);
-  if (byEmail >= 0) return byEmail;
+  const keys = new Set(canonicalLoginKeys(seed));
+  const byLogin = rows.findIndex(
+    (u) =>
+      keys.has(normalizeLoginKey(u.email)) ||
+      (u.username ? keys.has(normalizeLoginKey(u.username)) : false),
+  );
+  if (byLogin >= 0) return byLogin;
   return rows.findIndex((u) => {
     const n = u.fullName.toLowerCase();
     if (seed.email.startsWith("herve")) return n.includes("herv") || n.includes("kinkete");
@@ -189,6 +213,7 @@ export async function ensureCanonicalAccounts(): Promise<void> {
         {
           id: crypto.randomUUID(),
           email: seed.email.toLowerCase(),
+          username: seed.aliases?.[0],
           fullName: seed.fullName,
           passwordHash: await hashPassword(seed.initialPassword),
           roles: [...seed.roles],
@@ -219,6 +244,10 @@ export async function ensureCanonicalAccounts(): Promise<void> {
         fullName: seed.fullName,
         roles: nextRoles,
         active: true,
+        // Conserve l'ancien e-mail (ex. Gmail) comme login alternatif.
+        username:
+          cur.username ||
+          (cur.email !== seed.email.toLowerCase() ? cur.email : seed.aliases?.[0]),
       };
       changed = true;
     }
@@ -300,8 +329,18 @@ export function hasAnyEcUser(): boolean {
 }
 
 export function getEcUserByEmail(email: string): EcUser | undefined {
-  const e = email.trim().toLowerCase();
-  return listEcUsers().find((u) => u.email === e || (u.username && u.username === e));
+  const e = normalizeLoginKey(email);
+  if (!e) return undefined;
+  const rows = listEcUsers();
+  const direct = rows.find((u) => u.email === e || (u.username && u.username === e));
+  if (direct) return direct;
+
+  for (const seed of CANONICAL_EC_ACCOUNTS) {
+    if (!canonicalLoginKeys(seed).includes(e)) continue;
+    const i = findCanonicalMatch(rows, seed);
+    if (i >= 0) return rows[i];
+  }
+  return undefined;
 }
 
 export function getEcUserByLogin(login: string): EcUser | undefined {

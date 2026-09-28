@@ -58,6 +58,14 @@ export default function SetupFirstUserPage() {
               <strong>{herve.fullName}</strong> — État civil national
               <br />
               <code>{herve.email}</code>
+              {herve.aliases?.[0] ? (
+                <>
+                  {" "}
+                  ou <code>{herve.aliases[0]}</code>
+                </>
+              ) : null}
+              <br />
+              <span className="muted small">Mot de passe initial : {herve.initialPassword}</span>
             </li>
             <li style={{ marginTop: "0.65rem" }}>
               <strong>{tshidibi.fullName}</strong> — Divinter (+ officier)
