@@ -132,13 +132,6 @@ const CITY_COMMUNES: Record<string, Record<string, string[]>> = {
   },
 };
 
-const KIN_DISTRICTS: Record<string, string[]> = {
-  Lukunga: ["Gombe", "Kinshasa", "Barumbu", "Kintambo", "Lingwala", "Ngaliema"],
-  Funa: ["Kasa-Vubu", "Kalamu", "Ngiri-Ngiri", "Bandalungwa", "Bumbu", "Makala", "Selembao"],
-  "Mont-Amba": ["Lemba", "Mont-Ngafula", "Kisenso", "Limete", "Matete", "Ngaba"],
-  Tshangu: ["Ndjili", "Kimbanseke", "Masina", "Nsele", "Maluku"],
-};
-
 /** SIGPOP phase3A : Province → Territoire → Secteur/Chefferie (145 × 734). */
 type SigpopSecteur = { name: string; type: string };
 const SIGPOP_RURAL = sigpopReferentiel.rural_by_province as Record<
