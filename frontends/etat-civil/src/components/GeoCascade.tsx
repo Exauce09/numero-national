@@ -427,7 +427,7 @@ export default function GeoCascade({
     else await onDistrict(id, kind);
   }
 
-  async function onVille(id: string, kind: ZoneKind | null = "ville") {
+  async function onVille(id: string, _kind: ZoneKind | null = "ville") {
     const v = villes.find((x) => x.id === id);
     const base = { ...sel };
     emit({
