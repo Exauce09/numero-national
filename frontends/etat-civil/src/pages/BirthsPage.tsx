@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import ActPrintActions from "../components/ActPrintActions";
 import ActPrintCard from "../components/ActPrintCard";
@@ -40,7 +40,9 @@ import {
 } from "../registry";
 import { getOfficerCommune } from "../commune";
 import { ISSUE_NAISSANCE_OPTIONS, type IssueNaissance } from "../deathType";
+import { listFacilityAccounts } from "../healthAuth";
 import { notifyFromHealthForm, type HealthFormContext } from "../healthFormMode";
+import { HOPITAUX_KEY, loadNamedList, rememberNamed } from "../namedLists";
 
 const MODES_ENREGISTREMENT = [
   { value: "sans_procuration", label: "Sans procuration" },
@@ -126,6 +128,8 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
   const [mandataireQualite, setMandataireQualite] = useState("");
   const [mandatairePiece, setMandatairePiece] = useState("");
   const [refJugement, setRefJugement] = useState("");
+  const [hopitalNaissance, setHopitalNaissance] = useState(health?.facilityName ?? "");
+  const [hopitalAutre, setHopitalAutre] = useState("");
   const [mother, setMother] = useState<Person | null>(null);
   const [father, setFather] = useState<Person | null>(null);
   const [adresseMere, setAdresseMere] = useState("");
@@ -168,6 +172,7 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
       };
       setGeoNaissance(locked);
       setLieuNaissance(locked.label || health.facilityName);
+      setHopitalNaissance(health.facilityName);
     });
     return () => {
       cancelled = true;
@@ -238,7 +243,22 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
   const [, bump] = useState(0);
 
   const acts = listActs("BIRTH");
-  const hopitalResolved = health?.facilityName.trim() || "";
+  const hospitals = useMemo(() => {
+    const facilities = listFacilityAccounts().filter((a) => a.active);
+    const extra = loadNamedList(HOPITAUX_KEY);
+    return [
+      ...facilities.map((h) => h.facilityName),
+      ...extra.filter((n) => !facilities.some((f) => f.facilityName === n)),
+    ];
+    // bump force le rechargement après mémorisation d'un hôpital
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [created]);
+
+  const hopitalResolved = health
+    ? health.facilityName.trim()
+    : hopitalNaissance === "__autre__"
+      ? hopitalAutre.trim()
+      : hopitalNaissance.trim();
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -355,6 +375,7 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
         label: lieu,
       };
       const link = inheritParentOrigin(father, mother);
+      if (hopitalResolved) rememberNamed(HOPITAUX_KEY, hopitalResolved);
       const effectiveOrigine: GeoSelection =
         geoOrigine.province_name || geoOrigine.district_name || geoOrigine.commune_name
           ? geoOrigine
@@ -627,6 +648,8 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
       setMandataireQualite("");
       setMandatairePiece("");
       setRefJugement("");
+      setHopitalNaissance(health?.facilityName ?? "");
+      setHopitalAutre("");
       setMother(null);
       setFather(null);
       setAdresseMere("");
@@ -1032,6 +1055,50 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
               required
               placeholder="Tapez un lieu — ex. Tshilenge, Nsele…"
             />
+          </div>
+          <div className="full">
+            <label className="form-label">Hôpital / structure</label>
+            <select
+              className="form-control"
+              value={
+                hopitalNaissance &&
+                hopitalNaissance !== "__autre__" &&
+                !hospitals.includes(hopitalNaissance)
+                  ? "__autre__"
+                  : hopitalNaissance
+              }
+              onChange={(e) => {
+                const v = e.target.value;
+                setHopitalNaissance(v);
+                if (v !== "__autre__") setHopitalAutre("");
+              }}
+            >
+              <option value="">— Optionnel —</option>
+              {hospitals.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+              <option value="__autre__">Autre (saisir)…</option>
+            </select>
+            {hopitalNaissance === "__autre__" ||
+            (hopitalNaissance &&
+              hopitalNaissance !== "__autre__" &&
+              !hospitals.includes(hopitalNaissance)) ? (
+              <input
+                className="form-control"
+                style={{ marginTop: 8 }}
+                value={hopitalNaissance === "__autre__" ? hopitalAutre : hopitalNaissance}
+                onChange={(e) => {
+                  setHopitalNaissance("__autre__");
+                  setHopitalAutre(e.target.value);
+                }}
+                placeholder="Nom de l'hôpital / maternité — sera proposé aux autres"
+              />
+            ) : null}
+            <div className="muted small" style={{ marginTop: 4 }}>
+              Une fois saisi, l&apos;hôpital est mémorisé pour sélection ultérieure.
+            </div>
           </div>
           <div className="full">
             <label className="form-label" style={{ display: "flex", gap: 8, alignItems: "center" }}>
