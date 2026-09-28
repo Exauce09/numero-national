@@ -397,7 +397,7 @@ export default function DashboardPage() {
           pending={pendingOf(marriageAll).length}
           icon={<IconRing size={22} />}
           color={RDC.yellow}
-          href={statsOnly ? "/synoptique/matrimonial" : "/lists/mariage"}
+          href={statsOnly ? "/synoptique/mariage" : "/lists/mariage"}
         />
         <StatCard
           title="Décès"
@@ -421,7 +421,7 @@ export default function DashboardPage() {
           pending={pendingOf(divorceAll).length}
           icon={<IconSplit size={22} />}
           color={RDC.redDeep}
-          href={statsOnly ? "/synoptique/matrimonial" : "/lists/divorce"}
+          href={statsOnly ? "/synoptique/divorce" : "/lists/divorce"}
         />
       </div>
 

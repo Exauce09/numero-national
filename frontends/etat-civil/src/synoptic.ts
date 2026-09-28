@@ -265,6 +265,12 @@ export function synopticDocuments(communeOverride?: OfficerCommune | FlatCommune
   };
 }
 
+export function synopticAdoptions(communeOverride?: OfficerCommune | FlatCommune | null) {
+  const commune = communeOverride ? toOfficerCommune(communeOverride) : getOfficerCommune();
+  const acts = actsForCommune("ADOPTION", commune);
+  return { commune, total: acts.length };
+}
+
 export type SynopticTerritoryRow = {
   province: string;
   ville: string;
@@ -275,6 +281,7 @@ export type SynopticTerritoryRow = {
   naissances_f: number;
   mariages: number;
   divorces: number;
+  adoptions: number;
   deces: number;
   documents: number;
   total: number;
@@ -327,13 +334,17 @@ export function synopticNationalTerritory(): SynopticTerritoryRow[] {
       naissances_f: 0,
       mariages: 0,
       divorces: 0,
+      adoptions: 0,
       deces: 0,
       documents: 0,
       total: 0,
     });
   }
 
-  function bump(kind: "naissances" | "mariages" | "divorces" | "deces" | "documents", act: Act) {
+  function bump(
+    kind: "naissances" | "mariages" | "divorces" | "adoptions" | "deces" | "documents",
+    act: Act,
+  ) {
     if (!isActCountedInTotals(act)) return;
     const hit = resolveActCommune(act.payload, communes);
     if (!hit) return;
@@ -351,6 +362,7 @@ export function synopticNationalTerritory(): SynopticTerritoryRow[] {
   for (const a of listActs("BIRTH")) bump("naissances", a);
   for (const a of listActs("MARRIAGE")) bump("mariages", a);
   for (const a of listActs("DIVORCE")) bump("divorces", a);
+  for (const a of listActs("ADOPTION")) bump("adoptions", a);
   for (const a of listActs("DEATH")) bump("deces", a);
   for (const a of listActs("DOCUMENT")) bump("documents", a);
 
@@ -371,6 +383,7 @@ export type SynopticProvinceRollup = {
   naissances_f: number;
   mariages: number;
   divorces: number;
+  adoptions: number;
   deces: number;
   documents: number;
   total: number;
@@ -391,6 +404,7 @@ export function synopticNationalByProvince(): SynopticProvinceRollup[] {
         naissances_f: 0,
         mariages: 0,
         divorces: 0,
+        adoptions: 0,
         deces: 0,
         documents: 0,
         total: 0,
@@ -405,6 +419,7 @@ export function synopticNationalByProvince(): SynopticProvinceRollup[] {
     hit.naissances_f += r.naissances_f;
     hit.mariages += r.mariages;
     hit.divorces += r.divorces;
+    hit.adoptions += r.adoptions;
     hit.deces += r.deces;
     hit.documents += r.documents;
     hit.total += r.total;
@@ -423,6 +438,7 @@ export type SynopticVilleRollup = {
   naissances_f: number;
   mariages: number;
   divorces: number;
+  adoptions: number;
   deces: number;
   documents: number;
   total: number;
@@ -446,6 +462,7 @@ export function synopticNationalByVille(province?: string | null): SynopticVille
         naissances_f: 0,
         mariages: 0,
         divorces: 0,
+        adoptions: 0,
         deces: 0,
         documents: 0,
         total: 0,
@@ -458,6 +475,7 @@ export function synopticNationalByVille(province?: string | null): SynopticVille
     hit.naissances_f += r.naissances_f;
     hit.mariages += r.mariages;
     hit.divorces += r.divorces;
+    hit.adoptions += r.adoptions;
     hit.deces += r.deces;
     hit.documents += r.documents;
     hit.total += r.total;
