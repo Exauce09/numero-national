@@ -1,6 +1,27 @@
 import { ensureAccessToken, getSession } from "./auth";
+import { getHealthSession } from "./healthAuth";
 
 const BASE = import.meta.env.VITE_API_BASE ?? "/api/v1";
+
+function isUuid(s: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
+}
+
+function authHeaders(): HeadersInit {
+  const session = getSession();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (session?.accessToken) {
+    headers.Authorization = `Bearer ${session.accessToken}`;
+    return headers;
+  }
+  // Infirmier titulaire (pas de JWT bureau) : envoi des déclarations via en-têtes démo si l'API l'autorise.
+  const health = getHealthSession();
+  if (health) {
+    headers["X-Permissions"] = "civil:declaration:create,civil:act:read,health:declare";
+    if (isUuid(health.facilityId)) headers["X-Actor-Id"] = health.facilityId;
+  }
+  return headers;
+}
 
 export type CivilAct = {
   id: string;
@@ -112,13 +133,6 @@ export type Residence = {
   address_line?: string;
   line1?: string;
 };
-
-function authHeaders(): HeadersInit {
-  const session = getSession();
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (session?.accessToken) headers.Authorization = `Bearer ${session.accessToken}`;
-  return headers;
-}
 
 function formatApiErrorBody(raw: string, status: number): string {
   const text = (raw || "").trim();

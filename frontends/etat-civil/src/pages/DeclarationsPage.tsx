@@ -15,6 +15,7 @@ import {
   listFacilityDeclarations,
   listLocalPendingDeclarations,
   setDeclarationStatus,
+  subscribeDeclarationsChanged,
 } from "../civilDeclarations";
 import { syncHospitalFacilitiesFromRequests } from "../accountRegistration";
 import {
@@ -144,6 +145,17 @@ export default function DeclarationsPage() {
   useEffect(() => {
     void refresh();
     refreshAccounts();
+    const unsub = subscribeDeclarationsChanged(() => {
+      void refresh();
+    });
+    const onFocus = () => void refresh();
+    window.addEventListener("focus", onFocus);
+    const timer = window.setInterval(() => void refresh(), 15_000);
+    return () => {
+      unsub();
+      window.removeEventListener("focus", onFocus);
+      window.clearInterval(timer);
+    };
   }, []);
 
   async function applyToRegistry(d: Declaration) {

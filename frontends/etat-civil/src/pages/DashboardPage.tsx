@@ -17,6 +17,7 @@ import {
 } from "../components/Icons";
 import { dashboardVariant, primaryRole, roleTitleFor } from "../rbac";
 import { RDC } from "../rdcColors";
+import { listPendingOfficerDeclarations } from "../civilDeclarations";
 import { listActs } from "../registry";
 
 function actProvince(a: {
@@ -347,6 +348,10 @@ export default function DashboardPage() {
     );
   }
 
+  const hospitalPending = listPendingOfficerDeclarations().filter(
+    (d) => d.source === "HOSPITAL" && (d.declaration_type === "BIRTH" || d.declaration_type === "DEATH"),
+  ).length;
+
   return (
     <div className="dash-page">
       <div className="dash-welcome">
@@ -360,6 +365,16 @@ export default function DashboardPage() {
           </p>
         </div>
       </div>
+
+      {hospitalPending > 0 ? (
+        <div className="success-banner no-print" style={{ marginBottom: "0.85rem" }}>
+          <strong>{hospitalPending}</strong> notification{hospitalPending > 1 ? "s" : ""} hôpital en
+          attente de validation.{" "}
+          <button type="button" className="btn-add btn-sm" onClick={() => navigate("/declarations")}>
+            Ouvrir Déclarations
+          </button>
+        </div>
+      ) : null}
 
       {apiError ? (
         <p className="muted small" role="status">

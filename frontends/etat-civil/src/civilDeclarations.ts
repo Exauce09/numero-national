@@ -1,6 +1,7 @@
 /** Déclarations hôpital → état civil (API prioritaire, localStorage secours). */
 
 import { api, ApiConflictError } from "./api";
+import { pushNotification } from "./prefs";
 import { duplicateActMessage, findDuplicateAct } from "./registry";
 
 export type CivilDeclaration = {
@@ -13,7 +14,7 @@ export type CivilDeclaration = {
 };
 
 const DEMO_KEY = "nn_civil_demo_store";
-const NOTIF_KEY = "nn_civil_officer_notifs";
+const DECL_CHANNEL = "nn_civil_declarations_sync";
 
 type DemoStore = {
   acts: unknown[];
@@ -40,6 +41,18 @@ function loadDemo(): DemoStore {
 
 function saveDemo(store: DemoStore) {
   localStorage.setItem(DEMO_KEY, JSON.stringify(store));
+  try {
+    localStorage.setItem(`${DEMO_KEY}:tick`, String(Date.now()));
+  } catch {
+    /* ignore */
+  }
+  try {
+    const bc = new BroadcastChannel(DECL_CHANNEL);
+    bc.postMessage({ type: "declarations-changed" });
+    bc.close();
+  } catch {
+    /* ignore */
+  }
 }
 
 function pushOfficerNotif(
@@ -49,19 +62,16 @@ function pushOfficerNotif(
   href = "/declarations",
 ) {
   try {
-    const raw = localStorage.getItem(NOTIF_KEY);
-    const rows = raw
-      ? (JSON.parse(raw) as {
-          id: string;
-          title: string;
-          body: string;
-          created_at: string;
-          read: boolean;
-          href?: string;
-        }[])
-      : [];
     const id = `decl-${declarationId}`;
-    const without = rows.filter((r) => r.id !== id);
+    const existing = JSON.parse(localStorage.getItem("nn_etat_civil_notifs") || "[]") as Array<{
+      id: string;
+      title: string;
+      body: string;
+      created_at: string;
+      read: boolean;
+      href?: string;
+    }>;
+    const without = existing.filter((r) => r.id !== id);
     without.unshift({
       id,
       title,
@@ -70,10 +80,33 @@ function pushOfficerNotif(
       read: false,
       href,
     });
-    localStorage.setItem(NOTIF_KEY, JSON.stringify(without.slice(0, 50)));
+    localStorage.setItem("nn_etat_civil_notifs", JSON.stringify(without.slice(0, 50)));
   } catch {
-    /* ignore */
+    pushNotification({ title, body, href });
   }
+}
+
+/** Écoute les nouvelles déclarations hôpital (autre onglet / même navigateur). */
+export function subscribeDeclarationsChanged(onChange: () => void): () => void {
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === DEMO_KEY || e.key === `${DEMO_KEY}:tick`) onChange();
+  };
+  window.addEventListener("storage", onStorage);
+  let bc: BroadcastChannel | null = null;
+  try {
+    bc = new BroadcastChannel(DECL_CHANNEL);
+    bc.onmessage = () => onChange();
+  } catch {
+    bc = null;
+  }
+  return () => {
+    window.removeEventListener("storage", onStorage);
+    try {
+      bc?.close();
+    } catch {
+      /* ignore */
+    }
+  };
 }
 
 function saveLocal(decl: CivilDeclaration) {

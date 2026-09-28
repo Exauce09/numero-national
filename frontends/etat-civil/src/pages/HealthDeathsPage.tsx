@@ -46,7 +46,7 @@ export default function HealthDeathsPage() {
         href: "/sante/deaths",
       });
       setMessage(
-        `Notification transmise à l'état civil (réf. ${ref}). Ce n'est pas un acte officiel.`,
+        `Notification transmise à l'état civil (réf. ${ref}). L'officier la valide dans Déclarations.`,
       );
       setListTick((n) => n + 1);
       setFormOpen(false);
