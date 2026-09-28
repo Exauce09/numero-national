@@ -75,6 +75,17 @@ function TableCard({ table }: { table: EacTable }) {
           </table>
         </div>
       )}
+      {table.summary?.length ? (
+        <div className="muted small" style={{ margin: "0.65rem 0.85rem 0.85rem" }}>
+          {table.summary.map((s) => (
+            <p key={s.key} style={{ margin: "0.25rem 0" }}>
+              <strong>{s.label}</strong>
+              {typeof s.value === "number" ? ` : ${s.value}` : s.value ? ` : ${s.value}` : ""}
+              {s.note ? ` — ${s.note}` : ""}
+            </p>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

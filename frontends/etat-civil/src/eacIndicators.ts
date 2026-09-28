@@ -57,8 +57,20 @@ export type EacReport = {
 };
 
 function parseDate(s: unknown): Date | null {
-  if (!s) return null;
-  const d = new Date(String(s));
+  if (s == null || s === "") return null;
+  const raw = String(s).trim();
+  if (!raw) return null;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+  if (iso) {
+    const d = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const fr = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(raw);
+  if (fr) {
+    const d = new Date(Number(fr[3]), Number(fr[2]) - 1, Number(fr[1]));
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(raw);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
@@ -70,6 +82,7 @@ function ageAt(dob: string | undefined, at: string | undefined): number | null {
   let age = event.getFullYear() - birth.getFullYear();
   const m = event.getMonth() - birth.getMonth();
   if (m < 0 || (m === 0 && event.getDate() < birth.getDate())) age -= 1;
+  if (age < 0 || age > 120) return null;
   return age;
 }
 
@@ -121,12 +134,57 @@ function motherFromAct(act: Act) {
   return id ? getPerson(id) : undefined;
 }
 
+/** Date de naissance de la mère — payload, snapshot, puis fiche personne. */
+function motherDob(act: Act): string | undefined {
+  const snap = act.payload.mother_snapshot;
+  const snapDob =
+    snap && typeof snap === "object"
+      ? String((snap as Record<string, unknown>).date_naissance ?? "").trim()
+      : "";
+  const mother = motherFromAct(act);
+  const candidates = [
+    act.payload.date_naissance_mere,
+    act.payload.mere_date_naissance,
+    act.payload.mother_date_naissance,
+    snapDob,
+    mother?.date_naissance,
+  ];
+  for (const c of candidates) {
+    const s = String(c ?? "").trim();
+    if (s && parseDate(s)) return s;
+  }
+  return undefined;
+}
+
+/**
+ * Âge de la mère à la naissance de l'enfant.
+ * Priorité : age_mere saisi → calcul date mère / date enfant.
+ * « Inconnu » uniquement si aucune date exploitable.
+ */
 function motherAge(act: Act): number | null {
   const fromPayload = Number(act.payload.age_mere);
-  if (Number.isFinite(fromPayload) && fromPayload > 0) return fromPayload;
-  const mother = motherFromAct(act);
-  const childDob = String(act.payload.date_naissance ?? "");
-  return mother ? ageAt(mother.date_naissance, childDob) : null;
+  if (Number.isFinite(fromPayload) && fromPayload > 0 && fromPayload < 120) {
+    return Math.floor(fromPayload);
+  }
+  const childDob = String(
+    act.payload.date_naissance ?? act.payload.child_date_naissance ?? "",
+  ).trim();
+  return ageAt(motherDob(act), childDob);
+}
+
+/** Tranche d'âge EAC à partir de l'âge calculé. */
+function motherAgeBand(age: number | null): string {
+  if (age == null) return "Inconnu";
+  if (age < 10) return "< 10";
+  if (age <= 14) return "10–14";
+  if (age <= 19) return "15–19";
+  if (age <= 24) return "20–24";
+  if (age <= 29) return "25–29";
+  if (age <= 34) return "30–34";
+  if (age <= 39) return "35–39";
+  if (age <= 44) return "40–44";
+  if (age <= 49) return "45–49";
+  return "50+";
 }
 
 function motherEtatCivil(act: Act): string {
@@ -297,6 +355,7 @@ function buildBirthTables(acts: Act[], pop: PopulationRef): EacTable[] {
   const byDeliv = countBy(liveBirths, placeDelivery);
 
   const motherAgeBands = [
+    { label: "< 10", min: 0, max: 9 },
     { label: "10–14", min: 10, max: 14 },
     { label: "15–19", min: 15, max: 19 },
     { label: "20–24", min: 20, max: 24 },
@@ -309,6 +368,7 @@ function buildBirthTables(acts: Act[], pop: PopulationRef): EacTable[] {
     { label: "Inconnu", min: -1, max: -1 },
   ];
   const ageTypeRows: Array<Record<string, string | number>> = [];
+  let unknownAgeCount = 0;
   for (const band of motherAgeBands) {
     const subset =
       band.min < 0
@@ -317,6 +377,7 @@ function buildBirthTables(acts: Act[], pop: PopulationRef): EacTable[] {
             const age = motherAge(a);
             return age != null && age >= band.min && age <= band.max;
           });
+    if (band.min < 0) unknownAgeCount = subset.length;
     const types = countBy(subset, birthType);
     ageTypeRows.push({
       "Âge mère": band.label,
@@ -343,27 +404,7 @@ function buildBirthTables(acts: Act[], pop: PopulationRef): EacTable[] {
 
   const ageEtat = new Map<string, number>();
   for (const a of liveBirths) {
-    const age = motherAge(a);
-    const band =
-      age == null
-        ? "Inconnu"
-        : age < 15
-          ? "10–14"
-          : age < 20
-            ? "15–19"
-            : age < 25
-              ? "20–24"
-              : age < 30
-                ? "25–29"
-                : age < 35
-                  ? "30–34"
-                  : age < 40
-                    ? "35–39"
-                    : age < 45
-                      ? "40–44"
-                      : age < 50
-                        ? "45–49"
-                        : "50+";
+    const band = motherAgeBand(motherAge(a));
     const etat = etatCivilLabel(motherEtatCivil(a));
     const k = `${band}|${etat}`;
     ageEtat.set(k, (ageEtat.get(k) ?? 0) + 1);
@@ -471,6 +512,17 @@ function buildBirthTables(acts: Act[], pop: PopulationRef): EacTable[] {
       title: "Naissances vivantes par âge de la mère et type de naissance",
       columns: ["Âge mère", "Total", "Voie basse", "Césarienne", "Instrumental", "Autre"],
       rows: ageTypeRows,
+      summary: [
+        {
+          key: "inconnu",
+          label: "Ligne « Inconnu »",
+          value: unknownAgeCount,
+          note:
+            unknownAgeCount > 0
+              ? "Âge non calculable : date de naissance de la mère manquante ou invalide (fiche mère / acte), ou date de naissance de l'enfant manquante. Complétez la date de naissance de la mère pour classer en 10–14, 15–19, etc."
+              : "Toutes les naissances ont un âge mère calculé.",
+        },
+      ],
     },
     {
       id: "b-1.7",

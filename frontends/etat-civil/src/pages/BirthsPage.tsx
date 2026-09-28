@@ -606,6 +606,7 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
           if (m < 0 || (m === 0 && at.getDate() < birth.getDate())) age -= 1;
           return age;
         })(),
+        date_naissance_mere: mother.date_naissance || null,
         mother_etat_civil: mother.etat_civil || null,
         mother_education: mother.parcours_scolaire || null,
         mother_id: mother.id,
