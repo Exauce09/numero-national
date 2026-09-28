@@ -89,16 +89,23 @@ async function fetchItems(
   path: string,
   onFallback?: () => void,
 ): Promise<Item[]> {
+  const local = fallbackForGeoPath(path) as Item[];
   try {
     const res = await fetch(`${BASE}${path}`);
     if (res.ok) {
       const rows = (await res.json()) as Item[];
-      if (Array.isArray(rows) && rows.length > 0) return rows;
+      if (Array.isArray(rows) && rows.length > 0) {
+        // Référentiel local SIGPOP prioritaire s'il est plus complet que l'API.
+        if (local.length > rows.length) {
+          onFallback?.();
+          return local;
+        }
+        return rows;
+      }
     }
   } catch {
     /* API down or unreachable */
   }
-  const local = fallbackForGeoPath(path) as Item[];
   if (local.length > 0) onFallback?.();
   return local;
 }
@@ -195,16 +202,18 @@ type Props = {
   zoneChoice?: boolean;
 };
 
-/** Branche ville : Commune → Quartier → Avenue → Rue, limitée aux niveaux demandés. */
+/** Branche ville : Commune → Quartier → Avenue → Rue (commune toujours présente). */
 function villeBranch(levels: readonly GeoLevel[]): GeoLevel[] {
-  const tail: GeoLevel[] = ["commune", "quartier", "avenue", "rue"];
-  return ["province", "ville", ...tail.filter((l) => levels.includes(l))];
+  const out: GeoLevel[] = ["province", "ville", "commune"];
+  for (const l of ["quartier", "avenue", "rue"] as const) {
+    if (levels.includes(l)) out.push(l);
+  }
+  return out;
 }
 
-/** Branche territoire : Secteur → Village ; une adresse (quartier demandé) descend jusqu'au village. */
+/** Branche territoire : Secteur/Chefferie → Village (secteur toujours présent). */
 function territoireBranch(levels: readonly GeoLevel[]): GeoLevel[] {
-  const out: GeoLevel[] = ["province", "district"];
-  if (levels.includes("commune")) out.push("commune");
+  const out: GeoLevel[] = ["province", "district", "commune"];
   if (levels.includes("localite") || levels.includes("quartier")) out.push("localite");
   return out;
 }
@@ -241,12 +250,17 @@ export default function GeoCascade({
 
   const show = (level: GeoLevel, kind: ZoneKind | null = zoneKind) => levelsFor(kind).includes(level);
   const lbl = (level: GeoLevel) => {
-    if (zoneChoice && zoneKind === "territoire") {
-      if (level === "commune") return "Secteur / Chefferie";
+    if (zoneChoice) {
+      if (level === "commune") {
+        return zoneKind === "territoire"
+          ? "Secteur / Chefferie"
+          : zoneKind === "ville"
+            ? "Commune"
+            : "Commune / Secteur";
+      }
       if (level === "localite") return "Village";
       if (level === "district") return "Territoire";
     }
-    if (zoneChoice && zoneKind === "ville" && level === "commune") return "Commune";
     return fieldLabels?.[level] ?? DEFAULT_FIELD_LABELS[level];
   };
 
@@ -374,15 +388,23 @@ export default function GeoCascade({
     emit({ province_id: id, province_name: p?.name });
     const markLocal = () =>
       setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
-    const loadDistrict = show("district") || zoneChoice;
-    const loadVille = show("ville") || zoneChoice;
-    setDistricts(loadDistrict ? await fetchItems(`/geo/districts?province_id=${id}`, markLocal) : []);
-    setVilles(loadVille ? await fetchItems(`/geo/villes?province_id=${id}`, markLocal) : []);
+    // Toujours charger TOUTES les villes + territoires de la province.
+    const [drows, vrows] = await Promise.all([
+      fetchItems(`/geo/districts?province_id=${id}`, markLocal),
+      fetchItems(`/geo/villes?province_id=${id}`, markLocal),
+    ]);
+    setDistricts(drows);
+    setVilles(vrows);
     setCommunes([]);
     setLocalites([]);
     setQuartiers([]);
     setAvenues([]);
     setRues([]);
+    if (zoneChoice) {
+      setHint(
+        `${vrows.length} ville(s) · ${drows.length} territoire(s) pour ${p?.name ?? "cette province"}`,
+      );
+    }
   }
 
   /** Liste unique Ville / Territoire : `ville:<id>` ou `territoire:<id>`. */
@@ -405,7 +427,7 @@ export default function GeoCascade({
     else await onDistrict(id, kind);
   }
 
-  async function onVille(id: string, kind: ZoneKind | null = zoneKind) {
+  async function onVille(id: string, kind: ZoneKind | null = "ville") {
     const v = villes.find((x) => x.id === id);
     const base = { ...sel };
     emit({
@@ -429,9 +451,9 @@ export default function GeoCascade({
     });
     const markLocal = () =>
       setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
-    // Prefer ville; if empty, also try province-wide so commune never disappears.
-    let rows = show("commune", kind) ? await fetchItems(`/geo/communes?ville_id=${id}`, markLocal) : [];
-    if (show("commune", kind) && rows.length === 0 && base.province_id) {
+    // Toutes les communes de la ville (branche urbaine).
+    let rows = await fetchItems(`/geo/communes?ville_id=${id}`, markLocal);
+    if (rows.length === 0 && base.province_id) {
       rows = await fetchItems(`/geo/communes?province_id=${base.province_id}`, markLocal);
     }
     setCommunes(rows);
@@ -439,9 +461,14 @@ export default function GeoCascade({
     setAvenues([]);
     setRues([]);
     setLocalites([]);
+    setHint(
+      rows.length
+        ? `${rows.length} commune(s) pour ${v?.name ?? "cette ville"}`
+        : "Aucune commune — utilisez + Ajouter",
+    );
   }
 
-  async function onDistrict(id: string, kind: ZoneKind | null = zoneKind, item?: Item) {
+  async function onDistrict(id: string, kind: ZoneKind | null = "territoire", item?: Item) {
     const d = item ?? districts.find((x) => x.id === id);
     const base = { ...sel };
     emit({
@@ -468,20 +495,25 @@ export default function GeoCascade({
     });
     const markLocal = () =>
       setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
-    const withCommunes = show("commune", kind);
-    let byDist = withCommunes ? await fetchItems(`/geo/communes?district_id=${id}`, markLocal) : [];
-    if (withCommunes && !zoneChoice && byDist.length === 0 && base.ville_id) {
+    // Tous les secteurs / chefferies du territoire.
+    let byDist = await fetchItems(`/geo/communes?district_id=${id}`, markLocal);
+    if (!zoneChoice && byDist.length === 0 && base.ville_id) {
       byDist = await fetchItems(`/geo/communes?ville_id=${base.ville_id}`, markLocal);
     }
-    if (withCommunes && byDist.length === 0 && base.province_id) {
+    if (byDist.length === 0 && base.province_id) {
       byDist = await fetchItems(`/geo/communes?province_id=${base.province_id}`, markLocal);
     }
-    if (byDist.length || zoneChoice) setCommunes(byDist);
+    setCommunes(byDist);
     setQuartiers([]);
     setAvenues([]);
     setRues([]);
     setLocalites(
       show("localite", kind) ? await fetchItems(`/geo/localites?district_id=${id}`, markLocal) : [],
+    );
+    setHint(
+      byDist.length
+        ? `${byDist.length} secteur(s) / chefferie(s) pour ${d?.name ?? "ce territoire"}`
+        : "Aucun secteur — utilisez + Ajouter",
     );
   }
 

@@ -241,9 +241,10 @@ export function fallbackProvinces(): GeoItem[] {
 export function fallbackVilles(provinceId: string): GeoItem[] {
   const p = provinceById(provinceId);
   if (!p) return [];
-  const villes = CITY_COMMUNES[p.name];
-  if (!villes) return [];
-  return Object.keys(villes)
+  const names = new Set<string>(Object.keys(CITY_COMMUNES[p.name] ?? {}));
+  // Chef-lieu toujours proposé comme ville, même s'il n'est pas encore dans CITY_COMMUNES.
+  if (p.chef_lieu?.trim()) names.add(p.chef_lieu.trim());
+  return [...names]
     .sort((a, b) => a.localeCompare(b, "fr"))
     .map((name) => ({
       id: villeId(p.name, name),
@@ -309,6 +310,18 @@ export function fallbackCommunes(opts: { villeId?: string; districtId?: string }
             name,
           }));
         }
+      }
+    }
+    // Chef-lieu sans communes cataloguées : proposer au moins la ville elle-même.
+    for (const p of PROVINCES) {
+      if (p.chef_lieu && villeId(p.name, p.chef_lieu) === opts.villeId) {
+        return [
+          {
+            id: communeId(p.chef_lieu, p.chef_lieu),
+            code: slug(p.chef_lieu).toUpperCase().slice(0, 12),
+            name: p.chef_lieu,
+          },
+        ];
       }
     }
   }
