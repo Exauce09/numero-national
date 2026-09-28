@@ -1,6 +1,7 @@
-/** Offline RDC geography fallback (seed mirror: provinces + CITY_COMMUNES + Kinshasa districts). */
+/** Offline RDC geography fallback (SIGPOP référentiel + communes urbaines + Kinshasa). */
 
 import { KIN_COMMUNE_QUARTIERS } from "./data/kinshasaQuartiers";
+import sigpopReferentiel from "./data/sigpopReferentiel.json";
 
 export type GeoItem = { id: string; code: string; name: string; voie_type?: string; chef_lieu?: string };
 
@@ -42,7 +43,7 @@ const PROVINCES: Array<{ code: string; name: string; chef_lieu: string }> = [
   { code: "SNK", name: "Sankuru", chef_lieu: "Lusambo" },
 ];
 
-/** province name → ville → communes */
+/** province name → ville → communes (référentiel urbain). */
 const CITY_COMMUNES: Record<string, Record<string, string[]>> = {
   Kinshasa: {
     Kinshasa: [
@@ -138,57 +139,25 @@ const KIN_DISTRICTS: Record<string, string[]> = {
   Tshangu: ["Ndjili", "Kimbanseke", "Masina", "Nsele", "Maluku"],
 };
 
-/** Territoires (et villes) par province — hors Kinshasa (districts urbains). */
-const PROVINCE_TERRITOIRES: Record<string, string[]> = {
-  "Kongo Central": [
-    "Matadi", "Boma", "Muanda", "Kasangulu", "Madimba", "Songololo", "Mbanza-Ngungu",
-    "Luozi", "Seke-Banza", "Kimvula", "Lukula", "Tshela", "Boma-Bungu",
-  ],
-  Kwango: ["Kenge", "Feshi", "Kahemba", "Kasongo-Lunda", "Popokabaka"],
-  Kwilu: ["Bandundu", "Baganga", "Bulungu", "Gungu", "Idiofa", "Masi-Manimba", "Kikwit"],
-  "Mai-Ndombe": ["Inongo", "Kiri", "Kutu", "Mushie", "Oshwe", "Bolobo", "Yumbi"],
-  Équateur: ["Mbandaka", "Bikoro", "Lukolela", "Basankusu", "Bolomba", "Bomongo", "Ingende"],
-  Mongala: ["Lisala", "Bumba", "Bongandanga"],
-  "Nord-Ubangi": ["Gbadolite", "Bosobolo", "Businga", "Mobayi-Mbongo"],
-  "Sud-Ubangi": ["Gemena", "Budjala", "Kungu", "Libenge", "Zongo"],
-  Tshuapa: ["Boende", "Befale", "Djolu", "Ikela", "Monkoto", "Bokungu"],
-  Tshopo: ["Kisangani", "Bafwasende", "Banalia", "Basoko", "Isangi", "Opala", "Ubundu", "Yahuma"],
-  "Bas-Uélé": ["Buta", "Aketi", "Ango", "Bambesa", "Bondo", "Poko"],
-  "Haut-Uélé": ["Isiro", "Dungu", "Faradje", "Niangara", "Rungu", "Wamba", "Watsa"],
-  Ituri: ["Bunia", "Aru", "Djugu", "Irumu", "Mahagi", "Mambasa"],
-  "Nord-Kivu": [
-    "Goma", "Beni", "Butembo", "Lubero", "Masisi", "Nyiragongo", "Rutshuru", "Walikale",
-  ],
-  "Sud-Kivu": [
-    "Bukavu", "Uvira", "Baraka", "Fizi", "Idjwi", "Kabare", "Kalehe", "Mwenga", "Shabunda",
-    "Walungu",
-  ],
-  Maniema: [
-    "Kindu", "Kasongo", "Kabambare", "Kailo", "Kibombo", "Lubutu", "Pangi", "Punia",
-  ],
-  "Haut-Katanga": [
-    "Lubumbashi", "Likasi", "Kipushi", "Kambove", "Kasenga", "Mitwaba", "Pweto", "Sakania",
-  ],
-  Lualaba: ["Kolwezi", "Dilala", "Fungurume", "Kapanga", "Lubudi", "Mutshatsha", "Sandoa"],
-  "Haut-Lomami": ["Kamina", "Bukama", "Kabongo", "Kaniama", "Malemba-Nkulu"],
-  Tanganyika: ["Kalemie", "Kongolo", "Kabalo", "Manono", "Moba", "Nyunzu"],
-  Kasaï: ["Tshikapa", "Ilebo", "Kamonia", "Luebo", "Mweka", "Dekese"],
-  "Kasaï Central": ["Kananga", "Demba", "Dibaya", "Dimbelenge", "Kazumba", "Luiza"],
-  "Kasaï Oriental": ["Mbuji-Mayi", "Miabi", "Kabeya-Kamwanga", "Katanda", "Lupatapata", "Tshilenge"],
-  Lomami: ["Kabinda", "Mwene-Ditu", "Ngandajika", "Kamiji", "Lubao", "Luilu"],
-  Sankuru: [
-    "Lusambo", "Lodja", "Lubefu", "Katako-Kombe", "Kole", "Lomela", "Ototo", "Tshumbe",
-  ],
-};
+/** SIGPOP phase3A : Province → Territoire → Secteur/Chefferie (145 × 734). */
+type SigpopSecteur = { name: string; type: string };
+const SIGPOP_RURAL = sigpopReferentiel.rural_by_province as Record<
+  string,
+  Record<string, SigpopSecteur[]>
+>;
 
-function secteursForTerritoire(territoireName: string): string[] {
-  return [
-    `${territoireName} Centre`,
-    `Secteur ${territoireName}`,
-    `Groupement Nord — ${territoireName}`,
-    `Groupement Sud — ${territoireName}`,
-    `Chefferie — ${territoireName}`,
-  ];
+/** Territoires ruraux par province (référentiel SIGPOP — 145). */
+const PROVINCE_TERRITOIRES: Record<string, string[]> = Object.fromEntries(
+  Object.entries(SIGPOP_RURAL).map(([province, terrMap]) => [
+    province,
+    Object.keys(terrMap).sort((a, b) => a.localeCompare(b, "fr")),
+  ]),
+);
+
+function secteursForTerritoire(provinceName: string, territoireName: string): string[] {
+  const list = SIGPOP_RURAL[provinceName]?.[territoireName];
+  if (list?.length) return list.map((s) => s.name);
+  return [`Secteur ${territoireName}`];
 }
 
 function provId(code: string) {
@@ -328,10 +297,24 @@ export function fallbackCommunes(opts: { villeId?: string; districtId?: string }
     for (const [provName, territoires] of Object.entries(PROVINCE_TERRITOIRES)) {
       const hit = territoires.find((name) => districtId(name, provName) === opts.districtId);
       if (hit) {
-        // Si le territoire est aussi une ville du référentiel, utiliser ses communes urbaines.
+        // Priorité au référentiel SIGPOP (secteurs/chefferies réels).
+        const sigpop = secteursForTerritoire(provName, hit);
+        if (sigpop.length > 0 && !(sigpop.length === 1 && sigpop[0] === `Secteur ${hit}`)) {
+          return sigpop.map((name) => ({
+            id: communeId(hit, name),
+            code: slug(name).toUpperCase().slice(0, 12),
+            name,
+          }));
+        }
         const urban = CITY_COMMUNES[provName]?.[hit];
-        const secteurs = urban?.length ? urban : secteursForTerritoire(hit);
-        return secteurs.map((name) => ({
+        if (urban?.length) {
+          return urban.map((name) => ({
+            id: communeId(hit, name),
+            code: slug(name).toUpperCase().slice(0, 12),
+            name,
+          }));
+        }
+        return sigpop.map((name) => ({
           id: communeId(hit, name),
           code: slug(name).toUpperCase().slice(0, 12),
           name,
@@ -419,14 +402,21 @@ export type FlatCommune = {
   province: string;
 };
 
-/** Toutes les communes du référentiel offline (synoptique multi-commune). */
+/** Toutes les communes urbaines + secteurs/chefferies SIGPOP (synoptique / recherche). */
 export function listAllCommunesFlat(): FlatCommune[] {
   const out: FlatCommune[] = [];
+  const seen = new Set<string>();
+  const push = (row: FlatCommune) => {
+    if (seen.has(row.id)) return;
+    seen.add(row.id);
+    out.push(row);
+  };
+
   for (const [provName, villes] of Object.entries(CITY_COMMUNES)) {
     for (const [villeName, communes] of Object.entries(villes)) {
       for (const name of communes) {
         const id = communeId(villeName, name);
-        out.push({
+        push({
           id,
           code: `${slug(villeName).toUpperCase().slice(0, 6)}-${slug(name).toUpperCase().slice(0, 10)}`,
           name,
@@ -436,11 +426,27 @@ export function listAllCommunesFlat(): FlatCommune[] {
       }
     }
   }
+
+  for (const [provName, terrMap] of Object.entries(SIGPOP_RURAL)) {
+    for (const [terrName, secteurs] of Object.entries(terrMap)) {
+      for (const s of secteurs) {
+        const id = communeId(terrName, s.name);
+        push({
+          id,
+          code: `${slug(terrName).toUpperCase().slice(0, 6)}-${slug(s.name).toUpperCase().slice(0, 10)}`,
+          name: s.name,
+          ville: terrName,
+          province: provName,
+        });
+      }
+    }
+  }
+
   return out.sort((a, b) => a.name.localeCompare(b.name, "fr"));
 }
 
 export type PlaceHit = {
-  kind: "commune" | "ville" | "territoire" | "province";
+  kind: "commune" | "ville" | "territoire" | "secteur" | "province";
   name: string;
   province: string;
   ville?: string;
@@ -518,6 +524,23 @@ export function searchPlaces(query: string, limit = 12): PlaceHit[] {
     }
   }
 
+  for (const [provName, terrMap] of Object.entries(SIGPOP_RURAL)) {
+    for (const [terrName, secteurs] of Object.entries(terrMap)) {
+      for (const s of secteurs) {
+        if (match(s.name)) {
+          push({
+            kind: "secteur",
+            name: s.name,
+            province: provName,
+            ville: terrName,
+            commune: s.name,
+            label: `${s.name} · ${terrName} · ${provName}`,
+          });
+        }
+      }
+    }
+  }
+
   for (const p of PROVINCES) {
     if (match(p.name) || match(p.chef_lieu)) {
       push({
@@ -533,7 +556,7 @@ export function searchPlaces(query: string, limit = 12): PlaceHit[] {
     const n = normalizePlaceQuery(h.name);
     if (n === q) return 0;
     if (n.startsWith(q)) return 1;
-    if (h.kind === "commune") return 2;
+    if (h.kind === "commune" || h.kind === "secteur") return 2;
     if (h.kind === "ville" || h.kind === "territoire") return 3;
     return 4;
   };
