@@ -298,8 +298,9 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
             title="LISTE DES ACTES"
             items={[
               {
-                label: "TOTAL GÉNÉRAL",
+                label: "VALIDÉS",
                 value: counted.length,
+                unit: "validated",
                 color: rdcColor(0),
                 onClick: () => goToListFocus("validated"),
                 active: statusFocus === "validated",
@@ -311,6 +312,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
                   const s = String(a.status ?? "DRAFT").toUpperCase();
                   return ["DRAFT", "SUBMITTED", "UNDER_REVIEW", "PENDING_OFFICER", "CORRECTION_REQUIRED", ""].includes(s);
                 }).length,
+                unit: "pending",
                 color: rdcColor(3),
                 onClick: () => goToListFocus("drafts"),
                 active: statusFocus === "drafts",
@@ -318,6 +320,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
               {
                 label: monthFilter ? `MOIS ${monthFilter}` : "FILTRÉS (MOIS)",
                 value: countedFiltered.length,
+                unit: "validated",
                 color: rdcColor(2),
               },
             ]}

@@ -540,6 +540,21 @@
   margin: 0.2rem 0 0.45rem;
 }
 
+.dash-kpi-unit {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--egouv-muted);
+  margin-left: 0.2rem;
+  letter-spacing: 0.01em;
+}
+
+.eg-simple-stat-unit {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--egouv-muted);
+  margin-left: 0.25rem;
+}
+
 .dash-kpi-foot {
   display: flex;
   justify-content: space-between;

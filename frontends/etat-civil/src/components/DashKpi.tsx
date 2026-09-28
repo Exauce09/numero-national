@@ -27,6 +27,16 @@ function useCountUp(target: number, durationMs = 700): number {
   return n;
 }
 
+/** Libellé d'unité près du chiffre (validé / à valider). */
+export function countUnitLabel(
+  n: number,
+  unit: "validated" | "pending" | "none" = "validated",
+): string {
+  if (unit === "none") return "";
+  if (unit === "pending") return "à valider";
+  return n > 1 ? "validés" : "validé";
+}
+
 /** Carte KPI du tableau de bord : total validé + « N à valider », cliquable vers la liste. */
 export function StatCard({
   title,
@@ -35,6 +45,7 @@ export function StatCard({
   icon,
   color,
   href,
+  valueUnit = "validated",
 }: {
   title: string;
   value: number;
@@ -42,9 +53,12 @@ export function StatCard({
   icon: ReactNode;
   color: string;
   href?: string;
+  /** Affiché à côté du chiffre — défaut : validé(s). */
+  valueUnit?: "validated" | "pending" | "none";
 }) {
   const shown = useCountUp(value);
   const navigate = useNavigate();
+  const unit = countUnitLabel(value, valueUnit);
   return (
     <button
       type="button"
@@ -60,7 +74,10 @@ export function StatCard({
         </span>
       </div>
       <div className="dash-kpi-title">{title}</div>
-      <div className="dash-kpi-value">{shown.toLocaleString("fr-CD")}</div>
+      <div className="dash-kpi-value">
+        {shown.toLocaleString("fr-CD")}
+        {unit ? <span className="dash-kpi-unit"> {unit}</span> : null}
+      </div>
       <div className="dash-kpi-foot">
         <span className="dash-kpi-sub">{subtitle}</span>
       </div>

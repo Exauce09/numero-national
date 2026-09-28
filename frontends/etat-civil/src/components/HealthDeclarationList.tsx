@@ -91,8 +91,9 @@ export default function HealthDeclarationList({
         title={listTitle}
         items={[
           {
-            label: "TOTAL GÉNÉRAL",
+            label: "VALIDÉS",
             value: validated.length,
+            unit: "validated",
             color: rdcColor(0),
             onClick: () => setFocus("validated"),
             active: focus === "validated",
@@ -100,6 +101,7 @@ export default function HealthDeclarationList({
           {
             label: "À VALIDER",
             value: pending.length,
+            unit: "pending",
             color: rdcColor(3),
             onClick: () => setFocus("pending"),
             active: focus === "pending",
@@ -107,6 +109,7 @@ export default function HealthDeclarationList({
           {
             label: "TOUTES LES NOTIFICATIONS",
             value: rows.length,
+            unit: "none",
             color: rdcColor(2),
             onClick: () => setFocus(null),
             active: !focus,

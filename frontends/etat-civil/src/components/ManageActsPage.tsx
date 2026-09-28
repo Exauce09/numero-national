@@ -491,8 +491,9 @@ export default function ManageActsPage({
             title={config.listTitle}
             items={[
               {
-                label: "TOTAL GÉNÉRAL",
+                label: "VALIDÉS",
                 value: totalGeneral,
+                unit: "validated",
                 color: rdcColor(0),
                 onClick: () => goToListFocus("validated"),
                 active: statusFocus === "validated",
@@ -500,6 +501,7 @@ export default function ManageActsPage({
               {
                 label: "À VALIDER",
                 value: draftsCount,
+                unit: "pending",
                 color: rdcColor(3),
                 onClick: () => goToListFocus("drafts"),
                 active: statusFocus === "drafts",
@@ -507,6 +509,7 @@ export default function ManageActsPage({
               {
                 label: monthFilter ? `MOIS ${monthFilter}` : "FILTRÉS (MOIS)",
                 value: countedFiltered.length,
+                unit: "validated",
                 color: rdcColor(2),
               },
             ]}

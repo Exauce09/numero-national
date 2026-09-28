@@ -297,6 +297,7 @@ export default function DashboardPage() {
             icon={<IconClipboard size={22} />}
             color={RDC.yellowDeep}
             href="/acts?focus=drafts"
+            valueUnit="pending"
           />
         </div>
 
@@ -412,12 +413,17 @@ export default function DashboardPage() {
         <div className="dash-action-row">
           <button type="button" className="dash-action-card" onClick={() => navigate("/declarations")}>
             <span className="dash-action-label">À vérifier / valider</span>
-            <strong className="dash-action-value">{submitted}</strong>
+            <strong className="dash-action-value">
+              {submitted} <span className="dash-kpi-unit">à valider</span>
+            </strong>
             <span className="btn-add btn-sm">Consulter</span>
           </button>
           <button type="button" className="dash-action-card" onClick={() => navigate("/acts")}>
             <span className="dash-action-label">Validés / authentifiés</span>
-            <strong className="dash-action-value">{validated}</strong>
+            <strong className="dash-action-value">
+              {validated}{" "}
+              <span className="dash-kpi-unit">{validated > 1 ? "validés" : "validé"}</span>
+            </strong>
             <span className="btn-secondary btn-sm">Voir actes</span>
           </button>
           <button type="button" className="dash-action-card" onClick={() => navigate("/missions")}>
