@@ -251,12 +251,18 @@ export default function DashboardPage() {
           </button>
           <button type="button" className="dash-action-card" onClick={() => navigate("/divorces")}>
             <span className="dash-action-label">Divorces</span>
-            <strong className="dash-action-value">{divorces.length}</strong>
+            <strong className="dash-action-value">
+              {divorces.length}{" "}
+              <span className="dash-kpi-unit">{divorces.length > 1 ? "validés" : "validé"}</span>
+            </strong>
             <span className="btn-secondary btn-sm">{isJuge ? "Consulter" : "Transcrire"}</span>
           </button>
           <button type="button" className="dash-action-card" onClick={() => navigate("/adoptions")}>
             <span className="dash-action-label">Adoptions</span>
-            <strong className="dash-action-value">{adoptions.length}</strong>
+            <strong className="dash-action-value">
+              {adoptions.length}{" "}
+              <span className="dash-kpi-unit">{adoptions.length > 1 ? "validés" : "validé"}</span>
+            </strong>
             <span className="btn-secondary btn-sm">{isJuge ? "Consulter" : "Transcrire"}</span>
           </button>
         </div>
