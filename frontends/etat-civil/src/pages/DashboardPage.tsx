@@ -435,7 +435,7 @@ export default function DashboardPage() {
             <span className="btn-add btn-sm">Consulter</span>
           </button>
           <button type="button" className="dash-action-card" onClick={() => navigate("/acts")}>
-            <span className="dash-action-label">Total général (actes)</span>
+            <span className="dash-action-label">Total Général (actes)</span>
             <strong className="dash-action-value">
               {validated + drafts} <span className="dash-kpi-unit">Total Général</span>
             </strong>
