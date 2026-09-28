@@ -38,18 +38,19 @@ export type GeoLevel =
 
 /** Profils courants pour réutiliser la base géo partout. */
 export const GEO_PRESETS = {
+  /** Complet : Province → Ville/Territoire → … */
   full: ["province", "ville", "district", "commune", "localite", "quartier", "avenue", "rue"] as GeoLevel[],
-  /** Adresse urbaine / résidence : Province → Ville → Commune → Quartier → Avenue. */
-  address: ["province", "ville", "commune", "quartier", "avenue"] as GeoLevel[],
-  /** Origine / territoire rural. */
+  /** Adresse urbaine / résidence : Province → Ville/Territoire → Commune/Secteur → … */
+  address: ["province", "ville", "district", "commune", "quartier", "avenue"] as GeoLevel[],
+  /** Origine : Province → Ville/Territoire → Commune/Secteur → Village. */
   origin: ["province", "ville", "district", "commune", "localite"] as GeoLevel[],
   /**
-   * Originaire EC RDC (cahier projets) :
-   * Province → Territoire → Secteur/Chefferie → Village (sans groupement).
+   * Originaire EC RDC :
+   * Province → Territoire → Secteur/Chefferie → Village.
    */
   originRural: ["province", "district", "commune", "localite"] as GeoLevel[],
   /** Lieu simple (naissance, décès, enregistrement…). */
-  place: ["province", "ville", "commune"] as GeoLevel[],
+  place: ["province", "ville", "district", "commune"] as GeoLevel[],
 } as const;
 
 const DEFAULT_FIELD_LABELS: Record<GeoLevel, string> = {
@@ -751,7 +752,7 @@ export default function GeoCascade({
                 </optgroup>
               ) : null}
               {districts.length ? (
-                <optgroup label="Territoires / districts">
+                <optgroup label="Territoires">
                   {districts.map((o) => (
                     <option key={o.id} value={`territoire:${o.id}`}>
                       {o.name}

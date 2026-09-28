@@ -262,15 +262,8 @@ export function fallbackVilles(provinceId: string): GeoItem[] {
 export function fallbackDistricts(provinceId: string): GeoItem[] {
   const p = provinceById(provinceId);
   if (!p) return [];
-  if (p.code === "KIN") {
-    return Object.keys(KIN_DISTRICTS)
-      .sort((a, b) => a.localeCompare(b, "fr"))
-      .map((name) => ({
-        id: districtId(name, "Kinshasa"),
-        code: slug(name).toUpperCase().slice(0, 12),
-        name,
-      }));
-  }
+  // Kinshasa : pas de territoire rural dans le référentiel SIGPOP — uniquement la ville + communes.
+  if (p.code === "KIN") return [];
   const territoires = PROVINCE_TERRITOIRES[p.name] ?? [];
   return territoires
     .slice()
@@ -284,16 +277,6 @@ export function fallbackDistricts(provinceId: string): GeoItem[] {
 
 export function fallbackCommunes(opts: { villeId?: string; districtId?: string }): GeoItem[] {
   if (opts.districtId) {
-    const kinEntry = Object.entries(KIN_DISTRICTS).find(
-      ([name]) => districtId(name, "Kinshasa") === opts.districtId,
-    );
-    if (kinEntry) {
-      return kinEntry[1].map((name) => ({
-        id: communeId("Kinshasa", name),
-        code: slug(name).toUpperCase().slice(0, 12),
-        name,
-      }));
-    }
     for (const [provName, territoires] of Object.entries(PROVINCE_TERRITOIRES)) {
       const hit = territoires.find((name) => districtId(name, provName) === opts.districtId);
       if (hit) {
