@@ -47,19 +47,19 @@ export default function HealthDashboardPage() {
       <div className="dash-kpi-grid">
         <StatCard
           title="Naissance"
-          value={births.length}
-          subtitle={`${pendingOf(birthAll).length} à valider`}
+          validated={births.length}
+          pending={pendingOf(birthAll).length}
           icon={<IconBaby size={22} />}
           color={RDC.yellowDeep}
-          href="/sante/births?focus=validated"
+          href="/sante/births"
         />
         <StatCard
           title="Décès"
-          value={deaths.length}
-          subtitle={`${pendingOf(deathAll).length} à valider`}
+          validated={deaths.length}
+          pending={pendingOf(deathAll).length}
           icon={<IconCross size={22} />}
           color={RDC.red}
-          href="/sante/deaths?focus=validated"
+          href="/sante/deaths"
         />
       </div>
 

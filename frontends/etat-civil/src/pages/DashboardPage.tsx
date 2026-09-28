@@ -252,17 +252,25 @@ export default function DashboardPage() {
           <button type="button" className="dash-action-card" onClick={() => navigate("/divorces")}>
             <span className="dash-action-label">Divorces</span>
             <strong className="dash-action-value">
-              {divorces.length}{" "}
-              <span className="dash-kpi-unit">{divorces.length > 1 ? "validés" : "validé"}</span>
+              {divorces.length + pendingOf(divorceAll).length}{" "}
+              <span className="dash-kpi-unit">total gén.</span>
             </strong>
+            <span className="muted small" style={{ display: "block", marginTop: 2 }}>
+              {divorces.length} validé{divorces.length > 1 ? "s" : ""} · {pendingOf(divorceAll).length}{" "}
+              à valider
+            </span>
             <span className="btn-secondary btn-sm">{isJuge ? "Consulter" : "Transcrire"}</span>
           </button>
           <button type="button" className="dash-action-card" onClick={() => navigate("/adoptions")}>
             <span className="dash-action-label">Adoptions</span>
             <strong className="dash-action-value">
-              {adoptions.length}{" "}
-              <span className="dash-kpi-unit">{adoptions.length > 1 ? "validés" : "validé"}</span>
+              {adoptions.length + pendingOf(adoptionAll).length}{" "}
+              <span className="dash-kpi-unit">total gén.</span>
             </strong>
+            <span className="muted small" style={{ display: "block", marginTop: 2 }}>
+              {adoptions.length} validé{adoptions.length > 1 ? "s" : ""} ·{" "}
+              {pendingOf(adoptionAll).length} à valider
+            </span>
             <span className="btn-secondary btn-sm">{isJuge ? "Consulter" : "Transcrire"}</span>
           </button>
         </div>
@@ -270,40 +278,27 @@ export default function DashboardPage() {
         <div className="dash-kpi-grid">
           <StatCard
             title="Divorce"
-            value={divorces.length}
-            subtitle={isJuge ? "Dossiers juridiction" : "Transcriptions greffe"}
+            validated={divorces.length}
+            pending={pendingOf(divorceAll).length}
             icon={<IconSplit size={22} />}
             color={RDC.redDeep}
-            href="/lists/divorce?focus=validated"
+            href="/lists/divorce"
           />
           <StatCard
             title="Adoption"
-            value={adoptions.length}
-            subtitle="Après jugement"
+            validated={adoptions.length}
+            pending={pendingOf(adoptionAll).length}
             icon={<IconClipboard size={22} />}
             color={RDC.blueMid}
-            href="/lists/adoption?focus=validated"
+            href="/lists/adoption"
           />
           <StatCard
             title="Dossiers judiciaires"
-            value={judicialActs.length}
-            subtitle="Divorce + adoption (validés)"
+            validated={judicialActs.length}
+            pending={pendingOf([...divorceAll, ...adoptionAll]).length}
             icon={<IconFile size={22} />}
             color={RDC.blue}
             href="/transcriptions"
-          />
-          <StatCard
-            title="En cours"
-            value={
-              judicialActs.filter((a) =>
-                ["DRAFT", "SUBMITTED", "UNDER_REVIEW", "PENDING_OFFICER"].includes(actStatus(a)),
-              ).length
-            }
-            subtitle="Brouillons / soumis"
-            icon={<IconClipboard size={22} />}
-            color={RDC.yellowDeep}
-            href="/acts?focus=drafts"
-            valueUnit="pending"
           />
         </div>
 
@@ -375,43 +370,43 @@ export default function DashboardPage() {
       <div className="dash-kpi-grid">
         <StatCard
           title="Naissance"
-          value={births.length}
-          subtitle={`${pendingOf(birthAll).length} à valider`}
+          validated={births.length}
+          pending={pendingOf(birthAll).length}
           icon={<IconBaby size={22} />}
           color={RDC.yellowDeep}
-          href={statsOnly ? "/synoptique/naissances" : "/lists/naissance?focus=validated"}
+          href={statsOnly ? "/synoptique/naissances" : "/lists/naissance"}
         />
         <StatCard
           title="Mariages"
-          value={marriages.length}
-          subtitle={`${pendingOf(marriageAll).length} à valider`}
+          validated={marriages.length}
+          pending={pendingOf(marriageAll).length}
           icon={<IconRing size={22} />}
           color={RDC.yellow}
-          href={statsOnly ? "/synoptique/matrimonial" : "/lists/mariage?focus=validated"}
+          href={statsOnly ? "/synoptique/matrimonial" : "/lists/mariage"}
         />
         <StatCard
           title="Décès"
-          value={deaths.length}
-          subtitle={`${pendingOf(deathAll).length} à valider`}
+          validated={deaths.length}
+          pending={pendingOf(deathAll).length}
           icon={<IconCross size={22} />}
           color={RDC.red}
-          href={statsOnly ? "/synoptique/deces" : "/lists/deces?focus=validated"}
+          href={statsOnly ? "/synoptique/deces" : "/lists/deces"}
         />
         <StatCard
           title="Adoption"
-          value={adoptions.length}
-          subtitle={`${pendingOf(adoptionAll).length} à valider`}
+          validated={adoptions.length}
+          pending={pendingOf(adoptionAll).length}
           icon={<IconHome size={22} />}
           color={RDC.blueMid}
-          href={statsOnly ? undefined : "/lists/adoption?focus=validated"}
+          href={statsOnly ? undefined : "/lists/adoption"}
         />
         <StatCard
           title="Divorce"
-          value={divorces.length}
-          subtitle={`${pendingOf(divorceAll).length} à valider`}
+          validated={divorces.length}
+          pending={pendingOf(divorceAll).length}
           icon={<IconSplit size={22} />}
           color={RDC.redDeep}
-          href={statsOnly ? "/synoptique/matrimonial" : "/lists/divorce?focus=validated"}
+          href={statsOnly ? "/synoptique/matrimonial" : "/lists/divorce"}
         />
       </div>
 
@@ -425,11 +420,13 @@ export default function DashboardPage() {
             <span className="btn-add btn-sm">Consulter</span>
           </button>
           <button type="button" className="dash-action-card" onClick={() => navigate("/acts")}>
-            <span className="dash-action-label">Validés / authentifiés</span>
+            <span className="dash-action-label">Total général (actes)</span>
             <strong className="dash-action-value">
-              {validated}{" "}
-              <span className="dash-kpi-unit">{validated > 1 ? "validés" : "validé"}</span>
+              {validated + drafts} <span className="dash-kpi-unit">total gén.</span>
             </strong>
+            <span className="muted small" style={{ display: "block", marginTop: 2 }}>
+              {validated} validé{validated > 1 ? "s" : ""} · {drafts} à valider
+            </span>
             <span className="btn-secondary btn-sm">Voir actes</span>
           </button>
           <button type="button" className="dash-action-card" onClick={() => navigate("/missions")}>

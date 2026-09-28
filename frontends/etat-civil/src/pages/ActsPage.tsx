@@ -298,10 +298,26 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
             title="LISTE DES ACTES"
             items={[
               {
+                label: "TOTAL GÉNÉRAL",
+                value:
+                  counted.length +
+                  all.filter((a) => {
+                    if (["CENSUS", "DISPLACEMENT"].includes(a.type)) return false;
+                    const s = String(a.status ?? "DRAFT").toUpperCase();
+                    return ["DRAFT", "SUBMITTED", "UNDER_REVIEW", "PENDING_OFFICER", "CORRECTION_REQUIRED", ""].includes(
+                      s,
+                    );
+                  }).length,
+                unit: "total",
+                color: rdcColor(0),
+                onClick: () => goToListFocus("all"),
+                active: statusFocus === "all",
+              },
+              {
                 label: "VALIDÉS",
                 value: counted.length,
                 unit: "validated",
-                color: rdcColor(0),
+                color: rdcColor(1),
                 onClick: () => goToListFocus("validated"),
                 active: statusFocus === "validated",
               },

@@ -491,10 +491,18 @@ export default function ManageActsPage({
             title={config.listTitle}
             items={[
               {
+                label: "TOTAL GÉNÉRAL",
+                value: totalGeneral + draftsCount,
+                unit: "total",
+                color: rdcColor(0),
+                onClick: () => goToListFocus("all"),
+                active: statusFocus === "all",
+              },
+              {
                 label: "VALIDÉS",
                 value: totalGeneral,
                 unit: "validated",
-                color: rdcColor(0),
+                color: rdcColor(1),
                 onClick: () => goToListFocus("validated"),
                 active: statusFocus === "validated",
               },
