@@ -106,7 +106,7 @@ export function SimpleStatBlocks({
     color?: string;
     onClick?: () => void;
     active?: boolean;
-    /** Unité affichée à côté du chiffre (ex. validés / à valider / Total Général). */
+    /** Conservé pour compat — non affiché (libellé déjà dans `label`). */
     unit?: "validated" | "pending" | "total" | "none";
   }>;
 }) {
@@ -117,16 +117,6 @@ export function SimpleStatBlocks({
         {items.map((it) => {
           const clickable = Boolean(it.onClick);
           const Tag = clickable ? "button" : "div";
-          const unit =
-            it.unit === "none" || !it.unit
-              ? ""
-              : it.unit === "pending"
-                ? "à valider"
-                : it.unit === "total"
-                  ? "Total Général"
-                  : it.value > 1
-                    ? "validés"
-                    : "validé";
           return (
             <Tag
               key={it.label}
@@ -136,10 +126,7 @@ export function SimpleStatBlocks({
               onClick={it.onClick}
             >
               <span className="muted">{it.label}</span>
-              <strong>
-                {it.value}
-                {unit ? <span className="eg-simple-stat-unit"> {unit}</span> : null}
-              </strong>
+              <strong>{it.value}</strong>
             </Tag>
           );
         })}
