@@ -201,6 +201,19 @@ export function synopticMarriagesDivorces(communeOverride?: OfficerCommune | Fla
   };
 }
 
+function deathBucket(
+  act: Act,
+): "garcon" | "fille" | "homme" | "femme" | "mortne_g" | "mortne_f" {
+  const person = act.national_id ? getPersonByNic(act.national_id) : undefined;
+  const sexe = String(act.payload.sexe ?? person?.sexe ?? "M").toUpperCase();
+  const female = sexe === "F";
+  if (isMortNe(act.payload)) return female ? "mortne_f" : "mortne_g";
+  const dob = String(act.payload.date_naissance ?? person?.date_naissance ?? "");
+  const age = dob ? ageYears(dob) : 30;
+  if (age < 18) return female ? "fille" : "garcon";
+  return female ? "femme" : "homme";
+}
+
 export function synopticDeaths(communeOverride?: OfficerCommune | FlatCommune | null) {
   const commune = communeOverride ? toOfficerCommune(communeOverride) : getOfficerCommune();
   const acts = actsForCommune("DEATH", commune);
@@ -213,22 +226,12 @@ export function synopticDeaths(communeOverride?: OfficerCommune | FlatCommune | 
   let mortsNesF = 0;
 
   for (const act of acts) {
-    const isStillbirth = isMortNe(act.payload);
-    const person = act.national_id ? getPersonByNic(act.national_id) : undefined;
-    const sexe = String(act.payload.sexe ?? person?.sexe ?? "M").toUpperCase();
-    const dob = String(act.payload.date_naissance ?? person?.date_naissance ?? "");
-    const age = dob ? ageYears(dob) : 30;
-    const minor = age < 18;
-
-    if (isStillbirth) {
-      if (sexe === "F") mortsNesF += 1;
-      else mortsNesG += 1;
-      continue;
-    }
-    if (minor) {
-      if (sexe === "F") filles += 1;
-      else garcons += 1;
-    } else if (sexe === "F") femmes += 1;
+    const bucket = deathBucket(act);
+    if (bucket === "mortne_g") mortsNesG += 1;
+    else if (bucket === "mortne_f") mortsNesF += 1;
+    else if (bucket === "garcon") garcons += 1;
+    else if (bucket === "fille") filles += 1;
+    else if (bucket === "femme") femmes += 1;
     else hommes += 1;
   }
 
@@ -283,6 +286,10 @@ export type SynopticTerritoryRow = {
   divorces: number;
   adoptions: number;
   deces: number;
+  deces_garcons: number;
+  deces_filles: number;
+  deces_hommes: number;
+  deces_femmes: number;
   documents: number;
   total: number;
 };
@@ -336,6 +343,10 @@ export function synopticNationalTerritory(): SynopticTerritoryRow[] {
       divorces: 0,
       adoptions: 0,
       deces: 0,
+      deces_garcons: 0,
+      deces_filles: 0,
+      deces_hommes: 0,
+      deces_femmes: 0,
       documents: 0,
       total: 0,
     });
@@ -355,6 +366,13 @@ export function synopticNationalTerritory(): SynopticTerritoryRow[] {
       const s = birthSexe(act).toUpperCase();
       if (s === "F") row.naissances_f += 1;
       else row.naissances_g += 1;
+    }
+    if (kind === "deces") {
+      const bucket = deathBucket(act);
+      if (bucket === "garcon") row.deces_garcons += 1;
+      else if (bucket === "fille") row.deces_filles += 1;
+      else if (bucket === "homme") row.deces_hommes += 1;
+      else if (bucket === "femme") row.deces_femmes += 1;
     }
     row.total += 1;
   }
@@ -385,9 +403,22 @@ export type SynopticProvinceRollup = {
   divorces: number;
   adoptions: number;
   deces: number;
+  deces_garcons: number;
+  deces_filles: number;
+  deces_hommes: number;
+  deces_femmes: number;
   documents: number;
   total: number;
 };
+
+function emptyDeathBreak() {
+  return {
+    deces_garcons: 0,
+    deces_filles: 0,
+    deces_hommes: 0,
+    deces_femmes: 0,
+  };
+}
 
 export function synopticNationalByProvince(): SynopticProvinceRollup[] {
   const rows = synopticNationalTerritory();
@@ -406,6 +437,7 @@ export function synopticNationalByProvince(): SynopticProvinceRollup[] {
         divorces: 0,
         adoptions: 0,
         deces: 0,
+        ...emptyDeathBreak(),
         documents: 0,
         total: 0,
         villeSet: new Set(),
@@ -421,6 +453,10 @@ export function synopticNationalByProvince(): SynopticProvinceRollup[] {
     hit.divorces += r.divorces;
     hit.adoptions += r.adoptions;
     hit.deces += r.deces;
+    hit.deces_garcons += r.deces_garcons;
+    hit.deces_filles += r.deces_filles;
+    hit.deces_hommes += r.deces_hommes;
+    hit.deces_femmes += r.deces_femmes;
     hit.documents += r.documents;
     hit.total += r.total;
   }
@@ -440,6 +476,10 @@ export type SynopticVilleRollup = {
   divorces: number;
   adoptions: number;
   deces: number;
+  deces_garcons: number;
+  deces_filles: number;
+  deces_hommes: number;
+  deces_femmes: number;
   documents: number;
   total: number;
 };
@@ -464,6 +504,7 @@ export function synopticNationalByVille(province?: string | null): SynopticVille
         divorces: 0,
         adoptions: 0,
         deces: 0,
+        ...emptyDeathBreak(),
         documents: 0,
         total: 0,
       };
@@ -477,6 +518,10 @@ export function synopticNationalByVille(province?: string | null): SynopticVille
     hit.divorces += r.divorces;
     hit.adoptions += r.adoptions;
     hit.deces += r.deces;
+    hit.deces_garcons += r.deces_garcons;
+    hit.deces_filles += r.deces_filles;
+    hit.deces_hommes += r.deces_hommes;
+    hit.deces_femmes += r.deces_femmes;
     hit.documents += r.documents;
     hit.total += r.total;
   }
