@@ -254,7 +254,7 @@ export default function DashboardPage() {
             <span className="dash-action-label">Divorces</span>
             <strong className="dash-action-value">
               {divorces.length + pendingOf(divorceAll).length}{" "}
-              <span className="dash-kpi-unit">total gén.</span>
+              <span className="dash-kpi-unit">Total Général</span>
             </strong>
             <span className="muted small" style={{ display: "block", marginTop: 2 }}>
               {divorces.length} validé{divorces.length > 1 ? "s" : ""} · {pendingOf(divorceAll).length}{" "}
@@ -266,7 +266,7 @@ export default function DashboardPage() {
             <span className="dash-action-label">Adoptions</span>
             <strong className="dash-action-value">
               {adoptions.length + pendingOf(adoptionAll).length}{" "}
-              <span className="dash-kpi-unit">total gén.</span>
+              <span className="dash-kpi-unit">Total Général</span>
             </strong>
             <span className="muted small" style={{ display: "block", marginTop: 2 }}>
               {adoptions.length} validé{adoptions.length > 1 ? "s" : ""} ·{" "}
@@ -437,7 +437,7 @@ export default function DashboardPage() {
           <button type="button" className="dash-action-card" onClick={() => navigate("/acts")}>
             <span className="dash-action-label">Total général (actes)</span>
             <strong className="dash-action-value">
-              {validated + drafts} <span className="dash-kpi-unit">total gén.</span>
+              {validated + drafts} <span className="dash-kpi-unit">Total Général</span>
             </strong>
             <span className="muted small" style={{ display: "block", marginTop: 2 }}>
               {validated} validé{validated > 1 ? "s" : ""} · {drafts} à valider

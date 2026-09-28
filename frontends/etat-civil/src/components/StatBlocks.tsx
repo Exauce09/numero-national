@@ -106,7 +106,7 @@ export function SimpleStatBlocks({
     color?: string;
     onClick?: () => void;
     active?: boolean;
-    /** Unité affichée à côté du chiffre (ex. validés / à valider / total gén.). */
+    /** Unité affichée à côté du chiffre (ex. validés / à valider / Total Général). */
     unit?: "validated" | "pending" | "total" | "none";
   }>;
 }) {
@@ -123,7 +123,7 @@ export function SimpleStatBlocks({
               : it.unit === "pending"
                 ? "à valider"
                 : it.unit === "total"
-                  ? "total gén."
+                  ? "Total Général"
                   : it.value > 1
                     ? "validés"
                     : "validé";

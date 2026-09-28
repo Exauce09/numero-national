@@ -38,7 +38,7 @@ export function countUnitLabel(
 }
 
 /**
- * Carte KPI : chiffre principal = total général (validés + à valider).
+ * Carte KPI : chiffre principal = Total Général (validés + à valider).
  * En bas : détail validé / à valider.
  */
 export function StatCard({
@@ -78,7 +78,7 @@ export function StatCard({
       <div className="dash-kpi-title">{title}</div>
       <div className="dash-kpi-value">
         {shown.toLocaleString("fr-CD")}
-        <span className="dash-kpi-unit"> total gén.</span>
+        <span className="dash-kpi-unit"> Total Général</span>
       </div>
       <div className="dash-kpi-foot dash-kpi-breakdown">
         <span className="dash-kpi-sub">
