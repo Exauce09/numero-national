@@ -338,19 +338,20 @@ function AdoptionsTable({ commune }: { commune: CommuneSel }) {
 
 function DeathsTable({ commune }: { commune: CommuneSel }) {
   const d = synopticDeaths(commune);
+  const totalMineurs = d.garcons + d.filles;
+  const totalMajeurs = d.hommes + d.femmes;
+  const totalGeneral = totalMineurs + totalMajeurs;
   const rows = [
     {
       commune: d.commune.name,
       code: d.commune.code,
-      hommes: d.hommes,
-      femmes: d.femmes,
-      garcons: d.garcons,
-      filles: d.filles,
-      totalA: d.totalA,
-      mortsNesG: d.mortsNesG,
-      mortsNesF: d.mortsNesF,
-      totalB: d.totalB,
-      totalAB: d.totalAB,
+      garcon: d.garcons,
+      fille: d.filles,
+      total_mineurs: totalMineurs,
+      homme: d.hommes,
+      femme: d.femmes,
+      total_majeurs: totalMajeurs,
+      total_general: totalGeneral,
     },
   ];
 
@@ -368,35 +369,43 @@ function DeathsTable({ commune }: { commune: CommuneSel }) {
         <table className="syn-official">
           <thead>
             <tr>
-              <th>COMMUNE</th>
-              <th>HOMMES</th>
-              <th>FEMMES</th>
-              <th>GARÇONS</th>
-              <th>FILLES</th>
-              <th>TOTAL (A)</th>
-              <th>MORTS-NÉS G</th>
-              <th>MORTS-NÉS F</th>
-              <th>TOTAL (B)</th>
-              <th>TOTAL (A+B)</th>
+              <th rowSpan={2}>COMMUNE</th>
+              <th colSpan={2}>MINEURS</th>
+              <th rowSpan={2}>TOTAL MINEURS</th>
+              <th colSpan={2}>MAJEURS</th>
+              <th rowSpan={2}>TOTAL MAJEURS</th>
+              <th rowSpan={2}>TOTAL GÉNÉRAL</th>
+            </tr>
+            <tr>
+              <th>GARÇON</th>
+              <th>FILLE</th>
+              <th>HOMME</th>
+              <th>FEMME</th>
             </tr>
           </thead>
           <tbody>
             <tr>
               <td className="syn-commune-cell">{d.commune.name}</td>
-              <td>{d.hommes}</td>
-              <td>{d.femmes}</td>
               <td>{d.garcons}</td>
               <td>{d.filles}</td>
-              <td>{d.totalA}</td>
-              <td>{d.mortsNesG}</td>
-              <td>{d.mortsNesF}</td>
-              <td>{d.totalB}</td>
-              <td>{d.totalAB}</td>
+              <td>
+                <strong>{totalMineurs}</strong>
+              </td>
+              <td>{d.hommes}</td>
+              <td>{d.femmes}</td>
+              <td>
+                <strong>{totalMajeurs}</strong>
+              </td>
+              <td>
+                <strong>{totalGeneral}</strong>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
-      <QuartiersPanel commune={commune} />
+      <p className="syn-legend muted small">
+        Mineurs = Garçon + Fille · Majeurs = Homme + Femme · Total Général = Mineurs + Majeurs
+      </p>
     </>
   );
 }
