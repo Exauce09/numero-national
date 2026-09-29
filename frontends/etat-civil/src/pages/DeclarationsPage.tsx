@@ -4,7 +4,6 @@ import ActsDocsNav from "../components/ActsDocsNav";
 import {
   api,
   ApiConflictError,
-  demoListDeclarations,
   demoValidateDeclaration,
   type Declaration,
 } from "../api";
@@ -135,7 +134,7 @@ export default function DeclarationsPage() {
       for (const d of remote) byId.set(d.id, d);
       setRows([...byId.values()].sort((a, b) => b.created_at.localeCompare(a.created_at)));
     } catch {
-      setRows(local.length ? local : demoListDeclarations());
+      setRows(local);
     }
   }
 

@@ -8,6 +8,7 @@ import {
   ensureCanonicalAccounts,
   hasAnyEcUser,
 } from "../ecUsers";
+import { clearFreshInstallMode } from "../resetLocalDevStore";
 
 export default function SetupFirstUserPage() {
   const navigate = useNavigate();
@@ -24,6 +25,7 @@ export default function SetupFirstUserPage() {
     setError(null);
     setBusy(true);
     try {
+      clearFreshInstallMode();
       await ensureCanonicalAccounts();
       const account =
         asWho === "herve" ? CANONICAL_EC_ACCOUNTS[0] : CANONICAL_EC_ACCOUNTS[1];

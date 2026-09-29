@@ -5,6 +5,7 @@
 
 import { DEFAULT_OFFICER_COMMUNE, type OfficerCommune } from "./commune";
 import { isDivinterViewer } from "./rbac";
+import { isFreshInstallMode } from "./resetLocalDevStore";
 
 export type EcUserRole =
   | "SUPER_ADMIN_NATIONAL"
@@ -201,6 +202,8 @@ function findCanonicalMatch(
  * Ne réécrit pas le mot de passe d'un compte déjà existant.
  */
 export async function ensureCanonicalAccounts(): Promise<void> {
+  if (isFreshInstallMode()) return;
+
   let rows = listEcUsers();
   let changed = false;
 
