@@ -1,6 +1,7 @@
 /** Cartographie : bureaux EC (principal / secondaire / appui) + structures sanitaires. */
 
 import { useMemo, useState } from "react";
+import RdcLeafletMap from "../components/RdcLeafletMap";
 import {
   collectMapPoints,
   distancesInProvince,
@@ -16,20 +17,6 @@ const KIND_FILTERS = [
   { value: "BUREAU_APPUI", label: "Bureau d'appui" },
   { value: "STRUCTURE_SANITAIRE", label: "Structure sanitaire" },
 ] as const;
-
-/** Projection simple lon/lat → % dans une bbox RDC. */
-function project(lat: number, lng: number): { left: string; top: string } {
-  const west = 12.0;
-  const east = 31.5;
-  const south = -13.5;
-  const north = 5.5;
-  const x = ((lng - west) / (east - west)) * 100;
-  const y = ((north - lat) / (north - south)) * 100;
-  return {
-    left: `${Math.min(98, Math.max(2, x))}%`,
-    top: `${Math.min(98, Math.max(2, y))}%`,
-  };
-}
 
 export default function CartographieBureauxPage() {
   const [province, setProvince] = useState("");
@@ -64,9 +51,9 @@ export default function CartographieBureauxPage() {
     <div>
       <h2 className="page-title">Cartographie des bureaux</h2>
       <p className="page-lead">
-        Bureau principal, Bureau secondaire, Bureau d&apos;appui et structures sanitaires —
-        distances entre bureaux d&apos;état civil dans une province, et nombre de faits enregistrés
-        par zone.
+        Carte de la République démocratique du Congo — Bureau principal, secondaire, d&apos;appui
+        et structures sanitaires. Distances entre bureaux dans une province et nombre de faits
+        enregistrés par zone.
       </p>
 
       <div className="panel form-grid" style={{ marginBottom: "1rem" }}>
@@ -80,7 +67,7 @@ export default function CartographieBureauxPage() {
               setSelected(null);
             }}
           >
-            <option value="">— Toutes —</option>
+            <option value="">— Toutes (vue RDC) —</option>
             {provinces.map((p) => (
               <option key={p} value={p}>
                 {p}
@@ -110,28 +97,12 @@ export default function CartographieBureauxPage() {
 
       <div className="carto-layout">
         <div className="carto-map panel" aria-label="Carte RDC">
-          <div className="carto-map-inner">
-            <div className="carto-map-bg" />
-            {points.map((p) => {
-              const pos = project(p.lat, p.lng);
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  className={`carto-marker${selected?.id === p.id ? " is-selected" : ""}`}
-                  style={{
-                    left: pos.left,
-                    top: pos.top,
-                    background: kindColor(p.kind),
-                  }}
-                  title={`${p.name} — ${p.kindLabel} — ${p.actCount} fait(s)`}
-                  onClick={() => setSelected(p)}
-                >
-                  <span>{p.actCount}</span>
-                </button>
-              );
-            })}
-          </div>
+          <RdcLeafletMap
+            points={points}
+            selectedId={selected?.id}
+            onSelect={setSelected}
+            provinceFilter={province}
+          />
           <div className="carto-legend">
             {KIND_FILTERS.filter((f) => f.value).map((f) => (
               <span key={f.value}>
@@ -140,6 +111,10 @@ export default function CartographieBureauxPage() {
               </span>
             ))}
           </div>
+          <p className="muted small" style={{ margin: "0.5rem 0 0" }}>
+            Fond de carte OpenStreetMap — zoom et déplacement disponibles. Connexion Internet
+            requise pour les tuiles.
+          </p>
         </div>
 
         <div className="carto-side">
@@ -163,7 +138,7 @@ export default function CartographieBureauxPage() {
               {!points.length ? (
                 <p className="muted">
                   Aucun point — créez des comptes préposé/officier (type de bureau) ou des structures
-                  sanitaires.
+                  sanitaires. La carte RDC reste visible.
                 </p>
               ) : null}
             </div>
