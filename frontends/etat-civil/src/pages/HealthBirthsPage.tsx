@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import HealthDeclarationList from "../components/HealthDeclarationList";
 import { declarationRef, listFacilityDeclarations } from "../civilDeclarations";
+import { hospitalBirthCertFromPayload } from "../hospitalBirthCertificate";
 import { findFacilityByUsername, getHealthSession } from "../healthAuth";
 import type { HealthFormContext, HealthFormResult } from "../healthFormMode";
 import { pushHealthNotification } from "../healthPrefs";
@@ -179,6 +180,11 @@ export default function HealthBirthsPage() {
           value: (d) => (d.declaration_type === "DEATH" ? "Mort-né" : "Né vivant"),
         },
         { label: "Mère", value: (d) => String(d.payload.mother_name ?? "") },
+        {
+          label: "Certificat hôpital",
+          value: (d) =>
+            d.declaration_type === "BIRTH" && hospitalBirthCertFromPayload(d.payload) ? "Oui" : "—",
+        },
       ]}
     />
   );

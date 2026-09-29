@@ -43,6 +43,11 @@ import { ISSUE_NAISSANCE_OPTIONS, type IssueNaissance } from "../deathType";
 import { listFacilityAccounts } from "../healthAuth";
 import { notifyFromHealthForm, type HealthFormContext } from "../healthFormMode";
 import { HOPITAUX_KEY, loadNamedList, rememberNamed } from "../namedLists";
+import HospitalBirthCertificateField from "../components/HospitalBirthCertificateField";
+import {
+  hospitalBirthCertPayload,
+  type HospitalBirthCertificate,
+} from "../hospitalBirthCertificate";
 
 const MODES_ENREGISTREMENT = [
   { value: "sans_procuration", label: "Sans procuration" },
@@ -88,6 +93,9 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
   const [issueNaissance, setIssueNaissance] = useState<IssueNaissance>("NE_VIVANT");
   const [typeAccouchement, setTypeAccouchement] = useState("");
   const [etatMorphologique, setEtatMorphologique] = useState("");
+  const [certificatHopital, setCertificatHopital] = useState<HospitalBirthCertificate | null>(
+    null,
+  );
   const [anneeRegistre, setAnneeRegistre] = useState(String(new Date().getFullYear()));
   const [numeroRegistre, setNumeroRegistre] = useState("");
   const [declarant, setDeclarant] = useState<Person | null>(null);
@@ -309,6 +317,10 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
     }
     if (qualiteDeclarant !== "MERE" && qualiteDeclarant !== "PERE" && !declarant) {
       setError("Indiquez le déclarant (ou choisissez la qualité « Mère » ou « Père »).");
+      return;
+    }
+    if (health && !isMortNeIssue && !certificatHopital) {
+      setError("Joignez le certificat de naissance établi par l'hôpital.");
       return;
     }
 
@@ -618,6 +630,7 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
         latitude: gpsLat,
         longitude: gpsLng,
         gps_captured_at: gpsLat != null ? new Date().toISOString() : null,
+        ...hospitalBirthCertPayload(certificatHopital),
       };
       await record("BIRTH", payload, child.nic);
       }
@@ -631,6 +644,7 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
       setIssueNaissance("NE_VIVANT");
       setTypeAccouchement("");
       setEtatMorphologique("");
+      setCertificatHopital(null);
       setAnneeRegistre(String(new Date().getFullYear()));
       setNumeroRegistre("");
       setDeclarant(null);
@@ -1279,6 +1293,14 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
               Père renseigné : <strong>{displayName(father)}</strong> — l&apos;origine peut être
               liée au père via le bloc Originaire ci-dessus.
             </div>
+          ) : null}
+          {health && issueNaissance !== "MORT_NE" ? (
+            <HospitalBirthCertificateField
+              value={certificatHopital}
+              onChange={setCertificatHopital}
+              required
+              disabled={submitting}
+            />
           ) : null}
           <div className="full birth-form-nav">
             <button type="button" className="btn-secondary" onClick={() => setFormStep(3)}>

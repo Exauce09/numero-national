@@ -35,6 +35,8 @@ import GeoCascade, {
   type GeoSelection,
 } from "../components/GeoCascade";
 import { getOfficerCommune } from "../commune";
+import HospitalBirthCertificateView from "../components/HospitalBirthCertificateView";
+import { payloadWithoutBirthCertBlob } from "../hospitalBirthCertificate";
 
 const FACILITY_TYPES: { value: FacilityAccount["facilityType"]; label: string }[] = [
   { value: "HOPITAL", label: "Hôpital" },
@@ -824,8 +826,11 @@ export default function DeclarationsPage() {
             <h3>
               Déclaration {selected.declaration_type === "BIRTH" ? "naissance" : "décès"}
             </h3>
+            {selected.declaration_type === "BIRTH" ? (
+              <HospitalBirthCertificateView payload={selected.payload} />
+            ) : null}
             <pre style={{ whiteSpace: "pre-wrap", fontSize: "0.85rem" }}>
-              {JSON.stringify(selected.payload, null, 2)}
+              {JSON.stringify(payloadWithoutBirthCertBlob(selected.payload), null, 2)}
             </pre>
             <div className="modal-actions">
               <button type="button" className="btn-secondary" onClick={() => setSelected(null)}>
