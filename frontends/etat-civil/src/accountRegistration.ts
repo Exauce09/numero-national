@@ -188,7 +188,7 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
       "Officier de l'état civil adjoint",
     ],
     showService: true,
-    serviceOptions: ["Bureau principal", "Bureau secondaire"],
+    serviceOptions: ["Bureau principal", "Bureau secondaire", "Bureau d'appui"],
   },
   {
     code: "ADMIN_PROVINCIAL",

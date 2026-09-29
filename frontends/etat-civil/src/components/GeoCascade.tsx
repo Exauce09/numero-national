@@ -817,7 +817,7 @@ export default function GeoCascade({
             >
               <option value="">— Sélectionner —</option>
               {villes.length ? (
-                <optgroup label="Villes">
+                <optgroup label={`Villes (${villes.length})`}>
                   {villes.map((o) => (
                     <option key={o.id} value={`ville:${o.id}`}>
                       {geoOptionLabel(o)}
@@ -826,7 +826,7 @@ export default function GeoCascade({
                 </optgroup>
               ) : null}
               {districts.length ? (
-                <optgroup label="Territoires">
+                <optgroup label={`Territoires (${districts.length})`}>
                   {districts.map((o) => (
                     <option key={o.id} value={`territoire:${o.id}`}>
                       {geoOptionLabel(o)}
@@ -835,6 +835,15 @@ export default function GeoCascade({
                 </optgroup>
               ) : null}
             </select>
+            {sel.province_id ? (
+              <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
+                {zoneKind === "ville"
+                  ? "Branche ville : Commune → Quartier → Avenue (pas de district)."
+                  : zoneKind === "territoire"
+                    ? "Branche territoire : Secteur / Chefferie → Village (pas de district)."
+                    : `${villes.length} ville(s) · ${districts.length} territoire(s) — choisissez une entrée.`}
+              </p>
+            ) : null}
           </div>
         ) : null}
         {show("ville") && !zoneChoice ? (

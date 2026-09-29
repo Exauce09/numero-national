@@ -34,11 +34,17 @@ function isKinshasa(name?: string | null): boolean {
   return (name ?? "").toLowerCase().includes("kinshasa");
 }
 
-/** Province → Ville / Territoire → Commune ou Secteur (affectation EC / santé). */
-const REGISTER_GEO_LEVELS: GeoLevel[] = ["province", "ville", "district", "commune"];
+/** Province → Ville/Territoire → Commune|Secteur → Quartier|Village. */
+const REGISTER_GEO_LEVELS: GeoLevel[] = [
+  "province",
+  "ville",
+  "district",
+  "commune",
+  "quartier",
+  "localite",
+];
 const REGISTER_GEO_LABELS: Partial<Record<GeoLevel, string>> = {
   province: "Province",
-  commune: "Commune / Secteur / Chefferie",
 };
 
 export default function RegisterAccountPage() {
@@ -503,8 +509,9 @@ export default function RegisterAccountPage() {
                     <div className="full">
                       <label className="form-label">Lieu d&apos;affectation *</label>
                       <p className="muted small" style={{ margin: "0 0 0.5rem" }}>
-                        <strong>Province</strong>, puis <strong>Ville ou Territoire</strong>, puis
-                        commune / secteur.
+                        <strong>Province</strong> → <strong>Ville ou Territoire</strong> (pas de
+                        district) → <strong>Commune</strong> (ville) ou{" "}
+                        <strong>Secteur / Chefferie</strong> (territoire) → quartier ou village.
                       </p>
                       <GeoCascade
                         value={geo}

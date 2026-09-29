@@ -44,7 +44,7 @@ const FACILITY_TYPES: { value: FacilityAccount["facilityType"]; label: string }[
   { value: "MATERNITE", label: "Maternité" },
 ];
 
-/** Ville → Commune → Quartier, ou Territoire → Secteur → Village (liste unique Ville / Territoire). */
+/** Province → Ville/Territoire → Commune|Secteur → Quartier|Village (pas de district). */
 const FACILITY_GEO_LEVELS: GeoLevel[] = ["province", "ville", "district", "commune", "quartier", "localite"];
 
 function facilityLocationLabel(a: FacilityAccountPublic): string {
