@@ -94,9 +94,9 @@ export default function RegisterAccountPage() {
 
   useEffect(() => {
     setMatricule("");
-    setFonction("");
+    setFonction(typeOpt.fonctionOptions?.length === 1 ? typeOpt.fonctionOptions[0] : "");
     setInstitution("");
-    setServiceBureau("");
+    setServiceBureau(typeOpt.serviceOptions?.length === 1 ? typeOpt.serviceOptions[0] : "");
     setJuridiction("");
     setTribunal("");
     setIdJudiciaire("");
@@ -442,7 +442,13 @@ export default function RegisterAccountPage() {
                           />
                         )}
                         <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
-                          Poste occupé dans le bureau (ex. préposé de l&apos;état civil, officier titulaire).
+                          {accountType === "HOPITAL_MATERNITE"
+                            ? "Fonction unique : infirmier(ère) titulaire de la structure."
+                            : accountType === "OFFICIER_ETAT_CIVIL"
+                              ? "Titulaire ou adjoint du bureau d'état civil."
+                              : accountType === "AGENT_ETAT_CIVIL"
+                                ? "Préposé affecté au bureau d'état civil."
+                                : "Poste occupé selon le type de compte."}
                         </p>
                       </div>
                     ) : null}
@@ -482,9 +488,9 @@ export default function RegisterAccountPage() {
                             disabled={busy}
                             placeholder={
                               accountType === "HOPITAL_MATERNITE"
-                                ? "ex. Hôpital / maternité / centre de santé de …"
+                                ? "ex. Hôpital général de référence de …"
                                 : accountType === "ADMIN_PROVINCIAL"
-                                  ? "ex. Divinter Kinshasa"
+                                  ? "ex. Division provinciale Kinshasa"
                                   : undefined
                             }
                           />
@@ -510,7 +516,7 @@ export default function RegisterAccountPage() {
                     </div>
                     {typeOpt.showService !== false && (typeOpt.serviceOptions?.length ?? 0) > 0 ? (
                       <div className="full">
-                        <label className="form-label">Service ou bureau</label>
+                        <label className="form-label">Type de bureau</label>
                         <select
                           className="form-control"
                           value={serviceBureau}
