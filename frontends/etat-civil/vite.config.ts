@@ -13,6 +13,9 @@ export default defineConfig({
       "Permissions-Policy": "geolocation=(self)",
       "Cache-Control": "no-store",
     },
+    watch: {
+      ignored: ["**/data/sigpop/_docx_tmp/**"],
+    },
   },
   build: { target: "es2018" },
 });
