@@ -110,16 +110,75 @@ export function kindLabel(kind: BureauKind): string {
 }
 
 export function kindColor(kind: BureauKind): string {
+  // Couleurs douces (pas trop saturées) pour la légende / marqueurs
   switch (kind) {
     case "BUREAU_PRINCIPAL":
-      return "#0b3d91";
+      return "#5b7fa3";
     case "BUREAU_SECONDAIRE":
-      return "#1a7a4c";
+      return "#6f9b7a";
     case "BUREAU_APPUI":
-      return "#b45309";
+      return "#b89a6a";
     case "STRUCTURE_SANITAIRE":
-      return "#b91c1c";
+      return "#a87d7d";
   }
+}
+
+export type BureauKindTotals = {
+  principal: number;
+  secondaire: number;
+  appui: number;
+  sanitaire: number;
+  totalBureaux: number;
+};
+
+export function countByKind(points: MapPoint[]): BureauKindTotals {
+  let principal = 0;
+  let secondaire = 0;
+  let appui = 0;
+  let sanitaire = 0;
+  for (const p of points) {
+    if (p.kind === "BUREAU_PRINCIPAL") principal += 1;
+    else if (p.kind === "BUREAU_SECONDAIRE") secondaire += 1;
+    else if (p.kind === "BUREAU_APPUI") appui += 1;
+    else if (p.kind === "STRUCTURE_SANITAIRE") sanitaire += 1;
+  }
+  return {
+    principal,
+    secondaire,
+    appui,
+    sanitaire,
+    totalBureaux: principal + secondaire + appui,
+  };
+}
+
+export type ProvinceBureauTotals = {
+  province: string;
+  lat: number;
+  lng: number;
+  principal: number;
+  secondaire: number;
+  appui: number;
+  total: number;
+};
+
+export function countByProvince(points: MapPoint[]): ProvinceBureauTotals[] {
+  const map = new Map<string, ProvinceBureauTotals>();
+  for (const p of points) {
+    if (p.kind === "STRUCTURE_SANITAIRE") continue;
+    const prov = p.province.trim() || "Non renseigné";
+    const key = prov.toLowerCase();
+    let row = map.get(key);
+    if (!row) {
+      const [lat, lng] = coordsForProvince(prov);
+      row = { province: prov, lat, lng, principal: 0, secondaire: 0, appui: 0, total: 0 };
+      map.set(key, row);
+    }
+    if (p.kind === "BUREAU_PRINCIPAL") row.principal += 1;
+    else if (p.kind === "BUREAU_SECONDAIRE") row.secondaire += 1;
+    else if (p.kind === "BUREAU_APPUI") row.appui += 1;
+    row.total = row.principal + row.secondaire + row.appui;
+  }
+  return [...map.values()].sort((a, b) => b.total - a.total || a.province.localeCompare(b.province));
 }
 
 /** Distance orthodromique en km. */

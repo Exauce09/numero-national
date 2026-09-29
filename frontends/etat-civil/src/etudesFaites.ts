@@ -113,6 +113,11 @@ export function emptyEtudes(): EtudesData {
 
 export function formatParcoursScolaire(data: EtudesData): string {
   const lines: string[] = [];
+  if (data.niveau_atteint.trim()) {
+    const label =
+      NIVEAUX_ETUDES.find((n) => n.value === data.niveau_atteint)?.label || data.niveau_atteint;
+    lines.push(`Niveau d'étude : ${label}`);
+  }
   if (data.annee_fin_etudes.trim()) lines.push(`Année fin d'études : ${data.annee_fin_etudes.trim()}`);
   if (data.etablissements.length) {
     lines.push(`Établissements (${data.etablissements.length}) :`);

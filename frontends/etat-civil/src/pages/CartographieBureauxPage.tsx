@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import RdcLeafletMap from "../components/RdcLeafletMap";
 import {
   collectMapPoints,
+  countByKind,
+  countByProvince,
   distancesInProvince,
   kindColor,
   zoneActCounts,
@@ -24,6 +26,9 @@ export default function CartographieBureauxPage() {
   const [selected, setSelected] = useState<MapPoint | null>(null);
 
   const allPoints = useMemo(() => collectMapPoints(), []);
+  const nationalTotals = useMemo(() => countByKind(allPoints), [allPoints]);
+  const provinceSummaries = useMemo(() => countByProvince(allPoints), [allPoints]);
+
   const provinces = useMemo(
     () =>
       [...new Set(allPoints.map((p) => p.province).filter(Boolean))].sort((a, b) =>
@@ -40,6 +45,8 @@ export default function CartographieBureauxPage() {
     });
   }, [allPoints, province, kind]);
 
+  const filteredTotals = useMemo(() => countByKind(points), [points]);
+
   const distances = useMemo(() => {
     if (!province.trim()) return [];
     return distancesInProvince(allPoints, province).slice(0, 40);
@@ -51,10 +58,39 @@ export default function CartographieBureauxPage() {
     <div>
       <h2 className="page-title">Cartographie des bureaux</h2>
       <p className="page-lead">
-        Carte de la République démocratique du Congo — Bureau principal, secondaire, d&apos;appui
-        et structures sanitaires. Distances entre bureaux dans une province et nombre de faits
-        enregistrés par zone.
+        Carte de la RDC — totaux nationaux et par province des bureaux principal, secondaire et
+        d&apos;appui.
       </p>
+
+      <div className="carto-totals">
+        <div className="carto-total-card" style={{ borderColor: kindColor("BUREAU_PRINCIPAL") }}>
+          <span className="carto-total-dot" style={{ background: kindColor("BUREAU_PRINCIPAL") }} />
+          <div>
+            <strong>{nationalTotals.principal}</strong>
+            <span>Bureau principal</span>
+          </div>
+        </div>
+        <div className="carto-total-card" style={{ borderColor: kindColor("BUREAU_SECONDAIRE") }}>
+          <span className="carto-total-dot" style={{ background: kindColor("BUREAU_SECONDAIRE") }} />
+          <div>
+            <strong>{nationalTotals.secondaire}</strong>
+            <span>Bureau secondaire</span>
+          </div>
+        </div>
+        <div className="carto-total-card" style={{ borderColor: kindColor("BUREAU_APPUI") }}>
+          <span className="carto-total-dot" style={{ background: kindColor("BUREAU_APPUI") }} />
+          <div>
+            <strong>{nationalTotals.appui}</strong>
+            <span>Bureau d&apos;appui</span>
+          </div>
+        </div>
+        <div className="carto-total-card carto-total-sum">
+          <div>
+            <strong>{nationalTotals.totalBureaux}</strong>
+            <span>Total bureaux EC</span>
+          </div>
+        </div>
+      </div>
 
       <div className="panel form-grid" style={{ marginBottom: "1rem" }}>
         <div>
@@ -67,7 +103,7 @@ export default function CartographieBureauxPage() {
               setSelected(null);
             }}
           >
-            <option value="">— Toutes (vue RDC) —</option>
+            <option value="">— Toutes (vue RDC + totaux par province) —</option>
             {provinces.map((p) => (
               <option key={p} value={p}>
                 {p}
@@ -90,34 +126,111 @@ export default function CartographieBureauxPage() {
           </select>
         </div>
         <div className="full muted small">
-          {points.length} point(s) affiché(s) ·{" "}
-          {points.reduce((s, p) => s + p.actCount, 0)} fait(s) d&apos;état civil liés
+          Filtre : {filteredTotals.principal} principal · {filteredTotals.secondaire} secondaire ·{" "}
+          {filteredTotals.appui} appui · {filteredTotals.sanitaire} structure(s) sanitaire(s)
         </div>
       </div>
 
       <div className="carto-layout">
         <div className="carto-map panel" aria-label="Carte RDC">
-          <RdcLeafletMap
-            points={points}
-            selectedId={selected?.id}
-            onSelect={setSelected}
-            provinceFilter={province}
-          />
+          <div className="carto-map-stack">
+            <RdcLeafletMap
+              points={points}
+              provinceSummaries={provinceSummaries}
+              selectedId={selected?.id}
+              onSelect={setSelected}
+              onSelectProvince={(p) => {
+                setProvince(p);
+                setSelected(null);
+              }}
+              provinceFilter={province}
+            />
+            <div className="carto-map-overlay">
+              <strong>Totaux RDC</strong>
+              <ul>
+                <li>
+                  <i style={{ background: kindColor("BUREAU_PRINCIPAL") }} />
+                  Principal <b>{nationalTotals.principal}</b>
+                </li>
+                <li>
+                  <i style={{ background: kindColor("BUREAU_SECONDAIRE") }} />
+                  Secondaire <b>{nationalTotals.secondaire}</b>
+                </li>
+                <li>
+                  <i style={{ background: kindColor("BUREAU_APPUI") }} />
+                  Appui <b>{nationalTotals.appui}</b>
+                </li>
+              </ul>
+            </div>
+          </div>
           <div className="carto-legend">
             {KIND_FILTERS.filter((f) => f.value).map((f) => (
-              <span key={f.value}>
+              <span key={f.value} className="carto-legend-item">
                 <i style={{ background: kindColor(f.value as MapPoint["kind"]) }} />
                 {f.label}
               </span>
             ))}
           </div>
           <p className="muted small" style={{ margin: "0.5rem 0 0" }}>
-            Fond de carte OpenStreetMap — zoom et déplacement disponibles. Connexion Internet
-            requise pour les tuiles.
+            Sur la carte nationale : pastilles par province (P / S / A). Cliquez une province pour
+            zoomer.
           </p>
         </div>
 
         <div className="carto-side">
+          <div className="panel">
+            <h3 className="panel-title">Totaux par province</h3>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Province</th>
+                  <th title="Principal">
+                    <i className="carto-th-dot" style={{ background: kindColor("BUREAU_PRINCIPAL") }} />
+                    P
+                  </th>
+                  <th title="Secondaire">
+                    <i className="carto-th-dot" style={{ background: kindColor("BUREAU_SECONDAIRE") }} />
+                    S
+                  </th>
+                  <th title="Appui">
+                    <i className="carto-th-dot" style={{ background: kindColor("BUREAU_APPUI") }} />
+                    A
+                  </th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {provinceSummaries.map((r) => (
+                  <tr
+                    key={r.province}
+                    className={
+                      province && province.toLowerCase() === r.province.toLowerCase()
+                        ? "is-active-row"
+                        : undefined
+                    }
+                    style={{ cursor: "pointer" }}
+                    onClick={() => setProvince(r.province)}
+                  >
+                    <td>{r.province}</td>
+                    <td>{r.principal}</td>
+                    <td>{r.secondaire}</td>
+                    <td>{r.appui}</td>
+                    <td>
+                      <strong>{r.total}</strong>
+                    </td>
+                  </tr>
+                ))}
+                {!provinceSummaries.length ? (
+                  <tr>
+                    <td colSpan={5} className="muted">
+                      Aucun bureau EC enregistré.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+
           <div className="panel">
             <h3 className="panel-title">Points</h3>
             <div className="carto-list">
@@ -130,6 +243,10 @@ export default function CartographieBureauxPage() {
                 >
                   <strong>{p.name}</strong>
                   <span className="muted small">
+                    <i
+                      className="carto-th-dot"
+                      style={{ background: kindColor(p.kind), marginRight: 6 }}
+                    />
                     {p.kindLabel} · {[p.commune, p.ville, p.province].filter(Boolean).join(" · ")}
                   </span>
                   <span className="carto-badge">{p.actCount} fait(s)</span>
@@ -138,7 +255,7 @@ export default function CartographieBureauxPage() {
               {!points.length ? (
                 <p className="muted">
                   Aucun point — créez des comptes préposé/officier (type de bureau) ou des structures
-                  sanitaires. La carte RDC reste visible.
+                  sanitaires.
                 </p>
               ) : null}
             </div>

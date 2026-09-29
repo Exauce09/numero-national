@@ -1,5 +1,6 @@
 import {
   DIPLOMES_UNIV,
+  NIVEAUX_ETUDES,
   NIVEAUX_SCOLAIRES,
   emptyEtablissement,
   emptyFormationPro,
@@ -16,6 +17,25 @@ type Props = {
 export default function EtudesFaitesForm({ value, onChange }: Props) {
   return (
     <div className="situation-familiale">
+      <fieldset className="id-fieldset">
+        <legend>Niveau d&apos;étude</legend>
+        <div className="form-grid">
+          <div>
+            <label className="form-label">Niveau atteint</label>
+            <select
+              className="form-control"
+              value={value.niveau_atteint}
+              onChange={(e) => onChange({ ...value, niveau_atteint: e.target.value })}
+            >
+              {NIVEAUX_ETUDES.map((n) => (
+                <option key={n.value || "empty"} value={n.value}>
+                  {n.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </fieldset>
       <fieldset className="id-fieldset">
         <legend>Parcours scolaire</legend>
         {value.etablissements.length === 0 ? (

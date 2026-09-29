@@ -52,6 +52,7 @@ import {
   emptyEtudes,
   formatParcoursScolaire,
   formatParcoursUniversitaire,
+  NIVEAUX_ETUDES,
   parseEtudes,
   type EtudesData,
 } from "../etudesFaites";
@@ -1191,6 +1192,22 @@ export default function CensusPage() {
                     />
                   </div>
                   <div>
+                    <label className="form-label">Niveau d&apos;étude</label>
+                    <select
+                      className="form-control"
+                      value={etudes.niveau_atteint}
+                      onChange={(e) =>
+                        setEtudes((prev) => ({ ...prev, niveau_atteint: e.target.value }))
+                      }
+                    >
+                      {NIVEAUX_ETUDES.map((n) => (
+                        <option key={n.value || "empty-d"} value={n.value}>
+                          {n.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
                     <label className="form-label">Dernière profession</label>
                     <input
                       className="form-control"
@@ -1275,6 +1292,22 @@ export default function CensusPage() {
                         <option key={p} value={p} />
                       ))}
                     </datalist>
+                  </div>
+                  <div>
+                    <label className="form-label">Niveau d&apos;étude</label>
+                    <select
+                      className="form-control"
+                      value={etudes.niveau_atteint}
+                      onChange={(e) =>
+                        setEtudes((prev) => ({ ...prev, niveau_atteint: e.target.value }))
+                      }
+                    >
+                      {NIVEAUX_ETUDES.map((n) => (
+                        <option key={n.value || "empty-m"} value={n.value}>
+                          {n.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="form-label">Nationalité</label>
@@ -1424,6 +1457,22 @@ export default function CensusPage() {
                       value={nationalite}
                       onChange={(e) => setNationalite(e.target.value)}
                     />
+                  </div>
+                  <div>
+                    <label className="form-label">Niveau d&apos;étude</label>
+                    <select
+                      className="form-control"
+                      value={etudes.niveau_atteint}
+                      onChange={(e) =>
+                        setEtudes((prev) => ({ ...prev, niveau_atteint: e.target.value }))
+                      }
+                    >
+                      {NIVEAUX_ETUDES.map((n) => (
+                        <option key={n.value || "empty"} value={n.value}>
+                          {n.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="full">
                     <label className="form-label">Profession</label>
