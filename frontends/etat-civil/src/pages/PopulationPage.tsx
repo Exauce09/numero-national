@@ -329,7 +329,7 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
             ) : (
               <>
                 Mode local navigateur — <strong>{total}</strong> fiche(s) en cache seulement (ce n’est
-                pas le registre national). Reconnectez-vous : officier / DemoCivil2026!
+                pas le registre national). Reconnectez-vous pour synchroniser avec le serveur.
               </>
             )}
           </p>

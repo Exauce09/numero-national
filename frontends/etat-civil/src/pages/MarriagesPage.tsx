@@ -296,7 +296,7 @@ export default function MarriagesPage() {
               type="submit"
               disabled={busy}
             >
-              {busy ? "Enregistrement…" : "Établir l&apos;acte de mariage"}
+              {busy ? "Enregistrement…" : "Enregistrer l'acte de mariage"}
             </button>
           </div>
         </form>
@@ -306,7 +306,7 @@ export default function MarriagesPage() {
         <div className="panel" style={{ marginTop: "1rem" }}>
           <div className="success-banner">Mariages — acte enregistré — {created.act_number}</div>
           {typeof created.payload.sync_warning === "string" ? (
-            <div className="login-error" style={{ marginTop: "0.75rem" }}>
+            <div className="muted small" style={{ marginTop: "0.75rem" }} role="status">
               {created.payload.sync_warning}
             </div>
           ) : null}

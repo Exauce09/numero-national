@@ -168,7 +168,7 @@ async function request<T>(path: string, init?: RequestInit, retried = false): Pr
     const detail = formatApiErrorBody(await res.text(), res.status);
     if (res.status === 401 || /Could not validate credentials/i.test(detail)) {
       throw new Error(
-        "Session API expirée. Déconnectez-vous puis reconnectez-vous (officier / DemoCivil2026!).",
+        "Session API expirée. Déconnectez-vous puis reconnectez-vous pour synchroniser.",
       );
     }
     if (res.status === 404 && /Act not found/i.test(detail)) {

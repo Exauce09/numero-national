@@ -37,7 +37,7 @@ export default function BiometricIdentifyPage() {
     try {
       await ensureAccessToken();
       if (!getSession()?.accessToken) {
-        throw new Error("Session API requise — reconnectez-vous (officier / DemoCivil2026!).");
+        throw new Error("Session API requise — reconnectez-vous pour continuer.");
       }
       const health = await zkHealth();
       if (!health?.sdk_loaded) {

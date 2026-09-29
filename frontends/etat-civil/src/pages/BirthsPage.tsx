@@ -101,9 +101,7 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
   const [numeroRegistre, setNumeroRegistre] = useState("");
   const [declarant, setDeclarant] = useState<Person | null>(null);
   const [qualiteDeclarant, setQualiteDeclarant] = useState("MERE");
-  const [lieuNaissance, setLieuNaissance] = useState(() =>
-    health?.geo_label?.trim() || health?.facilityName || "",
-  );
+  const [lieuNaissance, setLieuNaissance] = useState("");
   const [geoNaissance, setGeoNaissance] = useState<GeoSelection>(() =>
     health
       ? {
@@ -114,17 +112,8 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
           quartier_name: health.quartier_name,
           district_name: health.district_name,
           localite_name: health.localite_name,
-          label:
-            health.geo_label ||
-            [
-              health.facilityName,
-              health.quartier_name || health.localite_name,
-              health.commune_name,
-              health.ville || health.district_name,
-              health.province,
-            ]
-              .filter(Boolean)
-              .join(" · "),
+          // Lieu de naissance saisi à part — ne pas préremplir avec le nom de la structure.
+          label: "",
         }
       : {},
   );
@@ -146,7 +135,7 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
   const [geoOrigineMere, setGeoOrigineMere] = useState<GeoSelection>({});
   const [geoOrigine, setGeoOrigine] = useState<GeoSelection>({});
 
-  /** IT : l'enfant naît dans la structure — adresse exacte de l'hôpital (inchangée). */
+  /** IT : structure = hôpital (fixe) ; le lieu de naissance reste saisi manuellement. */
   useEffect(() => {
     if (!health) return;
     let cancelled = false;
@@ -157,30 +146,19 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
       commune_name: health.commune_name || officer.name,
     }).then((resolved) => {
       if (cancelled) return;
-      const locked: GeoSelection = {
+      setGeoNaissance((prev) => ({
+        ...prev,
         ...(resolved ?? {}),
-        commune_code: health.commune_code || resolved?.commune_code,
-        commune_name: health.commune_name || resolved?.commune_name,
-        ville_name: health.ville || resolved?.ville_name,
-        province_name: health.province || resolved?.province_name,
-        quartier_name: health.quartier_name || resolved?.quartier_name,
-        district_name: health.district_name || resolved?.district_name,
-        localite_name: health.localite_name || resolved?.localite_name,
-        label:
-          health.geo_label ||
-          [
-            health.facilityName,
-            health.quartier_name || health.localite_name,
-            health.commune_name,
-            health.ville || health.district_name,
-            health.province,
-          ]
-            .filter(Boolean)
-            .join(" · ") ||
-          resolved?.label,
-      };
-      setGeoNaissance(locked);
-      setLieuNaissance(locked.label || health.facilityName);
+        commune_code: health.commune_code || resolved?.commune_code || prev.commune_code,
+        commune_name: health.commune_name || resolved?.commune_name || prev.commune_name,
+        ville_name: health.ville || resolved?.ville_name || prev.ville_name,
+        province_name: health.province || resolved?.province_name || prev.province_name,
+        quartier_name: health.quartier_name || resolved?.quartier_name || prev.quartier_name,
+        district_name: health.district_name || resolved?.district_name || prev.district_name,
+        localite_name: health.localite_name || resolved?.localite_name || prev.localite_name,
+        // Conserver la saisie utilisateur du lieu — jamais le nom de la structure.
+        label: prev.label || "",
+      }));
       setHopitalNaissance(health.facilityName);
     });
     return () => {
@@ -290,7 +268,11 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
       setError("L'état morphologique est obligatoire.");
       return;
     }
-    if (!health && !geoNaissance.province_name && !geoNaissance.label && !lieuNaissance.trim()) {
+    if (
+      !geoNaissance.province_name &&
+      !geoNaissance.label &&
+      !lieuNaissance.trim()
+    ) {
       setError("Indiquez le lieu de naissance (ex. Tshilenge, Nsele…).");
       return;
     }
@@ -1019,32 +1001,36 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
                 <label className="form-label">Hôpital / structure *</label>
                 <input className="form-control" value={health.facilityName} readOnly disabled />
                 <p className="muted small" style={{ marginTop: "0.35rem" }}>
-                  Fixé à votre structure — non modifiable.
+                  Structure qui notifie — distincte du lieu de naissance déclaré.
                 </p>
               </div>
               <div className="full">
-                <label className="form-label">Adresse exacte du lieu de naissance *</label>
-                <input
-                  className="form-control"
-                  value={
-                    geoNaissance.label ||
-                    health.geo_label ||
-                    [
-                      health.facilityName,
-                      health.quartier_name || health.localite_name,
-                      health.commune_name,
-                      health.ville || health.district_name,
-                      health.province,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")
-                  }
-                  readOnly
-                  disabled
+                <GeoPlaceLookup
+                  label="Lieu de naissance *"
+                  value={geoNaissance}
+                  onChange={(g) => {
+                    setGeoNaissance(g);
+                    setLieuNaissance(geoPlaceLabel(g));
+                  }}
+                  required
+                  placeholder="Saisissez le lieu — ex. maternité, commune, adresse…"
                 />
                 <p className="muted small" style={{ marginTop: "0.35rem" }}>
-                  Adresse de la structure sanitaire (enfant né ici).
+                  Saisie obligatoire — ne pas recopier automatiquement le nom de la structure.
                 </p>
+              </div>
+              <div className="full">
+                <label className="form-label">Précision du lieu (si besoin)</label>
+                <input
+                  className="form-control"
+                  value={lieuNaissance}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setLieuNaissance(v);
+                    setGeoNaissance((prev) => ({ ...prev, label: v || prev.label }));
+                  }}
+                  placeholder="Ex. salle d'accouchement, adresse précise…"
+                />
               </div>
               <div className="full">
                 <label className="form-label" style={{ display: "flex", gap: 8, alignItems: "center" }}>

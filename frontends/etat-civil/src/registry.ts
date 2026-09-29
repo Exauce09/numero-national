@@ -1224,8 +1224,12 @@ async function tryPostCivil(
 ): Promise<Record<string, unknown> | null> {
   await ensureAccessToken();
   const session = getSession();
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (session?.accessToken) headers.Authorization = `Bearer ${session.accessToken}`;
+  // Sans jeton API : enregistrement local uniquement (pas d'appel qui déclenche une fausse alerte).
+  if (!session?.accessToken) return null;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${session.accessToken}`,
+  };
   const core: ActType[] = [
     "BIRTH",
     "MARRIAGE",
@@ -1259,13 +1263,10 @@ async function tryPostCivil(
       // Jeton expiré / invalide : on ne bloque plus l'enregistrement local.
       updateSession({ accessToken: undefined });
       throw new CivilAuthError(
-        "Session API expirée ou invalide. L'acte est conservé localement — reconnectez-vous (officier / DemoCivil2026!) pour synchroniser.",
+        "Acte enregistré localement. Reconnectez-vous pour synchroniser avec le serveur.",
       );
     }
-    if (session?.accessToken) {
-      throw new Error(detail || `Sync API état civil échouée (${res.status})`);
-    }
-    return null;
+    throw new Error(detail || `Sync API état civil échouée (${res.status})`);
   }
   return (await res.json()) as Record<string, unknown>;
 }
