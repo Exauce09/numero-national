@@ -6,8 +6,10 @@ import { syncHospitalFacilitiesFromRequests } from "./accountRegistration";
 import { migrateAccountsToCurrentRoles } from "./auth";
 import { refreshHealthSessionRoleTitle } from "./healthAuth";
 import { purgeLocalDraftActsOnce, wipeAllAdultsOnce } from "./registry";
+import { applyDevResetFromUrl } from "./resetLocalDevStore";
 import "./styles.css";
 
+applyDevResetFromUrl();
 wipeAllAdultsOnce();
 purgeLocalDraftActsOnce();
 syncHospitalFacilitiesFromRequests();
