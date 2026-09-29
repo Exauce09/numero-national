@@ -35,6 +35,7 @@ import GeoCascade, {
 } from "../components/GeoCascade";
 import PasswordField from "../components/PasswordField";
 import { roleTitleFor } from "../rbac";
+import { userInViewerScope } from "../viewerScope";
 
 const FACILITY_GEO_LEVELS: GeoLevel[] = ["province", "ville", "district", "commune", "quartier", "localite"];
 
@@ -85,7 +86,9 @@ export default function UsersEcPage() {
   const users = useMemo(() => {
     const all = listEcUsers();
     // Divinter : ne voit pas l'État civil national (Hervé) dans sa liste de gestion.
-    if (!isSuper) return all.filter((u) => !isProtectedPlatformAdmin(u));
+    if (!isSuper) {
+      return all.filter((u) => !isProtectedPlatformAdmin(u) && userInViewerScope(u));
+    }
     return all;
   }, [bump, isSuper]);
 

@@ -4,7 +4,8 @@ import { api, type CivilAct } from "../api";
 import { ensureAccessToken, getSession } from "../auth";
 import { BarChart, LineChart, PieChart } from "../components/Charts";
 import { countByMonth, lastNMonths, StatCard } from "../components/DashKpi";
-import { actBelongsToOfficerCommune, getOfficerCommune } from "../commune";
+import { getOfficerCommune } from "../commune";
+import { actInViewerScope, viewerScope } from "../viewerScope";
 import { isSuperAdminNational } from "../ecUsers";
 import {
   IconBaby,
@@ -78,7 +79,8 @@ export default function DashboardPage() {
         return;
       }
       try {
-        const communeFilter = nationalScope ? undefined : officerCommune.code;
+        const scope = viewerScope();
+        const communeFilter = scope.level === "bureau" ? officerCommune.code : undefined;
         const [births, deaths, marriages, divorces, adoptions, recognitions] = await Promise.all([
           api.listActs("births", communeFilter).catch(() => [] as CivilAct[]),
           api.listActs("deaths", communeFilter).catch(() => [] as CivilAct[]),
@@ -119,7 +121,7 @@ export default function DashboardPage() {
           !["CENSUS", "DISPLACEMENT", "DOCUMENT"].includes(a.type) &&
           !apiIds.has(a.id) &&
           !apiIds.has(String(a.payload?.server_act_id ?? "")) &&
-          (nationalScope || actBelongsToOfficerCommune(a.payload, officerCommune)),
+          actInViewerScope(a.payload),
       )
       .map((a) => ({
         id: a.id,
@@ -132,12 +134,11 @@ export default function DashboardPage() {
         created_at: a.created_at,
       }));
     const merged = [...fromApi, ...fromLocal];
-    if (nationalScope) return merged;
     return merged.filter((a) =>
-      actBelongsToOfficerCommune(
-        { ...(a.payload ?? {}), commune_code: a.commune_code || (a.payload as { commune_code?: string })?.commune_code },
-        officerCommune,
-      ),
+      actInViewerScope({
+        ...(a.payload ?? {}),
+        commune_code: a.commune_code || (a.payload as { commune_code?: string })?.commune_code,
+      }),
     );
   }, [apiActs, localActs, nationalScope, officerCommune]);
 
@@ -209,11 +210,13 @@ export default function DashboardPage() {
   const territory = [session?.commune_province, session?.commune_ville, session?.commune_name]
     .filter(Boolean)
     .join(" · ");
-  const scopeLabel = nationalScope
-    ? "Vue nationale"
-    : territory
-      ? `Périmètre : ${territory}`
-      : `Périmètre : ${officerCommune.name}`;
+  const dataScope = viewerScope();
+  const scopeLabel =
+    dataScope.level === "national"
+      ? "Vue nationale"
+      : dataScope.level === "province"
+        ? `Périmètre : province ${dataScope.province}`
+        : `Périmètre : ${dataScope.commune} · ${dataScope.ville} · ${dataScope.province}`;
 
   if (variant === "judiciaire") {
     const isJuge = rolePrimary === "JUGE";
@@ -453,7 +456,12 @@ export default function DashboardPage() {
       )}
 
       <h3 className="dash-section-title">
-        Statistiques {nationalScope ? "nationales" : `de ${officerCommune.name}`}
+        Statistiques{" "}
+        {dataScope.level === "national"
+          ? "nationales"
+          : dataScope.level === "province"
+            ? `de la province ${dataScope.province}`
+            : `de ${dataScope.commune}`}
       </h3>
       <div className="eg-charts-row dash-charts-main">
         <BarChart

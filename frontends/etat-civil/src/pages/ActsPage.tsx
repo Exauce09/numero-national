@@ -20,6 +20,7 @@ import {
   type ActType,
 } from "../registry";
 import { RDC_CHART_SERIES, rdcColor } from "../rdcColors";
+import { actInViewerScope } from "../viewerScope";
 
 const TYPES: Array<ActType | ""> = [
   "",
@@ -120,7 +121,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
     }
   }
 
-  const all = useMemo(() => listActs(), [tick]);
+  const all = useMemo(() => listActs().filter((a) => actInViewerScope(a.payload)), [tick]);
   const counted = useMemo(() => all.filter(isActCountedInTotals), [all]);
 
   function monthKey(iso: string): string {

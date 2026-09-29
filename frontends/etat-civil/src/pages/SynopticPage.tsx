@@ -4,8 +4,7 @@ import { useMemo, useState } from "react";
 import { Link, NavLink, Navigate, useParams } from "react-router-dom";
 import DataToolbar from "../components/DataToolbar";
 import { getSession } from "../auth";
-import { getOfficerCommune, type OfficerCommune } from "../commune";
-import { isSuperAdminNational } from "../ecUsers";
+import { type OfficerCommune } from "../commune";
 import type { FlatCommune } from "../geoFallback";
 import { isJudicialRole } from "../rbac";
 import {
@@ -25,6 +24,7 @@ import {
   type SynopticVilleRollup,
 } from "../synoptic";
 import { listActs } from "../registry";
+import { communeInViewerScope, viewerScope } from "../viewerScope";
 
 const TABS = [
   {
@@ -888,11 +888,17 @@ export default function SynopticPage() {
   if (isJudicialRole(session?.roles)) {
     return <Navigate to="/" replace />;
   }
-  const isNational = isSuperAdminNational(session?.roles);
-  const officer = getOfficerCommune();
-  const [filterProvince, setFilterProvince] = useState("");
-  const [filterVille, setFilterVille] = useState("");
-  const [selected, setSelected] = useState<FlatCommune | null>(null);
+  const scope = viewerScope();
+  const [filterProvince, setFilterProvince] = useState(() =>
+    scope.level === "national" ? "" : scope.province,
+  );
+  const [filterVille, setFilterVille] = useState(() => (scope.level === "bureau" ? scope.ville : ""));
+  const [selected, setSelected] = useState<FlatCommune | null>(() => {
+    if (scope.level !== "bureau") return null;
+    return (
+      listSynopticCommunes().find((c) => communeInViewerScope(c)) ?? null
+    );
+  });
 
   if (!section) return <Navigate to="/synoptique/naissances" replace />;
   if (section === "matrimonial") return <Navigate to="/synoptique/mariage" replace />;
@@ -908,7 +914,11 @@ export default function SynopticPage() {
   const communeRows = useMemo(
     () =>
       filterProvince
-        ? synopticNationalTerritory().filter((r) => r.province === filterProvince)
+        ? synopticNationalTerritory().filter(
+            (r) =>
+              r.province === filterProvince &&
+              communeInViewerScope({ province: r.province, ville: r.ville, name: r.commune }),
+          )
         : [],
     [filterProvince, actCount],
   );
@@ -918,12 +928,9 @@ export default function SynopticPage() {
   );
 
   const overviewRows = useMemo(() => {
-    if (isNational || !officer.province) return provinceRows;
-    const scoped = provinceRows.filter(
-      (r) => r.province.toLowerCase() === officer.province.toLowerCase(),
-    );
-    return scoped.length > 0 ? scoped : provinceRows;
-  }, [isNational, officer.province, provinceRows]);
+    if (scope.level === "national") return provinceRows;
+    return provinceRows.filter((r) => communeInViewerScope({ province: r.province }));
+  }, [scope.level, provinceRows]);
 
   function pickCommuneByCode(code: string) {
     const hit = listSynopticCommunes().find((c) => c.code === code) ?? null;
@@ -952,9 +959,13 @@ export default function SynopticPage() {
 
   const provinces = useMemo(
     () =>
-      [...new Set(listSynopticCommunes().map((c) => c.province))].sort((a, b) =>
-        a.localeCompare(b, "fr"),
-      ),
+      [
+        ...new Set(
+          listSynopticCommunes()
+            .filter((c) => communeInViewerScope({ province: c.province }))
+            .map((c) => c.province),
+        ),
+      ].sort((a, b) => a.localeCompare(b, "fr")),
     [],
   );
 
@@ -963,6 +974,7 @@ export default function SynopticPage() {
       [
         ...new Set(
           listSynopticCommunes()
+            .filter((c) => communeInViewerScope(c))
             .filter((c) => !filterProvince || c.province === filterProvince)
             .map((c) => c.ville),
         ),
@@ -973,6 +985,7 @@ export default function SynopticPage() {
   const communesOpts = useMemo(
     () =>
       listSynopticCommunes()
+        .filter((c) => communeInViewerScope(c))
         .filter((c) => !filterProvince || c.province === filterProvince)
         .filter((c) => !filterVille || c.ville === filterVille)
         .sort((a, b) => a.name.localeCompare(b.name, "fr")),
@@ -999,9 +1012,17 @@ export default function SynopticPage() {
           <h3 className="panel-title" style={{ margin: 0 }}>
             Filtres
           </h3>
-          <button type="button" className="btn-secondary btn-sm" onClick={resetToGeneral}>
-            Vue générale (provinces)
-          </button>
+          {scope.level === "national" ? (
+            <button type="button" className="btn-secondary btn-sm" onClick={resetToGeneral}>
+              Vue générale (provinces)
+            </button>
+          ) : (
+            <p className="muted small" style={{ margin: 0 }}>
+              {scope.level === "province"
+                ? `Votre niveau : province ${scope.province}`
+                : `Votre niveau : ${scope.commune} · ${scope.ville} · ${scope.province}`}
+            </p>
+          )}
         </div>
         <div className="form-grid">
           <div>
@@ -1009,13 +1030,14 @@ export default function SynopticPage() {
             <select
               className="form-control"
               value={filterProvince}
+              disabled={scope.level !== "national"}
               onChange={(e) => {
                 setFilterProvince(e.target.value);
                 setFilterVille("");
                 setSelected(null);
               }}
             >
-              <option value="">— Toutes les provinces —</option>
+              {scope.level === "national" ? <option value="">— Toutes les provinces —</option> : null}
               {provinces.map((p) => (
                 <option key={p} value={p}>
                   {p}
@@ -1032,7 +1054,7 @@ export default function SynopticPage() {
                 setFilterVille(e.target.value);
                 setSelected(null);
               }}
-              disabled={!filterProvince}
+              disabled={!filterProvince || scope.level === "bureau"}
             >
               <option value="">— Toutes les villes —</option>
               {villes.map((v) => (
@@ -1054,7 +1076,7 @@ export default function SynopticPage() {
                 }
                 pickCommuneByCode(e.target.value);
               }}
-              disabled={!filterProvince}
+              disabled={!filterProvince || scope.level === "bureau"}
             >
               <option value="">— Choisir la commune —</option>
               {communesOpts.map((c) => (

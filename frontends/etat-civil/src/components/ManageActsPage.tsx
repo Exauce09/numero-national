@@ -20,6 +20,7 @@ import {
   type ActType,
 } from "../registry";
 import { RDC_CHART_SERIES, rdcColor } from "../rdcColors";
+import { actInViewerScope } from "../viewerScope";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "Brouillon",
@@ -290,7 +291,10 @@ export default function ManageActsPage({
     void refresh();
   }, [refresh]);
 
-  const all = useMemo(() => listActs(config.actType), [config.actType, tick]);
+  const all = useMemo(
+    () => listActs(config.actType).filter((a) => actInViewerScope(a.payload)),
+    [config.actType, tick],
+  );
   const counted = useMemo(() => all.filter(isActCountedInTotals), [all]);
 
   const monthOptions = useMemo(() => {

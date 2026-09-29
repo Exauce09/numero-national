@@ -43,6 +43,7 @@ import { ISSUE_NAISSANCE_OPTIONS, type IssueNaissance } from "../deathType";
 import { listFacilityAccounts } from "../healthAuth";
 import { notifyFromHealthForm, type HealthFormContext } from "../healthFormMode";
 import { HOPITAUX_KEY, loadNamedList, rememberNamed } from "../namedLists";
+import { actInViewerScope } from "../viewerScope";
 import HospitalBirthCertificateField from "../components/HospitalBirthCertificateField";
 import {
   hospitalBirthCertPayload,
@@ -250,7 +251,7 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
   const [submitting, setSubmitting] = useState(false);
   const [, bump] = useState(0);
 
-  const acts = listActs("BIRTH");
+  const acts = listActs("BIRTH").filter((a) => health || actInViewerScope(a.payload));
   const hospitals = useMemo(() => {
     const facilities = listFacilityAccounts().filter((a) => a.active);
     const extra = loadNamedList(HOPITAUX_KEY);
