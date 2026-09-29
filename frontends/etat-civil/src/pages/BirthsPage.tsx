@@ -12,6 +12,7 @@ import GeoCascade, {
   ORIGIN_FIELD_LABELS,
   type GeoSelection,
 } from "../components/GeoCascade";
+import GeoPlaceLookup from "../components/GeoPlaceLookup";
 import GpsLocatePanel, { applyGpsToGeo } from "../components/GpsLocatePanel";
 import PersonPicker from "../components/PersonPicker";
 import { LIEU_ENREGISTREMENT_LABELS } from "../bureauCartographie";
@@ -93,7 +94,6 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
   const [declarant, setDeclarant] = useState<Person | null>(null);
   const [qualiteDeclarant, setQualiteDeclarant] = useState("MERE");
   const [lieuNaissance, setLieuNaissance] = useState("");
-  const [lieuPrecision, setLieuPrecision] = useState("");
   const [geoNaissance, setGeoNaissance] = useState<GeoSelection>({});
   const [typeLieuEnregistrement, setTypeLieuEnregistrement] = useState(() => {
     if (health) return "Structure sanitaire";
@@ -227,10 +227,8 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
       setError("L'état morphologique est obligatoire.");
       return;
     }
-    if (
-      !lieuNaissance.trim()
-    ) {
-      setError("Indiquez le lieu de naissance (saisie obligatoire — ne pas recopier le nom de la structure).");
+    if (!geoNaissance.province_name && !geoNaissance.label && !lieuNaissance.trim()) {
+      setError("Indiquez le lieu de naissance (ex. Tshilenge, Nsele…).");
       return;
     }
     if (!health && !typeLieuEnregistrement.trim()) {
@@ -327,11 +325,15 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
         return;
       }
 
-      const lieuBase = lieuNaissance.trim();
-      const lieu = [lieuBase, lieuPrecision.trim()].filter(Boolean).join(" — ");
+      const lieu =
+        geoNaissance.label ||
+        lieuNaissance.trim() ||
+        [geoNaissance.commune_name, geoNaissance.ville_name, geoNaissance.province_name]
+          .filter(Boolean)
+          .join(" · ");
       const geoPayload: GeoSelection = {
         ...geoNaissance,
-        label: lieuBase,
+        label: lieu,
       };
       const typeLieu =
         health
@@ -531,8 +533,6 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
         juge_requis: needsJuge,
         hopital_naissance: hopitalResolved || null,
         geo_naissance: geoPayload,
-        lieu_naissance_saisi: lieuBase,
-        lieu_naissance_precision: lieuPrecision.trim() || null,
         type_lieu_enregistrement: typeLieu,
         service_bureau: typeLieu,
         bureau_type: typeLieu,
@@ -610,7 +610,6 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
       setDeclarant(null);
       setQualiteDeclarant("MERE");
       setLieuNaissance("");
-      setLieuPrecision("");
       setGeoNaissance({});
       setTypeLieuEnregistrement(
         health ? "Structure sanitaire" : getSession()?.service_bureau?.trim() || "",
@@ -981,25 +980,18 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
                 </p>
               </div>
               <div className="full">
-                <label className="form-label">Lieu de naissance *</label>
-                <input
-                  className="form-control"
-                  value={lieuNaissance}
-                  onChange={(e) => setLieuNaissance(e.target.value)}
+                <GeoPlaceLookup
+                  label="Lieu de naissance"
+                  value={geoNaissance}
+                  onChange={(g) => {
+                    setGeoNaissance(g);
+                    setLieuNaissance(
+                      g.label ||
+                        [g.commune_name, g.ville_name, g.province_name].filter(Boolean).join(" · "),
+                    );
+                  }}
                   required
-                  placeholder="Saisissez le lieu — ex. maternité, commune, adresse…"
-                />
-                <p className="muted small" style={{ marginTop: "0.35rem" }}>
-                  Saisie obligatoire — ne pas recopier automatiquement le nom de la structure.
-                </p>
-              </div>
-              <div className="full">
-                <label className="form-label">Précision du lieu (si besoin)</label>
-                <input
-                  className="form-control"
-                  value={lieuPrecision}
-                  onChange={(e) => setLieuPrecision(e.target.value)}
-                  placeholder="Ex. salle d'accouchement, adresse précise…"
+                  placeholder="Tapez un lieu — ex. Tshilenge, Nsele…"
                 />
               </div>
               <div className="full">
@@ -1020,25 +1012,18 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
           ) : (
             <>
           <div className="full">
-            <label className="form-label">Lieu de naissance *</label>
-            <input
-              className="form-control"
-              value={lieuNaissance}
-              onChange={(e) => setLieuNaissance(e.target.value)}
+            <GeoPlaceLookup
+              label="Lieu de naissance"
+              value={geoNaissance}
+              onChange={(g) => {
+                setGeoNaissance(g);
+                setLieuNaissance(
+                  g.label ||
+                    [g.commune_name, g.ville_name, g.province_name].filter(Boolean).join(" · "),
+                );
+              }}
               required
-              placeholder="Saisissez le lieu — ex. Bukavu, Kolwezi, maternité…"
-            />
-            <p className="muted small" style={{ marginTop: "0.35rem" }}>
-              Saisie obligatoire — ne pas recopier automatiquement le nom de la structure.
-            </p>
-          </div>
-          <div className="full">
-            <label className="form-label">Précision du lieu (si besoin)</label>
-            <input
-              className="form-control"
-              value={lieuPrecision}
-              onChange={(e) => setLieuPrecision(e.target.value)}
-              placeholder="Ex. salle d'accouchement, adresse précise…"
+              placeholder="Tapez un lieu — ex. Tshilenge, Nsele…"
             />
           </div>
           <div className="full">
