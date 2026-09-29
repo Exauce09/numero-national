@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Remise à zéro — état civil</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 32rem;
+        margin: 3rem auto;
+        padding: 0 1rem;
+        line-height: 1.5;
+      }
+      .ok {
+        color: #0a6;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Remise à zéro locale</h1>
+    <p id="msg">Effacement en cours…</p>
+    <script>
+      (function () {
+        var prefixes = ["nn_", "civil-officer:"];
+        var removed = [];
+        for (var i = localStorage.length - 1; i >= 0; i--) {
+          var k = localStorage.key(i);
+          if (!k) continue;
+          for (var p = 0; p < prefixes.length; p++) {
+            if (k.indexOf(prefixes[p]) === 0) {
+              localStorage.removeItem(k);
+              removed.push(k);
+              break;
+            }
+          }
+        }
+        try {
+          sessionStorage.clear();
+        } catch (e) {}
+        document.getElementById("msg").innerHTML =
+          '<span class="ok"><strong>' +
+          removed.length +
+          "</strong> entrée(s) supprimée(s) dans ce navigateur (port " +
+          location.port +
+          ').</span><br/>Redirection vers la connexion…';
+        setTimeout(function () {
+          location.replace("/login");
+        }, 1500);
+      })();
+    </script>
+  </body>
+</html>
