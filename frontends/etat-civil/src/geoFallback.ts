@@ -138,8 +138,9 @@ function secteursForTerritoire(provinceName: string, territoireName: string): st
   return [`Secteur ${territoireName}`];
 }
 
+/** Identifiant province = code_interne (ex. COD-P01). */
 function provId(code: string) {
-  return `prov-${code}`;
+  return code;
 }
 function villeId(provinceName: string, villeName: string) {
   return `ville-${slug(provinceName)}-${slug(villeName)}`;
@@ -147,8 +148,9 @@ function villeId(provinceName: string, villeName: string) {
 function communeId(villeName: string, communeName: string) {
   return `com-${slug(villeName)}-${slug(communeName)}`;
 }
+/** Identifiant territoire = code_interne (ex. COD-P02-T01). */
 function districtId(name: string, provinceName = "Kinshasa") {
-  return `dist-${slug(provinceName)}-${slug(name)}`;
+  return TERRITORY_CODES.get(`${provinceName}|${name}`) ?? `dist-${slug(provinceName)}-${slug(name)}`;
 }
 function quartierId(communeIdValue: string, quartierName: string) {
   return `q-${communeIdValue}-${slug(quartierName)}`;
@@ -160,7 +162,8 @@ function localiteId(parentId: string, name: string) {
   return `loc-${parentId}-${slug(name)}`;
 }
 function provinceById(id: string) {
-  return PROVINCES.find((p) => provId(p.code) === id);
+  const norm = id.startsWith("prov-") ? id.slice(5) : id;
+  return PROVINCES.find((p) => p.code === norm || provId(p.code) === norm);
 }
 
 const DEFAULT_QUARTIERS: Array<{ name: string; voies: Array<{ type: string; name: string }> }> = [
@@ -247,11 +250,14 @@ export function fallbackDistricts(provinceId: string): GeoItem[] {
   return territoires
     .slice()
     .sort((a, b) => a.localeCompare(b, "fr"))
-    .map((name) => ({
-      id: districtId(name, p.name),
-      code: TERRITORY_CODES.get(`${p.name}|${name}`) ?? slug(name).toUpperCase().slice(0, 12),
-      name,
-    }));
+    .map((name) => {
+      const code = TERRITORY_CODES.get(`${p.name}|${name}`) ?? slug(name).toUpperCase().slice(0, 12);
+      return {
+        id: code,
+        code,
+        name,
+      };
+    });
 }
 
 export function fallbackCommunes(opts: { villeId?: string; districtId?: string }): GeoItem[] {

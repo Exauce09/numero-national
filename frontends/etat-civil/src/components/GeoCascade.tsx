@@ -5,8 +5,12 @@ import { fallbackForGeoPath } from "../geoFallback";
 
 export type GeoSelection = {
   province_id?: string;
+  /** Code officiel province (ex. COD-P01). */
+  province_code?: string;
   province_name?: string;
   district_id?: string;
+  /** Code officiel territoire (ex. COD-P02-T01). */
+  district_code?: string;
   district_name?: string;
   ville_id?: string;
   ville_name?: string;
@@ -54,9 +58,9 @@ export const GEO_PRESETS = {
 } as const;
 
 const DEFAULT_FIELD_LABELS: Record<GeoLevel, string> = {
-  province: "Province",
+  province: "Province (identifiant COD-Pxx)",
   ville: "Ville",
-  district: "Territoire",
+  district: "Territoire (identifiant COD-Pxx-Tyy)",
   commune: "Commune / Secteur",
   localite: "Village / Localité",
   quartier: "Quartier",
@@ -78,6 +82,17 @@ export const ORIGIN_FIELD_LABELS: Partial<Record<GeoLevel, string>> = {
 };
 
 type Item = { id: string; code: string; name: string; voie_type?: string; chef_lieu?: string };
+
+function geoOptionLabel(o: Item): string {
+  if (o.code && /^COD-P\d/i.test(o.code)) return `${o.name} (${o.code})`;
+  return o.name;
+}
+
+/** Anciens ids locaux (prov-COD-P01, dist-…) → identifiants officiels. */
+function normalizeProvinceId(id: string | undefined): string | undefined {
+  if (!id) return id;
+  return id.startsWith("prov-") ? id.slice(5) : id;
+}
 
 type ZoneKind = "ville" | "territoire";
 
@@ -157,7 +172,11 @@ export async function resolveGeoByNames(input: {
   const provinces = await fetchItems("/geo/provinces");
   const p = provinces.find((x) => normGeo(x.name) === normGeo(input.province));
   if (!p) return null;
-  const sel: GeoSelection = { province_id: p.id, province_name: p.name };
+  const sel: GeoSelection = {
+    province_id: p.id,
+    province_code: p.code,
+    province_name: p.name,
+  };
   const villes = await fetchItems(`/geo/villes?province_id=${p.id}`);
   const v = villes.find((x) => normGeo(x.name) === normGeo(input.ville));
   if (v) {
@@ -315,7 +334,11 @@ export default function GeoCascade({
     void (async () => {
       const markLocal = () =>
         setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
-      const next = { ...value };
+      const provinceId = normalizeProvinceId(value.province_id);
+      const next = {
+        ...value,
+        ...(provinceId && provinceId !== value.province_id ? { province_id: provinceId } : {}),
+      };
       const kind: ZoneKind | null = zoneChoice
         ? value.district_id
           ? "territoire"
@@ -324,22 +347,23 @@ export default function GeoCascade({
             : zoneKind
         : null;
       if (zoneChoice) setZoneKind(kind);
-      if (value.province_id) {
+      const pid = provinceId ?? value.province_id;
+      if (pid) {
         if (show("ville") || zoneChoice) {
-          const vrows = await fetchItems(`/geo/villes?province_id=${value.province_id}`, markLocal);
+          const vrows = await fetchItems(`/geo/villes?province_id=${pid}`, markLocal);
           if (cancelled) return;
           setVilles(vrows);
         }
         if (show("district") || zoneChoice) {
-          const drows = await fetchItems(`/geo/districts?province_id=${value.province_id}`, markLocal);
+          const drows = await fetchItems(`/geo/districts?province_id=${pid}`, markLocal);
           if (cancelled) return;
           setDistricts(drows);
         }
       }
       if (value.ville_id && show("commune", kind)) {
         let crows = await fetchItems(`/geo/communes?ville_id=${value.ville_id}`, markLocal);
-        if (crows.length === 0 && value.province_id) {
-          crows = await fetchItems(`/geo/communes?province_id=${value.province_id}`, markLocal);
+        if (crows.length === 0 && pid) {
+          crows = await fetchItems(`/geo/communes?province_id=${pid}`, markLocal);
         }
         if (cancelled) return;
         setCommunes(crows);
@@ -385,7 +409,11 @@ export default function GeoCascade({
   async function onProvince(id: string) {
     const p = provinces.find((x) => x.id === id);
     if (zoneChoice) setZoneKind(null);
-    emit({ province_id: id, province_name: p?.name });
+    emit({
+      province_id: id,
+      province_code: p?.code,
+      province_name: p?.name,
+    });
     const markLocal = () =>
       setHint("Mode local — référentiel géographie embarqué (API vide ou indisponible).");
     // Toujours charger TOUTES les villes + territoires de la province.
@@ -414,7 +442,11 @@ export default function GeoCascade({
     const id = raw.slice(sep + 1);
     if (!id || (kind !== "ville" && kind !== "territoire")) {
       setZoneKind(null);
-      emit({ province_id: sel.province_id, province_name: sel.province_name });
+      emit({
+        province_id: sel.province_id,
+        province_code: sel.province_code,
+        province_name: sel.province_name,
+      });
       setCommunes([]);
       setLocalites([]);
       setQuartiers([]);
@@ -474,6 +506,7 @@ export default function GeoCascade({
     emit({
       ...base,
       district_id: id,
+      district_code: d?.code,
       district_name: d?.name,
       ...(zoneChoice
         ? {
@@ -718,7 +751,7 @@ export default function GeoCascade({
           <option value="">— Sélectionner —</option>
           {options.map((o) => (
             <option key={o.id} value={o.id}>
-              {o.name}
+              {geoOptionLabel(o)}
             </option>
           ))}
         </select>
@@ -778,7 +811,7 @@ export default function GeoCascade({
                 <optgroup label="Villes">
                   {villes.map((o) => (
                     <option key={o.id} value={`ville:${o.id}`}>
-                      {o.name}
+                      {geoOptionLabel(o)}
                     </option>
                   ))}
                 </optgroup>
@@ -787,7 +820,7 @@ export default function GeoCascade({
                 <optgroup label="Territoires">
                   {districts.map((o) => (
                     <option key={o.id} value={`territoire:${o.id}`}>
-                      {o.name}
+                      {geoOptionLabel(o)}
                     </option>
                   ))}
                 </optgroup>
