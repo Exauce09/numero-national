@@ -82,9 +82,10 @@ export default function BureauxPage() {
         <div>
           <label className="form-label">Type</label>
           <select className="form-control" value={bureauType} onChange={(e) => setBureauType(e.target.value)}>
-            <option value="PRINCIPAL">Principal</option>
-            <option value="SECONDAIRE">Secondaire</option>
-            <option value="CONSULAIRE">Consulaire</option>
+            <option value="PRINCIPAL">Bureau principal de l&apos;état-civil</option>
+            <option value="SECONDAIRE">Bureau secondaire de l&apos;état-civil</option>
+            <option value="APPUI">Bureau d&apos;appui</option>
+            <option value="SANITAIRE">Structure sanitaire</option>
           </select>
         </div>
         <div className="full">

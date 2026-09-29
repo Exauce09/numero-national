@@ -25,6 +25,9 @@ export type Session = {
   permissions?: string[];
   accountStatus?: string;
   userId?: string;
+  fonction?: string;
+  service_bureau?: string;
+  institution?: string;
 };
 
 const KEY = "nn_session_etat_civil";
@@ -59,12 +62,15 @@ function sessionFromEcUser(user: EcUser, photoDataUrl?: string): Session {
     {
       username: user.email,
       displayName: user.fullName,
-      roleTitle: roleTitleFor(roles),
+      roleTitle: user.fonction?.trim() || roleTitleFor(roles),
       photoDataUrl,
       roles,
       permissions: permissionsForRoles(roles),
       accountStatus: "ACTIVE",
       userId: user.id,
+      fonction: user.fonction,
+      service_bureau: user.service_bureau,
+      institution: user.institution,
     },
     user.email,
   );

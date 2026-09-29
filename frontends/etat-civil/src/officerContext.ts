@@ -45,3 +45,8 @@ export function geoFromOfficer(): GeoSelection {
     label: parts.join(" · "),
   };
 }
+
+/** Type de bureau du compte connecté (principal / secondaire / appui). */
+export function serviceBureauFromSession(): string {
+  return getSession()?.service_bureau?.trim() || "";
+}

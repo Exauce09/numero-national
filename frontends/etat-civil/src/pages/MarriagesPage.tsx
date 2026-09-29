@@ -19,6 +19,7 @@ import {
   type Person,
 } from "../registry";
 import { geoFromOfficer, getLoggedOfficer } from "../officerContext";
+import { getSession } from "../auth";
 
 type Regime = "COMMUNAUTE" | "SEPARATION" | "DOT";
 
@@ -175,6 +176,9 @@ export default function MarriagesPage() {
         lieu_etat_civil: geo.label || "",
         geo,
         commune_code: geo.commune_code ?? null,
+        type_lieu_enregistrement:
+          getSession()?.service_bureau?.trim() || "Bureau principal de l'état-civil",
+        service_bureau: getSession()?.service_bureau?.trim() || null,
         motif: motif.trim() || null,
         remarque: motif.trim() || null,
         date_mariage: dateMariage,

@@ -27,6 +27,12 @@ export type EcUser = {
   passwordHash: string;
   roles: EcUserRole[];
   commune: OfficerCommune;
+  /** Fonction exacte (ex. OFFICIER DE L'ÉTAT-CIVIL TITULAIRE). */
+  fonction?: string;
+  /** Bureau principal / secondaire / d'appui. */
+  service_bureau?: string;
+  /** Nom du bureau / institution d'affectation. */
+  institution?: string;
   created_at: string;
   created_by?: string | null;
   active: boolean;
@@ -518,6 +524,9 @@ export function createEcUserFromHash(input: {
   passwordHash: string;
   roles: EcUserRole[];
   commune?: OfficerCommune;
+  fonction?: string;
+  service_bureau?: string;
+  institution?: string;
   createdBy?: string;
   /** Date d'activation de la source : ignorée si le compte a été supprimé après. */
   sourceUpdatedAt?: string;
@@ -525,7 +534,32 @@ export function createEcUserFromHash(input: {
   const email = input.email.trim().toLowerCase();
   const username = input.username?.trim().toLowerCase() || undefined;
   const existing = getEcUserByEmail(email) || (username ? getEcUserByLogin(username) : undefined);
-  if (existing) return existing;
+  if (existing) {
+    let changed = false;
+    const patch: Partial<EcUser> = {};
+    if (input.fonction?.trim() && !existing.fonction) {
+      patch.fonction = input.fonction.trim();
+      changed = true;
+    }
+    if (input.service_bureau?.trim() && !existing.service_bureau) {
+      patch.service_bureau = input.service_bureau.trim();
+      changed = true;
+    }
+    if (input.institution?.trim() && !existing.institution) {
+      patch.institution = input.institution.trim();
+      changed = true;
+    }
+    if (changed) {
+      const rows = listEcUsers();
+      const i = rows.findIndex((u) => u.id === existing.id);
+      if (i >= 0) {
+        rows[i] = { ...rows[i], ...patch, updated_at: new Date().toISOString() };
+        saveEcUsers(rows);
+        return rows[i];
+      }
+    }
+    return existing;
+  }
   if (
     isEcLoginDeleted(email, input.sourceUpdatedAt) ||
     isEcLoginDeleted(username, input.sourceUpdatedAt)
@@ -547,6 +581,9 @@ export function createEcUserFromHash(input: {
     passwordHash: input.passwordHash,
     roles,
     commune: { ...(input.commune ?? DEFAULT_OFFICER_COMMUNE) },
+    fonction: input.fonction?.trim() || undefined,
+    service_bureau: input.service_bureau?.trim() || undefined,
+    institution: input.institution?.trim() || undefined,
     created_at: new Date().toISOString(),
     created_by: input.createdBy ?? "system:registration",
     active: true,

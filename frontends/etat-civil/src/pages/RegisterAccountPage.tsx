@@ -166,6 +166,21 @@ export default function RegisterAccountPage() {
       setError("Sélectionnez le lieu d'affectation (province et commune / secteur).");
       return;
     }
+    if (
+      (accountType === "AGENT_ETAT_CIVIL" || accountType === "OFFICIER_ETAT_CIVIL") &&
+      !serviceBureau.trim()
+    ) {
+      setError(
+        "Indiquez le type de bureau : Bureau principal, Bureau secondaire ou Bureau d'appui.",
+      );
+      return;
+    }
+    if (accountType === "OFFICIER_ETAT_CIVIL" && !fonction.trim()) {
+      setError(
+        "Sélectionnez la fonction : OFFICIER DE L'ÉTAT-CIVIL TITULAIRE, ADJOINT ou INTÉRIMAIRE.",
+      );
+      return;
+    }
     if (typeOpt.needsJudgeFields && (!juridiction.trim() || !tribunal.trim())) {
       setError("Sélectionnez d'abord la juridiction, puis le tribunal.");
       return;
@@ -434,6 +449,7 @@ export default function RegisterAccountPage() {
                             value={fonction}
                             onChange={(e) => setFonction(e.target.value)}
                             disabled={busy}
+                            required={accountType === "OFFICIER_ETAT_CIVIL"}
                           >
                             <option value="">— Sélectionner la fonction —</option>
                             {typeOpt.fonctionOptions!.map((opt) => (
@@ -454,7 +470,7 @@ export default function RegisterAccountPage() {
                           {accountType === "HOPITAL_MATERNITE"
                             ? "Fonction unique : infirmier(ère) titulaire de la structure."
                             : accountType === "OFFICIER_ETAT_CIVIL"
-                              ? "Titulaire ou adjoint du bureau d'état civil."
+                              ? "OFFICIER DE L'ÉTAT-CIVIL TITULAIRE, ADJOINT ou INTÉRIMAIRE."
                               : accountType === "AGENT_ETAT_CIVIL"
                                 ? "Préposé affecté au bureau d'état civil."
                                 : "Poste occupé selon le type de compte."}
@@ -530,12 +546,22 @@ export default function RegisterAccountPage() {
                     </div>
                     {typeOpt.showService !== false && (typeOpt.serviceOptions?.length ?? 0) > 0 ? (
                       <div className="full">
-                        <label className="form-label">Type de bureau</label>
+                        <label className="form-label">
+                          Type de bureau
+                          {accountType === "AGENT_ETAT_CIVIL" ||
+                          accountType === "OFFICIER_ETAT_CIVIL"
+                            ? " *"
+                            : ""}
+                        </label>
                         <select
                           className="form-control"
                           value={serviceBureau}
                           onChange={(e) => setServiceBureau(e.target.value)}
                           disabled={busy}
+                          required={
+                            accountType === "AGENT_ETAT_CIVIL" ||
+                            accountType === "OFFICIER_ETAT_CIVIL"
+                          }
                         >
                           <option value="">— Sélectionner —</option>
                           {typeOpt.serviceOptions!.map((opt) => (
@@ -544,6 +570,10 @@ export default function RegisterAccountPage() {
                             </option>
                           ))}
                         </select>
+                        <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
+                          Indiquez si l&apos;affectation est un Bureau principal, un Bureau
+                          secondaire ou un Bureau d&apos;appui.
+                        </p>
                       </div>
                     ) : null}
                     {typeOpt.needsJudgeFields ? (

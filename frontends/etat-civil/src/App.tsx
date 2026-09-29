@@ -76,6 +76,7 @@ import {
   IconCross,
   IconDashboard,
   IconHome,
+  IconMap,
   IconRing,
   IconSplit,
   IconTable,
@@ -83,6 +84,7 @@ import {
 } from "./components/Icons";
 import PopulationPage from "./pages/PopulationPage";
 import PersonDetailPage from "./pages/PersonDetailPage";
+import CartographieBureauxPage from "./pages/CartographieBureauxPage";
 
 function RequireCivil({ children }: { children: ReactNode }) {
   if (!hasAnyEcUser()) return <Navigate to="/setup" replace />;
@@ -404,6 +406,15 @@ function Shell() {
             </NavLink>
           ) : null}
 
+          {canSeeNav("cartes", roles) || canSeeNav("synoptique", roles) ? (
+            <NavLink
+              to="/cartographie-bureaux"
+              className={({ isActive }) => (isActive ? "active" : undefined)}
+            >
+              <IconMap size={18} /> Cartographie bureaux
+            </NavLink>
+          ) : null}
+
           {canSeeNav("naissances", roles) ? (
             <NavLink to="/manage/naissance">
               <IconBaby size={18} /> Naissance
@@ -573,6 +584,17 @@ function Shell() {
               element={
                 canSeeNav("indicateurs_eac", getSession()?.roles ?? []) ? (
                   <EacIndicatorsPage />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route
+              path="/cartographie-bureaux"
+              element={
+                canSeeNav("cartes", getSession()?.roles ?? []) ||
+                canSeeNav("synoptique", getSession()?.roles ?? []) ? (
+                  <CartographieBureauxPage />
                 ) : (
                   <Navigate to="/" replace />
                 )

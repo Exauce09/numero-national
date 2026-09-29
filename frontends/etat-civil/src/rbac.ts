@@ -297,7 +297,8 @@ export function canAccessPath(pathname: string, roles: string[] | undefined | nu
       path === "/" ||
       path === "" ||
       path.startsWith("/synoptique") ||
-      path.startsWith("/indicateurs-eac")
+      path.startsWith("/indicateurs-eac") ||
+      path.startsWith("/cartographie-bureaux")
     );
   }
 
@@ -317,6 +318,9 @@ export function canAccessPath(pathname: string, roles: string[] | undefined | nu
   }
   if (path.startsWith("/synoptique")) return canSeeNav("synoptique", r);
   if (path.startsWith("/indicateurs-eac")) return canSeeNav("indicateurs_eac", r);
+  if (path.startsWith("/cartographie-bureaux")) {
+    return canSeeNav("cartes", r) || canSeeNav("synoptique", r) || canSeeNav("admin_bureaux", r);
+  }
   if (path.startsWith("/declarations")) return canSeeNav("declarations", r);
   if (path.startsWith("/corrections")) return canSeeNav("corrections", r);
   if (path.startsWith("/births") || path.startsWith("/manage/naissance") || path.startsWith("/lists/naissance")) {

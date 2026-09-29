@@ -169,7 +169,9 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     ],
     showService: true,
     serviceOptions: [
-      "Bureau de l'état civil",
+      "Bureau principal de l'état-civil",
+      "Bureau secondaire de l'état-civil",
+      "Bureau d'appui",
     ],
   },
   {
@@ -184,11 +186,16 @@ export const ACCOUNT_TYPE_OPTIONS: AccountTypeOption[] = [
     showMatricule: true,
     showFonction: true,
     fonctionOptions: [
-      "Officier de l'état civil titulaire",
-      "Officier de l'état civil adjoint",
+      "OFFICIER DE L'ÉTAT-CIVIL TITULAIRE",
+      "OFFICIER DE L'ÉTAT-CIVIL ADJOINT",
+      "OFFICIER DE L'ÉTAT-CIVIL INTÉRIMAIRE",
     ],
     showService: true,
-    serviceOptions: ["Bureau principal", "Bureau secondaire", "Bureau d'appui"],
+    serviceOptions: [
+      "Bureau principal de l'état-civil",
+      "Bureau secondaire de l'état-civil",
+      "Bureau d'appui",
+    ],
   },
   {
     code: "ADMIN_PROVINCIAL",
@@ -575,6 +582,19 @@ export async function submitAccountRegistration(
     if (!input.institution?.trim()) throw new Error("L'institution est obligatoire.");
     if (!input.province?.trim()) throw new Error("La province est obligatoire.");
   }
+  if (
+    (input.accountType === "AGENT_ETAT_CIVIL" || input.accountType === "OFFICIER_ETAT_CIVIL") &&
+    !input.serviceBureau?.trim()
+  ) {
+    throw new Error(
+      "Indiquez le type de bureau : Bureau principal, Bureau secondaire ou Bureau d'appui.",
+    );
+  }
+  if (input.accountType === "OFFICIER_ETAT_CIVIL" && !input.fonction?.trim()) {
+    throw new Error(
+      "Sélectionnez la fonction : OFFICIER DE L'ÉTAT-CIVIL TITULAIRE, ADJOINT ou INTÉRIMAIRE.",
+    );
+  }
   if (type.needsJudgeFields) {
     if (!input.juridiction?.trim()) throw new Error("La juridiction est obligatoire.");
     if (!input.tribunal?.trim()) throw new Error("Le tribunal est obligatoire.");
@@ -829,6 +849,9 @@ export function provisionCivilUserFromRequest(req: AccountRegistrationRequest): 
       ville: req.ville_territoire || "Kinshasa",
       province: req.province || "Kinshasa",
     },
+    fonction: req.fonction,
+    service_bureau: req.service_bureau,
+    institution: req.institution,
     createdBy: req.created_by_super_admin || "system:registration",
     sourceUpdatedAt: req.updated_at,
   });
