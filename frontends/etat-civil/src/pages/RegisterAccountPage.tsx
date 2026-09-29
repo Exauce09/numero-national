@@ -23,7 +23,6 @@ import {
 import { getSession } from "../auth";
 import PasswordField from "../components/PasswordField";
 import GeoCascade, {
-  ADDRESS_FIELD_LABELS,
   type GeoLevel,
   type GeoSelection,
 } from "../components/GeoCascade";
@@ -35,8 +34,12 @@ function isKinshasa(name?: string | null): boolean {
   return (name ?? "").toLowerCase().includes("kinshasa");
 }
 
-/** Ville → Commune → Quartier, ou Territoire → Secteur → Village (liste unique Ville / Territoire). */
-const REGISTER_GEO_LEVELS: GeoLevel[] = ["province", "ville", "district", "commune", "quartier", "localite"];
+/** Province → Ville / Territoire → Commune ou Secteur (affectation EC / santé). */
+const REGISTER_GEO_LEVELS: GeoLevel[] = ["province", "ville", "district", "commune"];
+const REGISTER_GEO_LABELS: Partial<Record<GeoLevel, string>> = {
+  province: "Province",
+  commune: "Commune / Secteur / Chefferie",
+};
 
 export default function RegisterAccountPage() {
   const session = getSession();
@@ -499,18 +502,22 @@ export default function RegisterAccountPage() {
                     ) : null}
                     <div className="full">
                       <label className="form-label">Lieu d&apos;affectation *</label>
+                      <p className="muted small" style={{ margin: "0 0 0.5rem" }}>
+                        <strong>Province</strong>, puis <strong>Ville ou Territoire</strong>, puis
+                        commune / secteur.
+                      </p>
                       <GeoCascade
                         value={geo}
                         onChange={onGeoChange}
                         levels={REGISTER_GEO_LEVELS}
-                        fieldLabels={ADDRESS_FIELD_LABELS}
+                        fieldLabels={REGISTER_GEO_LABELS}
                         embedded
+                        zoneChoice
                         label=""
                       />
                       {!province || !communeSecteur ? (
                         <p className="muted small">
-                          Sélectionnez la province, la ville ou le territoire, puis la commune ou le
-                          secteur (obligatoire).
+                          Obligatoire : province → ville ou territoire → commune / secteur.
                         </p>
                       ) : null}
                     </div>

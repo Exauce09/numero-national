@@ -58,9 +58,9 @@ export const GEO_PRESETS = {
 } as const;
 
 const DEFAULT_FIELD_LABELS: Record<GeoLevel, string> = {
-  province: "Province (identifiant COD-Pxx)",
+  province: "Province",
   ville: "Ville",
-  district: "Territoire (identifiant COD-Pxx-Tyy)",
+  district: "Territoire",
   commune: "Commune / Secteur",
   localite: "Village / Localité",
   quartier: "Quartier",
@@ -105,12 +105,21 @@ async function fetchItems(
   onFallback?: () => void,
 ): Promise<Item[]> {
   const local = fallbackForGeoPath(path) as Item[];
+  const preferLocal =
+    path.startsWith("/geo/provinces") ||
+    path.startsWith("/geo/villes") ||
+    path.startsWith("/geo/districts") ||
+    path.startsWith("/geo/communes");
   try {
     const res = await fetch(`${BASE}${path}`);
     if (res.ok) {
       const rows = (await res.json()) as Item[];
       if (Array.isArray(rows) && rows.length > 0) {
-        // Référentiel local SIGPOP prioritaire s'il est plus complet que l'API.
+        // Référentiel local SIGPOP (COD-Pxx) prioritaire pour Province / Ville / Territoire.
+        if (preferLocal && local.length > 0 && local.length >= rows.length) {
+          onFallback?.();
+          return local;
+        }
         if (local.length > rows.length) {
           onFallback?.();
           return local;
