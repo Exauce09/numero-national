@@ -891,7 +891,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
     setState(() => _busy = true);
     try {
       final db = LocalDatabase.instance.db;
-      final now = DateTime.now().toUtc().toIso8601String();
+    final now = DateTime.now().toUtc().toIso8601String();
       final dob = _dob.text.trim();
       final payload = _buildPayload();
       // Numéro national dès finalisation (coupon + QR).
@@ -919,14 +919,14 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
       final row = <String, Object?>{
         'given_names': given,
         'family_name': family,
-        'sex': _sex,
+      'sex': _sex,
         'date_of_birth': dob.isEmpty ? null : dob,
-        'photo_ref': _photoRef,
+      'photo_ref': _photoRef,
         'payload': payloadJson,
         'version': nextVersion,
         'status': status,
-        'updated_at': now,
-      };
+      'updated_at': now,
+    };
 
       if (isUpdate) {
         if (!draft) {
@@ -965,15 +965,15 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
       });
 
       await LocalDatabase.instance.setMeta('sync_status', 'EN_ATTENTE');
-      await SyncQueue().enqueue(
-        SyncQueueItem(
-          entityType: 'census_record',
-          localId: localId,
+    await SyncQueue().enqueue(
+      SyncQueueItem(
+        entityType: 'census_record',
+        localId: localId,
           version: nextVersion,
-          payload: {
+        payload: {
             'local_id': localId,
-            'household_local_id': widget.householdLocalId,
-            'campaign_id': widget.campaignId,
+          'household_local_id': widget.householdLocalId,
+          'campaign_id': widget.campaignId,
             'given_names': given,
             'family_name': family,
             'sex': _sex,
@@ -983,9 +983,9 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             'status': status,
             'payload': payload,
             'relationship_to_head': _relation,
-          },
-        ),
-      );
+        },
+      ),
+    );
       SyncLifecycle.instance.nudge();
 
       // Brouillon partagé aussi via API form-drafts (web / autre agent).
@@ -1668,7 +1668,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+          const SizedBox(height: 12),
             if (_step == 1) _buildIdentityBlock(),
             if (_step == 2) _buildOriginBlock(),
             if (_step == 3) _buildBioBlock(),
@@ -1755,7 +1755,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             child: _jobFields(_emplois[i]),
           ),
         ],
-        const SizedBox(height: 12),
+          const SizedBox(height: 12),
         TextFormField(
           controller: _expRemarques,
           decoration: _dec('Remarques professionnelles'),
@@ -1945,7 +1945,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
             child: _proFields(_formationsPro[i]),
           ),
         ],
-        const SizedBox(height: 12),
+          const SizedBox(height: 12),
         TextFormField(
           controller: _etudesRemarques,
           decoration: _dec('Remarques études'),
@@ -1974,7 +1974,7 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
           ],
         ),
         const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
+          DropdownButtonFormField<String>(
           value: m.statut.isEmpty ? null : m.statut,
           decoration: _dec('Statut'),
           items: const [
@@ -2423,9 +2423,9 @@ class _CitizensFormScreenState extends State<CitizensFormScreen> {
               child: DropdownButtonFormField<String>(
                 value: m.sexe.isEmpty ? null : m.sexe,
                 decoration: _dec('Sexe'),
-                items: const [
-                  DropdownMenuItem(value: 'M', child: Text('Masculin')),
-                  DropdownMenuItem(value: 'F', child: Text('Féminin')),
+            items: const [
+              DropdownMenuItem(value: 'M', child: Text('Masculin')),
+              DropdownMenuItem(value: 'F', child: Text('Féminin')),
                 ],
                 onChanged: locked ? null : (v) => setState(() => m.sexe = v ?? ''),
               ),
