@@ -3,6 +3,7 @@ import { getSession } from "../auth";
 import { getOfficerCommune } from "../commune";
 import { actRefLabel, actTypeLabel, type Act } from "../registry";
 import BirthCertificatePrint from "./BirthCertificatePrint";
+import MarriageCertificatePrint from "./MarriageCertificatePrint";
 
 type Props = {
   act: Act;
@@ -87,6 +88,30 @@ export default function ActPrintCard({
       `Commune de ${commune.name}`;
     return (
       <BirthCertificatePrint
+        act={act}
+        verificationCode={verificationCode}
+        officerName={officerName}
+        bureauLabel={bureauLabel}
+      />
+    );
+  }
+
+  if (act.type === "MARRIAGE") {
+    const session = getSession();
+    const commune = getOfficerCommune();
+    const officerName =
+      session?.displayName ||
+      (typeof act.payload.officier_name === "string" ? act.payload.officier_name : undefined) ||
+      (typeof act.payload.officier_celebrant_name === "string"
+        ? act.payload.officier_celebrant_name
+        : undefined) ||
+      (typeof act.payload.officer_name === "string" ? act.payload.officer_name : undefined);
+    const bureauLabel =
+      (typeof act.payload.lieu_etat_civil === "string" && act.payload.lieu_etat_civil.trim()) ||
+      (typeof act.payload.bureau === "string" && act.payload.bureau.trim()) ||
+      `Commune de ${commune.name}`;
+    return (
+      <MarriageCertificatePrint
         act={act}
         verificationCode={verificationCode}
         officerName={officerName}

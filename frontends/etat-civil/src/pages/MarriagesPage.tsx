@@ -124,11 +124,36 @@ export default function MarriagesPage() {
       const epouse = ensureLocalSpouse({ ...conjointe, etat_civil: etatF });
       const officer = getLoggedOfficer();
       const geo = geoFromOfficer();
+      const snapPerson = (person: Person) => {
+        const pere = person.father_id ? getPerson(person.father_id) : undefined;
+        const mere = person.mother_id ? getPerson(person.mother_id) : undefined;
+        return {
+          name: displayName(person),
+          sexe: person.sexe,
+          date_naissance: person.date_naissance,
+          lieu_naissance: person.lieu_naissance,
+          etat_civil: person.etat_civil,
+          nationalite: person.nationalite || "CONGOLAIS",
+          profession: person.parcours_professionnel || "",
+          residence:
+            person.adresse_geo?.label ||
+            [person.adresse, person.secteur, person.ville || person.territoire, person.province]
+              .filter(Boolean)
+              .join(", ") ||
+            "",
+          pere_name: pere ? displayName(pere) : "",
+          mere_name: mere ? displayName(mere) : "",
+          pere_profession: pere?.parcours_professionnel || "",
+          mere_profession: mere?.parcours_professionnel || "",
+        };
+      };
       const payload = {
         epoux_id: epoux.id,
         epoux_name: displayName(epoux),
+        epoux_snapshot: snapPerson(epoux),
         epouse_id: epouse.id,
         epouse_name: displayName(epouse),
+        epouse_snapshot: snapPerson(epouse),
         regime_matrimonial: regime,
         publications_bans: true,
         date_publications: datePublications || null,
@@ -138,8 +163,10 @@ export default function MarriagesPage() {
         receveur_dote_name: receveurDote ? displayName(receveurDote) : null,
         temoin1_id: temoin1.id,
         temoin1_name: displayName(temoin1),
+        temoin1_snapshot: snapPerson(temoin1),
         temoin2_id: temoin2.id,
         temoin2_name: displayName(temoin2),
+        temoin2_snapshot: snapPerson(temoin2),
         officier_celebrant_id: officer?.userId ?? officer?.username ?? null,
         officier_celebrant_name: officer?.displayName ?? null,
         officier_id: officer?.userId ?? officer?.username ?? null,

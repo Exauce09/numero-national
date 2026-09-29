@@ -1621,33 +1621,53 @@
   border: 1px solid var(--egouv-line);
 }
 
+/* Formulaires officiels RDC (naissance + mariage) */
+.official-acte,
 .birth-acte {
   position: relative;
   border: 2px solid #1a3a6b;
   padding: 1.25rem 1.4rem 1rem;
-  background: #fff;
+  background:
+    repeating-linear-gradient(
+      -18deg,
+      transparent,
+      transparent 28px,
+      rgba(30, 90, 180, 0.015) 28px,
+      rgba(30, 90, 180, 0.015) 56px
+    ),
+    #f7fbff;
   color: #122;
   font-family: "Times New Roman", Times, serif;
-  font-size: 0.92rem;
-  line-height: 1.45;
+  font-size: 0.88rem;
+  line-height: 1.42;
   overflow: hidden;
+  color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
+.official-acte-watermark,
 .birth-acte-watermark {
   position: absolute;
-  inset: 18% 5%;
+  inset: 12% 4%;
   display: grid;
   place-items: center;
-  font-size: clamp(2rem, 8vw, 3.4rem);
+  font-size: clamp(1.6rem, 7vw, 3rem);
   font-weight: 700;
-  letter-spacing: 0.08em;
-  color: rgba(30, 90, 180, 0.08);
+  letter-spacing: 0.1em;
+  color: rgba(30, 90, 180, 0.07);
   transform: rotate(-28deg);
   pointer-events: none;
   z-index: 0;
   text-align: center;
+  text-transform: uppercase;
 }
 
+.official-acte-head,
+.official-acte-title,
+.official-acte-body,
+.official-acte-foot,
+.official-acte-qr-row,
 .birth-acte-head,
 .birth-acte-title,
 .birth-acte-body,
@@ -1657,18 +1677,21 @@
   z-index: 1;
 }
 
+.official-acte-head,
 .birth-acte-head {
   display: grid;
-  grid-template-columns: 1fr 120px;
+  grid-template-columns: 1fr 110px;
   gap: 0.75rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.65rem;
 }
 
+.official-acte-state,
 .birth-acte-state {
   font-weight: 700;
   letter-spacing: 0.04em;
   margin: 0 0 0.2rem;
   text-transform: uppercase;
+  font-size: 0.95rem;
 }
 
 .birth-acte-brand {
@@ -1679,33 +1702,43 @@
   font-family: system-ui, sans-serif;
 }
 
+.official-acte-head-left p,
 .birth-acte-head-left p {
-  margin: 0.12rem 0;
+  margin: 0.1rem 0;
 }
 
+.official-acte-head-left u,
+.official-acte-body u,
 .birth-acte-head-left u,
 .birth-acte-body u {
   text-decoration: none;
-  border-bottom: 1px dotted #333;
-  padding: 0 0.15rem;
-  font-weight: 600;
+  border-bottom: 1px dotted #1a3a6b;
+  padding: 0 0.12rem;
+  font-weight: 700;
+  color: #0b2a55;
+  text-transform: uppercase;
+  font-size: 0.92em;
 }
 
+.official-acte-refs,
 .birth-acte-ref {
-  margin-top: 0.45rem !important;
-  font-size: 0.8rem;
-  font-family: system-ui, sans-serif;
+  margin-top: 0.4rem !important;
+  font-size: 0.82rem;
 }
 
+.official-acte-head-right,
 .birth-acte-head-right {
   text-align: center;
 }
 
+.official-acte-volet,
 .birth-acte-volet {
   font-weight: 700;
   margin-bottom: 0.35rem;
+  font-size: 0.95rem;
 }
 
+.official-acte-flag-fallback,
 .birth-acte-flag-fallback {
   width: 72px;
   height: 48px;
@@ -1718,6 +1751,7 @@
   position: relative;
 }
 
+.official-acte-flag-fallback::before,
 .birth-acte-flag-fallback::before {
   content: "";
   position: absolute;
@@ -1729,6 +1763,7 @@
   clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
 }
 
+.official-acte-flag,
 .birth-acte-flag {
   width: 72px;
   height: auto;
@@ -1736,19 +1771,24 @@
   margin: 0 auto;
 }
 
+.official-acte-diag,
 .birth-acte-diag {
   margin-top: 0.35rem;
   font-weight: 700;
   transform: rotate(-18deg);
   color: #0b3d91;
+  font-size: 0.95rem;
 }
 
+.official-acte-title,
 .birth-acte-title {
   text-align: center;
   text-decoration: underline;
-  font-size: 1.35rem;
-  margin: 0.4rem 0 0.15rem;
-  letter-spacing: 0.06em;
+  font-size: 1.4rem;
+  margin: 0.35rem 0 0.55rem;
+  letter-spacing: 0.08em;
+  color: #0b3d91;
+  font-weight: 800;
 }
 
 .birth-acte-subtitle {
@@ -1756,25 +1796,59 @@
   margin: 0 0 0.75rem;
 }
 
+.official-acte-body p,
 .birth-acte-body p {
-  margin: 0.45rem 0;
+  margin: 0.38rem 0;
   text-align: justify;
 }
 
+.official-acte-foot,
 .birth-acte-foot {
   display: grid;
-  grid-template-columns: 1fr 1fr minmax(100px, 120px);
+  grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
-  margin-top: 1.4rem;
+  margin-top: 1.35rem;
   text-align: center;
-  align-items: end;
+  align-items: start;
 }
 
+.marriage-acte-foot {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.official-acte-sign,
+.birth-acte-sign {
+  height: 52px;
+  margin: 0.4rem auto 0.15rem;
+  border-bottom: 1px solid #333;
+  width: 78%;
+}
+
+.official-acte-sign-caption {
+  margin: 0.15rem 0 0.35rem;
+  font-size: 0.78rem;
+}
+
+.official-acte-officer-stamp {
+  margin: 0.35rem auto 0;
+  padding: 0.35rem 0.45rem;
+  border: 2px solid #1a5a9a;
+  color: #0b3d91;
+  font-weight: 700;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  max-width: 92%;
+  line-height: 1.25;
+}
+
+.official-acte-qr-row,
 .birth-acte-qr {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.25rem;
+  margin-top: 1rem;
 }
 
 .act-print-actions {
@@ -1785,16 +1859,10 @@
   max-width: min(920px, 96vw) !important;
 }
 
+.modal-panel-act .official-acte,
 .modal-panel-act .birth-acte {
-  max-height: min(78vh, 900px);
+  max-height: min(78vh, 980px);
   overflow-y: auto;
-}
-
-.birth-acte-sign {
-  height: 64px;
-  margin: 0.5rem auto 0.25rem;
-  border-bottom: 1px solid #333;
-  width: 70%;
 }
 
 .birth-acte-notes {
@@ -1802,15 +1870,26 @@
 }
 
 @media print {
+  .official-acte,
   .birth-acte {
     border-color: #000;
     max-height: none !important;
     overflow: visible !important;
     page-break-inside: avoid;
+    background: #fff;
   }
 
+  .official-acte-foot,
   .birth-acte-foot {
-    grid-template-columns: 1fr 1fr 100px;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .marriage-acte-foot {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .official-acte-qr-row {
+    display: none;
   }
 }
 
