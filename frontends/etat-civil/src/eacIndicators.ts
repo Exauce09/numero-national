@@ -234,9 +234,11 @@ function placeResidenceMere(act: Act): string {
 }
 
 function placeDelivery(act: Act): string {
-  const h = String(act.payload.hopital_naissance ?? "").trim();
+  // Lieu géographique exact de la naissance (saisi), pas le nom de la structure / hôpital.
+  const exact = placeOccurrence(act);
+  if (exact && exact !== "Non renseigné") return exact;
+  const h = String(act.payload.hopital_naissance ?? act.payload.facility_name ?? "").trim();
   if (h) return h;
-  if (act.payload.facility_name) return String(act.payload.facility_name);
   return "Domicile / autre / non renseigné";
 }
 
