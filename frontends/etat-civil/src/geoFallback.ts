@@ -14,34 +14,19 @@ function slug(s: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-const PROVINCES: Array<{ code: string; name: string; chef_lieu: string }> = [
-  { code: "KIN", name: "Kinshasa", chef_lieu: "Kinshasa" },
-  { code: "BC", name: "Kongo Central", chef_lieu: "Matadi" },
-  { code: "KWG", name: "Kwango", chef_lieu: "Kenge" },
-  { code: "KWL", name: "Kwilu", chef_lieu: "Bandundu" },
-  { code: "MND", name: "Mai-Ndombe", chef_lieu: "Inongo" },
-  { code: "EQT", name: "Équateur", chef_lieu: "Mbandaka" },
-  { code: "MNG", name: "Mongala", chef_lieu: "Lisala" },
-  { code: "NUB", name: "Nord-Ubangi", chef_lieu: "Gbadolite" },
-  { code: "SUB", name: "Sud-Ubangi", chef_lieu: "Gemena" },
-  { code: "TSH", name: "Tshuapa", chef_lieu: "Boende" },
-  { code: "TSHO", name: "Tshopo", chef_lieu: "Kisangani" },
-  { code: "BUE", name: "Bas-Uélé", chef_lieu: "Buta" },
-  { code: "HUE", name: "Haut-Uélé", chef_lieu: "Isiro" },
-  { code: "ITU", name: "Ituri", chef_lieu: "Bunia" },
-  { code: "NKV", name: "Nord-Kivu", chef_lieu: "Goma" },
-  { code: "SKV", name: "Sud-Kivu", chef_lieu: "Bukavu" },
-  { code: "MNM", name: "Maniema", chef_lieu: "Kindu" },
-  { code: "HKT", name: "Haut-Katanga", chef_lieu: "Lubumbashi" },
-  { code: "LLB", name: "Lualaba", chef_lieu: "Kolwezi" },
-  { code: "HLM", name: "Haut-Lomami", chef_lieu: "Kamina" },
-  { code: "TGY", name: "Tanganyika", chef_lieu: "Kalemie" },
-  { code: "KAS", name: "Kasaï", chef_lieu: "Tshikapa" },
-  { code: "KAC", name: "Kasaï Central", chef_lieu: "Kananga" },
-  { code: "KAO", name: "Kasaï Oriental", chef_lieu: "Mbuji-Mayi" },
-  { code: "LOM", name: "Lomami", chef_lieu: "Kabinda" },
-  { code: "SNK", name: "Sankuru", chef_lieu: "Lusambo" },
-];
+/** Provinces RDC — source : province.docx / sigpopReferentiel.json (COD-P01…P26). */
+const PROVINCES: Array<{ code: string; name: string; chef_lieu: string }> =
+  sigpopReferentiel.provinces.map((p) => ({
+    code: p.code,
+    name: p.name,
+    chef_lieu: p.chef_lieu,
+  }));
+
+const TERRITORY_CODES = new Map<string, string>(
+  sigpopReferentiel.territoires.map((t) => [`${t.province}|${t.name}`, t.code]),
+);
+
+const KINSHASA_PROVINCE_CODE = "COD-P01";
 
 /** province name → ville → communes (référentiel urbain). */
 const CITY_COMMUNES: Record<string, Record<string, string[]>> = {
@@ -256,15 +241,15 @@ export function fallbackVilles(provinceId: string): GeoItem[] {
 export function fallbackDistricts(provinceId: string): GeoItem[] {
   const p = provinceById(provinceId);
   if (!p) return [];
-  // Kinshasa : pas de territoire rural dans le référentiel SIGPOP — uniquement la ville + communes.
-  if (p.code === "KIN") return [];
+  // Kinshasa : pas de territoire rural — uniquement la ville + communes (province.docx).
+  if (p.code === KINSHASA_PROVINCE_CODE) return [];
   const territoires = PROVINCE_TERRITOIRES[p.name] ?? [];
   return territoires
     .slice()
     .sort((a, b) => a.localeCompare(b, "fr"))
     .map((name) => ({
       id: districtId(name, p.name),
-      code: slug(name).toUpperCase().slice(0, 12),
+      code: TERRITORY_CODES.get(`${p.name}|${name}`) ?? slug(name).toUpperCase().slice(0, 12),
       name,
     }));
 }
