@@ -1,6 +1,5 @@
 import {
   DIPLOMES_UNIV,
-  NIVEAUX_ETUDES,
   NIVEAUX_SCOLAIRES,
   emptyEtablissement,
   emptyFormationPro,
@@ -8,6 +7,7 @@ import {
   type EtudesData,
 } from "../etudesFaites";
 import { DIPLOMES_SCOLAIRES, ETABLISSEMENTS_SUPERIEURS_RDC } from "../data/etablissementsRdc";
+import NiveauEtudeField from "./NiveauEtudeField";
 
 type Props = {
   value: EtudesData;
@@ -20,20 +20,11 @@ export default function EtudesFaitesForm({ value, onChange }: Props) {
       <fieldset className="id-fieldset">
         <legend>Niveau d&apos;étude</legend>
         <div className="form-grid">
-          <div>
-            <label className="form-label">Niveau atteint</label>
-            <select
-              className="form-control"
-              value={value.niveau_atteint}
-              onChange={(e) => onChange({ ...value, niveau_atteint: e.target.value })}
-            >
-              {NIVEAUX_ETUDES.map((n) => (
-                <option key={n.value || "empty"} value={n.value}>
-                  {n.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <NiveauEtudeField
+            label="Niveau atteint"
+            value={value.niveau_atteint}
+            onChange={(code) => onChange({ ...value, niveau_atteint: code })}
+          />
         </div>
       </fieldset>
       <fieldset className="id-fieldset">

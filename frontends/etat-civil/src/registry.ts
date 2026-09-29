@@ -1550,6 +1550,7 @@ export function setCivilStatusOverride(citizenId: string, etat: EtatCivil): void
 export function upsertLocalPersonFromApi(
   base: Pick<Person, "id" | "nom" | "postnom" | "prenom" | "sexe" | "date_naissance" | "lieu_naissance" | "nic"> & {
     etat_civil: EtatCivil;
+    parcours_scolaire?: string;
   },
 ): Person {
   setCivilStatusOverride(base.id, base.etat_civil);
@@ -1565,6 +1566,9 @@ export function upsertLocalPersonFromApi(
         lieu_naissance: base.lieu_naissance,
         etat_civil: base.etat_civil,
         nic: base.nic || existing.nic,
+        ...(base.parcours_scolaire !== undefined
+          ? { parcours_scolaire: base.parcours_scolaire }
+          : {}),
       }) ?? existing
     );
   }
@@ -1581,6 +1585,7 @@ export function upsertLocalPersonFromApi(
     nic: base.nic || `API-${base.id.replace(/-/g, "").slice(0, 12)}`,
     handicap_type: "NORMAL",
     created_at: new Date().toISOString(),
+    ...(base.parcours_scolaire ? { parcours_scolaire: base.parcours_scolaire } : {}),
   };
   registry.persons.unshift(person);
   save(registry);

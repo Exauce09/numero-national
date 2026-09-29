@@ -1,6 +1,7 @@
 /** Construit une Fiche d'identification à partir du registre local / personne. */
 
 import { getOfficerCommune } from "./commune";
+import { extractNiveauEtude } from "./etudesFaites";
 import {
   emptyFichePerson,
   type FicheIdentificationData,
@@ -54,6 +55,7 @@ function personToBlock(p: Person | null | undefined): FichePersonBlock {
         ? "Étrangère"
         : "Congolaise",
     profession: String(p.parcours_professionnel ?? "").trim() || "",
+    niveau_etude: extractNiveauEtude(p.parcours_scolaire),
     secteur: p.secteur || o.secteur || o.commune || "",
     territoire: p.territoire || o.territoire || "",
     ville: p.ville || o.ville || "",

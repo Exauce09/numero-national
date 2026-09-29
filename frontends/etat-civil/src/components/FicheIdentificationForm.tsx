@@ -1,6 +1,7 @@
 /** Fiche d'identification type Justicia / état civil — sans District (config RDC actuelle). */
 
 import type { CSSProperties } from "react";
+import { niveauEtudeLabel } from "../etudesFaites";
 
 export type FichePersonBlock = {
   nom: string;
@@ -11,6 +12,8 @@ export type FichePersonBlock = {
   lieu_date_naissance: string;
   nationalite: string;
   profession: string;
+  /** Code NIVEAUX_ETUDES (AUCUN, PRIMAIRE…). */
+  niveau_etude: string;
   secteur: string;
   territoire: string;
   ville: string;
@@ -43,6 +46,7 @@ export const emptyFichePerson = (): FichePersonBlock => ({
   lieu_date_naissance: "",
   nationalite: "Congolaise",
   profession: "",
+  niveau_etude: "",
   secteur: "",
   territoire: "",
   ville: "",
@@ -92,6 +96,10 @@ function PersonColumn({ title, data }: { title?: string; data: FichePersonBlock 
       <Line label="Lieu et date de naissance" value={data.lieu_date_naissance} />
       <Line label="Nationalité" value={data.nationalite} />
       <Line label="Profession" value={data.profession} />
+      <Line
+        label="Niveau d'étude"
+        value={data.niveau_etude ? niveauEtudeLabel(data.niveau_etude) || data.niveau_etude : ""}
+      />
       <Line label="Secteur" value={data.secteur} />
       <Line label="Territoire" value={data.territoire} />
       <Line label="Ville" value={data.ville} />

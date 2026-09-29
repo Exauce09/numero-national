@@ -10,6 +10,7 @@ import GeoCascade, {
   ORIGIN_FIELD_LABELS,
   type GeoSelection,
 } from "./GeoCascade";
+import NiveauEtudeField from "./NiveauEtudeField";
 
 export type FicheEditorConjoint = {
   nom: string;
@@ -206,6 +207,11 @@ function ParentSection({
           placeholder="Profession"
         />
       </div>
+      <NiveauEtudeField
+        className="full"
+        value={value.niveau_etude || ""}
+        onChange={(code) => set("niveau_etude", code)}
+      />
       <div className="full">
         <OriginGeoField
           label={`Origine — ${who}`}
@@ -405,6 +411,12 @@ export default function FicheIdentificationEditor({
               ))}
             </datalist>
           </div>
+
+          <NiveauEtudeField
+            className="full"
+            value={i.niveau_etude || ""}
+            onChange={(code) => patchInteresse({ niveau_etude: code })}
+          />
 
           <div className="full">
             <OriginGeoField

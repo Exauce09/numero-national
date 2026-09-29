@@ -45,6 +45,44 @@ export const NIVEAUX_ETUDES = [
   { value: "POST_UNIV", label: "Post-universitaire" },
 ] as const;
 
+export function niveauEtudeLabel(code: string): string {
+  const c = (code || "").trim();
+  if (!c) return "";
+  return NIVEAUX_ETUDES.find((n) => n.value === c)?.label || c;
+}
+
+/** Extrait le code niveau depuis un texte parcours_scolaire. */
+export function extractNiveauEtude(parcours?: string | null): string {
+  const raw = (parcours || "").trim();
+  if (!raw) return "";
+  const m = raw.match(/Niveau d['']étude\s*:\s*([^\n]+)/i);
+  if (m) {
+    const label = m[1].trim();
+    const byLabel = NIVEAUX_ETUDES.find(
+      (n) => n.label.toLowerCase() === label.toLowerCase() || n.value === label.toUpperCase(),
+    );
+    if (byLabel) return byLabel.value;
+  }
+  const upper = raw.toUpperCase();
+  for (const n of NIVEAUX_ETUDES) {
+    if (!n.value) continue;
+    if (upper.includes(n.value) || upper.includes(n.label.toUpperCase())) return n.value;
+  }
+  return "";
+}
+
+/** Injecte / remplace la ligne « Niveau d'étude » dans parcours_scolaire. */
+export function parcoursWithNiveau(existing: string | undefined | null, code: string): string {
+  const label = niveauEtudeLabel(code);
+  const base = (existing || "")
+    .split("\n")
+    .filter((l) => !/^\s*Niveau d['']étude\s*:/i.test(l))
+    .join("\n")
+    .trim();
+  if (!label) return base;
+  return [`Niveau d'étude : ${label}`, base].filter(Boolean).join("\n");
+}
+
 export const NIVEAUX_SCOLAIRES = [
   "",
   "Maternelle",

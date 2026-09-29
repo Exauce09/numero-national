@@ -4,9 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { BarChart, PieChart } from "../components/Charts";
 import DataToolbar from "../components/DataToolbar";
+import NiveauEtudeField from "../components/NiveauEtudeField";
 import { PopulationStatBlocks } from "../components/StatBlocks";
 import { api, type CitizenListItem } from "../api";
 import { ensureAccessToken, getSession } from "../auth";
+import { extractNiveauEtude, parcoursWithNiveau } from "../etudesFaites";
 import { splitFamilyName, splitGivenNames } from "../nationalSearch";
 import { RDC, rdcColor } from "../rdcColors";
 import {
@@ -144,6 +146,7 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
     date_naissance: "",
     lieu_naissance: "",
     etat_civil: "CELIBATAIRE" as EtatCivil,
+    niveau_etude: "",
   });
   const [actionMsg, setActionMsg] = useState<string | null>(null);
 
@@ -253,6 +256,7 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
       date_naissance: (local.date_naissance || "").slice(0, 10),
       lieu_naissance: local.lieu_naissance || "",
       etat_civil: local.etat_civil || "CELIBATAIRE",
+      niveau_etude: extractNiveauEtude(local.parcours_scolaire),
     });
     const next = new URLSearchParams(params);
     next.delete("edit");
@@ -505,6 +509,7 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                             date_naissance: (local.date_naissance || "").slice(0, 10),
                             lieu_naissance: local.lieu_naissance || "",
                             etat_civil: local.etat_civil || "CELIBATAIRE",
+                            niveau_etude: extractNiveauEtude(local.parcours_scolaire),
                           });
                           setActionMsg(null);
                         }}
@@ -611,6 +616,10 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                   lieu_naissance: editForm.lieu_naissance.trim(),
                   etat_civil: editForm.etat_civil,
                   nic: editRow.nic || "",
+                  parcours_scolaire: parcoursWithNiveau(
+                    getPerson(editRow.id)?.parcours_scolaire ?? editRow.parcours_scolaire,
+                    editForm.niveau_etude,
+                  ),
                 });
                 setPersons((prev) =>
                   prev.map((p) =>
@@ -624,6 +633,10 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                           date_naissance: editForm.date_naissance,
                           lieu_naissance: editForm.lieu_naissance.trim(),
                           etat_civil: editForm.etat_civil,
+                          parcours_scolaire: parcoursWithNiveau(
+                            p.parcours_scolaire,
+                            editForm.niveau_etude,
+                          ),
                         }
                       : p,
                   ),
@@ -707,6 +720,11 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                   onChange={(e) => setEditForm((f) => ({ ...f, lieu_naissance: e.target.value }))}
                 />
               </div>
+              <NiveauEtudeField
+                className="full"
+                value={editForm.niveau_etude}
+                onChange={(code) => setEditForm((f) => ({ ...f, niveau_etude: code }))}
+              />
               <div className="full" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                 <button type="submit" className="btn-primary">
                   Enregistrer

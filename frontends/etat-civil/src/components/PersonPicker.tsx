@@ -4,6 +4,7 @@ import FicheIdentificationEditor, {
   emptyFicheEditorState,
   type FicheEditorState,
 } from "./FicheIdentificationEditor";
+import { parcoursWithNiveau } from "../etudesFaites";
 import { getOfficerCommune } from "../commune";
 import {
   addPerson,
@@ -80,6 +81,7 @@ function tryAddRelative(
     lieu_date_naissance: string;
     nationalite?: string;
     profession?: string;
+    niveau_etude?: string;
     province?: string;
     ville?: string;
     territoire?: string;
@@ -130,6 +132,9 @@ function tryAddRelative(
       etat_civil: "UNKNOWN" as Person["etat_civil"],
       nationalite: natFromLabel(block.nationalite || "Congolaise"),
       parcours_professionnel: block.profession?.trim() || undefined,
+      parcours_scolaire: block.niveau_etude
+        ? parcoursWithNiveau(undefined, block.niveau_etude)
+        : undefined,
       province: block.province?.trim() || undefined,
       ville: block.ville?.trim() || undefined,
       territoire: block.territoire?.trim() || undefined,
@@ -303,6 +308,9 @@ export default function PersonPicker({
         etat_civil: i.etat_civil_code,
         nationalite: natFromLabel(i.nationalite),
         parcours_professionnel: i.profession.trim() || undefined,
+        parcours_scolaire: i.niveau_etude
+          ? parcoursWithNiveau(undefined, i.niveau_etude)
+          : undefined,
         adresse: i.adresse.trim() || undefined,
         adresse_geo: i.adresse_geo
           ? {
