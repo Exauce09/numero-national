@@ -46,6 +46,10 @@ import { HOPITAUX_KEY, loadNamedList, rememberNamed } from "../namedLists";
 import { actInViewerScope } from "../viewerScope";
 import HospitalBirthCertificateField from "../components/HospitalBirthCertificateField";
 import {
+  childOriginRuleLabel,
+  resolveChildOriginSource,
+} from "../childOriginRdc";
+import {
   hospitalBirthCertPayload,
   type HospitalBirthCertificate,
 } from "../hospitalBirthCertificate";
@@ -56,12 +60,11 @@ const MODES_ENREGISTREMENT = [
   { value: "jugement_suppletif", label: "Par jugement supplétif" },
 ] as const;
 
-/** Étapes du formulaire naissance. */
+/** Étapes du formulaire naissance (origine enfant = automatique, plus d'étape 4). */
 const BIRTH_FORM_STEPS = [
   { id: 1, title: "Enfant" },
   { id: 2, title: "Lieu" },
   { id: 3, title: "Filiation" },
-  { id: 4, title: "Origine" },
 ] as const;
 
 /** `health` : même formulaire chez l'infirmier titulaire — transmet une notification au bureau. */
@@ -116,7 +119,7 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
   const [adresseMere, setAdresseMere] = useState("");
   const [geoAdresseMere, setGeoAdresseMere] = useState<GeoSelection>({});
   const [geoOrigineMere, setGeoOrigineMere] = useState<GeoSelection>({});
-  const [geoOrigine, setGeoOrigine] = useState<GeoSelection>({});
+  // geoOrigine enfant = calcul auto (childOriginAuto) — plus de saisie étape 4
 
   /** IT : structure = hôpital (fixe) ; le lieu de naissance reste saisi manuellement (jamais le nom de la structure). */
   useEffect(() => {
@@ -148,7 +151,6 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
         label: o.label || undefined,
       };
       setGeoOrigineMere(originGeo);
-      if (!father) setGeoOrigine(originGeo);
     }
     if (p.adresse_geo && (p.adresse_geo.label || p.adresse_geo.commune_name || p.adresse_geo.province_name)) {
       setGeoAdresseMere({ ...p.adresse_geo });
@@ -164,18 +166,57 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
       setQualiteDeclarant("PERE");
       setDeclarant(null);
     }
-    if (!p) return;
-    const o = personOrigin(p);
-    if (o.province || o.territoire || o.secteur || o.ville) {
-      setGeoOrigine({
-        province_name: o.province || undefined,
-        district_name: o.territoire || undefined,
-        commune_name: o.secteur || undefined,
-        ville_name: o.ville || undefined,
-        label: o.label || undefined,
-      });
-    }
   }
+
+  /** Origine enfant : auto (père / mère / province matrilinéaire) — pas de saisie manuelle. */
+  const childOriginAuto = useMemo(() => {
+    const motherProvince = geoOrigineMere.province_name || mother?.province || "";
+    const source = resolveChildOriginSource(Boolean(father), motherProvince);
+    const link = inheritParentOrigin(father, mother, motherProvince);
+    let geo: GeoSelection = {};
+    if (source === "mother") {
+      geo =
+        geoOrigineMere.province_name || geoOrigineMere.district_name || geoOrigineMere.commune_name
+          ? { ...geoOrigineMere }
+          : {
+              province_name: link.geo.province || undefined,
+              district_name: link.geo.territoire || undefined,
+              commune_name: link.geo.secteur || undefined,
+              ville_name: link.geo.ville || undefined,
+              localite_name: link.geo.village || undefined,
+              label: [link.geo.village, link.geo.secteur, link.geo.territoire, link.geo.province]
+                .filter(Boolean)
+                .join(" · ") || undefined,
+            };
+    } else if (father) {
+      const o = personOrigin(father);
+      geo = {
+        province_name: o.province || link.geo.province || undefined,
+        district_name: o.territoire || link.geo.territoire || undefined,
+        commune_name: o.secteur || link.geo.secteur || undefined,
+        ville_name: o.ville || link.geo.ville || undefined,
+        localite_name: link.geo.village || undefined,
+        label:
+          o.label ||
+          [link.geo.village, link.geo.secteur, link.geo.territoire, link.geo.province]
+            .filter(Boolean)
+            .join(" · ") ||
+          undefined,
+      };
+    }
+    const label =
+      geo.label ||
+      [geo.localite_name, geo.commune_name, geo.district_name, geo.ville_name, geo.province_name]
+        .filter(Boolean)
+        .join(" · ");
+    return {
+      source,
+      geo: { ...geo, label: label || undefined },
+      rule: childOriginRuleLabel(source, motherProvince),
+      motherProvince,
+    };
+  }, [father, mother, geoOrigineMere]);
+
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [created, setCreated] = useState<Act | null>(null);
@@ -341,14 +382,12 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
           : typeLieuEnregistrement.trim() ||
             getSession()?.service_bureau?.trim() ||
             "Bureau principal de l'état-civil";
-      const link = inheritParentOrigin(father, mother);
+      const link = inheritParentOrigin(father, mother, geoOrigineMere.province_name || mother.province);
       if (hopitalResolved) rememberNamed(HOPITAUX_KEY, hopitalResolved);
-      const effectiveOrigine: GeoSelection =
-        geoOrigine.province_name || geoOrigine.district_name || geoOrigine.commune_name
-          ? geoOrigine
-          : !father
-            ? geoOrigineMere
-            : geoOrigine;
+      const effectiveOrigine: GeoSelection = {
+        ...childOriginAuto.geo,
+        label: childOriginAuto.geo.label || undefined,
+      };
       const origineFromCascade = [
         effectiveOrigine.localite_name,
         effectiveOrigine.commune_name,
@@ -584,7 +623,8 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
         territoire_origine: effectiveOrigine.district_name || link.geo.territoire || null,
         secteur_chefferie_commune: effectiveOrigine.commune_name || link.geo.secteur || null,
         village_origine: effectiveOrigine.localite_name || link.geo.village || null,
-        origine_source: father ? "father_or_manual" : "mother_or_manual",
+        origine_source: childOriginAuto.source,
+        origine_regle: childOriginAuto.rule,
         geo_origine_mere: geoOrigineMere,
         note: `Nouveau-né — ${modeLabel}`,
         latitude: gpsLat,
@@ -627,9 +667,6 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
       setAdresseMere("");
       setGeoAdresseMere({});
       setGeoOrigineMere({});
-      setGeoOrigine({});
-      setGeoAdresseMere({});
-      setGeoOrigine({});
       setGpsLat(null);
       setGpsLng(null);
       bump((n) => n + 1);
@@ -716,14 +753,14 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
         <form
           className="form-grid"
           onSubmit={(e) => {
-            if (formStep < 4) {
+            if (formStep < 3) {
               e.preventDefault();
-              setFormStep((s) => Math.min(4, s + 1));
+              setFormStep((s) => Math.min(3, s + 1));
               return;
             }
             void onSubmit(e);
           }}
-          noValidate={formStep < 4}
+          noValidate={formStep < 3}
         >
           <div className="full">
             <div className="birth-form-steps" role="tablist" aria-label="Étapes d'enregistrement">
@@ -1181,24 +1218,27 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
             />
             <p className="muted small" style={{ marginTop: 6 }}>
               Recherchez une personne déjà enregistrée, ou ajoutez-la. À la sélection, origine et
-              adresse se remplissent automatiquement. Si le père n&apos;est pas reconnu, l&apos;origine
-              de la mère sera reprise pour l&apos;enfant.
+              adresse se remplissent automatiquement. L&apos;origine de l&apos;enfant est calculée
+              automatiquement (mère si père inconnu ; père si connu — sauf provinces matrilinéaires).
             </p>
           </div>
           <div className="full">
-            <label className="form-label">Origine de la mère</label>
+            <label className="form-label">Origine de la mère *</label>
             <GeoCascade
               embedded
               allowAdd
               levels={[...GEO_PRESETS.originRural]}
               fieldLabels={ORIGIN_FIELD_LABELS}
               value={geoOrigineMere}
-              onChange={(g) => {
-                setGeoOrigineMere(g);
-                if (!father) setGeoOrigine(g);
-              }}
+              onChange={setGeoOrigineMere}
               label="Origine de la mère"
             />
+            <p className="muted small" style={{ marginTop: 6 }}>
+              Province / territoire / secteur / village d&apos;origine de la mère (et tribu
+              coutumière via le territoire). Si la province est matrilinéaire (Kongo Central, Kwango,
+              Kwilu, Mai-Ndombe), l&apos;enfant prend uniquement l&apos;origine de la mère — même si
+              le père est connu.
+            </p>
           </div>
           <div className="full">
             <label className="form-label">Adresse de la mère *</label>
@@ -1232,47 +1272,17 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
               sexFilter="M"
             />
           </div>
-          <div className="full birth-form-nav">
-            <button type="button" className="btn-secondary" onClick={() => setFormStep(2)}>
-              Précédent
-            </button>
-            <button type="button" className="btn-add" onClick={() => setFormStep(4)}>
-              Suivant — Origine
-            </button>
-          </div>
-            </>
-          ) : null}
-          {formStep === 4 ? (
-            <>
-          <div className="full">
-            <h3 className="panel-title" style={{ marginTop: 0 }}>
-              Originaire
-            </h3>
-            <p className="muted small" style={{ marginTop: 0 }}>
-              Lieu d&apos;origine de l&apos;enfant. Sans père reconnu, l&apos;origine de la mère est
-              reprise automatiquement (modifiable ci-dessous).
-            </p>
-          </div>
-          <div className="full">
-            <GeoCascade
-              embedded
-              allowAdd
-              levels={[...GEO_PRESETS.originRural]}
-              fieldLabels={ORIGIN_FIELD_LABELS}
-              value={geoOrigine}
-              onChange={setGeoOrigine}
-              label="Originaire"
-            />
-            <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
-              Si un territoire, secteur ou village manque, utilisez <strong>+ Ajouter</strong>.
-            </p>
-          </div>
-          {father ? (
-            <div className="full success-banner" style={{ margin: 0 }}>
-              Père renseigné : <strong>{displayName(father)}</strong> — l&apos;origine peut être
-              liée au père via le bloc Originaire ci-dessus.
+          <div className="full success-banner" style={{ margin: 0 }}>
+            <strong>Origine de l&apos;enfant (automatique)</strong>
+            <div style={{ marginTop: 6 }}>{childOriginAuto.rule}</div>
+            <div className="muted small" style={{ marginTop: 4 }}>
+              {childOriginAuto.geo.label ||
+                [childOriginAuto.geo.commune_name, childOriginAuto.geo.district_name, childOriginAuto.geo.province_name]
+                  .filter(Boolean)
+                  .join(" · ") ||
+                "— renseignez d'abord l'origine de la mère (et le père le cas échéant) —"}
             </div>
-          ) : null}
+          </div>
           {health && issueNaissance !== "MORT_NE" ? (
             <HospitalBirthCertificateField
               value={certificatHopital}
@@ -1282,7 +1292,7 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
             />
           ) : null}
           <div className="full birth-form-nav">
-            <button type="button" className="btn-secondary" onClick={() => setFormStep(3)}>
+            <button type="button" className="btn-secondary" onClick={() => setFormStep(2)}>
               Précédent
             </button>
             <button

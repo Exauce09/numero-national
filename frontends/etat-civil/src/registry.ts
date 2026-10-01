@@ -1,5 +1,6 @@
 import { getSession, updateSession, ensureAccessToken } from "./auth";
 import { getOfficerCommune } from "./commune";
+import { resolveChildOriginSource } from "./childOriginRdc";
 
 const STORAGE_KEY = "nn_civil_registry_v1";
 const COMMUNE_CODE = "KIN-GOMBE";
@@ -533,8 +534,12 @@ function snapshotParent(p: Person) {
   };
 }
 
-/** Hérite l'origine du père, sinon de la mère (pour lier un nouveau-né). */
-export function inheritParentOrigin(father?: Person | null, mother?: Person | null): {
+/** Hérite l'origine selon la règle RDC (père / mère / province matrilinéaire). */
+export function inheritParentOrigin(
+  father?: Person | null,
+  mother?: Person | null,
+  motherProvinceOverride?: string | null,
+): {
   source: "father" | "mother" | null;
   geo: ReturnType<typeof locationFromActs>;
   parent: ReturnType<typeof snapshotParent> | null;
@@ -543,19 +548,74 @@ export function inheritParentOrigin(father?: Person | null, mother?: Person | nu
 } {
   const father_snapshot = father ? snapshotParent(father) : null;
   const mother_snapshot = mother ? snapshotParent(mother) : null;
-  if (father) {
+  const motherLoc = mother
+    ? locationFromActs(mother.id, mother.nic)
+    : { province: "", ville: "", territoire: "", secteur: "", village: "", commune: "" };
+  const motherProvince =
+    (motherProvinceOverride || "").trim() ||
+    mother?.province ||
+    motherLoc.province ||
+    "";
+
+  const emptyGeo = {
+    province: "",
+    ville: "",
+    territoire: "",
+    secteur: "",
+    village: "",
+    commune: "",
+  };
+
+  if (!father && !mother) {
+    return {
+      source: null,
+      geo: emptyGeo,
+      parent: null,
+      father_snapshot,
+      mother_snapshot,
+    };
+  }
+
+  const source = resolveChildOriginSource(Boolean(father), motherProvince);
+
+  if (source === "father" && father) {
     const geo = locationFromActs(father.id, father.nic);
-    if (geo.province || geo.ville || geo.territoire || geo.commune) {
-      return { source: "father", geo, parent: father_snapshot, father_snapshot, mother_snapshot };
-    }
+    return {
+      source: "father",
+      geo: {
+        province: geo.province || father.province || "",
+        ville: geo.ville || father.ville || "",
+        territoire: geo.territoire || father.territoire || "",
+        secteur: geo.secteur || father.secteur || "",
+        village: geo.village || "",
+        commune: geo.commune || father.secteur || "",
+      },
+      parent: father_snapshot,
+      father_snapshot,
+      mother_snapshot,
+    };
   }
+
   if (mother) {
-    const geo = locationFromActs(mother.id, mother.nic);
-    return { source: "mother", geo, parent: mother_snapshot, father_snapshot, mother_snapshot };
+    return {
+      source: "mother",
+      geo: {
+        province: motherProvince || motherLoc.province || "",
+        ville: motherLoc.ville || mother.ville || "",
+        territoire: motherLoc.territoire || mother.territoire || "",
+        secteur: motherLoc.secteur || mother.secteur || "",
+        village: motherLoc.village || "",
+        commune: motherLoc.commune || mother.secteur || "",
+      },
+      parent: mother_snapshot,
+      father_snapshot,
+      mother_snapshot,
+    };
   }
+
   return {
     source: null,
-    geo: { province: "", ville: "", territoire: "", secteur: "", village: "", commune: "" },
+    geo: emptyGeo,
     parent: null,
     father_snapshot,
     mother_snapshot,
@@ -591,27 +651,53 @@ export function personOrigin(p: Person): ParentOrigin {
     };
   }
   const father = p.father_id ? getPerson(p.father_id) : undefined;
-  if (father) {
+  const mother = p.mother_id ? getPerson(p.mother_id) : undefined;
+  const motherLoc = mother ? locationFromActs(mother.id, mother.nic) : null;
+  const motherProvince = mother?.province || motherLoc?.province || "";
+  const prefer = resolveChildOriginSource(Boolean(father), motherProvince);
+
+  if (prefer === "father" && father) {
     const loc = locationFromActs(father.id, father.nic);
-    if (loc.province || loc.ville || loc.territoire || loc.commune) {
+    if (loc.province || loc.ville || loc.territoire || loc.commune || father.province) {
       return {
         source: "father",
         source_name: displayName(father),
-        ...loc,
-        label: [loc.province, loc.ville, loc.territoire, loc.secteur, loc.village]
+        province: loc.province || father.province || "",
+        ville: loc.ville || father.ville || "",
+        territoire: loc.territoire || father.territoire || "",
+        secteur: loc.secteur || father.secteur || "",
+        village: loc.village || "",
+        commune: loc.commune || father.secteur || "",
+        label: [
+          loc.province || father.province,
+          loc.ville || father.ville,
+          loc.territoire || father.territoire,
+          loc.secteur || father.secteur,
+          loc.village,
+        ]
           .filter(Boolean)
           .join(" · "),
       };
     }
   }
-  const mother = p.mother_id ? getPerson(p.mother_id) : undefined;
   if (mother) {
-    const loc = locationFromActs(mother.id, mother.nic);
+    const loc = motherLoc ?? locationFromActs(mother.id, mother.nic);
     return {
       source: "mother",
       source_name: displayName(mother),
-      ...loc,
-      label: [loc.province, loc.ville, loc.territoire, loc.secteur, loc.village]
+      province: motherProvince || loc.province || "",
+      ville: loc.ville || mother.ville || "",
+      territoire: loc.territoire || mother.territoire || "",
+      secteur: loc.secteur || mother.secteur || "",
+      village: loc.village || "",
+      commune: loc.commune || mother.secteur || "",
+      label: [
+        motherProvince || loc.province,
+        loc.ville || mother.ville,
+        loc.territoire || mother.territoire,
+        loc.secteur || mother.secteur,
+        loc.village,
+      ]
         .filter(Boolean)
         .join(" · "),
     };
@@ -623,8 +709,20 @@ export function personOrigin(p: Person): ParentOrigin {
   if (birth) {
     const fromFather = birth.payload.father_snapshot as Record<string, string> | undefined;
     const fromMother = birth.payload.mother_snapshot as Record<string, string> | undefined;
-    const snap = (fromFather?.province || fromFather?.ville ? fromFather : fromMother) ?? null;
-    const source = fromFather?.province || fromFather?.ville ? "father" : fromMother ? "mother" : null;
+    const birthMotherProvince = String(
+      (birth.payload.geo_origine_mere as { province_name?: string } | undefined)?.province_name ??
+        fromMother?.province ??
+        "",
+    );
+    const birthPrefer = resolveChildOriginSource(
+      Boolean(fromFather?.province || fromFather?.ville),
+      birthMotherProvince,
+    );
+    const snap =
+      birthPrefer === "father" && (fromFather?.province || fromFather?.ville)
+        ? fromFather
+        : fromMother;
+    const source = snap === fromFather ? "father" : fromMother ? "mother" : null;
     if (snap && source) {
       return {
         source,

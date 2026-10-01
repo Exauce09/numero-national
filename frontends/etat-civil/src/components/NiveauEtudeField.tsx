@@ -1,6 +1,6 @@
 /** Champ Niveau d'étude — réutilisable sur tous les formulaires d'identité. */
 
-import { NIVEAUX_ETUDES } from "../etudesFaites";
+import { NIVEAUX_ETUDES, normalizeNiveauCode } from "../etudesFaites";
 
 type Props = {
   value: string;
@@ -21,6 +21,7 @@ export default function NiveauEtudeField({
   id,
   className,
 }: Props) {
+  const normalized = normalizeNiveauCode(value);
   return (
     <div className={className}>
       <label className="form-label" htmlFor={id}>
@@ -30,7 +31,7 @@ export default function NiveauEtudeField({
       <select
         id={id}
         className="form-control"
-        value={value}
+        value={normalized}
         required={required}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
