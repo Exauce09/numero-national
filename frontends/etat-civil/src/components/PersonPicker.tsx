@@ -392,7 +392,8 @@ export default function PersonPicker({
       // Sync API en arrière-plan — ne jamais bloquer ni effacer la fiche locale
       void pushPersonToNationalRegistry(person).catch(() => undefined);
 
-      onChange(person);
+      const linked = getPerson(person.id) ?? person;
+      onChange(linked);
       setQuery("");
       setResults([]);
       setOpen(false);
