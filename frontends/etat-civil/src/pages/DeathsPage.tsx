@@ -199,7 +199,10 @@ export default function DeathsPage({ health }: { health?: HealthFormContext } = 
               Personne à enregistrer
             </h3>
           </div>
-          <div className="full">
+          <div className="full filiation-seq">
+            <p className="filiation-seq-title">
+              <span className="filiation-seq-num">1</span> Personne décédée
+            </p>
             <PersonPicker
               label="Identité de la personne"
               value={deceased}
@@ -212,6 +215,7 @@ export default function DeathsPage({ health }: { health?: HealthFormContext } = 
               required
               hideNic
               excludeDeceased={false}
+              addButtonLabel="Saisir / Ajouter la personne"
             />
           </div>
           <div>

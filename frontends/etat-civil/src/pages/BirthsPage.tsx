@@ -1188,7 +1188,10 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
                 : "Renseignez le déclarant, puis les informations des parents (au minimum la mère)."}
           </div>
           {qualiteDeclarant !== "MERE" && qualiteDeclarant !== "PERE" ? (
-            <div className="full">
+            <div className="full filiation-seq">
+              <p className="filiation-seq-title">
+                <span className="filiation-seq-num">1</span> Déclarant
+              </p>
               <PersonPicker
                 label="Déclarant *"
                 value={declarant}
@@ -1209,7 +1212,13 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
               />
             </div>
           ) : null}
-          <div className="full">
+          <div className="full filiation-seq">
+            <p className="filiation-seq-title">
+              <span className="filiation-seq-num">
+                {qualiteDeclarant !== "MERE" && qualiteDeclarant !== "PERE" ? "2" : "1"}
+              </span>{" "}
+              Mère
+            </p>
             <PersonPicker
               label={qualiteDeclarant === "MERE" ? "Mère * (déclarante)" : "Mère *"}
               value={mother}
@@ -1224,7 +1233,20 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
               automatiquement (mère si père inconnu ; père si connu — sauf provinces matrilinéaires).
             </p>
           </div>
-          <div className="full">
+          <div
+            className="full filiation-seq"
+            style={mother ? undefined : { opacity: 0.55, pointerEvents: "none" }}
+            aria-disabled={!mother}
+          >
+            <p className="filiation-seq-title">
+              <span className="filiation-seq-num">
+                {qualiteDeclarant !== "MERE" && qualiteDeclarant !== "PERE" ? "3" : "2"}
+              </span>{" "}
+              Origine & adresse de la mère
+            </p>
+            {!mother ? (
+              <p className="muted small">Sélectionnez d&apos;abord la mère (étape précédente).</p>
+            ) : null}
             <label className="form-label">Origine de la mère *</label>
             <GeoCascade
               embedded
@@ -1241,9 +1263,9 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
               Kwilu, Mai-Ndombe), l&apos;enfant prend uniquement l&apos;origine de la mère — même si
               le père est connu.
             </p>
-          </div>
-          <div className="full">
-            <label className="form-label">Adresse de la mère *</label>
+            <label className="form-label" style={{ marginTop: "0.75rem" }}>
+              Adresse de la mère *
+            </label>
             <GeoCascade
               embedded
               allowAdd
@@ -1265,13 +1287,27 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
               placeholder="Complément d'adresse (n°, parcelle, référence…)"
             />
           </div>
-          <div className="full">
+          <div
+            className="full filiation-seq"
+            style={mother ? undefined : { opacity: 0.55, pointerEvents: "none" }}
+            aria-disabled={!mother}
+          >
+            <p className="filiation-seq-title">
+              <span className="filiation-seq-num">
+                {qualiteDeclarant !== "MERE" && qualiteDeclarant !== "PERE" ? "4" : "3"}
+              </span>{" "}
+              Père
+            </p>
+            {!mother ? (
+              <p className="muted small">Sélectionnez d&apos;abord la mère avant le père.</p>
+            ) : null}
             <PersonPicker
               label={qualiteDeclarant === "PERE" ? "Père * (déclarant)" : "Père (optionnel)"}
               value={father}
               onChange={applyFatherPerson}
               originGeoFilter
               sexFilter="M"
+              addButtonLabel="Saisir / Ajouter le père"
             />
           </div>
           <div className="full success-banner" style={{ margin: 0 }}>

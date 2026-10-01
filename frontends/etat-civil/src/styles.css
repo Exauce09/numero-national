@@ -2326,12 +2326,96 @@
 }
 .eg-acts-table-caption {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  justify-content: flex-start;
   align-items: center;
   gap: 0.75rem;
   padding: 0.65rem 0.85rem;
   border-bottom: 1px solid var(--egouv-line, #d0d7e2);
   background: rgba(0, 86, 179, 0.04);
+}
+.eg-th-sort {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-weight: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+.eg-th-sort:hover {
+  color: var(--rdc-blue, #0056b3);
+}
+.fiche-add-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+.fiche-add-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--egouv-line, #d0d7e2);
+  background: #fff;
+  border-radius: 8px;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  color: inherit;
+}
+.fiche-add-step.is-active {
+  border-color: var(--rdc-blue, #0056b3);
+  font-weight: 600;
+  box-shadow: 0 0 0 2px rgba(0, 86, 179, 0.12);
+}
+.fiche-add-step-num {
+  display: inline-grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: rgba(0, 86, 179, 0.1);
+  font-weight: 700;
+  font-size: 0.72rem;
+}
+.fiche-add-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.85rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--egouv-line, #d0d7e2);
+}
+.filiation-seq {
+  border: 1px solid var(--egouv-line, #d0d7e2);
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+  margin-bottom: 0.75rem;
+  background: rgba(0, 86, 179, 0.02);
+}
+.filiation-seq-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  margin: 0 0 0.55rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.filiation-seq-num {
+  display: inline-grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  background: var(--rdc-blue, #0056b3);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 .eg-acts-table-scroll {
   overflow-x: auto;

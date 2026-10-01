@@ -198,6 +198,7 @@ export default function PersonPicker({
   const [results, setResults] = useState<Person[]>([]);
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editorOnLastStep, setEditorOnLastStep] = useState(false);
 
   const isPere =
     label.toLowerCase().includes("papa") || label.toLowerCase().includes("père");
@@ -208,6 +209,7 @@ export default function PersonPicker({
     if (forceAddOpen) {
       setFiche(seedFromQuery(sexFilter, query));
       setOpen(false);
+      setEditorOnLastStep(false);
       setModal(true);
       onForceAddConsumed?.();
     }
@@ -265,6 +267,7 @@ export default function PersonPicker({
     setError(null);
     setOpen(false);
     setResults([]);
+    setEditorOnLastStep(false);
     setModal(true);
   }
 
@@ -608,6 +611,7 @@ export default function PersonPicker({
                     onChange={setFiche}
                     sexeLocked={sexFilter}
                     compact={isPere || isMere}
+                    onLastStepChange={setEditorOnLastStep}
                   />
 
                   {error ? <div className="login-error">{error}</div> : null}
@@ -625,7 +629,12 @@ export default function PersonPicker({
                       type="button"
                       className="btn-primary"
                       style={{ width: "auto", minWidth: 180 }}
-                      disabled={saving}
+                      disabled={saving || !editorOnLastStep}
+                      title={
+                        editorOnLastStep
+                          ? undefined
+                          : "Parcourez toutes les étapes avant d'enregistrer"
+                      }
                       onClick={() => void saveNewPerson()}
                     >
                       {saving ? "Enregistrement…" : "Enregistrer et lier"}

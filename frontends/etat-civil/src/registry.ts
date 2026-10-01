@@ -123,6 +123,17 @@ export function isActCountedInTotals(a: { type?: string; status?: string | null 
   return s === "VALIDATED" || s === "AUTHENTICATED" || s === "ARCHIVED";
 }
 
+/** Acte figé : plus de modification ni suppression (rectification via Corrections uniquement). */
+export function isActImmutable(a: { status?: string | null; type?: string }): boolean {
+  const s = String(a.status ?? "").toUpperCase().trim();
+  return (
+    s === "VALIDATED" ||
+    s === "AUTHENTICATED" ||
+    s === "ARCHIVED" ||
+    s === "RECORDED"
+  );
+}
+
 export type MarriageLink = {
   id: string;
   act_number: string;

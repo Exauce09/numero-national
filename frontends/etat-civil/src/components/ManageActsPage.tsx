@@ -14,6 +14,7 @@ import {
   getAct,
   getPersonByNic,
   isActCountedInTotals,
+  isActImmutable,
   listActs,
   upsertActsFromApi,
   type Act,
@@ -21,6 +22,7 @@ import {
 } from "../registry";
 import { RDC_CHART_SERIES, rdcColor } from "../rdcColors";
 import { actInViewerScope } from "../viewerScope";
+import { canCreateActs } from "../rbac";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "Brouillon",
@@ -242,6 +244,9 @@ export default function ManageActsPage({
   const [viewAct, setViewAct] = useState<Act | null>(null);
   const [tick, setTick] = useState(0);
   const [source, setSource] = useState<"api" | "cache">("cache");
+  const [sortKey, setSortKey] = useState<"sexe" | "status" | "created_at" | "act_number" | "primary" | "secondary" | "tertiary">("created_at");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const allowCreate = canCreateActs(session?.roles);
 
   useEffect(() => {
     const f = searchParams.get("focus");
@@ -249,7 +254,6 @@ export default function ManageActsPage({
       setStatusFocus(f);
       if (f === "drafts" || f === "validated") {
         setMonthFilter("");
-        setQ("");
       }
     }
   }, [searchParams]);
@@ -262,7 +266,6 @@ export default function ManageActsPage({
     setSearchParams(next, { replace: true });
     if (focus === "drafts" || focus === "validated") {
       setMonthFilter("");
-      setQ("");
     }
     setPage(1);
     window.requestAnimationFrame(() => {
@@ -316,7 +319,7 @@ export default function ManageActsPage({
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return all.filter((act) => {
+    const filtered = all.filter((act) => {
       if (monthFilter && monthKey(act.created_at) !== monthFilter) return false;
       const st = String(act.status ?? "DRAFT").toUpperCase().trim();
       if (statusFocus === "drafts" && !(draftStatuses.has(st) || !st)) return false;
@@ -326,11 +329,54 @@ export default function ManageActsPage({
         act.act_number,
         act.national_id,
         act.status ?? "",
+        statusLabel(act.status),
         ...config.summaryFields.map((f) => String(act.payload[f.key] ?? "")),
       ];
       return parts.join(" ").toLowerCase().includes(needle);
     });
-  }, [all, config.summaryFields, q, monthFilter, statusFocus, draftStatuses]);
+
+    const dir = sortDir === "asc" ? 1 : -1;
+    const sorted = [...filtered].sort((a, b) => {
+      let av = "";
+      let bv = "";
+      if (sortKey === "created_at") {
+        return (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * dir;
+      }
+      if (sortKey === "status") {
+        av = statusLabel(a.status);
+        bv = statusLabel(b.status);
+      } else if (sortKey === "act_number") {
+        av = a.act_number;
+        bv = b.act_number;
+      } else if (sortKey === "sexe" || sortKey === "primary" || sortKey === "secondary" || sortKey === "tertiary") {
+        const field =
+          sortKey === "sexe"
+            ? config.summaryFields.find((f) => f.key === "sexe")
+            : sortKey === "primary"
+              ? config.summaryFields[0]
+              : sortKey === "secondary"
+                ? config.summaryFields[1]
+                : config.summaryFields[2];
+        av = field ? cell(a, field.key) : "";
+        bv = field ? cell(b, field.key) : "";
+      }
+      return av.localeCompare(bv, "fr", { sensitivity: "base" }) * dir;
+    });
+    return sorted;
+  }, [all, config.summaryFields, q, monthFilter, statusFocus, draftStatuses, sortKey, sortDir]);
+
+  function toggleSort(key: typeof sortKey) {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setSortDir(key === "created_at" ? "desc" : "asc");
+    }
+  }
+
+  function sortMark(key: typeof sortKey) {
+    if (sortKey !== key) return " ↕";
+    return sortDir === "asc" ? " ↑" : " ↓";
+  }
 
   useEffect(() => {
     setPage(1);
@@ -456,9 +502,15 @@ export default function ManageActsPage({
             )}
           </p>
         </div>
-        <button type="button" className="btn-add" onClick={() => navigate(config.createPath)}>
-          + Ajouter
-        </button>
+        {allowCreate ? (
+          <button type="button" className="btn-add" onClick={() => navigate(config.createPath)}>
+            + Ajouter
+          </button>
+        ) : (
+          <p className="muted small" style={{ margin: 0, maxWidth: 280, textAlign: "right" }}>
+            Consultation seule — l&apos;enregistrement se fait au bureau communal.
+          </p>
+        )}
       </div>
 
       {pendingHospital > 0 ? (
@@ -548,7 +600,7 @@ export default function ManageActsPage({
         <div className="panel-head">
           <div className="eg-filter-bar">
             <label className="muted small" htmlFor={`search-${config.slug}`}>
-              Search:
+              Recherche :
             </label>
             <input
               id={`search-${config.slug}`}
@@ -596,6 +648,17 @@ export default function ManageActsPage({
                   ? " · validés uniquement (hors brouillons)"
                   : ""}
             </span>
+            <label className="muted small" htmlFor={`search-table-${config.slug}`} style={{ marginLeft: "auto" }}>
+              Recherche
+            </label>
+            <input
+              id={`search-table-${config.slug}`}
+              className="form-control"
+              style={{ marginBottom: 0, minWidth: 180, maxWidth: 260 }}
+              placeholder={config.searchHint}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
           </div>
           {statusFocus === "drafts" ? (
             <p className="muted small" style={{ margin: "0.5rem 0.85rem" }}>
@@ -611,12 +674,50 @@ export default function ManageActsPage({
                 <tr>
                   <th>#</th>
                   <th>Photo</th>
-                  <th>{actRefLabel(config.actType)}</th>
-                  {primary ? <th>{primary.label}</th> : null}
-                  {secondary ? <th>{secondary.label}</th> : null}
-                  {tertiary ? <th>{tertiary.label}</th> : null}
-                  <th>Statut</th>
-                  <th>Enregistré le</th>
+                  <th>
+                    <button type="button" className="eg-th-sort" onClick={() => toggleSort("act_number")}>
+                      {actRefLabel(config.actType)}
+                      {sortMark("act_number")}
+                    </button>
+                  </th>
+                  {primary ? (
+                    <th>
+                      <button type="button" className="eg-th-sort" onClick={() => toggleSort("primary")}>
+                        {primary.label}
+                        {sortMark("primary")}
+                      </button>
+                    </th>
+                  ) : null}
+                  {secondary ? (
+                    <th>
+                      <button type="button" className="eg-th-sort" onClick={() => toggleSort("secondary")}>
+                        {secondary.label}
+                        {sortMark("secondary")}
+                      </button>
+                    </th>
+                  ) : null}
+                  {tertiary ? (
+                    <th>
+                      <button
+                        type="button"
+                        className="eg-th-sort"
+                        onClick={() => toggleSort(tertiary.key === "sexe" ? "sexe" : "tertiary")}
+                      >
+                        {tertiary.label}
+                        {sortMark(tertiary.key === "sexe" ? "sexe" : "tertiary")}
+                      </button>
+                    </th>
+                  ) : null}
+                  <th>
+                    <button type="button" className="eg-th-sort" onClick={() => toggleSort("status")}>
+                      Statut{sortMark("status")}
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className="eg-th-sort" onClick={() => toggleSort("created_at")}>
+                      Enregistré le{sortMark("created_at")}
+                    </button>
+                  </th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -626,7 +727,8 @@ export default function ManageActsPage({
                     <td colSpan={6 + (primary ? 1 : 0) + (secondary ? 1 : 0) + (tertiary ? 1 : 0)} className="muted">
                       {statusFocus === "drafts"
                         ? "Aucun dossier à valider pour le moment."
-                        : "Aucun enregistrement. Cliquez « + Ajouter » pour créer."}
+                        : "Aucun enregistrement." +
+                          (allowCreate ? " Cliquez « + Ajouter » pour créer." : "")}
                     </td>
                   </tr>
                 ) : (
@@ -635,6 +737,7 @@ export default function ManageActsPage({
                     const label = subjectLabel(a, config);
                     const st = String(a.status ?? "DRAFT").toUpperCase();
                     const pending = ["DRAFT", "SUBMITTED", "UNDER_REVIEW", "PENDING_OFFICER", "CORRECTION_REQUIRED"].includes(st);
+                    const locked = isActImmutable(a);
                     return (
                       <tr key={a.id} className={pending ? "eg-row-pending" : undefined}>
                         <td>{(safePage - 1) * PAGE_SIZE + i + 1}</td>
@@ -667,21 +770,29 @@ export default function ManageActsPage({
                           >
                             Voir
                           </button>
-                          <button
-                            type="button"
-                            className="btn-secondary btn-sm"
-                            onClick={() => setViewAct(getAct(a.id) ?? a)}
-                          >
-                            Modifier
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-secondary btn-sm"
-                            title="Les actes validés se rectifient via Corrections"
-                            onClick={() => navigate("/corrections")}
-                          >
-                            Supprimer
-                          </button>
+                          {locked ? (
+                            <span className="muted small" title="Acte validé — modification et suppression interdites">
+                              Verrouillé
+                            </span>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                className="btn-secondary btn-sm"
+                                onClick={() => setViewAct(getAct(a.id) ?? a)}
+                              >
+                                Modifier
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-secondary btn-sm"
+                                title="Les actes validés se rectifient via Corrections"
+                                onClick={() => navigate("/corrections")}
+                              >
+                                Supprimer
+                              </button>
+                            </>
+                          )}
                         </td>
                       </tr>
                     );

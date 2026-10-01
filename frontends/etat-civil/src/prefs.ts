@@ -66,20 +66,48 @@ export function saveNotifications(rows: AppNotification[]): void {
   localStorage.setItem(NOTIF_KEY, JSON.stringify(rows));
 }
 
+const DISMISSED_KEY = "nn_etat_civil_notifs_dismissed";
+
+function listDismissedIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DISMISSED_KEY);
+    if (raw) return new Set(JSON.parse(raw) as string[]);
+  } catch {
+    /* ignore */
+  }
+  return new Set();
+}
+
+function saveDismissedIds(ids: Set<string>): void {
+  localStorage.setItem(DISMISSED_KEY, JSON.stringify([...ids].slice(-200)));
+}
+
+function rememberDismissed(id: string): void {
+  const set = listDismissedIds();
+  set.add(id);
+  saveDismissedIds(set);
+}
+
 export function unreadCount(): number {
   return listNotifications().filter((n) => !n.read).length;
 }
 
+/** Lu / validé → suppression immédiate de la notification. */
 export function markNotificationRead(id: string): AppNotification[] {
-  const rows = listNotifications().map((n) => (n.id === id ? { ...n, read: true } : n));
+  rememberDismissed(id);
+  const rows = listNotifications().filter((n) => n.id !== id);
   saveNotifications(rows);
   return rows;
 }
 
+/** Tout marquer lu / tout valider → vide la file. */
 export function markAllNotificationsRead(): AppNotification[] {
-  const rows = listNotifications().map((n) => ({ ...n, read: true }));
-  saveNotifications(rows);
-  return rows;
+  const existing = listNotifications();
+  const dismissed = listDismissedIds();
+  for (const n of existing) dismissed.add(n.id);
+  saveDismissedIds(dismissed);
+  saveNotifications([]);
+  return [];
 }
 
 export function pushNotification(input: {
@@ -113,6 +141,18 @@ export function syncDeclarationNotifications(
   const prevRead = new Map(
     existing.filter((n) => n.id.startsWith("decl-")).map((n) => [n.id, n.read] as const),
   );
+  const dismissed = listDismissedIds();
+  const pendingIds = new Set(pending.map((d) => `decl-${d.id}`));
+  // Nettoie les dismissals des déclarations déjà traitées.
+  let dismissedDirty = false;
+  for (const id of [...dismissed]) {
+    if (id.startsWith("decl-") && !pendingIds.has(id)) {
+      dismissed.delete(id);
+      dismissedDirty = true;
+    }
+  }
+  if (dismissedDirty) saveDismissedIds(dismissed);
+
   const generated: AppNotification[] = pending
     .filter((d) => {
       const t = String(d.declaration_type).toUpperCase();
@@ -141,9 +181,10 @@ export function syncDeclarationNotifications(
         read: prevRead.get(id) === true,
         href: "/declarations",
       };
-    });
+    })
+    .filter((n) => !dismissed.has(n.id) && prevRead.get(n.id) !== true);
   // Conserve les notifs système hors déclarations (ex. validation effectuée).
-  const others = existing.filter((n) => !n.id.startsWith("decl-"));
+  const others = existing.filter((n) => !n.id.startsWith("decl-") && !dismissed.has(n.id));
   const merged = [...generated, ...others].slice(0, 50);
   saveNotifications(merged);
   return merged;

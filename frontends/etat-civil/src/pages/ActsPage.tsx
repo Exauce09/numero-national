@@ -13,6 +13,7 @@ import {
   getAct,
   getPersonByNic,
   isActCountedInTotals,
+  isActImmutable,
   listActs,
   updateAct,
   upsertActsFromApi,
@@ -444,6 +445,7 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
               ) : (
                 pageRows.map((a, i) => {
                   const person = a.national_id ? getPersonByNic(a.national_id) : undefined;
+                  const locked = isActImmutable(a);
                   return (
                     <tr key={a.id}>
                       <td>{(safePage - 1) * PAGE_SIZE + i + 1}</td>
@@ -468,24 +470,32 @@ export default function ActsPage({ showAnalytics = false }: { showAnalytics?: bo
                         >
                           Voir
                         </button>
-                        <button
-                          type="button"
-                          className="btn-secondary btn-sm"
-                          onClick={() => {
-                            setEditAct(a);
-                            setEditJson(JSON.stringify(a.payload, null, 2));
-                          }}
-                        >
-                          Modifier
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-secondary btn-sm"
-                          title="Rectification officielle"
-                          onClick={() => navigate("/corrections")}
-                        >
-                          Supprimer
-                        </button>
+                        {locked ? (
+                          <span className="muted small" title="Acte validé — modification et suppression interdites">
+                            Verrouillé
+                          </span>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              className="btn-secondary btn-sm"
+                              onClick={() => {
+                                setEditAct(a);
+                                setEditJson(JSON.stringify(a.payload, null, 2));
+                              }}
+                            >
+                              Modifier
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-secondary btn-sm"
+                              title="Rectification officielle"
+                              onClick={() => navigate("/corrections")}
+                            >
+                              Supprimer
+                            </button>
+                          </>
+                        )}
                       </td>
                     </tr>
                   );

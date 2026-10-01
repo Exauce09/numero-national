@@ -12,7 +12,7 @@ import {
   isSuperAdminNational,
   permissionsForRoles,
 } from "./ecUsers";
-import { canAccessPath, canSeeNav, isDivinterViewer, isJudicialRole, primaryRole, roleTitleFor } from "./rbac";
+import { canAccessPath, canCreateActs, canSeeNav, isDivinterViewer, isJudicialRole, isNationalViewer, primaryRole, roleTitleFor } from "./rbac";
 import {
   applyTheme,
   getPrefs,
@@ -144,6 +144,13 @@ function NavCollapsibleGroup({
 function RequireCivilBureau({ children }: { children: ReactNode }) {
   const session = getSession();
   if (isJudicialRole(session?.roles)) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
+/** Bloque la saisie d'actes pour le niveau national / divinter. */
+function RequireActRegistration({ children }: { children: ReactNode }) {
+  const session = getSession();
+  if (!canCreateActs(session?.roles)) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -319,17 +326,31 @@ function Shell() {
   const communeLabel = session?.commune_name
     ? `Commune de ${session.commune_name}`
     : null;
-  const territoryLine = [
-    session?.commune_province,
-    session?.commune_ville,
-    session?.commune_name ? `Commune de ${session.commune_name}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
   const roles = session?.roles ?? ["OFFICIER_ETAT_CIVIL"];
   const judicialOnly = isJudicialRole(roles);
   const judicialKind = primaryRole(roles);
   const role = primaryRole(roles);
+  const nationalOnly = isNationalViewer(roles);
+  const divinterOnly = isDivinterViewer(roles);
+  const provinceLabel = session?.commune_province
+    ? `Province ${session.commune_province}`
+    : null;
+  /** Périmètre affiché selon le rôle : national (aucun), divinter (province), officier/préposé (commune). */
+  const scopeLabel = nationalOnly
+    ? null
+    : divinterOnly
+      ? provinceLabel
+      : communeLabel ||
+        (session?.commune_name
+          ? `Commune de ${session.commune_name}`
+          : null);
+  const territoryLine = nationalOnly
+    ? null
+    : divinterOnly
+      ? provinceLabel
+      : [session?.commune_province, session?.commune_ville, communeLabel]
+          .filter(Boolean)
+          .join(" · ") || null;
   const badge = unreadCount();
   const photo = prefs.photoDataUrl || session?.photoDataUrl;
 
@@ -344,10 +365,10 @@ function Shell() {
           ? "Divinter · division provinciale"
           : role === "OFFICIER_ETAT_CIVIL"
             ? "Officier d'état civil"
-            : role === "SUPER_ADMIN_NATIONAL"
+            : role === "SUPER_ADMIN_NATIONAL" || role === "ADMIN_NATIONAL" || role === "CENTRAL_ADMIN"
               ? "État civil national"
               : roleTitle,
-    communeLabel || territoryLine || null,
+    scopeLabel,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -402,9 +423,9 @@ function Shell() {
             <NavCollapsibleGroup
               label="Indicateurs"
               icon={<IconTable size={18} />}
-              activePrefixes={["/indicateurs-eac", "/indicateurs-rdc"]}
+              activePrefixes={["/indicateurs-rdc", "/indicateurs-eac"]}
             >
-              <NavLink to="/indicateurs-rdc">Indicateurs RDC (45 + prévisions)</NavLink>
+              <NavLink to="/indicateurs-rdc">Indicateurs ODD (45 + prévisions)</NavLink>
               <NavLink to="/indicateurs-eac">Indicateurs EAC / CAE</NavLink>
             </NavCollapsibleGroup>
           ) : null}
@@ -495,13 +516,13 @@ function Shell() {
           <div className="topbar-right">
             <div
               className="topbar-identity"
-              title={[roleTitle, territoryLine || communeLabel].filter(Boolean).join(" · ")}
+              title={[roleTitle, scopeLabel || territoryLine].filter(Boolean).join(" · ")}
             >
               <strong className="topbar-responsable">{responsableLabel}</strong>
               <span className="topbar-role">{roleTitle}</span>
-              {communeLabel || territoryLine ? (
+              {scopeLabel ? (
                 <span className="topbar-role" style={{ opacity: 0.85, fontWeight: 600 }}>
-                  {territoryLine || communeLabel}
+                  {scopeLabel}
                 </span>
               ) : null}
             </div>
@@ -629,13 +650,13 @@ function Shell() {
             <Route path="/lists/mariage" element={<RequireCivilBureau><ManageActsPage config={MANAGE_CONFIGS.mariage} showAnalytics /></RequireCivilBureau>} />
             <Route path="/lists/naissance" element={<RequireCivilBureau><ManageActsPage config={MANAGE_CONFIGS.naissance} showAnalytics /></RequireCivilBureau>} />
             <Route path="/lists/acts" element={<RequireCivilBureau><ActsPage showAnalytics /></RequireCivilBureau>} />
-            <Route path="/births" element={<RequireCivilBureau><BirthsPage /></RequireCivilBureau>} />
-            <Route path="/deaths" element={<RequireCivilBureau><DeathsPage /></RequireCivilBureau>} />
-            <Route path="/marriages" element={<RequireCivilBureau><MarriagesPage /></RequireCivilBureau>} />
-            <Route path="/adoptions" element={<AdoptionsPage />} />
-            <Route path="/recognitions" element={<RequireCivilBureau><RecognitionsPage /></RequireCivilBureau>} />
-            <Route path="/divorces" element={<DivorcesPage />} />
-            <Route path="/documents" element={<DocumentsPage />} />
+            <Route path="/births" element={<RequireCivilBureau><RequireActRegistration><BirthsPage /></RequireActRegistration></RequireCivilBureau>} />
+            <Route path="/deaths" element={<RequireCivilBureau><RequireActRegistration><DeathsPage /></RequireActRegistration></RequireCivilBureau>} />
+            <Route path="/marriages" element={<RequireCivilBureau><RequireActRegistration><MarriagesPage /></RequireActRegistration></RequireCivilBureau>} />
+            <Route path="/adoptions" element={<RequireActRegistration><AdoptionsPage /></RequireActRegistration>} />
+            <Route path="/recognitions" element={<RequireCivilBureau><RequireActRegistration><RecognitionsPage /></RequireActRegistration></RequireCivilBureau>} />
+            <Route path="/divorces" element={<RequireActRegistration><DivorcesPage /></RequireActRegistration>} />
+            <Route path="/documents" element={<RequireActRegistration><DocumentsPage /></RequireActRegistration>} />
             <Route path="/verify-document" element={<RequireCivilBureau><DocumentVerifyPage /></RequireCivilBureau>} />
             <Route path="/acts" element={<RequireCivilBureau><ActsPage /></RequireCivilBureau>} />
             <Route path="/acts/qrcode" element={<RequireCivilBureau><ActQrScanPage /></RequireCivilBureau>} />
@@ -669,7 +690,7 @@ function Shell() {
                   className="btn-add btn-sm"
                   onClick={() => setNotifs(markAllNotificationsRead())}
                 >
-                  Tout marquer lu
+                  Tout valider
                 </button>
                 <button type="button" className="btn-secondary btn-sm" onClick={() => setNotifOpen(false)}>
                   Fermer
@@ -686,15 +707,13 @@ function Shell() {
                   {new Date(n.created_at).toLocaleString("fr-CD")}
                 </p>
                 <div className="table-actions">
-                  {!n.read ? (
-                    <button
-                      type="button"
-                      className="btn-add btn-sm"
-                      onClick={() => setNotifs(markNotificationRead(n.id))}
-                    >
-                      Marquer lu
-                    </button>
-                  ) : null}
+                  <button
+                    type="button"
+                    className="btn-add btn-sm"
+                    onClick={() => setNotifs(markNotificationRead(n.id))}
+                  >
+                    Valider / Lu
+                  </button>
                   {n.href ? (
                     <button
                       type="button"
@@ -711,6 +730,11 @@ function Shell() {
                 </div>
               </article>
             ))}
+            {notifs.length === 0 ? (
+              <p className="muted" style={{ margin: "0.75rem 0 0" }}>
+                Aucune notification.
+              </p>
+            ) : null}
           </div>
         </div>
       ) : null}

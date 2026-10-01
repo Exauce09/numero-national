@@ -1,6 +1,6 @@
 /** Formulaire d'ajout personne — champs standards + origine / adresse séparées. */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ETAT_CIVIL_OPTIONS, type EtatCivil, type Sexe } from "../registry";
 import { listKnownProfessions, PROFESSIONS_KEY, rememberNamed } from "../namedLists";
 import { emptyFichePerson, type FichePersonBlock } from "./FicheIdentificationForm";
@@ -71,6 +71,8 @@ type Props = {
   onChange: (next: FicheEditorState) => void;
   sexeLocked?: Sexe;
   compact?: boolean;
+  /** Notifie le parent quand on est sur la dernière étape (pour afficher Enregistrer). */
+  onLastStepChange?: (isLast: boolean) => void;
 };
 
 /** Province → Territoire → Secteur → Village (+ Ajouter si manquant). */
@@ -244,12 +246,35 @@ export default function FicheIdentificationEditor({
   onChange,
   sexeLocked,
   compact = false,
+  onLastStepChange,
 }: Props) {
   const i = value.interesse;
   const professions = useMemo(() => listKnownProfessions([i.profession]), [i.profession]);
   const [originGeo, setOriginGeo] = useState<GeoSelection>({});
   const [addressGeo, setAddressGeo] = useState<GeoSelection>({});
   const [adresseComplement, setAdresseComplement] = useState("");
+  const steps = useMemo(
+    () =>
+      compact
+        ? [
+            { id: 1, label: "Identité" },
+            { id: 2, label: "Naissance" },
+            { id: 3, label: "Origine & adresse" },
+          ]
+        : [
+            { id: 1, label: "Identité" },
+            { id: 2, label: "Naissance" },
+            { id: 3, label: "Origine & adresse" },
+            { id: 4, label: "Parents" },
+          ],
+    [compact],
+  );
+  const [step, setStep] = useState(1);
+  const maxStep = steps[steps.length - 1]?.id ?? 1;
+
+  useEffect(() => {
+    onLastStepChange?.(step >= maxStep);
+  }, [step, maxStep, onLastStepChange]);
 
   function patchInteresse(patch: Partial<typeof i>) {
     const sexe_code = sexeLocked ?? patch.sexe_code ?? i.sexe_code;
@@ -288,6 +313,12 @@ export default function FicheIdentificationEditor({
 
   const interesseOrigin = originSummary(i);
 
+  function canGoNext(): boolean {
+    if (step === 1) return Boolean(i.nom.trim() && i.prenom.trim());
+    if (step === 2) return Boolean(i.date_naissance);
+    return true;
+  }
+
   return (
     <div className="fiche-ident-edit fiche-ident-form-normal">
       <div className="panel" style={{ margin: 0, boxShadow: "none" }}>
@@ -297,184 +328,212 @@ export default function FicheIdentificationEditor({
               Ajouter une personne
             </h3>
             <p className="muted small" style={{ margin: "0.25rem 0 0" }}>
-              Bureau : Commune de {value.communeName || "—"} · {value.villeProvince || "RDC"}
+              Bureau : Commune de {value.communeName || "—"} · {value.villeProvince || "RDC"} — saisie
+              en séquence
             </p>
           </div>
         </div>
 
-        <div className="form-grid">
-          <div>
-            <label className="form-label">Nom *</label>
-            <input
-              className="form-control"
-              value={i.nom}
-              onChange={(e) => patchInteresse({ nom: e.target.value })}
-              required
-              autoFocus
-            />
-          </div>
-          <div>
-            <label className="form-label">Post-nom</label>
-            <input
-              className="form-control"
-              value={i.postnom}
-              onChange={(e) => patchInteresse({ postnom: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="form-label">Prénom *</label>
-            <input
-              className="form-control"
-              value={i.prenom}
-              onChange={(e) => patchInteresse({ prenom: e.target.value })}
-              required
-            />
-          </div>
-          <div>
-            <label className="form-label">Sexe *</label>
-            {sexeLocked ? (
-              <input
-                className="form-control"
-                value={sexeLocked === "F" ? "Féminin" : "Masculin"}
-                readOnly
-              />
-            ) : (
-              <select
-                className="form-control"
-                value={i.sexe_code}
-                onChange={(e) => patchInteresse({ sexe_code: e.target.value as Sexe })}
-              >
-                <option value="M">Masculin</option>
-                <option value="F">Féminin</option>
-              </select>
-            )}
-          </div>
-          <div>
-            <label className="form-label">État civil *</label>
-            <select
-              className="form-control"
-              value={i.etat_civil_code}
-              onChange={(e) => {
-                const code = e.target.value as EtatCivil;
-                const opt = ETAT_CIVIL_OPTIONS.find((o) => o.value === code);
-                patchInteresse({ etat_civil_code: code, etat_civil: opt?.label || code });
+        <div className="fiche-add-steps" role="tablist" aria-label="Étapes d'ajout">
+          {steps.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              role="tab"
+              aria-selected={step === s.id}
+              className={`fiche-add-step${step === s.id ? " is-active" : ""}`}
+              onClick={() => {
+                if (s.id <= step || (s.id === step + 1 && canGoNext())) setStep(s.id);
               }}
             >
-              {ETAT_CIVIL_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="form-label">Nationalité</label>
-            <input
-              className="form-control"
-              value={i.nationalite}
-              onChange={(e) => patchInteresse({ nationalite: e.target.value })}
-            />
-          </div>
+              <span className="fiche-add-step-num">{s.id}</span>
+              {s.label}
+            </button>
+          ))}
+        </div>
 
-          <div className="full">
-            <LieuNaissanceField
-              label="Lieu de naissance"
-              value={i.lieu_date_naissance}
-              onChange={(text) => patchInteresse({ lieu_date_naissance: text })}
-              placeholder="Tapez un lieu — ex. Tshilenge, Nsele…"
-            />
-          </div>
-          <div>
-            <label className="form-label">Date de naissance *</label>
-            <input
-              className="form-control"
-              type="date"
-              value={i.date_naissance}
-              onChange={(e) => patchInteresse({ date_naissance: e.target.value })}
-              required
-            />
-          </div>
+        <div className="form-grid">
+          {step === 1 ? (
+            <>
+              <div>
+                <label className="form-label">Nom *</label>
+                <input
+                  className="form-control"
+                  value={i.nom}
+                  onChange={(e) => patchInteresse({ nom: e.target.value })}
+                  required
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="form-label">Post-nom</label>
+                <input
+                  className="form-control"
+                  value={i.postnom}
+                  onChange={(e) => patchInteresse({ postnom: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="form-label">Prénom *</label>
+                <input
+                  className="form-control"
+                  value={i.prenom}
+                  onChange={(e) => patchInteresse({ prenom: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <label className="form-label">Sexe *</label>
+                {sexeLocked ? (
+                  <input
+                    className="form-control"
+                    value={sexeLocked === "F" ? "Féminin" : "Masculin"}
+                    readOnly
+                  />
+                ) : (
+                  <select
+                    className="form-control"
+                    value={i.sexe_code}
+                    onChange={(e) => patchInteresse({ sexe_code: e.target.value as Sexe })}
+                  >
+                    <option value="M">Masculin</option>
+                    <option value="F">Féminin</option>
+                  </select>
+                )}
+              </div>
+              <div>
+                <label className="form-label">État civil *</label>
+                <select
+                  className="form-control"
+                  value={i.etat_civil_code}
+                  onChange={(e) => {
+                    const code = e.target.value as EtatCivil;
+                    const opt = ETAT_CIVIL_OPTIONS.find((o) => o.value === code);
+                    patchInteresse({ etat_civil_code: code, etat_civil: opt?.label || code });
+                  }}
+                >
+                  {ETAT_CIVIL_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Nationalité</label>
+                <input
+                  className="form-control"
+                  value={i.nationalite}
+                  onChange={(e) => patchInteresse({ nationalite: e.target.value })}
+                />
+              </div>
+            </>
+          ) : null}
 
-          <div className="full">
-            <label className="form-label">Profession</label>
-            <input
-              className="form-control"
-              list="fiche-professions"
-              value={i.profession}
-              onChange={(e) => {
-                patchInteresse({ profession: e.target.value });
-                if (e.target.value.trim().length > 2) rememberNamed(PROFESSIONS_KEY, e.target.value);
-              }}
-              placeholder="Choisir ou saisir…"
-            />
-            <datalist id="fiche-professions">
-              {professions.map((p) => (
-                <option key={p} value={p} />
-              ))}
-            </datalist>
-          </div>
-
-          <NiveauEtudeField
-            className="full"
-            value={i.niveau_etude || ""}
-            onChange={(code) => patchInteresse({ niveau_etude: code })}
-          />
-
-          <div className="full">
-            <OriginGeoField
-              label="Origine"
-              help="Lieu d’origine de la personne (ancestral / natif) — distinct de l’adresse de résidence."
-              value={originGeo}
-              onChange={applyOrigin}
-            />
-            {interesseOrigin ? (
-              <p className="muted small" style={{ marginTop: 6 }}>
-                Origine enregistrée : <strong>{interesseOrigin}</strong>
-              </p>
-            ) : null}
-          </div>
-
-          <div className="full">
-            <fieldset className="id-fieldset" style={{ margin: 0 }}>
-              <legend className="form-label" style={{ padding: "0 0.35rem" }}>
-                Adresse de résidence (actuelle)
-              </legend>
-              <p className="muted small" style={{ margin: "0 0 0.65rem" }}>
-                Ville ou Territoire, puis Commune/Secteur. Utilisez <strong>+ Ajouter</strong> si un
-                lieu manque.
-              </p>
-              <GeoCascade
-                embedded
-                allowAdd
-                levels={GEO_PRESETS.address}
-                fieldLabels={{
-                  ...ADDRESS_FIELD_LABELS,
-                  commune: "Commune / Secteur",
-                  localite: "Village",
-                  avenue: "Avenue",
-                }}
-                value={addressGeo}
-                onChange={applyAddress}
-                label="Adresse de résidence"
+          {step === 2 ? (
+            <>
+              <div className="full">
+                <LieuNaissanceField
+                  label="Lieu de naissance"
+                  value={i.lieu_date_naissance}
+                  onChange={(text) => patchInteresse({ lieu_date_naissance: text })}
+                  placeholder="Tapez un lieu — ex. Tshilenge, Nsele…"
+                />
+              </div>
+              <div>
+                <label className="form-label">Date de naissance *</label>
+                <input
+                  className="form-control"
+                  type="date"
+                  value={i.date_naissance}
+                  onChange={(e) => patchInteresse({ date_naissance: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="full">
+                <label className="form-label">Profession</label>
+                <input
+                  className="form-control"
+                  list="fiche-professions"
+                  value={i.profession}
+                  onChange={(e) => {
+                    patchInteresse({ profession: e.target.value });
+                    if (e.target.value.trim().length > 2) rememberNamed(PROFESSIONS_KEY, e.target.value);
+                  }}
+                  placeholder="Choisir ou saisir…"
+                />
+                <datalist id="fiche-professions">
+                  {professions.map((p) => (
+                    <option key={p} value={p} />
+                  ))}
+                </datalist>
+              </div>
+              <NiveauEtudeField
+                className="full"
+                value={i.niveau_etude || ""}
+                onChange={(code) => patchInteresse({ niveau_etude: code })}
               />
-            </fieldset>
-            <label className="form-label" style={{ marginTop: "0.65rem" }}>
-              Complément d&apos;adresse
-            </label>
-            <input
-              className="form-control"
-              value={adresseComplement}
-              onChange={(e) => onComplement(e.target.value)}
-              placeholder="Parcelle, référence, point de repère…"
-            />
-            {i.adresse ? (
-              <p className="muted small" style={{ marginTop: 6 }}>
-                Adresse enregistrée : <strong>{i.adresse}</strong>
-              </p>
-            ) : null}
-          </div>
+            </>
+          ) : null}
 
-          {!compact ? (
+          {step === 3 ? (
+            <>
+              <div className="full">
+                <OriginGeoField
+                  label="Origine"
+                  help="Lieu d’origine de la personne (ancestral / natif) — distinct de l’adresse de résidence."
+                  value={originGeo}
+                  onChange={applyOrigin}
+                />
+                {interesseOrigin ? (
+                  <p className="muted small" style={{ marginTop: 6 }}>
+                    Origine enregistrée : <strong>{interesseOrigin}</strong>
+                  </p>
+                ) : null}
+              </div>
+              <div className="full">
+                <fieldset className="id-fieldset" style={{ margin: 0 }}>
+                  <legend className="form-label" style={{ padding: "0 0.35rem" }}>
+                    Adresse de résidence (actuelle)
+                  </legend>
+                  <p className="muted small" style={{ margin: "0 0 0.65rem" }}>
+                    Ville ou Territoire, puis Commune/Secteur. Utilisez <strong>+ Ajouter</strong> si un
+                    lieu manque.
+                  </p>
+                  <GeoCascade
+                    embedded
+                    allowAdd
+                    levels={GEO_PRESETS.address}
+                    fieldLabels={{
+                      ...ADDRESS_FIELD_LABELS,
+                      commune: "Commune / Secteur",
+                      localite: "Village",
+                      avenue: "Avenue",
+                    }}
+                    value={addressGeo}
+                    onChange={applyAddress}
+                    label="Adresse de résidence"
+                  />
+                </fieldset>
+                <label className="form-label" style={{ marginTop: "0.65rem" }}>
+                  Complément d&apos;adresse
+                </label>
+                <input
+                  className="form-control"
+                  value={adresseComplement}
+                  onChange={(e) => onComplement(e.target.value)}
+                  placeholder="Parcelle, référence, point de repère…"
+                />
+                {i.adresse ? (
+                  <p className="muted small" style={{ marginTop: 6 }}>
+                    Adresse enregistrée : <strong>{i.adresse}</strong>
+                  </p>
+                ) : null}
+              </div>
+            </>
+          ) : null}
+
+          {step === 4 && !compact ? (
             <>
               <ParentSection
                 title="Père (optionnel)"
@@ -490,6 +549,31 @@ export default function FicheIdentificationEditor({
               />
             </>
           ) : null}
+        </div>
+
+        <div className="fiche-add-nav">
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={step <= 1}
+            onClick={() => setStep((s) => Math.max(1, s - 1))}
+          >
+            Précédent
+          </button>
+          {step < maxStep ? (
+            <button
+              type="button"
+              className="btn-next"
+              disabled={!canGoNext()}
+              onClick={() => setStep((s) => Math.min(maxStep, s + 1))}
+            >
+              Suivant
+            </button>
+          ) : (
+            <span className="muted small" style={{ alignSelf: "center" }}>
+              Dernière étape — validez avec « Enregistrer et lier »
+            </span>
+          )}
         </div>
       </div>
     </div>

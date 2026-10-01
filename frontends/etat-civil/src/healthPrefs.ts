@@ -62,16 +62,17 @@ export function healthUnreadCount(): number {
   return listHealthNotifications().filter((n) => !n.read).length;
 }
 
+/** Lu / validé → suppression immédiate. */
 export function markHealthNotificationRead(id: string): HealthNotification[] {
-  const rows = listHealthNotifications().map((n) => (n.id === id ? { ...n, read: true } : n));
+  const rows = listHealthNotifications().filter((n) => n.id !== id);
   saveHealthNotifications(rows);
   return rows;
 }
 
+/** Tout marquer lu / tout valider → vide la file. */
 export function markAllHealthNotificationsRead(): HealthNotification[] {
-  const rows = listHealthNotifications().map((n) => ({ ...n, read: true }));
-  saveHealthNotifications(rows);
-  return rows;
+  saveHealthNotifications([]);
+  return [];
 }
 
 export function pushHealthNotification(input: {

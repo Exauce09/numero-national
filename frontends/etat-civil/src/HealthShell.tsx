@@ -205,7 +205,7 @@ export default function HealthShell() {
                 className="btn-add btn-sm"
                 onClick={() => setNotifs(markAllHealthNotificationsRead())}
               >
-                Tout marquer lu
+                Tout valider
               </button>
             </div>
             {notifs.map((n) => (
@@ -218,7 +218,7 @@ export default function HealthShell() {
                     className="btn-sm btn-secondary"
                     onClick={() => setNotifs(markHealthNotificationRead(n.id))}
                   >
-                    Lu
+                    Valider / Lu
                   </button>
                 ) : null}
               </article>

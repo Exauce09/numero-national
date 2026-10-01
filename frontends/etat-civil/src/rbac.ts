@@ -77,6 +77,12 @@ export function isDivinterViewer(roles: string[] | undefined | null): boolean {
   return role === "ADMIN_PROVINCIAL" || role === "RESPONSABLE_BUREAU";
 }
 
+/** État civil national : supervision / stats uniquement — pas d'enregistrement d'actes. */
+export function isNationalViewer(roles: string[] | undefined | null): boolean {
+  const r = normalizeRoles(roles);
+  return r.some((x) => NATIONAL.has(x));
+}
+
 export function primaryRole(roles: string[]): AppRole {
   const r = normalizeRoles(roles);
   if (r.some((x) => NATIONAL.has(x))) return r.find((x) => NATIONAL.has(x))!;
@@ -127,23 +133,20 @@ export function canValidateActs(
   roles: string[] | undefined | null,
   permissions?: string[] | null,
 ): boolean {
-  if (isDivinterViewer(roles)) return false;
+  if (isDivinterViewer(roles) || isNationalViewer(roles)) return false;
   const perms = permissions ?? [];
   if (perms.length > 0) {
     return can("civil:act:validate", perms) || can("*", perms);
   }
   const r = normalizeRoles(roles);
-  return r.some((x) => OFFICIER.has(x) || BUREAU_LEAD.has(x) || NATIONAL.has(x));
+  return r.some((x) => OFFICIER.has(x) || BUREAU_LEAD.has(x));
 }
 
-/** Création / saisie d'actes (pas l'auditeur, le divinter, ni le juge seul). */
+/** Création / saisie d'actes (pas l'auditeur, le divinter, le national, ni le juge seul). */
 export function canCreateActs(roles: string[] | undefined | null): boolean {
-  if (isDivinterViewer(roles)) return false;
+  if (isDivinterViewer(roles) || isNationalViewer(roles)) return false;
   const role = primaryRole(roles ?? []);
   return (
-    role === "SUPER_ADMIN_NATIONAL" ||
-    role === "ADMIN_NATIONAL" ||
-    role === "CENTRAL_ADMIN" ||
     role === "OFFICIER_ETAT_CIVIL" ||
     role === "CIVIL_OFFICER" ||
     role === "AGENT_ETAT_CIVIL" ||
@@ -248,8 +251,10 @@ export function canSeeNav(key: NavKey, roles: string[], permissions?: string[] |
     case "divorces":
     case "documents":
     case "acts_register":
-    case "create_acts":
       return isOfficier || isLead || isProvincial || isNational;
+    case "create_acts":
+      // Officier / agent (branche agent plus haut) — pas le niveau national.
+      return isOfficier && !isNational;
     case "mentions":
     case "transcriptions":
       // Autorité juridique EC uniquement — pas le super admin technique.
@@ -324,13 +329,16 @@ export function canAccessPath(pathname: string, roles: string[] | undefined | nu
   }
   if (path.startsWith("/declarations")) return canSeeNav("declarations", r);
   if (path.startsWith("/corrections")) return canSeeNav("corrections", r);
-  if (path.startsWith("/births") || path.startsWith("/manage/naissance") || path.startsWith("/lists/naissance")) {
+  if (path.startsWith("/births") || path.startsWith("/deaths") || path.startsWith("/marriages")) {
+    return canCreateActs(r);
+  }
+  if (path.startsWith("/manage/naissance") || path.startsWith("/lists/naissance")) {
     return canSeeNav("naissances", r);
   }
-  if (path.startsWith("/marriages") || path.startsWith("/manage/mariage") || path.startsWith("/lists/mariage")) {
+  if (path.startsWith("/manage/mariage") || path.startsWith("/lists/mariage")) {
     return canSeeNav("mariages", r);
   }
-  if (path.startsWith("/deaths") || path.startsWith("/manage/deces") || path.startsWith("/lists/deces")) {
+  if (path.startsWith("/manage/deces") || path.startsWith("/lists/deces")) {
     return canSeeNav("deces", r);
   }
   if (path.startsWith("/divorces") || path.startsWith("/manage/divorce") || path.startsWith("/lists/divorce")) {

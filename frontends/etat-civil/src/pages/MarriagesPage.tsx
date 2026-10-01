@@ -219,11 +219,24 @@ export default function MarriagesPage() {
               Époux et épouse
             </h3>
           </div>
-          <div className="full">
-            <PersonPicker label="Époux *" value={conjoint} onChange={setConjoint} required sexFilter="M" minAge={18} />
+          <div className="full filiation-seq">
+            <p className="filiation-seq-title">
+              <span className="filiation-seq-num">1</span> Époux
+            </p>
+            <PersonPicker label="Époux *" value={conjoint} onChange={setConjoint} required sexFilter="M" minAge={18} addButtonLabel="Saisir / Ajouter l'époux" />
           </div>
-          <div className="full">
-            <PersonPicker label="Épouse *" value={conjointe} onChange={setConjointe} required sexFilter="F" minAge={18} />
+          <div
+            className="full filiation-seq"
+            style={conjoint ? undefined : { opacity: 0.55, pointerEvents: "none" }}
+            aria-disabled={!conjoint}
+          >
+            <p className="filiation-seq-title">
+              <span className="filiation-seq-num">2</span> Épouse
+            </p>
+            {!conjoint ? (
+              <p className="muted small">Sélectionnez d&apos;abord l&apos;époux.</p>
+            ) : null}
+            <PersonPicker label="Épouse *" value={conjointe} onChange={setConjointe} required sexFilter="F" minAge={18} addButtonLabel="Saisir / Ajouter l'épouse" />
           </div>
           <div>
             <label className="form-label">Régime matrimonial *</label>
