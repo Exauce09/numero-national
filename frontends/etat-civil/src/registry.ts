@@ -60,6 +60,19 @@ export type Person = {
     numero?: string;
     label?: string;
   };
+  /** Origine ancestrale structurée (reprise automatique dans les formulaires). */
+  origine_geo?: {
+    province_name?: string;
+    ville_name?: string;
+    district_name?: string;
+    commune_name?: string;
+    commune_code?: string;
+    quartier_name?: string;
+    localite_name?: string;
+    avenue_name?: string;
+    numero?: string;
+    label?: string;
+  };
   secteur?: string;
   territoire?: string;
   ville?: string;
@@ -822,6 +835,63 @@ export function getPerson(id: string): Person | undefined {
 
 export function getPersonByNic(nic: string): Person | undefined {
   return load().persons.find((p) => p.nic === nic);
+}
+
+/** Reconstruit la GeoSelection d'origine pour préremplir les cascades. */
+export function personOrigineGeo(p: Person): {
+  province_name?: string;
+  ville_name?: string;
+  district_name?: string;
+  commune_name?: string;
+  commune_code?: string;
+  quartier_name?: string;
+  localite_name?: string;
+  avenue_name?: string;
+  numero?: string;
+  label?: string;
+} {
+  if (p.origine_geo && (p.origine_geo.province_name || p.origine_geo.label || p.origine_geo.district_name)) {
+    return { ...p.origine_geo };
+  }
+  const o = personOrigin(p);
+  const secteurParts = (o.secteur || p.secteur || "")
+    .split("·")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const label =
+    o.label ||
+    [secteurParts[1], secteurParts[0], o.territoire || p.territoire, o.ville || p.ville, o.province || p.province]
+      .filter(Boolean)
+      .join(" · ");
+  if (!(o.province || p.province || o.territoire || p.territoire || label)) return {};
+  return {
+    province_name: o.province || p.province || undefined,
+    ville_name: o.ville || p.ville || undefined,
+    district_name: o.territoire || p.territoire || undefined,
+    commune_name: secteurParts[0] || undefined,
+    localite_name: secteurParts[1] || o.village || undefined,
+    label: label || undefined,
+  };
+}
+
+/** Reconstruit la GeoSelection d'adresse pour préremplir les cascades. */
+export function personAdresseGeo(p: Person): {
+  province_name?: string;
+  ville_name?: string;
+  district_name?: string;
+  commune_name?: string;
+  commune_code?: string;
+  quartier_name?: string;
+  localite_name?: string;
+  avenue_name?: string;
+  numero?: string;
+  label?: string;
+} {
+  if (p.adresse_geo && (p.adresse_geo.province_name || p.adresse_geo.label || p.adresse_geo.commune_name)) {
+    return { ...p.adresse_geo };
+  }
+  if (!p.adresse?.trim()) return {};
+  return { label: p.adresse.trim(), numero: p.adresse.trim() };
 }
 
 export type PersonInput = Omit<Person, "id" | "nic" | "created_at" | "handicap_type"> & {

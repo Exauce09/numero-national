@@ -4,7 +4,7 @@ import FicheIdentificationEditor, {
   emptyFicheEditorState,
   type FicheEditorState,
 } from "./FicheIdentificationEditor";
-import { parcoursWithNiveau } from "../etudesFaites";
+import { parcoursWithNiveau, extractNiveauEtude, niveauEtudeLabel } from "../etudesFaites";
 import { getOfficerCommune } from "../commune";
 import {
   addPerson,
@@ -13,7 +13,9 @@ import {
   findDuplicatePerson,
   getPerson,
   isDeceased,
+  personAdresseGeo,
   personOrigin,
+  personOrigineGeo,
   provinceDigitsFromName,
   searchPersons,
   updatePerson,
@@ -326,6 +328,32 @@ export default function PersonPicker({
               label: i.adresse_geo.label || i.adresse.trim() || undefined,
             }
           : undefined,
+        origine_geo: i.origine_geo
+          ? {
+              province_name: i.origine_geo.province_name,
+              ville_name: i.origine_geo.ville_name,
+              district_name: i.origine_geo.district_name,
+              commune_name: i.origine_geo.commune_name,
+              commune_code: i.origine_geo.commune_code,
+              quartier_name: i.origine_geo.quartier_name,
+              localite_name: i.origine_geo.localite_name,
+              avenue_name: i.origine_geo.avenue_name,
+              numero: i.origine_geo.numero,
+              label:
+                i.origine_geo.label ||
+                [i.secteur, i.territoire, i.ville, i.province].filter(Boolean).join(" · ") ||
+                undefined,
+            }
+          : i.province || i.territoire || i.secteur
+            ? {
+                province_name: i.province || undefined,
+                ville_name: i.ville || undefined,
+                district_name: i.territoire || undefined,
+                commune_name: i.secteur.split("·")[0]?.trim() || undefined,
+                localite_name: i.secteur.split("·")[1]?.trim() || undefined,
+                label: [i.secteur, i.territoire, i.ville, i.province].filter(Boolean).join(" · ") || undefined,
+              }
+            : undefined,
         secteur: i.secteur.trim() || undefined,
         territoire: i.territoire.trim() || undefined,
         ville: i.ville.trim() || undefined,
@@ -387,8 +415,40 @@ export default function PersonPicker({
         <div className="person-picker-selected">
           <div>
             <strong>{displayName(value)}</strong>
+            <div className="muted small" style={{ marginTop: 4 }}>
+              {[
+                value.sexe === "F" ? "Féminin" : "Masculin",
+                value.date_naissance ? `né(e) le ${value.date_naissance}` : "",
+                value.lieu_naissance,
+                value.etat_civil,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </div>
             {!hideNic && value.nic ? <div className="muted small">{value.nic}</div> : null}
-            {originGeoFilter ? (
+            {value.parcours_professionnel ? (
+              <div className="muted small">Profession : {value.parcours_professionnel.split("\n")[0]}</div>
+            ) : null}
+            {extractNiveauEtude(value.parcours_scolaire) ? (
+              <div className="muted small">
+                Niveau d&apos;étude : {niveauEtudeLabel(extractNiveauEtude(value.parcours_scolaire))}
+              </div>
+            ) : null}
+            {(() => {
+              const og = personOrigineGeo(value);
+              const label =
+                og.label ||
+                [og.localite_name, og.commune_name, og.district_name, og.ville_name, og.province_name]
+                  .filter(Boolean)
+                  .join(" · ");
+              return label ? <div className="muted small">Origine : {label}</div> : null;
+            })()}
+            {(() => {
+              const ag = personAdresseGeo(value);
+              const label = ag.label || value.adresse;
+              return label ? <div className="muted small">Adresse : {label}</div> : null;
+            })()}
+            {originGeoFilter && !personOrigineGeo(value).province_name && !personOrigineGeo(value).label ? (
               <div className="muted small">
                 {[
                   personOrigin(value).province,

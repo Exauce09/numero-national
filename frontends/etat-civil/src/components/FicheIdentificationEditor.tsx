@@ -29,6 +29,8 @@ export type FicheEditorState = {
     etat_civil_code: EtatCivil;
     /** Adresse de résidence structurée (reprise à la sélection). */
     adresse_geo?: GeoSelection;
+    /** Origine ancestrale structurée (reprise à la sélection). */
+    origine_geo?: GeoSelection;
   };
   conjoint: FicheEditorConjoint;
   pere: FichePersonBlock;
@@ -223,7 +225,8 @@ function ParentSection({
               ...value,
               sexe: sexeFixed === "F" ? "Féminin" : "Masculin",
               ...originFromGeo(geo),
-            });
+              origine_geo: geo,
+            } as typeof value);
           }}
         />
         {summary ? (
@@ -263,7 +266,7 @@ export default function FicheIdentificationEditor({
 
   function applyOrigin(geo: GeoSelection) {
     setOriginGeo(geo);
-    patchInteresse(originFromGeo(geo));
+    patchInteresse({ ...originFromGeo(geo), origine_geo: geo });
   }
 
   function applyAddress(geo: GeoSelection) {

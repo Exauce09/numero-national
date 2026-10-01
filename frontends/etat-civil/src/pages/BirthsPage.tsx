@@ -28,8 +28,10 @@ import {
   inheritParentOrigin,
   listActs,
   NEWBORN_DELAI_JOURS,
+  personAdresseGeo,
   personNationalite,
   personOrigin,
+  personOrigineGeo,
   suggestDelaiEnregistrement,
   updateAct,
   updatePerson,
@@ -141,22 +143,22 @@ export default function BirthsPage({ health }: { health?: HealthFormContext } = 
       setAdresseMere("");
       return;
     }
-    const o = personOrigin(p);
-    if (o.province || o.territoire || o.secteur || o.ville) {
-      const originGeo: GeoSelection = {
-        province_name: o.province || undefined,
-        district_name: o.territoire || undefined,
-        commune_name: o.secteur || undefined,
-        ville_name: o.ville || undefined,
-        label: o.label || undefined,
-      };
-      setGeoOrigineMere(originGeo);
+    const og = personOrigineGeo(p);
+    if (og.province_name || og.district_name || og.commune_name || og.label) {
+      setGeoOrigineMere(og);
+    } else {
+      setGeoOrigineMere({});
     }
-    if (p.adresse_geo && (p.adresse_geo.label || p.adresse_geo.commune_name || p.adresse_geo.province_name)) {
-      setGeoAdresseMere({ ...p.adresse_geo });
-      setAdresseMere(p.adresse || p.adresse_geo.numero || "");
+    const ag = personAdresseGeo(p);
+    if (ag.province_name || ag.commune_name || ag.label) {
+      setGeoAdresseMere(ag);
+      setAdresseMere(p.adresse || ag.numero || ag.label || "");
     } else if (p.adresse?.trim()) {
+      setGeoAdresseMere({});
       setAdresseMere(p.adresse.trim());
+    } else {
+      setGeoAdresseMere({});
+      setAdresseMere("");
     }
   }
 
