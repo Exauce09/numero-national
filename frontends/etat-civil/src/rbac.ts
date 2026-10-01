@@ -317,7 +317,8 @@ export function canAccessPath(pathname: string, roles: string[] | undefined | nu
     return canSeeNav("naissances", r) || canSeeNav("create_acts", r);
   }
   if (path.startsWith("/synoptique")) return canSeeNav("synoptique", r);
-  if (path.startsWith("/indicateurs-eac")) return canSeeNav("indicateurs_eac", r);
+  if (path.startsWith("/indicateurs-eac") || path.startsWith("/indicateurs-rdc"))
+    return canSeeNav("indicateurs_eac", r);
   if (path.startsWith("/cartographie-bureaux")) {
     return canSeeNav("cartes", r) || canSeeNav("synoptique", r) || canSeeNav("admin_bureaux", r);
   }

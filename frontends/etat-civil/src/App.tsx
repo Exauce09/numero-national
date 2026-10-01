@@ -67,6 +67,7 @@ import ManageMariagePage from "./pages/ManageMariagePage";
 import ManageNaissancePage from "./pages/ManageNaissancePage";
 import SynopticPage from "./pages/SynopticPage";
 import EacIndicatorsPage from "./pages/EacIndicatorsPage";
+import RdcIndicateursPage from "./pages/RdcIndicateursPage";
 import ManageActsPage, { MANAGE_CONFIGS } from "./components/ManageActsPage";
 import TerritoryPage from "./pages/TerritoryPage";
 import TopbarSearch from "./components/TopbarSearch";
@@ -398,12 +399,14 @@ function Shell() {
           ) : null}
 
           {canSeeNav("indicateurs_eac", roles) ? (
-            <NavLink
-              to="/indicateurs-eac"
-              className={({ isActive }) => (isActive ? "active" : undefined)}
+            <NavCollapsibleGroup
+              label="Indicateurs"
+              icon={<IconTable size={18} />}
+              activePrefixes={["/indicateurs-eac", "/indicateurs-rdc"]}
             >
-              <IconTable size={18} /> Indicateurs EAC
-            </NavLink>
+              <NavLink to="/indicateurs-rdc">Indicateurs RDC (45 + prévisions)</NavLink>
+              <NavLink to="/indicateurs-eac">Indicateurs EAC / CAE</NavLink>
+            </NavCollapsibleGroup>
           ) : null}
 
           {canSeeNav("cartes", roles) || canSeeNav("synoptique", roles) ? (
@@ -584,6 +587,16 @@ function Shell() {
               element={
                 canSeeNav("indicateurs_eac", getSession()?.roles ?? []) ? (
                   <EacIndicatorsPage />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route
+              path="/indicateurs-rdc"
+              element={
+                canSeeNav("indicateurs_eac", getSession()?.roles ?? []) ? (
+                  <RdcIndicateursPage />
                 ) : (
                   <Navigate to="/" replace />
                 )
