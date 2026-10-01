@@ -7,6 +7,7 @@ import GeoCascade, {
   type GeoSelection,
 } from "../components/GeoCascade";
 import PersonPicker from "../components/PersonPicker";
+import { LieuNaissanceField } from "../components/GeoPlaceLookup";
 import { TYPE_DECES_OPTIONS, typeDecesLabel, type TypeDeces } from "../deathType";
 import SituationFamilialeForm from "../components/SituationFamilialeForm";
 import EtudesFaitesForm from "../components/EtudesFaitesForm";
@@ -1049,16 +1050,15 @@ export default function CensusPage() {
                     </p>
                   </div>
                   <div className="full">
-                    <label className="form-label">Lieu de naissance *</label>
-                    <input
-                      className="form-control"
+                    <LieuNaissanceField
+                      label="Lieu de naissance"
                       value={lieuNaissanceManuel}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setLieuNaissanceManuel(v);
-                        setGeoNaissance((prev) => ({ ...prev, label: v }));
+                      required
+                      onChange={(text, geo) => {
+                        setLieuNaissanceManuel(text);
+                        setGeoNaissance(geo);
                       }}
-                      placeholder="Maternité, hôpital, domicile…"
+                      placeholder="Tapez un lieu — ex. Tshilenge, Nsele…"
                     />
                   </div>
                   <div className="full">
@@ -1176,15 +1176,15 @@ export default function CensusPage() {
                     </select>
                   </div>
                   <div className="full">
-                    <label className="form-label">Lieu de naissance *</label>
-                    <input
-                      className="form-control"
+                    <LieuNaissanceField
+                      label="Lieu de naissance"
                       value={lieuNaissanceManuel}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setLieuNaissanceManuel(v);
-                        setGeoNaissance((prev) => ({ ...prev, label: v }));
+                      required
+                      onChange={(text, geo) => {
+                        setLieuNaissanceManuel(text);
+                        setGeoNaissance(geo);
                       }}
+                      placeholder="Tapez un lieu — ex. Tshilenge, Nsele…"
                     />
                   </div>
                   <div>
@@ -1262,15 +1262,15 @@ export default function CensusPage() {
                     />
                   </div>
                   <div className="full">
-                    <label className="form-label">Lieu de naissance *</label>
-                    <input
-                      className="form-control"
+                    <LieuNaissanceField
+                      label="Lieu de naissance"
                       value={lieuNaissanceManuel}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setLieuNaissanceManuel(v);
-                        setGeoNaissance((prev) => ({ ...prev, label: v }));
+                      required
+                      onChange={(text, geo) => {
+                        setLieuNaissanceManuel(text);
+                        setGeoNaissance(geo);
                       }}
+                      placeholder="Tapez un lieu — ex. Tshilenge, Nsele…"
                     />
                   </div>
                   <div className="full">
@@ -1413,16 +1413,15 @@ export default function CensusPage() {
                     </select>
                   </div>
                   <div className="full">
-                    <label className="form-label">Lieu de naissance *</label>
-                    <input
-                      className="form-control"
+                    <LieuNaissanceField
+                      label="Lieu de naissance"
                       value={lieuNaissanceManuel}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setLieuNaissanceManuel(v);
-                        setGeoNaissance((prev) => ({ ...prev, label: v }));
+                      required
+                      onChange={(text, geo) => {
+                        setLieuNaissanceManuel(text);
+                        setGeoNaissance(geo);
                       }}
-                      placeholder="Saisie manuelle du lieu de naissance"
+                      placeholder="Tapez un lieu — ex. Tshilenge, Nsele…"
                     />
                   </div>
                   <div>

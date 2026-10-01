@@ -5,6 +5,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { BarChart, PieChart } from "../components/Charts";
 import DataToolbar from "../components/DataToolbar";
 import NiveauEtudeField from "../components/NiveauEtudeField";
+import { LieuNaissanceField } from "../components/GeoPlaceLookup";
 import { PopulationStatBlocks } from "../components/StatBlocks";
 import { api, type CitizenListItem } from "../api";
 import { ensureAccessToken, getSession } from "../auth";
@@ -713,11 +714,11 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
                 </select>
               </div>
               <div className="full">
-                <label className="form-label">Lieu de naissance</label>
-                <input
-                  className="form-control"
+                <LieuNaissanceField
+                  label="Lieu de naissance"
                   value={editForm.lieu_naissance}
-                  onChange={(e) => setEditForm((f) => ({ ...f, lieu_naissance: e.target.value }))}
+                  onChange={(text) => setEditForm((f) => ({ ...f, lieu_naissance: text }))}
+                  placeholder="Tapez un lieu — ex. Tshilenge, Nsele…"
                 />
               </div>
               <NiveauEtudeField

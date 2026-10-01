@@ -10,6 +10,7 @@ import GeoCascade, {
   ORIGIN_FIELD_LABELS,
   type GeoSelection,
 } from "./GeoCascade";
+import { LieuNaissanceField } from "./GeoPlaceLookup";
 import NiveauEtudeField from "./NiveauEtudeField";
 
 export type FicheEditorConjoint = {
@@ -183,13 +184,12 @@ function ParentSection({
           readOnly
         />
       </div>
-      <div>
-        <label className="form-label">Lieu de naissance</label>
-        <input
-          className="form-control"
+      <div className="full">
+        <LieuNaissanceField
+          label="Lieu de naissance"
           value={value.lieu_date_naissance}
-          onChange={(e) => set("lieu_date_naissance", e.target.value)}
-          placeholder="Lieu de naissance"
+          onChange={(text) => set("lieu_date_naissance", text)}
+          placeholder="Tapez un lieu — ex. Tshilenge, Nsele…"
         />
       </div>
       <div>
@@ -376,13 +376,12 @@ export default function FicheIdentificationEditor({
             />
           </div>
 
-          <div>
-            <label className="form-label">Lieu de naissance</label>
-            <input
-              className="form-control"
+          <div className="full">
+            <LieuNaissanceField
+              label="Lieu de naissance"
               value={i.lieu_date_naissance}
-              onChange={(e) => patchInteresse({ lieu_date_naissance: e.target.value })}
-              placeholder="Lieu (commune, ville, province…)"
+              onChange={(text) => patchInteresse({ lieu_date_naissance: text })}
+              placeholder="Tapez un lieu — ex. Tshilenge, Nsele…"
             />
           </div>
           <div>

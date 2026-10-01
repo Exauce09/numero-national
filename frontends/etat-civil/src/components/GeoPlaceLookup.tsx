@@ -1,4 +1,4 @@
-/** Un seul champ : tapez un lieu → province / ville / commune renseignés. */
+/** Un seul champ : tapez un lieu → suggestions référentiel + saisie libre. */
 
 import { useEffect, useMemo, useState } from "react";
 import { searchPlaces, type PlaceHit } from "../geoFallback";
@@ -10,6 +10,8 @@ type Props = {
   onChange: (v: GeoSelection) => void;
   required?: boolean;
   placeholder?: string;
+  className?: string;
+  id?: string;
 };
 
 function hitToGeo(hit: PlaceHit): GeoSelection {
@@ -21,20 +23,31 @@ function hitToGeo(hit: PlaceHit): GeoSelection {
   };
 }
 
+function geoLabel(g: GeoSelection): string {
+  return (
+    g.label ||
+    [g.commune_name, g.ville_name, g.province_name].filter(Boolean).join(" · ") ||
+    ""
+  );
+}
+
 export default function GeoPlaceLookup({
   label = "Lieu",
   value,
   onChange,
   required,
-  placeholder = "Ex. Tshilenge, Nsele, Kananga…",
+  placeholder = "Tapez un lieu — ex. Tshilenge, Nsele, Kananga…",
+  className,
+  id,
 }: Props) {
-  const [query, setQuery] = useState(value.label || "");
+  const [query, setQuery] = useState(geoLabel(value));
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (value.label && value.label !== query) setQuery(value.label);
+    const next = geoLabel(value);
+    if (next && next !== query) setQuery(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync from parent selection only
-  }, [value.label]);
+  }, [value.label, value.commune_name, value.ville_name, value.province_name]);
 
   const hits = useMemo(() => searchPlaces(query), [query]);
 
@@ -45,13 +58,28 @@ export default function GeoPlaceLookup({
     setOpen(false);
   }
 
+  function commitFreeText(raw: string) {
+    const t = raw.trim();
+    if (!t) {
+      onChange({});
+      return;
+    }
+    // Conserve la structure si le libellé n'a pas changé (sélection précédente).
+    if (t === geoLabel(value) && (value.province_name || value.commune_name)) {
+      onChange({ ...value, label: t });
+      return;
+    }
+    onChange({ label: t });
+  }
+
   return (
-    <div className="person-picker">
-      <label className="form-label">
+    <div className={`person-picker${className ? ` ${className}` : ""}`}>
+      <label className="form-label" htmlFor={id}>
         {label}
         {required ? " *" : ""}
       </label>
       <input
+        id={id}
         className="form-control"
         value={query}
         required={required}
@@ -61,7 +89,7 @@ export default function GeoPlaceLookup({
           const v = e.target.value;
           setQuery(v);
           setOpen(true);
-          if (!v.trim()) onChange({});
+          commitFreeText(v);
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => {
@@ -76,7 +104,7 @@ export default function GeoPlaceLookup({
       {open && query.trim().length >= 2 ? (
         <ul className="person-picker-list">
           {hits.length === 0 ? (
-            <li className="muted">Aucun lieu trouvé dans le référentiel.</li>
+            <li className="muted">Aucun lieu trouvé — la saisie libre reste acceptée.</li>
           ) : (
             hits.map((h) => (
               <li key={`${h.kind}-${h.label}`}>
@@ -90,5 +118,43 @@ export default function GeoPlaceLookup({
         </ul>
       ) : null}
     </div>
+  );
+}
+
+/** Variante texte pour Person.lieu_naissance / fiches sans GeoSelection. */
+export function LieuNaissanceField({
+  value,
+  onChange,
+  label = "Lieu de naissance",
+  required,
+  placeholder,
+  className,
+  id,
+}: {
+  value: string;
+  onChange: (text: string, geo: GeoSelection) => void;
+  label?: string;
+  required?: boolean;
+  placeholder?: string;
+  className?: string;
+  id?: string;
+}) {
+  const geo: GeoSelection = useMemo(
+    () => (value.trim() ? { label: value.trim() } : {}),
+    [value],
+  );
+  return (
+    <GeoPlaceLookup
+      id={id}
+      className={className}
+      label={label}
+      value={geo}
+      required={required}
+      placeholder={placeholder}
+      onChange={(g) => {
+        const text = geoLabel(g);
+        onChange(text, g);
+      }}
+    />
   );
 }
