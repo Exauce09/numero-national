@@ -15,7 +15,7 @@ type Props = {
 export default function NiveauEtudeField({
   value,
   onChange,
-  label = "Niveau d'étude",
+  label = "Niveau d'étude (diplôme / certificat)",
   required,
   disabled,
   id,

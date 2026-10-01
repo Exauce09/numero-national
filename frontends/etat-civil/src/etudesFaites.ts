@@ -35,14 +35,27 @@ export type EtudesData = {
   remarques: string;
 };
 
+/** Niveau d'étude = diplôme / certificat obtenu (référence RDC). */
 export const NIVEAUX_ETUDES = [
   { value: "", label: "—" },
-  { value: "AUCUN", label: "Aucun" },
-  { value: "PRIMAIRE", label: "Primaire" },
-  { value: "SECONDAIRE", label: "Secondaire" },
-  { value: "TECHNIQUE", label: "Technique / professionnel" },
-  { value: "UNIVERSITAIRE", label: "Universitaire" },
-  { value: "POST_UNIV", label: "Post-universitaire" },
+  { value: "AUCUN", label: "Aucun diplôme / certificat" },
+  { value: "CEPE", label: "Certificat d'études primaires (CEPE)" },
+  { value: "BREVET", label: "Brevet / cycle court" },
+  { value: "DIPLOME_ETAT", label: "Diplôme d'État (humanités)" },
+  { value: "DIPLOME_TECHNIQUE", label: "Diplôme technique" },
+  { value: "CERTIFICAT_PRO", label: "Certificat professionnel" },
+  { value: "CERTIFICAT_UNIV", label: "Certificat universitaire" },
+  { value: "GRADUAT", label: "Graduat" },
+  { value: "LICENCE", label: "Licence" },
+  { value: "MASTER", label: "Master" },
+  { value: "DOCTORAT", label: "Doctorat" },
+  { value: "AUTRE_DIPLOME", label: "Autre diplôme / certificat" },
+  // Anciens codes (compatibilité données déjà saisies)
+  { value: "PRIMAIRE", label: "Primaire (sans diplôme précisé)" },
+  { value: "SECONDAIRE", label: "Secondaire (sans diplôme précisé)" },
+  { value: "TECHNIQUE", label: "Technique / professionnel (sans diplôme précisé)" },
+  { value: "UNIVERSITAIRE", label: "Universitaire (sans diplôme précisé)" },
+  { value: "POST_UNIV", label: "Post-universitaire (sans diplôme précisé)" },
 ] as const;
 
 export function niveauEtudeLabel(code: string): string {
