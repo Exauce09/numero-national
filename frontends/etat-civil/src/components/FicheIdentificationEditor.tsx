@@ -1,6 +1,6 @@
 /** Formulaire d'ajout personne — champs standards + origine / adresse séparées. */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ETAT_CIVIL_OPTIONS, type EtatCivil, type Sexe } from "../registry";
 import { listKnownProfessions, PROFESSIONS_KEY, rememberNamed } from "../namedLists";
 import { emptyFichePerson, type FichePersonBlock } from "./FicheIdentificationForm";
@@ -71,8 +71,6 @@ type Props = {
   onChange: (next: FicheEditorState) => void;
   sexeLocked?: Sexe;
   compact?: boolean;
-  /** Notifie le parent quand on est sur la dernière étape (pour afficher Enregistrer). */
-  onLastStepChange?: (isLast: boolean) => void;
 };
 
 /** Province → Territoire → Secteur → Village (+ Ajouter si manquant). */
@@ -246,7 +244,6 @@ export default function FicheIdentificationEditor({
   onChange,
   sexeLocked,
   compact = false,
-  onLastStepChange,
 }: Props) {
   const i = value.interesse;
   const professions = useMemo(() => listKnownProfessions([i.profession]), [i.profession]);
@@ -271,10 +268,6 @@ export default function FicheIdentificationEditor({
   );
   const [step, setStep] = useState(1);
   const maxStep = steps[steps.length - 1]?.id ?? 1;
-
-  useEffect(() => {
-    onLastStepChange?.(step >= maxStep);
-  }, [step, maxStep, onLastStepChange]);
 
   function patchInteresse(patch: Partial<typeof i>) {
     const sexe_code = sexeLocked ?? patch.sexe_code ?? i.sexe_code;
@@ -571,7 +564,7 @@ export default function FicheIdentificationEditor({
             </button>
           ) : (
             <span className="muted small" style={{ alignSelf: "center" }}>
-              Dernière étape — validez avec « Enregistrer et lier »
+              Vous pouvez enregistrer à tout moment (nom, prénom, date requis)
             </span>
           )}
         </div>
