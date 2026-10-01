@@ -423,10 +423,10 @@ function Shell() {
             <NavCollapsibleGroup
               label="Indicateurs"
               icon={<IconTable size={18} />}
-              activePrefixes={["/indicateurs-rdc", "/indicateurs-eac"]}
+              activePrefixes={["/indicateurs-eac", "/indicateurs-rdc"]}
             >
-              <NavLink to="/indicateurs-rdc">Indicateurs ODD (45 + prévisions)</NavLink>
               <NavLink to="/indicateurs-eac">Indicateurs EAC / CAE</NavLink>
+              <NavLink to="/indicateurs-rdc">Indicateurs ODD (45 + prévisions)</NavLink>
             </NavCollapsibleGroup>
           ) : null}
 
