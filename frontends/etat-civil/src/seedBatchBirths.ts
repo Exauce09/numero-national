@@ -7,11 +7,13 @@ import {
   addPerson,
   findDuplicatePerson,
   generateBirthDossierId,
+  inheritParentOrigin,
   listActs,
   type Person,
   type Sexe,
 } from "./registry";
 import { listAllCommunesFlat } from "./geoFallback";
+import { resolveChildOriginSource } from "./childOriginRdc";
 
 const SEED_FLAG = "nn_civil_seed_births_batch_30_v1";
 
@@ -224,10 +226,18 @@ export async function seedBatchBirths(): Promise<{ created: number; skipped: num
       commune_code: communeCode,
       label: lieu,
     };
-    const geoOrigine = {
-      province_name: row.provinceOrigine,
-      label: row.provinceOrigine,
-    };
+    const originSource = resolveChildOriginSource(true, row.provinceOrigine);
+    const link = inheritParentOrigin(father, mother, row.provinceOrigine);
+    const geoOrigine =
+      originSource === "mother"
+        ? {
+            province_name: row.provinceOrigine || link.geo.province || mother.province || "",
+            label: row.provinceOrigine || link.geo.province || mother.province || "",
+          }
+        : {
+            province_name: father.province || link.geo.province || row.provinceOrigine,
+            label: father.province || link.geo.province || row.provinceOrigine,
+          };
 
     const payload = {
       child_id: child.id,
@@ -274,8 +284,9 @@ export async function seedBatchBirths(): Promise<{ created: number; skipped: num
       bureau: `Commune de ${geo.commune}`,
       officer_name: "Officier de l'État civil",
       geo_origine: geoOrigine,
-      originaire: row.provinceOrigine,
-      province_origine: row.provinceOrigine,
+      originaire: geoOrigine.label || row.provinceOrigine,
+      province_origine: geoOrigine.province_name || row.provinceOrigine,
+      origine_source: originSource,
       note: "Nouveau-né — lot saisi (30 actes)",
       seed_batch: "births_batch_30_v1",
     };

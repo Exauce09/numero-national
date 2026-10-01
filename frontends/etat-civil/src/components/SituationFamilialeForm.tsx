@@ -53,11 +53,11 @@ function MemberFields({
     onChange({
       ...value,
       person_id: p.id,
-      nom: p.nom,
-      postnom: p.postnom,
-      prenom: p.prenom,
+      nom: p.nom || "",
+      postnom: p.postnom || "",
+      prenom: p.prenom || "",
       sexe: p.sexe,
-      date_naissance: p.date_naissance,
+      date_naissance: p.date_naissance || "",
       telephone: value.telephone,
     });
   }

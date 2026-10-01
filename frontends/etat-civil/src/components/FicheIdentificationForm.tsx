@@ -12,7 +12,7 @@ export type FichePersonBlock = {
   lieu_date_naissance: string;
   nationalite: string;
   profession: string;
-  /** Code NIVEAUX_ETUDES (AUCUN, PRIMAIRE…). */
+  /** Code NIVEAUX_ETUDES (CEP, CTEB, EXETAT, GRADUAT…). */
   niveau_etude: string;
   secteur: string;
   territoire: string;

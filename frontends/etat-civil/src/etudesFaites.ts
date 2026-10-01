@@ -206,8 +206,7 @@ export function emptyEtudes(): EtudesData {
 export function formatParcoursScolaire(data: EtudesData): string {
   const lines: string[] = [];
   if (data.niveau_atteint.trim()) {
-    const label =
-      NIVEAUX_ETUDES.find((n) => n.value === data.niveau_atteint)?.label || data.niveau_atteint;
+    const label = niveauEtudeLabel(data.niveau_atteint) || data.niveau_atteint;
     lines.push(`Niveau d'étude : ${label}`);
   }
   if (data.annee_fin_etudes.trim()) lines.push(`Année fin d'études : ${data.annee_fin_etudes.trim()}`);
@@ -272,7 +271,8 @@ export function parseEtudes(raw: unknown): EtudesData {
   return {
     sait_lire: d.sait_lire === "oui" || d.sait_lire === "non" ? d.sait_lire : "",
     sait_ecrire: d.sait_ecrire === "oui" || d.sait_ecrire === "non" ? d.sait_ecrire : "",
-    niveau_atteint: typeof d.niveau_atteint === "string" ? d.niveau_atteint : "",
+    niveau_atteint:
+      typeof d.niveau_atteint === "string" ? normalizeNiveauCode(d.niveau_atteint) : "",
     annee_fin_etudes: typeof d.annee_fin_etudes === "string" ? d.annee_fin_etudes : "",
     etablissements: Array.isArray(d.etablissements)
       ? d.etablissements.map((e) => ({ ...emptyEtablissement(), ...e }))

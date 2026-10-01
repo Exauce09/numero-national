@@ -51,6 +51,7 @@ import {
 } from "../situationFamiliale";
 import {
   emptyEtudes,
+  extractNiveauEtude,
   formatParcoursScolaire,
   formatParcoursUniversitaire,
   parseEtudes,
@@ -267,6 +268,9 @@ export default function CensusPage() {
         d.etudes
           ? parseEtudes(d.etudes)
           : parseEtudes({
+              niveau_atteint: extractNiveauEtude(
+                [d.scolaire, d.universitaire].filter(Boolean).join("\n"),
+              ),
               remarques: [d.scolaire, d.universitaire].filter(Boolean).join("\n"),
             })
       );
@@ -1329,11 +1333,11 @@ export default function CensusPage() {
                           conjoint: {
                             ...prev.conjoint,
                             person_id: p?.id ?? null,
-                            nom: p?.nom ?? prev.conjoint.nom,
-                            postnom: p?.postnom ?? prev.conjoint.postnom,
-                            prenom: p?.prenom ?? prev.conjoint.prenom,
+                            nom: p?.nom ?? "",
+                            postnom: p?.postnom ?? "",
+                            prenom: p?.prenom ?? "",
                             sexe: (p?.sexe as Sexe | "") || prev.conjoint.sexe,
-                            date_naissance: p?.date_naissance ?? prev.conjoint.date_naissance,
+                            date_naissance: p?.date_naissance ?? "",
                           },
                         }))
                       }

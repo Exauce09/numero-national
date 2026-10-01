@@ -255,7 +255,7 @@ export default function PersonPicker({
   }, [query, open, value, sexFilter, excludeDeceased, minAge]);
 
   function select(person: Person) {
-    onChange(person);
+    onChange(getPerson(person.id) ?? person);
     setOpen(false);
     setQuery("");
   }

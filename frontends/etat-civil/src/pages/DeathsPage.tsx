@@ -203,7 +203,12 @@ export default function DeathsPage({ health }: { health?: HealthFormContext } = 
             <PersonPicker
               label="Identité de la personne"
               value={deceased}
-              onChange={setDeceased}
+              onChange={(p) => {
+                setDeceased(p);
+                if (p?.etat_civil && p.etat_civil !== "UNKNOWN") {
+                  setEtatMatrimonial(p.etat_civil);
+                }
+              }}
               required
               hideNic
               excludeDeceased={false}
