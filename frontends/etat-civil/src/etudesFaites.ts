@@ -35,27 +35,43 @@ export type EtudesData = {
   remarques: string;
 };
 
-/** Niveau d'étude = diplôme / certificat obtenu (référence RDC). */
+/**
+ * Niveau d'étude = diplôme / certificat officiel RDC
+ * (MINEDU-NC : ENAFEP, TENASOSP, EXETAT ; enseignement supérieur Graduat / LMD).
+ */
 export const NIVEAUX_ETUDES = [
   { value: "", label: "—" },
   { value: "AUCUN", label: "Aucun diplôme / certificat" },
-  { value: "CEPE", label: "Certificat d'études primaires (CEPE)" },
-  { value: "BREVET", label: "Brevet / cycle court" },
-  { value: "DIPLOME_ETAT", label: "Diplôme d'État (humanités)" },
-  { value: "DIPLOME_TECHNIQUE", label: "Diplôme technique" },
-  { value: "CERTIFICAT_PRO", label: "Certificat professionnel" },
-  { value: "CERTIFICAT_UNIV", label: "Certificat universitaire" },
-  { value: "GRADUAT", label: "Graduat" },
-  { value: "LICENCE", label: "Licence" },
-  { value: "MASTER", label: "Master" },
+  // Éducation de base
+  { value: "CEP", label: "Certificat d'études primaires — CEP (ENAFEP)" },
+  { value: "TENASOSP", label: "Certificat de fin d'éducation de base — CTEB (TENASOSP)" },
+  // Secondaire / Humanités (EXETAT)
+  { value: "DIPLOME_ETAT", label: "Diplôme d'État — Humanités générales (EXETAT)" },
+  { value: "DIPLOME_ETAT_TECH", label: "Diplôme d'État — Humanités techniques (EXETAT)" },
+  { value: "DIPLOME_ETAT_PRO", label: "Diplôme d'État — Humanités professionnelles (EXETAT)" },
+  { value: "DIPLOME_PRO_3ANS", label: "Diplôme de fin d'humanités professionnelles (cycle 3 ans)" },
+  // Supérieur / Instituts (titres courants RDC)
+  { value: "A3", label: "A3 — Certificat / brevet professionnel supérieur" },
+  { value: "A2", label: "A2 — Graduat court / technicien supérieur" },
+  { value: "A1", label: "A1 — Graduat / licence professionnelle (instituts)" },
+  { value: "A0", label: "A0 — Licence / niveau universitaire (instituts)" },
+  { value: "GRADUAT", label: "Graduat (bac+3)" },
+  { value: "LICENCE", label: "Licence — LMD (bac+3)" },
+  { value: "MASTER", label: "Master — LMD (bac+5)" },
+  { value: "DEA", label: "DEA — Diplôme d'études approfondies" },
   { value: "DOCTORAT", label: "Doctorat" },
-  { value: "AUTRE_DIPLOME", label: "Autre diplôme / certificat" },
+  { value: "AUTRE_DIPLOME", label: "Autre diplôme / certificat reconnu" },
   // Anciens codes (compatibilité données déjà saisies)
-  { value: "PRIMAIRE", label: "Primaire (sans diplôme précisé)" },
-  { value: "SECONDAIRE", label: "Secondaire (sans diplôme précisé)" },
-  { value: "TECHNIQUE", label: "Technique / professionnel (sans diplôme précisé)" },
-  { value: "UNIVERSITAIRE", label: "Universitaire (sans diplôme précisé)" },
-  { value: "POST_UNIV", label: "Post-universitaire (sans diplôme précisé)" },
+  { value: "CEPE", label: "CEP / CEPE (ancien libellé)" },
+  { value: "BREVET", label: "Brevet / cycle court (ancien)" },
+  { value: "DIPLOME_TECHNIQUE", label: "Diplôme technique (ancien)" },
+  { value: "CERTIFICAT_PRO", label: "Certificat professionnel (ancien)" },
+  { value: "CERTIFICAT_UNIV", label: "Certificat universitaire (ancien)" },
+  { value: "PRIMAIRE", label: "Primaire sans diplôme précisé" },
+  { value: "SECONDAIRE", label: "Secondaire sans diplôme précisé" },
+  { value: "TECHNIQUE", label: "Technique / professionnel sans diplôme précisé" },
+  { value: "UNIVERSITAIRE", label: "Universitaire sans diplôme précisé" },
+  { value: "POST_UNIV", label: "Post-universitaire sans diplôme précisé" },
 ] as const;
 
 export function niveauEtudeLabel(code: string): string {
@@ -77,6 +93,26 @@ export function extractNiveauEtude(parcours?: string | null): string {
     if (byLabel) return byLabel.value;
   }
   const upper = raw.toUpperCase();
+  // Alias courants RDC (ordre du plus spécifique au plus large)
+  const aliases: [RegExp, string][] = [
+    [/TENASOSP|FIN D['']ÉDUCATION DE BASE|CTEB/i, "TENASOSP"],
+    [/\bEXETAT\b|DIPL[OÔ]ME D['']ÉTAT.*PROFESSION/i, "DIPLOME_ETAT_PRO"],
+    [/DIPL[OÔ]ME D['']ÉTAT.*TECHNI/i, "DIPLOME_ETAT_TECH"],
+    [/DIPL[OÔ]ME D['']ÉTAT|\bBAC(CALAUR[EÉ]AT)?\b/i, "DIPLOME_ETAT"],
+    [/\bCEPE\b|\bCEP\b|ENAFEP|ÉTUDES PRIMAIRES/i, "CEP"],
+    [/\bDEA\b|ÉTUDES APPROFONDIES/i, "DEA"],
+    [/\bA0\b/, "A0"],
+    [/\bA1\b/, "A1"],
+    [/\bA2\b/, "A2"],
+    [/\bA3\b/, "A3"],
+    [/DOCTORAT|PH\.?\s*D/i, "DOCTORAT"],
+    [/\bMASTER\b|\bMA[IÎ]TRISE\b/i, "MASTER"],
+    [/\bLICENCE\b/, "LICENCE"],
+    [/\bGRADUAT\b/, "GRADUAT"],
+  ];
+  for (const [re, code] of aliases) {
+    if (re.test(raw)) return code;
+  }
   for (const n of NIVEAUX_ETUDES) {
     if (!n.value) continue;
     if (upper.includes(n.value) || upper.includes(n.label.toUpperCase())) return n.value;
@@ -99,20 +135,23 @@ export function parcoursWithNiveau(existing: string | undefined | null, code: st
 export const NIVEAUX_SCOLAIRES = [
   "",
   "Maternelle",
-  "Primaire",
-  "Secondaire cycle 1",
-  "Secondaire cycle 2",
-  "Humanités",
-  "Technique",
-  "Professionnel",
+  "Primaire (1ʳᵉ–6ᵉ)",
+  "CTEB — Cycle terminal de l'éducation de base (7ᵉ–8ᵉ)",
+  "Humanités générales",
+  "Humanités techniques",
+  "Humanités professionnelles",
 ] as const;
 
 export const DIPLOMES_UNIV = [
   "",
-  "Certificat",
+  "A3",
+  "A2",
+  "A1",
+  "A0",
   "Graduat",
-  "Licence",
-  "Master",
+  "Licence (LMD)",
+  "Master (LMD)",
+  "DEA",
   "Doctorat",
   "Autre",
 ] as const;

@@ -45,10 +45,11 @@ export const ETABLISSEMENTS_SUPERIEURS_RDC = [
 export const DIPLOMES_SCOLAIRES = [
   "",
   "Aucun",
-  "Certificat d'études primaires (CEPE)",
-  "Brevet / cycle court",
-  "Diplôme d'État (humanités)",
-  "Diplôme technique",
-  "Certificat professionnel",
+  "Certificat d'études primaires — CEP (ENAFEP)",
+  "Certificat de fin d'éducation de base — CTEB (TENASOSP)",
+  "Diplôme d'État — Humanités générales (EXETAT)",
+  "Diplôme d'État — Humanités techniques (EXETAT)",
+  "Diplôme d'État — Humanités professionnelles (EXETAT)",
+  "Diplôme de fin d'humanités professionnelles (cycle 3 ans)",
   "Autre",
 ] as const;

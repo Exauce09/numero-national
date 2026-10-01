@@ -21,7 +21,7 @@ export default function EtudesFaitesForm({ value, onChange }: Props) {
         <legend>Niveau d&apos;étude</legend>
         <div className="form-grid">
           <NiveauEtudeField
-            label="Diplôme / certificat obtenu"
+            label="Diplôme / certificat obtenu (RDC)"
             value={value.niveau_atteint}
             onChange={(code) => onChange({ ...value, niveau_atteint: code })}
           />
