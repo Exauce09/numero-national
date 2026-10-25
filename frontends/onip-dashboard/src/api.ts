@@ -425,7 +425,30 @@ export const censusApi = {
       method: "POST",
       body: JSON.stringify({ assign_nic: assignNic }),
     }),
+  batchPromote: (campaignId: string, assignNic = true, limit = 50) =>
+    request<{
+      promoted: number;
+      skipped: number;
+      failed: number;
+      results: PromoteResult[];
+      errors: { census_record_id?: string; error?: string }[];
+    }>(`/census/campaigns/${campaignId}/promote`, {
+      method: "POST",
+      body: JSON.stringify({ assign_nic: assignNic, limit }),
+    }),
   stats: (campaignId: string) => request<CampaignStats>(`/census/campaigns/${campaignId}/stats`),
+  enrollmentCatalog: () =>
+    request<{
+      module?: number;
+      title?: string;
+      labels: Record<string, string>;
+      transitions: Record<string, string[]>;
+      offline_nin_forbidden: boolean;
+      auto_merge_forbidden?: boolean;
+      endpoints?: Record<string, string>;
+      note?: string;
+      map_plan_fr?: Record<string, string>;
+    }>("/census/enrollment-status-catalog"),
   /** @deprecated prefer accountsApi.listUsers */
   listUsers: () => accountsApi.listUsers(),
   exportCsvUrl: (campaignId: string, status?: string) => {

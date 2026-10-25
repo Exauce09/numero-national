@@ -1070,9 +1070,19 @@ async def get_record(db: AsyncSession, record_id: uuid.UUID) -> CensusRecord | N
     return await db.get(CensusRecord, record_id)
 
 
+def _status_value(rec: CensusRecord) -> str:
+    st = rec.status
+    return st.value if hasattr(st, "value") else str(st)
+
+
 def _assert_reviewable(rec: CensusRecord) -> None:
-    if rec.status not in {CensusRecordStatus.SYNCED, CensusRecordStatus.REJECTED}:
-        raise ValueError("not_reviewable")
+    """Approve depuis SYNCED / CONFLICT / REJECTED (reprise)."""
+    from apps.api.domains.recensement.enrollment_status import assert_transition
+
+    try:
+        assert_transition(_status_value(rec), CensusRecordStatus.APPROVED.value)
+    except ValueError as exc:
+        raise ValueError("not_reviewable") from exc
 
 
 async def approve_record(
@@ -1097,8 +1107,12 @@ async def reject_record(
     reviewer_id: uuid.UUID,
     body: RecordRejectRequest,
 ) -> CensusRecord:
-    if rec.status not in {CensusRecordStatus.SYNCED, CensusRecordStatus.APPROVED}:
-        raise ValueError("not_reviewable")
+    from apps.api.domains.recensement.enrollment_status import assert_transition
+
+    try:
+        assert_transition(_status_value(rec), CensusRecordStatus.REJECTED.value)
+    except ValueError as exc:
+        raise ValueError("not_reviewable") from exc
     rec.status = CensusRecordStatus.REJECTED
     rec.reviewed_by = reviewer_id
     rec.reviewed_at = datetime.now(timezone.utc)
@@ -1162,8 +1176,12 @@ async def promote_record(
             nic_assigned=citizen.nic is not None,
         )
 
-    if rec.status != CensusRecordStatus.APPROVED:
-        raise ValueError("not_promotable")
+    from apps.api.domains.recensement.enrollment_status import assert_transition
+
+    try:
+        assert_transition(_status_value(rec), CensusRecordStatus.PROMOTED.value)
+    except ValueError as exc:
+        raise ValueError("not_promotable") from exc
 
     if not (rec.given_names and rec.given_names.strip()):
         raise ValueError("missing_given_names")

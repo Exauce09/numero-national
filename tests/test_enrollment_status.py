@@ -14,6 +14,8 @@ def test_catalog_forbids_offline_nin():
     cat = enrollment_status_catalog()
     assert cat["offline_nin_forbidden"] is True
     assert cat["map_plan_fr"]["valide"] == CensusRecordStatus.APPROVED.value
+    assert cat.get("module") == 3
+    assert "transitions" in cat
 
 
 def test_plan_labels_cover_enum():

@@ -11,6 +11,7 @@ import CardsPage from "./pages/CardsPage";
 import CartographiePage from "./pages/CartographiePage";
 import ConformitePage from "./pages/ConformitePage";
 import DashboardPage from "./pages/DashboardPage";
+import EnrolementPage from "./pages/EnrolementPage";
 import EtatCivilOnipPage from "./pages/EtatCivilOnipPage";
 import FeuilleDeRoutePage from "./pages/FeuilleDeRoutePage";
 import LoginPage from "./pages/LoginPage";
@@ -25,6 +26,7 @@ function RequireAuth({ children }: { children: ReactNode }) {
 const PAGE_TITLES: Record<string, string> = {
   "/": "Tableau de bord national",
   "/accounts": "Comptes agents",
+  "/enrolement": "Enrôlement",
   "/campaigns": "Campagnes & contrôle",
   "/anomalies": "Anomalies",
   "/population": "Population / FGP",
@@ -91,6 +93,7 @@ function Shell() {
           ) : null}
 
           <div className="nav-group-label">Recensement</div>
+          <NavLink to="/enrolement">Enrôlement</NavLink>
           <NavLink to="/campaigns">Campagnes &amp; contrôle</NavLink>
           <NavLink to="/anomalies">Anomalies</NavLink>
           <NavLink to="/cartographie">Cartographie</NavLink>
@@ -136,6 +139,7 @@ function Shell() {
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/accounts" element={<AccountsPage />} />
+            <Route path="/enrolement" element={<EnrolementPage />} />
             <Route path="/campaigns" element={<CampaignsPage />} />
             <Route path="/anomalies" element={<AnomaliesPage />} />
             <Route path="/cartographie" element={<CartographiePage />} />

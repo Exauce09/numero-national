@@ -1,0 +1,755 @@
+SIGPOP-RDC
+MODULE 3ENRÔLEMENT DE LA POPULATION
+Cahier des charges fonctionnel et technique détailléPortail ONIP — FGP, collecte biographique, documents et biométrie
+Version de travail — octobre 2026
+Document destiné à l’audit, à la conception et au développement progressif du module existant.
+
+Avertissement et statut du document
+Ce cahier des charges développe le Module 3 — Enrôlement de la population — dans le contexte du projet SIGPOP-RDC / ONIP. Il décrit une cible fonctionnelle pour collecter, contrôler et transmettre des dossiers de personnes. Il ne certifie ni l’implémentation actuelle du dépôt ni les procédures internes non publiques de l’ONIP.
+Les champs obligatoires, documents recevables, catégories de personnes, modalités de capture biométrique, règles de validation et procédures de rendez-vous doivent être confirmés à partir des textes complets et des instructions de l’autorité compétente. Les étapes proposées doivent être adaptées au workflow institutionnel approuvé.
+Règle fondamentale : un dossier collecté n’est pas automatiquement une identité validée dans le FGP. Le module d’enrôlement ne doit pas inventer ou attribuer localement un NIN définitif, ne doit pas considérer une correspondance algorithmique comme une fraude prouvée et ne doit pas fusionner automatiquement deux dossiers.
+Sommaire
+1. Finalité et objectifs
+2. Périmètre, acteurs et responsabilités
+3. Parcours d’enrôlement de bout en bout
+4. Organisation des écrans et formulaires
+5. Collecte biographique et contrôle des données
+6. Documents justificatifs
+7. Capture biométrique et contrôle qualité
+8. Recherche de doublons et validation
+9. Statuts, transitions et gestion des exceptions
+10. Fonctionnement hors connexion et synchronisation
+11. Modèle de données indicatif
+12. API et intégrations
+13. Sécurité et confidentialité
+14. Notifications, reçus et suivi
+15. Cas d’utilisation détaillés
+16. Tests et critères d’acceptation
+17. Plan de développement
+18. Prompt pour l’agent développeur
+19. Décisions à valider et limites
+
+1. Finalité et objectifs
+1.1 Finalité
+Le module Enrôlement organise la collecte et la préparation d’un dossier avant sa validation par les acteurs habilités. Il doit guider l’agent à travers les étapes autorisées, réduire les erreurs de saisie, rattacher les pièces justificatives, contrôler la qualité des données et transmettre le dossier aux modules de vérification, de biométrie et du FGP.
+1.2 Objectifs fonctionnels
+Créer un dossier de collecte provisoire avec une référence de suivi et un identifiant interne unique.
+Associer la campagne, le centre, l’équipe, l’agent et la source de collecte au dossier.
+Permettre une collecte progressive, avec sauvegarde du brouillon et reprise d’un dossier incomplet.
+Collecter les champs biographiques requis par la procédure approuvée, en distinguant les valeurs déclarées des valeurs vérifiées.
+Contrôler les documents et leur provenance sans prétendre rendre automatiquement une décision juridique d’authenticité.
+Acquérir les éléments biométriques lorsque requis et autorisés, contrôler leur qualité et tracer le résultat.
+Rechercher les dossiers similaires avant de soumettre une nouvelle identité au processus de validation.
+Gérer les rejets, demandes de complément, erreurs techniques et cas de doublons potentiels.
+Synchroniser les collectes réalisées hors connexion sans créer de doublons lors des reprises.
+Assurer la traçabilité complète des opérations et protéger les données personnelles et biométriques.
+1.3 Résultats attendus
+Résultat
+Description
+Preuve attendue
+Dossier exploitable
+Les champs nécessaires et la provenance sont correctement enregistrés.
+Fiche et événements de collecte consultables par un utilisateur autorisé.
+Dossier vérifiable
+Les documents et captures sont rattachés et leur état est clair.
+Liste de pièces, résultats de contrôle et anomalies.
+Dossier traçable
+Les actions de l’agent et les transmissions sont enregistrées.
+Historique horodaté avec acteur, source et résultat.
+Dossier non dupliqué par défaut
+Le système recherche les correspondances et met les cas ambigus en revue.
+Référence de contrôle et éventuelle tâche de rapprochement.
+Synchronisation fiable
+Une retransmission ne crée pas une nouvelle collecte ou identité.
+Identifiant d’événement stable, accusé de réception et statut.
+
+2. Périmètre, acteurs et responsabilités
+2.1 Fonctions couvertes
+Pré-enregistrement ou création sur place, selon la procédure autorisée.
+Affectation à une campagne, un centre ou une équipe mobile.
+Collecte biographique, adresse et liens ou références nécessaires.
+Pièces justificatives et contrôle documentaire.
+Capture photo, empreintes et signature lorsque prévues et autorisées.
+Contrôle qualité et prévention des erreurs.
+Recherche de dossiers similaires et passage en revue si nécessaire.
+Soumission, demandes de complément, refus motivé ou transfert vers la validation.
+Reçu, suivi, synchronisation et journalisation.
+2.2 Hors périmètre direct
+Décision définitive d’attribution du NIN : dépend du service NIN central autorisé.
+Décision juridique sur l’authenticité d’un acte : dépend des autorités et procédures compétentes.
+Fusion irréversible de dossiers : dépend d’un workflow renforcé distinct.
+Décision automatique de fraude fondée uniquement sur un score biométrique ou algorithmique.
+Production et remise de la CIN : relèvent du module de gestion des cartes après vérification des prérequis.
+2.3 Acteurs
+Acteur
+Responsabilités possibles
+Limites de responsabilité
+Agent d’enrôlement
+Créer le brouillon, collecter les données, joindre les pièces, effectuer les captures permises et soumettre.
+Ne valide pas automatiquement son propre dossier si la séparation des tâches est requise.
+Chef de centre
+Organiser les files, affecter les agents, contrôler les dossiers et suivre les retards.
+N’accède pas automatiquement aux données hors périmètre.
+Vérificateur documentaire
+Examiner les pièces, relever les incohérences et demander des compléments.
+Ne modifie pas les règles nationales ni le NIN.
+Opérateur biométrique
+Effectuer les captures et contrôler leur qualité avec l’équipement autorisé.
+Ne télécharge pas librement les gabarits biométriques.
+Validateur
+Prendre les décisions qui lui sont déléguées après contrôle.
+Décisions motivées et auditées.
+Superviseur de campagne
+Suivre les lots, équipes, coupons, taux de collecte et erreurs de synchronisation.
+Accès limité aux données individuelles nécessaires à sa mission.
+Administrateur technique
+Maintenir le système et surveiller les services.
+Pas d’accès métier complet par défaut.
+
+2.4 Permissions granulaires indicatives
+enrollment.create — créer un dossier de collecte.
+enrollment.edit.draft — modifier un brouillon.
+enrollment.submit — soumettre pour contrôle.
+enrollment.review.documents — examiner les pièces.
+enrollment.capture.biometric — utiliser la fonction de capture autorisée.
+enrollment.view.biometric_status — consulter le statut de capture sans accéder nécessairement aux données brutes.
+enrollment.request_completion — demander des compléments.
+enrollment.validate — valider si le rôle est habilité.
+enrollment.reject — rejeter avec motif.
+enrollment.sync.manage — traiter les erreurs de synchronisation.
+enrollment.export — exporter un rapport autorisé, si cette permission est explicitement accordée.
+3. Parcours d’enrôlement de bout en bout
+3.1 Étapes standard
+1. Ouverture du dossier
+L’agent choisit le mode de collecte autorisé. Le système vérifie sa session, son rôle, son centre et sa campagne éventuelle.
+2. Création de la référence
+Le système crée une référence de collecte provisoire et un identifiant technique stable. Ils ne doivent pas être confondus avec le NIN.
+3. Recherche préalable
+L’agent recherche les dossiers déjà présents à l’aide des critères autorisés avant de soumettre une nouvelle personne.
+4. Saisie biographique
+Les informations nécessaires sont recueillies ; leur provenance et leur état de vérification sont indiqués.
+5. Adresse et contexte de collecte
+Le lieu est enregistré à partir du référentiel administratif disponible, ainsi que le centre, la campagne, l’équipe et la date.
+6. Documents
+Les pièces sont enregistrées avec leurs métadonnées et soumises aux contrôles prévus.
+7. Capture biométrique
+La photo, les empreintes ou autres données prévues sont capturées au moyen des dispositifs compatibles et autorisés.
+8. Contrôle qualité
+Le système vérifie que les captures sont présentes, exploitables et correctement rattachées.
+9. Recherche de correspondances
+Les données sont comparées aux dossiers existants à l’aide des services autorisés. Les correspondances potentielles sont mises en revue.
+10. Contrôle et soumission
+Le système vérifie les champs requis, les pièces et les contrôles en attente. L’agent soumet le dossier ou le conserve en brouillon.
+11. Vérification / validation
+Un acteur habilité accepte, rejette avec motif ou demande un complément. Les transitions sont historisées.
+12. Transmission aux modules aval
+Le dossier validé peut être transmis au workflow FGP/NIN ou à une autre étape autorisée. Le module d’enrôlement ne décide pas seul de l’attribution du NIN.
+3.2 Flux résumé
+Étape
+État possible après traitement
+Condition de passage
+Création
+Brouillon
+Dossier ouvert par un agent autorisé.
+Collecte
+En cours
+Champs et pièces saisis progressivement.
+Pré-contrôles
+À compléter / contrôle requis
+Champs requis et pièces examinés.
+Détection de doublons
+Aucun candidat / doublon potentiel
+Recherche exécutée selon la procédure.
+Soumission
+Soumis / en vérification
+Dossier complet selon les critères de soumission.
+Décision
+Validé / rejeté / à compléter
+Acteur habilité, motif et résultat enregistrés.
+Transmission
+En attente / transmis / erreur
+Service cible disponible et accusé de réception conservé.
+
+4. Organisation des écrans et formulaires
+Écran
+Contenu
+Actions
+Accueil enrôlement
+Compteurs par statut, campagnes actives, brouillons, dossiers à compléter, erreurs de synchronisation.
+Ouvrir une file, filtrer par centre ou campagne.
+Nouvel enrôlement
+Sélection du mode, du centre, de la campagne et création d’un brouillon.
+Créer, reprendre, annuler selon politique.
+Recherche préalable
+Critères biographiques et références de dossier.
+Rechercher, examiner les résultats autorisés, créer si approprié.
+Formulaire identité
+Champs biographiques groupés par étapes avec indicateurs de validité.
+Sauvegarder, continuer, corriger les erreurs.
+Adresse / collecte
+Référentiel territorial, lieu, campagne, équipe et agent.
+Choisir les valeurs, signaler les localités inconnues.
+Documents
+Type de pièce, référence, source, date et état de contrôle.
+Ajouter, prévisualiser selon droits, soumettre à contrôle.
+Biométrie
+État du périphérique, consignes de capture, qualité et erreurs.
+Capturer, reprendre une capture défectueuse, terminer.
+Résumé avant soumission
+Champs, pièces manquantes, résultat de recherche de doublons et avertissements.
+Soumettre, revenir à une étape, enregistrer en brouillon.
+Détail du dossier enrôlé
+Statut, historique, commentaires, transferts et décisions.
+Suivre, compléter, répondre à une demande.
+File d’examen
+Dossiers à contrôler, dossiers incomplets et correspondances potentielles.
+Prendre en charge, demander des pièces, accepter ou rejeter selon droits.
+Synchronisation
+Éléments en attente, transmis, en erreur, tentatives et derniers accusés.
+Réessayer de manière contrôlée, afficher les erreurs, escalader.
+
+4.1 Principes d’ergonomie
+Afficher l’avancement, l’étape actuelle et la prochaine action attendue.
+Distinguer les erreurs bloquantes des avertissements qui doivent être examinés.
+Sauvegarder les brouillons de façon fiable et afficher la date de dernière sauvegarde.
+Limiter les champs visibles selon le rôle et l’étape du processus.
+Rendre le formulaire utilisable sur tablette et ordinateur ; si mobile, tenir compte des périphériques disponibles.
+Ne pas afficher en clair des données biométriques brutes ni de secrets techniques.
+Prévoir une interface claire pour les connexions lentes et les erreurs de périphériques.
+5. Collecte biographique et contrôle des données
+5.1 Groupes de données indicatifs
+Les champs ci-dessous sont des exemples tirés des besoins généraux du projet. Leur caractère obligatoire doit être confirmé dans le formulaire officiel applicable. Ne pas collecter un champ simplement parce qu’il est techniquement possible de le stocker.
+Groupe
+Exemples de données
+Contrôles / précautions
+Identité nominale
+Nom, post-nom, prénom, autres noms ou variantes autorisées.
+Respecter les caractères, éviter les normalisations destructives et enregistrer la source.
+Naissance
+Date et lieu de naissance, référence d’acte si disponible.
+Contrôler le format et signaler les incohérences sans inventer la valeur manquante.
+Autres attributs
+Sexe, profession, nationalité ou autres champs prévus par la procédure.
+Ne collecter que ce qui est requis et autorisé.
+Adresse
+Province, ville/territoire, commune/secteur, quartier/village ou localité.
+Utiliser un référentiel versionné ; conserver les valeurs saisies si un choix du référentiel manque.
+Relations
+Références de filiation ou tuteur si applicables et autorisées.
+Distinguer relation déclarée et relation vérifiée ; éviter de créer des doublons de personnes liées.
+Contexte collecte
+Campagne, centre, agent, équipe, appareil ou source si pertinent.
+Traçabilité de la collecte ; pas d’exposition de secrets d’appareil.
+
+5.2 Validation de saisie
+Validation côté interface pour aider l’agent, et revalidation côté serveur pour la sécurité.
+Normalisation prudente des espaces et formats sans modifier arbitrairement les noms officiels.
+Références territoriales vérifiées contre le référentiel disponible ; possibilité de signaler une valeur manquante au référentiel.
+Valeurs inconnues ou non disponibles distinctes des valeurs vides lorsque le modèle le permet.
+Détection des incohérences de dates sans auto-correction silencieuse.
+Conservation de l’origine de l’information pour les champs critiques.
+Contrôle de concurrence ou de version lorsque plusieurs agents peuvent compléter le même dossier.
+5.3 Gestion des formulaires conditionnels
+Le formulaire peut afficher ou exiger certains champs selon le type de démarche, la catégorie du dossier ou les règles approuvées. Les conditions doivent être paramétrables ou centralisées afin d’éviter que plusieurs écrans appliquent des règles contradictoires. Toute modification de ces règles doit être versionnée et testée.
+6. Documents justificatifs
+6.1 Métadonnées à enregistrer
+Type et catégorie de document.
+Référence ou numéro, lorsque la pièce en possède un et que la procédure le demande.
+Organisme émetteur ou source déclarée.
+Date d’émission, de réception et d’expiration si applicable.
+Référence sécurisée du fichier ou du système documentaire.
+Agent ayant ajouté la pièce, horodatage et campagne/centre si pertinent.
+État de contrôle, responsable du contrôle, décision et motif.
+6.2 États documentaires indicatifs
+État
+Signification
+Actions suivantes
+Manquant
+La pièce exigée pour cette procédure n’a pas été fournie.
+Demander un complément ou poursuivre si exception autorisée.
+Reçu
+La pièce a été jointe ou référencée mais pas encore examinée.
+Vérification documentaire.
+À vérifier
+Le contrôle est en cours ou nécessite une information complémentaire.
+Prendre en charge, demander une pièce ou transmettre.
+Accepté / vérifié
+Le contrôle prévu par le processus a été réalisé.
+Permettre la suite de l’enrôlement selon les règles.
+Rejeté
+Le contrôleur a indiqué un motif de rejet.
+Informer l’agent et demander une pièce valide si la procédure le permet.
+Illisible / incomplet
+Le contenu ne permet pas la vérification attendue.
+Nouvelle capture ou nouvelle pièce.
+
+6.3 Sécurité des fichiers
+Stocker les fichiers dans un espace privé, jamais dans un dossier web public par défaut.
+Limiter les formats et la taille ; contrôler les fichiers reçus avant de les ouvrir ou de les distribuer.
+Générer des références de stockage non devinables et vérifier l’autorisation à chaque téléchargement.
+Journaliser les ajouts, consultations, téléchargements et changements de statut sensibles.
+Définir la conservation, l’archivage et l’effacement sur instruction approuvée.
+Ne pas reproduire le contenu complet des pièces dans les journaux.
+7. Capture biométrique et contrôle qualité
+7.1 Principe général
+La capture biométrique est exécutée uniquement lorsque la procédure l’exige et que le dispositif, le SDK et le traitement sont autorisés. Le module d’enrôlement orchestre la capture et en conserve le statut ; le stockage et la comparaison biométriques doivent rester sous le contrôle du service spécialisé prévu par l’architecture.
+7.2 Séquence indicative
+1. Vérifier que l’utilisateur dispose de la permission de capture.
+2. Vérifier la présence et l’état du périphérique ou du SDK.
+3. Afficher les instructions adaptées au type de capture.
+4. Exécuter la capture et recevoir le résultat du dispositif.
+5. Contrôler le format, la qualité technique et la complétude de la capture.
+6. Associer le résultat au bon dossier et au bon type de capture.
+7. Conserver les métadonnées nécessaires et le statut ; protéger la donnée brute selon la politique officielle.
+8. Proposer une nouvelle capture ou une procédure alternative en cas d’échec, si elle est prévue.
+7.3 Statuts techniques possibles
+Statut
+Signification
+Comportement attendu
+Non commencé
+Aucune capture tentée.
+Afficher l’action si autorisée.
+En cours
+Capture active.
+Empêcher les doubles soumissions et signaler les erreurs.
+Réussie — contrôle requis
+Le périphérique a produit un résultat mais le contrôle métier n’est pas fini.
+Exécuter le contrôle qualité défini.
+Qualité insuffisante
+Résultat présent mais non exploitable selon les contrôles techniques.
+Expliquer le motif et permettre une reprise autorisée.
+Échec technique
+SDK, caméra, lecteur ou communication en erreur.
+Tracer code d’erreur non sensible et proposer un dépannage.
+Confirmée par service
+Le service biométrique a accepté la capture selon ses règles.
+Continuer le workflow sans exposer le template brut.
+En attente de revue
+Un problème ou une correspondance nécessite une intervention.
+Créer une tâche de revue pour un rôle habilité.
+
+7.4 Contrôles de qualité
+Présence de la capture attendue et liaison au dossier correct.
+Format et intégrité du résultat retourné par le SDK.
+Qualité technique conforme aux capacités du dispositif et aux seuils validés.
+Gestion des captures répétées et des tentatives partielles.
+Compatibilité de la version du SDK et journalisation des erreurs utiles au diagnostic.
+Protection des gabarits ; aucun template ni échantillon brut dans les logs applicatifs.
+Traçabilité de l’opérateur, du périphérique autorisé et de l’horodatage selon la politique applicable.
+7.5 Limite d’automatisation
+Le résultat d’un moteur biométrique ou d’un algorithme de comparaison est un indicateur technique. Il ne doit pas être interprété seul comme une fraude ou entraîner automatiquement une fusion. Les seuils, le taux de faux positifs acceptable, la revue humaine et les éventuelles voies de recours doivent être définis par les responsables compétents.
+8. Recherche de doublons et validation
+8.1 Recherche préalable
+Lancer la recherche biographique avant la soumission définitive.
+Utiliser, si autorisée et disponible, la recherche biométrique via un service distinct.
+Présenter uniquement les informations nécessaires pour permettre une comparaison par un agent habilité.
+Conserver la date, le service interrogé, le résultat, les candidats et l’état de traitement.
+Traiter les indisponibilités du moteur de recherche comme une exception explicite, et non comme une preuve qu’il n’existe aucun doublon.
+8.2 Résultats et décisions
+Résultat
+Action système
+Décision humaine attendue
+Aucun candidat retourné
+Marquer le contrôle comme effectué sans correspondance identifiée, avec la référence du contrôle.
+Poursuivre le workflow si les autres prérequis sont satisfaits.
+Correspondance potentielle
+Bloquer la validation automatique et créer une tâche de revue.
+Déterminer si les dossiers concernent la même personne selon la procédure.
+Service indisponible
+Marquer le contrôle en attente ou en erreur.
+Reprendre le contrôle avant toute étape qui l’exige.
+Informations contradictoires
+Créer une anomalie ou demander un complément.
+Résoudre le conflit avec des éléments autorisés.
+Doublon confirmé
+Suivre la procédure de rapprochement/fusion distincte.
+Décision renforcée et historique conservé.
+
+8.3 Validation du dossier
+Le validateur vérifie que les données et pièces requises sont présentes, que les contrôles obligatoires ont été exécutés, que les anomalies sont résolues ou traitées selon une exception autorisée et que la provenance est suffisante. Le système doit enregistrer la décision, le motif, l’acteur, l’horodatage et le statut résultant.
+9. Statuts, transitions et exceptions
+Les statuts ci-dessous sont des propositions ; les statuts déjà utilisés dans le dépôt doivent être inventoriés et réutilisés lorsque possible.
+Statut indicatif
+Description
+Transitions possibles
+BROUILLON
+Collecte commencée et non soumise.
+Poursuivre, soumettre, annuler si permis.
+EN_COLLECTE
+Saisie ou capture en cours.
+Sauvegarder, compléter, soumettre.
+A_COMPLETER
+Champs ou pièces manquants.
+Compléter et renvoyer en vérification.
+EN_CONTROLE_DOCUMENTAIRE
+Pièces examinées.
+Accepté, rejeté ou complément demandé.
+EN_CONTROLE_BIOMETRIQUE
+Capture ou contrôle biométrique en cours.
+Captures confirmées, reprise ou revue.
+DOUBLON_POTENTIEL
+Correspondance possible avec un dossier existant.
+Revue, clôture sans doublon ou procédure de rapprochement.
+SOUMIS
+Dossier soumis à traitement.
+Prise en charge, validation, rejet ou complément.
+EN_VALIDATION
+Contrôles préalables terminés ; décision en attente.
+Validé, rejeté, complément.
+VALIDE
+Dossier accepté par le rôle autorisé pour l’étape d’enrôlement.
+Transmission au service aval selon workflow.
+REJETE
+Dossier refusé avec motif.
+Réouverture seulement si la procédure l’autorise.
+ERREUR_SYNCHRONISATION
+Échange avec un service aval en échec.
+Réessayer, corriger, escalader.
+TRANSMIS
+Service cible a accusé réception de l’événement.
+Suivi du traitement aval.
+
+9.1 Exceptions à gérer explicitement
+Exception
+Réaction attendue
+À éviter
+Réseau indisponible
+Sauvegarder localement de façon protégée si le mode hors connexion est autorisé.
+Perdre le dossier ou annoncer un envoi réussi sans accusé serveur.
+Lecteur biométrique absent
+Afficher l’erreur et conserver le statut de capture.
+Marquer la capture comme réussie sans résultat vérifiable.
+Pièce illisible
+Indiquer le motif et demander une nouvelle capture ou pièce selon procédure.
+Supprimer sans trace la pièce précédente.
+Doublon potentiel
+Bloquer les étapes qui exigent une résolution et créer une revue.
+Créer un nouveau dossier de référence sans rapprochement.
+Échec de synchronisation
+Garder une file de reprise et une clé d’idempotence.
+Renvoyer aveuglément l’événement sans identifiant stable.
+Dossier modifié en parallèle
+Détecter le conflit de version et proposer une résolution.
+Écraser silencieusement le travail d’un autre agent.
+Agent non autorisé
+Refuser l’action côté serveur et journaliser l’événement selon politique.
+Se contenter de masquer un bouton dans l’interface.
+
+10. Fonctionnement hors connexion et synchronisation
+10.1 Objectif
+Le mode hors connexion peut être utile lors d’opérations de terrain avec une connectivité instable. Il doit être activé uniquement si la solution locale, les appareils, les données conservées et la procédure de synchronisation ont été approuvés. Une collecte locale n’équivaut pas à l’enregistrement définitif au FGP.
+10.2 Cycle de synchronisation
+1. Créer localement un identifiant d’événement stable et non réutilisé.
+2. Conserver les données minimales nécessaires dans un espace protégé, chiffré et soumis à expiration.
+3. Associer chaque dossier à la campagne, au centre, à l’agent, à la version du formulaire et à l’horodatage.
+4. À la reconnexion, envoyer les éléments par lots sécurisés avec une clé d’idempotence.
+5. Le serveur vérifie l’autorisation, le format, la provenance, la répétition de l’événement et les conflits.
+6. Retourner un accusé de réception par élément ou par lot, avec statut et référence serveur.
+7. Placer les éléments rejetés en file de traitement avec un motif exploitable.
+8. Ne supprimer la copie locale qu’après confirmation et selon la politique de conservation approuvée.
+9. Laisser au workflow central la recherche nationale des doublons et les décisions qui nécessitent la connexion centrale.
+10.3 Statuts de synchronisation
+Statut
+Signification
+LOCAL_ONLY
+Données présentes sur l’appareil, non envoyées.
+QUEUED
+Prêtes à être transmises.
+SENDING
+Transmission en cours.
+ACKNOWLEDGED
+Le serveur a confirmé la réception.
+REJECTED
+Le serveur a rejeté l’événement avec motif.
+RETRY_PENDING
+Une nouvelle tentative contrôlée est prévue.
+CONFLICT_REVIEW
+Une contradiction nécessite une intervention.
+FAILED_FINAL
+Échec définitif selon une règle explicite, à traiter par un responsable.
+
+10.4 Contrôles anti-doublons et reprise
+Chaque soumission porte un identifiant source stable.
+Le serveur conserve le résultat des événements déjà traités.
+Les nouvelles tentatives réutilisent l’identifiant d’événement ; elles ne créent pas une nouvelle collecte.
+Les conflits entre plusieurs modifications sont signalés au lieu d’être résolus silencieusement.
+Les appareils perdus ou compromis doivent pouvoir être révoqués et les données locales protégées selon la capacité de l’appareil.
+11. Modèle de données indicatif
+Les noms ci-dessous sont conceptuels et doivent être confrontés aux modèles et migrations existants avant tout changement.
+Entité/table indicative
+Responsabilité
+Contraintes principales
+enrollments
+Référence de collecte, statut, date, campagne, centre, agent et identifiant interne.
+Identifiant stable ; statut contrôlé ; source enregistrée.
+enrollment_biographic_data
+Données collectées et état de vérification des champs.
+Validation des valeurs et historique des modifications sensibles.
+enrollment_addresses
+Adresse de collecte et référence territoriale.
+Référentiel territorial versionné.
+enrollment_documents
+Métadonnées des pièces, source, stockage sécurisé et résultat du contrôle.
+Accès restreint ; intégrité et état de vérification.
+enrollment_biometric_events
+Événements de capture, statut, qualité et référence au service biométrique.
+Pas de biométrie brute dans les logs métier.
+enrollment_reviews
+Revue documentaire, anomalies et décisions.
+Acteur, motif, résultat et horodatage.
+duplicate_check_requests
+Requêtes de recherche de candidats et résultats contrôlés.
+Service, référence de requête, statut et permissions.
+enrollment_status_history
+Historique de transitions.
+Ancien/nouveau statut, acteur, motif, date.
+enrollment_sync_events
+Événements d’intégration, clé d’idempotence, accusé et erreurs.
+Clé unique source et reprise contrôlée.
+campaigns / centers / teams
+Référentiel opérationnel des campagnes et affectations.
+Dates, périmètre, statut et droits.
+audit_events
+Journal des opérations importantes.
+Protection contre l’altération et données minimisées.
+
+11.1 Contraintes de modélisation
+Réutiliser les entités du système existant lorsqu’elles remplissent déjà le besoin.
+Séparer la référence de collecte provisoire de l’identifiant de la personne dans le FGP.
+Éviter d’ajouter le même attribut à plusieurs endroits sans règle claire de synchronisation.
+Prévoir la gestion des versions du formulaire et des règles de validation.
+Utiliser des contraintes d’unicité sur les identifiants techniques et les clés d’événement source.
+Ne pas conserver les secrets d’appareil, jetons ou données biométriques brutes dans les journaux.
+12. API et intégrations
+Les chemins ci-dessous sont des exemples conceptuels. Les endpoints effectivement présents doivent être inventoriés et réutilisés avant de proposer de nouvelles routes.
+Opération
+Exemple conceptuel
+Contrôles
+Créer une collecte
+POST /api/v1/enrollments
+Authentification, permission, référence source, validation et idempotence.
+Lister les collectes
+GET /api/v1/enrollments
+Pagination, filtres autorisés, restrictions par centre/campagne.
+Consulter un dossier de collecte
+GET /api/v1/enrollments/{id}
+Vérifier l’accès et masquer les données interdites.
+Mettre à jour un brouillon
+PATCH /api/v1/enrollments/{id}
+Statut modifiable, version, champs permis et journalisation.
+Ajouter une pièce
+POST /api/v1/enrollments/{id}/documents
+Contrôle fichier, stockage privé, autorisation et audit.
+Enregistrer une capture
+POST /api/v1/enrollments/{id}/biometric-events
+Permission dédiée, référence de capture et état technique.
+Lancer recherche de doublon
+POST /api/v1/enrollments/{id}/duplicate-checks
+Appel au service autorisé, référence de résultat et gestion d’indisponibilité.
+Soumettre le dossier
+POST /api/v1/enrollments/{id}/submit
+Préconditions, contrôle des champs et statut légalement approprié.
+Traiter une décision
+POST /api/v1/enrollments/{id}/decision
+Rôle autorisé, décision contrôlée, motif et audit.
+Transmettre un lot
+POST /api/v1/enrollment-sync/batches
+Clé d’idempotence, signature/authentification et accusé.
+
+12.1 Contrôles d’API
+Vérifier les permissions côté serveur pour chaque route et chaque dossier.
+Limiter taille des charges utiles, nombre de pièces et volume des lots selon configuration.
+Valider le type et le contenu des données ; traiter proprement les champs inconnus.
+Appliquer des clés d’idempotence sur les opérations de création et de synchronisation.
+Retourner des erreurs structurées sans exposer les informations d’un autre dossier.
+Limiter le débit, surveiller les appels inhabituels et tracer les opérations sensibles.
+Utiliser des contrats versionnés pour les systèmes intégrés.
+12.2 Intégration avec les modules voisins
+Module partenaire
+Échange attendu
+Garde-fou
+Campagnes / recensement
+Identifiants des fiches terrain, lot, campagne, agent et données collectées.
+Rapprochement avec l’existant ; import idempotent.
+Module 2 — Dossiers
+Création ou rattachement au dossier personne selon le workflow existant.
+Ne pas créer de seconde identité en cas de personne déjà présente.
+Biométrie
+Capture, statut qualité, référence de template ou résultat de recherche.
+Pas de transmission libre de données brutes à des services non habilités.
+FGP / NIN
+Transmission après validation des prérequis au service central.
+Aucun NIN généré localement ou attribué avant décision autorisée.
+État civil
+Références et événements vérifiés lorsqu’ils font partie du processus.
+Provenance, idempotence et résolution des conflits.
+CIN
+Transmission du dossier admissible une fois les contrôles nécessaires terminés.
+N’assimiler pas la fin de l’enrôlement à la délivrance automatique d’une carte.
+
+13. Sécurité et confidentialité
+13.1 Contrôles généraux
+Authentifier tous les agents et appliquer les permissions côté serveur.
+Limiter l’accès aux dossiers selon le rôle, le centre, la campagne et le besoin opérationnel.
+Séparer les permissions de collecte, revue documentaire, capture biométrique, validation et synchronisation.
+Protéger les communications et les stockages sensibles selon la politique institutionnelle.
+Masquer les données personnelles dans les logs et outils de diagnostic.
+Gérer les sessions, appareils et comptes techniques avec procédure de révocation.
+Sauvegarder les données conformément à une politique approuvée et tester la restauration.
+Prévoir journalisation et traitement des accès inhabituels ou tentatives non autorisées.
+13.2 Données biométriques
+L’enrôlement ne doit enregistrer que les références et métadonnées nécessaires au suivi du processus dans sa base métier, sauf architecture approuvée différente. La donnée brute et les templates doivent être protégés par le service spécialisé. Leur accès, export, conservation et suppression doivent être soumis à des règles distinctes et vérifiées.
+13.3 Données locales hors connexion
+Éviter de stocker localement les champs non nécessaires à la mission.
+Protéger l’espace local et la session, et définir une politique d’expiration.
+Permettre la révocation d’un appareil ou compte compromis.
+Éviter les sauvegardes locales non chiffrées ou copiées sur des supports non contrôlés.
+Effacer ou archiver les données locales selon la procédure approuvée après synchronisation confirmée.
+14. Notifications, reçus et suivi
+14.1 Reçu de collecte
+Le reçu peut confirmer qu’une collecte a été enregistrée ou reçue par le système. Il ne doit pas être présenté comme une preuve de validation définitive, d’attribution du NIN ou de délivrance de la CIN si ces étapes ne sont pas terminées.
+Référence de suivi non ambiguë.
+Date et centre de collecte si autorisés.
+Statut au moment de l’émission et mention de sa portée.
+Canal d’information sur la suite du dossier, si un canal officiel est disponible.
+Aucun secret, donnée biométrique ou donnée personnelle excessive sur un reçu imprimé.
+14.2 Notifications opérationnelles
+Dossier incomplet : indiquer les éléments attendus à l’agent concerné.
+Erreur de capture : donner un motif technique compréhensible sans exposer les détails sensibles.
+Correspondance potentielle : créer une tâche de revue pour le rôle habilité.
+Synchronisation en erreur : signaler le lot, le nombre d’éléments affectés et l’action requise.
+Décision prise : mettre à jour le statut et notifier les personnes autorisées.
+15. Cas d’utilisation détaillés
+Cas 1 — Enrôlement standard en centre
+1. L’agent s’authentifie et le système vérifie son affectation au centre.
+2. Il ouvre une campagne ou une procédure de collecte autorisée.
+3. Il effectue la recherche préalable et examine les résultats.
+4. Il crée un brouillon uniquement si les règles le permettent.
+5. Il saisit les informations, ajoute les pièces et effectue les captures requises.
+6. Le système signale les champs manquants, les problèmes de qualité et les correspondances potentielles.
+7. L’agent corrige les erreurs ou demande une intervention.
+8. Il soumet le dossier ; le serveur vérifie à nouveau les préconditions.
+9. Le dossier arrive dans la file de vérification et l’historique reçoit un événement.
+Cas 2 — Collecte terrain hors connexion
+1. L’agent utilise un appareil autorisé et démarre une collecte hors connexion si cette fonction est activée.
+2. Le système crée un identifiant local stable et protège les informations conservées.
+3. La collecte est enregistrée localement avec sa campagne, son agent et son horodatage.
+4. À la reconnexion, le lot est transmis avec clés d’idempotence.
+5. Le serveur renvoie un accusé de réception pour chaque élément ou lot.
+6. Les éléments en conflit ou rejetés sont envoyés dans une file de résolution.
+7. Le système n’annonce pas l’identité comme validée avant la fin des contrôles centraux.
+Cas 3 — Capture d’empreinte impossible
+1. L’opérateur lance la capture via le SDK autorisé.
+2. Le périphérique retourne une erreur ou une qualité insuffisante.
+3. Le système enregistre le statut exact, un code technique non sensible et l’horodatage.
+4. L’interface propose une nouvelle tentative ou une procédure alternative si elle est prévue.
+5. Le dossier ne franchit pas une étape qui exige une capture confirmée sans traitement de l’exception.
+Cas 4 — Correspondance possible avec une personne déjà enregistrée
+1. Le contrôle biographique ou biométrique renvoie un candidat potentiel.
+2. Le dossier passe dans une file de revue et la soumission finale est suspendue si nécessaire.
+3. Un agent habilité compare les éléments autorisés et documente sa décision.
+4. Si les personnes sont distinctes, la revue est clôturée avec justification.
+5. Si un doublon est confirmé, le workflow de rapprochement distinct est déclenché ; aucune fusion automatique n’est exécutée.
+Cas 5 — Document refusé
+1. Le vérificateur sélectionne le document et enregistre le motif de refus.
+2. Le statut du document et le dossier sont mis à jour selon les règles du workflow.
+3. L’agent reçoit une demande de pièce de remplacement ou un rejet motivé.
+4. La pièce précédente et la décision restent historisées conformément à la politique de conservation.
+Cas 6 — Lot envoyé deux fois
+1. Le premier lot est traité et son identifiant source enregistré.
+2. La même transmission est répétée après une coupure réseau.
+3. Le serveur reconnaît la clé d’idempotence et renvoie l’état du résultat précédent.
+4. Aucune nouvelle personne ni nouvelle collecte n’est créée par la répétition.
+16. Tests et critères d’acceptation
+Type de test
+Scénario
+Résultat attendu
+Fonctionnel
+Créer, sauvegarder, reprendre et soumettre un dossier.
+Dossier complet, identifiant stable et transitions correctes.
+Validation
+Champ mal formé ou requis manquant.
+Erreur explicite ; aucune soumission non conforme aux règles.
+Recherche
+Dossier similaire déjà présent.
+Candidats présentés selon permissions ; pas de fusion automatique.
+Documentaire
+Pièce illisible, trop volumineuse ou type interdit.
+Contrôle sûr et motif enregistré.
+Biométrie
+Périphérique absent, capture échouée ou qualité faible.
+Statut exact et possibilité de reprise autorisée.
+Rôles
+Agent tente une validation ou un accès hors périmètre.
+Action refusée côté serveur.
+Historique
+Dossier modifié après soumission.
+Changement et motif traçables ; conflit détecté si nécessaire.
+Hors connexion
+Synchronisation interrompue puis reprise.
+Pas de perte silencieuse ni de doublon.
+Idempotence
+Même événement transmis deux fois.
+Le résultat initial est réutilisé ; aucun nouvel enregistrement.
+Sécurité
+Examen des journaux et des erreurs.
+Aucun secret ni donnée biométrique brute dans les logs.
+Intégration
+Transmission vers les modules aval.
+Contrat respecté, accusé conservé et erreur récupérable.
+Non-régression
+Exécution des tests du projet avant et après changements.
+Fonctions existantes conservées ou écarts explicitement documentés.
+
+16.1 Checklist d’acceptation
+☐ La création, la sauvegarde et la reprise des brouillons fonctionnent.
+☐ La recherche préalable est intégrée au parcours de création.
+☐ Les champs collectés et leur caractère obligatoire sont validés par le responsable métier.
+☐ Les pièces justificatives sont protégées et leur statut est traçable.
+☐ La capture biométrique expose les erreurs et contrôle la qualité selon la configuration approuvée.
+☐ Les correspondances potentielles passent par une revue humaine autorisée.
+☐ Les statuts et transitions sont appliqués côté serveur.
+☐ La synchronisation est idempotente et supporte les reprises après coupure.
+☐ Aucun NIN définitif n’est généré par le formulaire d’enrôlement.
+☐ Les permissions, les journaux et les tests de non-régression sont vérifiés.
+17. Plan de développement progressif
+Phase 1 — Audit du dépôt
+Cartographier les pages d’enrôlement, modèles, endpoints, statuts, SDK, dépendances de campagnes et synchronisation. Ne pas modifier les données de production.
+Livrable : rapport d’audit avec preuves et tests existants.
+Phase 2 — Parcours et modèle
+Confirmer les champs, formulaires, références de collecte, règles de statut et provenance. Réutiliser les tables existantes.
+Livrable : workflow et schéma comparés à l’existant.
+Phase 3 — Formulaires et documents
+Finaliser les brouillons, validations, pièces et états documentaires.
+Livrable : parcours de saisie vérifié.
+Phase 4 — Biométrie
+Vérifier les intégrations et le contrôle qualité, isoler les données sensibles et tracer les erreurs SDK.
+Livrable : capture et reprise testées sur matériel autorisé.
+Phase 5 — Doublons et validation
+Intégrer le contrôle préalable, la file de revue et les décisions.
+Livrable : scénarios de candidats et revue humaine.
+Phase 6 — Synchronisation
+Sécuriser les identifiants source, clés d’idempotence, accusés et reprises.
+Livrable : test de retransmission et de coupure réseau.
+Phase 7 — Sécurité et audit
+Vérifier RBAC, périmètres, traces, documents et données locales.
+Livrable : rapport de tests de permissions et sécurité.
+Phase 8 — Recette contrôlée
+Exécuter les tests fonctionnels, d’intégration et de non-régression avec données fictives ou autorisées.
+Livrable : rapport de recette avant déploiement.
+18. Prompt pour l’agent développeur
+Tu interviens sur le projet existant SIGPOP-RDC, module ONIP. Tu dois auditer puis compléter le Module 3 — Enrôlement de la population. Le but est d’améliorer le système actuel sans le reconstruire ni casser les fonctions opérationnelles.RÈGLES ABSOLUES1. Inspecte d’abord le dépôt, README, pages, composants, endpoints API, modèles, migrations, tests, intégration de campagne, SDK biométrique et synchronisation.2. Avant de modifier, produis un rapport d’audit avec statut réel, preuves, fichiers et routes exactes, écarts, risques, priorités et tests.3. Ne supprime ni ne remplace aucune route, table, donnée ou fonction sans justification, sauvegarde, plan de migration et stratégie de retour arrière.4. Réutilise les workflows et modèles existants lorsqu’ils sont adaptés. Distingue les faits observés des hypothèses et propositions.5. Un dossier de collecte n’est pas une identité validée du FGP. Utilise un identifiant technique interne et une référence de collecte ; n’invente pas de NIN.6. N’attribue jamais de NIN définitif depuis le formulaire d’enrôlement. Appelle uniquement le service autorisé après validation des prérequis et de la règle officielle.7. Ajoute une recherche de correspondances avant la soumission selon les services disponibles. Une correspondance est un candidat, pas une preuve automatique de fraude. Aucune fusion automatique.8. Les champs obligatoires, documents requis, règles biométriques et transitions doivent venir des procédures approuvées. Si elles ne sont pas confirmées, signale le point et évite de coder une règle supposée comme officielle.9. Protège les documents, données personnelles, captures et templates. Ne mets aucun secret ni biométrie brute dans les logs.10. Toute transition sensible doit être autorisée côté serveur et auditée.11. Les transferts de campagne et synchronisations doivent être idempotents : une même clé d’événement ne crée pas deux collectes.12. Utilise des données fictives ou anonymisées pour tester. N’effectue aucun déploiement production sans autorisation.TRAVAUXA. Cartographier les écrans de création, étapes, brouillons, documents, captures biométriques, recherche de doublons, soumission, files de validation et erreurs de synchronisation.B. Examiner les modèles et migrations existants ; ne crée pas des tables redondantes sans justification.C. Vérifier les permissions par rôle, centre, campagne et opération.D. Finaliser la validation côté client et serveur, la sauvegarde et la reprise des dossiers.E. Contrôler le stockage privé des documents et l’audit des opérations.F. Vérifier le SDK biométrique et les cas d’échec ; préserver la séparation des données sensibles.G. Ajouter l’idempotence, les accusés de réception et la gestion des conflits lors des synchronisations.H. Ajouter les tests unitaires, intégration, permissions, biométrie simulée, hors connexion, idempotence et non-régression.I. Exécuter réellement les tests, le lint et le build ; donner les commandes et résultats exacts.LIVRABLE INITIAL OBLIGATOIREUn tableau comprenant : fonctionnalité, état réel, preuves, fichiers/endpoints/tables, écart, risque, action proposée, priorité et tests. Commence par cet audit avant les changements structurels.LIVRABLE FINALListe des fichiers modifiés, migrations, endpoints touchés, règles métier implémentées, tests exécutés, résultats exacts, risques résiduels et procédure de retour arrière. Ne déclare pas une fonction terminée sans preuves de test.
+19. Décisions à valider et limites
+Champs obligatoires et facultatifs pour chaque type d’enrôlement.
+Catégories de personnes et procédures applicables.
+Pièces justificatives recevables, autorité de vérification et règles d’exception.
+Capture biométrique exigée, équipements, SDK, qualité, sécurité et conservation.
+Statuts officiels, transitions et rôles habilités à chaque décision.
+Règles de traitement des doublons, faux positifs, reprises et recours.
+Politique d’enrôlement hors connexion, stockage local et effacement après synchronisation.
+Interfaces et contrats exacts avec recensement, FGP, biométrie, NIN, état civil et CIN.
+Politique de conservation des dossiers, documents et journaux.
+Procédures de validation métier, juridique et sécurité avant production.
+Conclusion
+Le Module 3 doit permettre de collecter des dossiers fiables et traçables, tout en distinguant clairement la collecte de la validation de l’identité. La priorité est d’auditer ce qui existe déjà, puis de sécuriser le parcours de saisie, les documents, la capture biométrique, la recherche de doublons et la synchronisation. Les règles officielles non confirmées doivent rester des points de validation explicites et ne pas être inventées dans le code.
+Le module sera considéré comme prêt uniquement lorsque les agents peuvent créer et reprendre une collecte, que les données et documents sont protégés, que les erreurs sont gérées, que les retransmissions sont idempotentes, que les permissions sont testées et que les résultats des tests de non-régression sont documentés.
