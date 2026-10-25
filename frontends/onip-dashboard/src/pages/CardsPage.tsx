@@ -80,6 +80,11 @@ export default function CardsPage() {
           alimentent le registre national : recherchez le citoyen ici, générez la carte, imprimez,
           puis la carte revient automatiquement à la commune pour livraison.
         </p>
+        <p className="muted small" style={{ marginBottom: 0 }}>
+          <strong>Prototype de démonstration</strong> — ne constitue pas une CIN officiellement
+          homologuée. Exige un NIC confirmé ; le NIN légal définitif reste en attente de l&apos;annexe
+          ONIP.
+        </p>
       </div>
 
       {!hasToken ? (

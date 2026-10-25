@@ -50,6 +50,10 @@ export default function NicNumbersPage() {
           numéro : menu <Link to="/campaigns">Recensement → Campagnes</Link> → onglet « Contrôle
           fiches » → filtre <strong>Promues</strong> ou bouton « Promouvoir NIC ».
         </p>
+        <p className="muted small" style={{ marginBottom: 0 }}>
+          Format actuel <strong>provisoire</strong> (non officiel FGP). Voir{" "}
+          <Link to="/conformite">Conformité FGP / NIN</Link>.
+        </p>
       </div>
 
       {!hasToken ? (

@@ -7,7 +7,9 @@ import AnomaliesPage from "./pages/AnomaliesPage";
 import CampaignsPage from "./pages/CampaignsPage";
 import CardsPage from "./pages/CardsPage";
 import CartographiePage from "./pages/CartographiePage";
+import ConformitePage from "./pages/ConformitePage";
 import DashboardPage from "./pages/DashboardPage";
+import FeuilleDeRoutePage from "./pages/FeuilleDeRoutePage";
 import LoginPage from "./pages/LoginPage";
 import NicNumbersPage from "./pages/NicNumbersPage";
 
@@ -22,6 +24,8 @@ const PAGE_TITLES: Record<string, string> = {
   "/campaigns": "Campagnes & contrôle",
   "/anomalies": "Anomalies",
   "/nic": "Numéros NIC",
+  "/conformite": "Conformité FGP / NIN",
+  "/feuille-de-route": "Feuille de route",
   "/cards": "Cartes d'identité",
   "/cartographie": "Cartographie",
 };
@@ -84,6 +88,8 @@ function Shell() {
           <div className="nav-group-label">Registre</div>
           <NavLink to="/nic">Numéros NIC</NavLink>
           <NavLink to="/cards">Cartes d&apos;identité</NavLink>
+          <NavLink to="/conformite">Conformité FGP / NIN</NavLink>
+          <NavLink to="/feuille-de-route">Feuille de route</NavLink>
         </nav>
         <div className="sidebar-foot">
           <button type="button" className="btn-logout" onClick={logout}>
@@ -120,6 +126,8 @@ function Shell() {
             <Route path="/anomalies" element={<AnomaliesPage />} />
             <Route path="/cartographie" element={<CartographiePage />} />
             <Route path="/nic" element={<NicNumbersPage />} />
+            <Route path="/conformite" element={<ConformitePage />} />
+            <Route path="/feuille-de-route" element={<FeuilleDeRoutePage />} />
             <Route path="/cards" element={<CardsPage />} />
           </Routes>
         </main>
