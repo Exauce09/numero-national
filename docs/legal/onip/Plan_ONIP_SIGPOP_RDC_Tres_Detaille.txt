@@ -1,0 +1,585 @@
+SIGPOP-RDC
+SYSTÈME NATIONAL DE SUPERVISION
+DE L’IDENTITÉ ET DE LA POPULATION
+Module ONIP — Fichier Général de la Population (FGP),
+enrôlement, biométrie, NIN, état civil et carte d’identité
+PLAN FONCTIONNEL, ARCHITECTURAL ET TECHNIQUE TRÈS DÉTAILLÉ
+Version de travail — octobre 2026
+Document de conception pour audit, développement progressif et validation
+Avertissement et statut du document
+Ce document transforme et développe les éléments transmis sur SIGPOP-RDC et le module ONIP en un plan de conception détaillé. Il s’agit d’une proposition de travail destinée à guider l’audit et le développement d’un logiciel existant, et non d’une description certifiée de l’architecture interne de l’ONIP.
+Les exigences juridiques, les règles opérationnelles, les formats de documents, la procédure de délivrance et surtout la composition exacte du NIN doivent être validés à partir des textes officiels complets, de leurs annexes et des instructions de l’autorité compétente avant toute mise en production.
+Les fonctions marquées comme existantes ou partiellement connectées sont reprises des notes fournies. Elles doivent être confirmées par inspection du dépôt, des API, de la base de données, des migrations et des tests.
+Sommaire
+1. Vision, objectifs et périmètre
+2. Principes de conception et exigences non négociables
+3. Architecture générale cible
+4. Parcours métier de bout en bout
+5. Description détaillée des 20 modules
+6. Modèle conceptuel de données
+7. API et interopérabilité
+8. Sécurité, confidentialité et gouvernance des données
+9. Fonctionnement hors connexion et synchronisation
+10. Interfaces et navigation du portail ONIP
+11. Stack technique indicative
+12. Tests, validation et critères d’acceptation
+13. Plan de réalisation par phases
+14. Risques et mesures de réduction
+15. Tableau d’audit de l’existant
+16. Prompt complet destiné à l’agent développeur
+17. Sources et limites
+1. Vision, objectifs et périmètre
+1.1 Vision
+SIGPOP-RDC est envisagé comme une plateforme opérationnelle de gestion de l’identification et de supervision de la population. Le portail ONIP ne doit pas se limiter à afficher des indicateurs : il doit relier les opérations de recensement, les dossiers individuels, la validation de l’identité, le Fichier Général de la Population (FGP), la biométrie, l’attribution du NIN, les événements d’état civil et la gestion des cartes d’identité.
+1.2 Objectifs généraux
+Constituer un référentiel individuel cohérent et historisé pour les personnes enregistrées dans le cadre applicable.
+Éviter les identités multiples grâce à des contrôles biographiques et biométriques, avec examen humain des correspondances ambiguës.
+Gérer le parcours complet d’un dossier, depuis le pré-enregistrement jusqu’à la validation, l’attribution du NIN et, lorsque les conditions sont réunies, la délivrance de la CIN.
+Synchroniser les informations issues du recensement et de l’état civil par des échanges traçables et contrôlés.
+Superviser les campagnes, centres, agents, anomalies, cartes, statistiques et incidents.
+Protéger les données personnelles et biométriques par une séparation des accès, le chiffrement, l’audit et la limitation des données échangées.
+Permettre un fonctionnement résilient lorsque la connectivité est intermittente, sans attribuer hors ligne un NIN définitif non validé centralement.
+1.3 Périmètre fonctionnel
+1.4 Ce que le système n’est pas
+Le système ne doit pas prétendre reproduire les systèmes internes non publics de l’ONIP. Il ne doit pas créer de format NIN, de tarif administratif, de règle d’éligibilité ou de modèle de carte sans source autorisée. Il ne doit pas prendre une décision juridique ou déclarer automatiquement une fraude sur la seule base d’un score algorithmique.
+2. Principes de conception et exigences non négociables
+Référentiel unique
+Le FGP constitue la référence de travail pour les dossiers validés, tandis que les systèmes sources gardent leur responsabilité sur les événements qu’ils produisent.
+Identifiant interne immuable
+Chaque dossier possède un identifiant technique interne distinct du NIN. Cet identifiant sert aux relations internes et ne remplace pas l’identifiant officiel.
+NIN centralisé
+Une seule fonction autorisée attribue le NIN. Aucun formulaire, import ou appareil local ne doit générer son propre NIN définitif.
+Unicité garantie en base
+L’unicité ne doit pas dépendre uniquement d’une vérification applicative préalable. Une contrainte de base et une transaction doivent protéger les appels simultanés.
+Historique conservé
+Les rectifications, fusions, changements d’adresse, événements d’état civil et opérations de carte doivent conserver leur provenance et leurs dates d’effet.
+Contrôle humain
+Les correspondances biométriques potentielles, les fusions de dossiers et les cas litigieux nécessitent une décision d’un agent habilité.
+Moindre privilège
+Chaque rôle ne reçoit que les permissions nécessaires, limitées à sa fonction, sa zone et la catégorie de données utile.
+Protection des données biométriques
+Les données biométriques sont conservées dans un espace fortement protégé, distinct des vues administratives ordinaires.
+Idempotence et traçabilité
+La répétition d’une requête de synchronisation ou d’attribution ne doit pas créer des doublons ni déclencher plusieurs opérations irréversibles.
+Développement non destructif
+L’audit du code et des données existants précède les changements. Toute migration doit être réversible ou accompagnée d’un plan de restauration.
+3. Architecture générale cible
+L’architecture ci-dessous est conceptuelle. Elle représente une séparation logique des responsabilités et ne décrit pas une infrastructure interne confirmée de l’ONIP.
+3.1 Vue logique
+Le portail appelle l’API ; il ne se connecte jamais directement à la base de données.
+L’API vérifie le jeton ou la session, le rôle, le périmètre territorial, la finalité et les permissions avant de traiter la demande.
+Le service FGP gère les dossiers de référence et leurs versions.
+Le service NIN attribue le numéro uniquement après la validation des prérequis et selon la règle officielle confirmée.
+Le service biométrique effectue les recherches autorisées et renvoie des candidats potentiels ; il ne décide pas seul d’une fraude.
+Le service d’état civil reçoit des événements vérifiés, enregistre leur provenance et applique la mise à jour prévue.
+Le service de cartes consomme uniquement les dossiers dont les conditions de délivrance ont été confirmées.
+Les événements importants sont inscrits dans un journal d’audit protégé.
+3.2 Déploiement indicatif
+Le choix final de l’hébergement, des zones de reprise, des fournisseurs biométriques, du système de gestion des clés et des technologies doit être validé par les responsables techniques et juridiques. Les documents fournis indiquent que le décret relatif au FGP prévoit un hébergement sur le territoire de la RDC ; cette exigence doit être vérifiée dans le texte officiel applicable et traduite en architecture d’hébergement conforme.
+4. Parcours métier de bout en bout
+4.1 Parcours standard d’enrôlement
+Pré-enregistrement : création d’un dossier provisoire avec un identifiant interne et la provenance de la demande.
+Contrôle documentaire : vérification des pièces, de leur validité apparente, de leur origine et des champs nécessaires.
+Saisie biographique : noms, date et lieu de naissance, sexe et autres données exigées par la procédure applicable.
+Adresse et localisation : saisie selon le référentiel administratif en vigueur, avec historique des changements.
+Capture biométrique : photo, empreintes et autres éléments uniquement lorsque requis et autorisés.
+Contrôle qualité : détection des captures incomplètes, floues ou inutilisables et demande de nouvelle capture si nécessaire.
+Recherche de doublons : recherche biographique et biométrique ; conservation des candidats et des scores dans un espace contrôlé.
+Vérification humaine : validation, rejet motivé, demande de complément ou ouverture d’une investigation.
+Attribution du NIN : opération centrale sécurisée, atomique, auditable et conforme à la règle officielle.
+Enregistrement au FGP : confirmation de l’identité de référence et journalisation des sources utilisées.
+CIN : demande, approbation, production et remise lorsque l’admissibilité et la procédure sont satisfaites.
+4.2 Exceptions
+4.3 Événements d’état civil
+Naissance, mariage, divorce, décès et rectification doivent être traités comme des événements documentés. Chaque événement doit porter une référence source, une date d’effet, un horodatage de réception, un statut de vérification et une trace du traitement. Le statut d’une personne peut évoluer sans effacer son dossier historique.
+4.4 Règle particulière au décès
+Le dossier ne doit pas être supprimé mécaniquement. La mise à jour du statut et le traitement du NIN doivent respecter les dispositions officielles applicables. La procédure exacte doit être validée sur la base de l’arrêté et de ses annexes.
+5. Description détaillée des 20 modules
+Module 1 — Tableau de bord national
+État indicatif : Déjà commencé selon les notes
+Objectif : Donner à la direction une vue consolidée de l’activité, de la qualité des données et de l’état technique.
+Fonctions : Afficher les dossiers enregistrés et validés, NIN attribués, dossiers en attente, doublons à examiner, cartes produites/remises/en attente, activité des campagnes, taux de synchronisation, anomalies et disponibilité des services.
+Filtres : Période, province, territoire, commune, secteur, centre, campagne, statut du dossier et statut de la carte.
+Règles : Les chiffres doivent être calculés à partir de données fiables, datés et filtrés selon les permissions. Les statistiques démographiques doivent être agrégées et les exports contrôlés.
+Tests : Comparer les compteurs avec des requêtes de référence, tester les filtres, les permissions territoriales et les états sans données.
+Module 2 — Gestion des personnes et des dossiers
+État indicatif : À auditer et compléter
+Objectif : Gérer le dossier individuel avec son identité biographique, ses relations, son adresse et ses justificatifs.
+Fonctions : Création, recherche, consultation, changement d’adresse, liens de filiation, références d’actes, profession, nationalité et autres attributs prévus par les textes.
+Historique : Enregistrer la valeur précédente, la nouvelle valeur, l’auteur, le motif, la pièce justificative, la date de décision et la date d’effet.
+Règles : Séparer les données déclarées des données vérifiées ; signaler les incohérences sans les corriger automatiquement.
+Tests : Recherche, validation des champs, gestion des homonymes, droits d’accès et conservation de l’historique.
+Module 3 — Enrôlement de la population
+État indicatif : À auditer et compléter
+Objectif : Encadrer toutes les étapes de collecte avant validation.
+Fonctions : Pré-enregistrement, rendez-vous éventuel, centre ou équipe mobile, vérification des pièces, saisie, captures, contrôle qualité, reçu et suivi.
+Statuts proposés : Brouillon, soumis, à compléter, en contrôle, doublon potentiel, en validation, validé, rejeté avec motif, synchronisation en attente.
+Règles : Une fiche importée ou collectée n’est pas automatiquement une identité validée. Les transitions de statut doivent être contrôlées par permissions.
+Tests : Parcours complet, abandon/reprise, pièces manquantes, doublon, échec de capture et synchronisation différée.
+Module 4 — Recensement et campagnes
+État indicatif : Déjà connecté en partie selon les notes
+Objectif : Planifier, attribuer et suivre les opérations de recensement.
+Fonctions : Campagnes, objectifs, équipes, agents, superviseurs, coupons, fiches, lots, zones, couverture, dossiers transmis au module ONIP et statistiques par équipe.
+Intégration : Le transfert terrain vers ONIP doit inclure un identifiant d’événement stable, la campagne source, l’agent, la date et l’état de validation.
+Règles : Détecter les dossiers répétés entre campagnes ; préserver la source et éviter la création d’un nouveau dossier de référence sans rapprochement.
+Tests : Import de lots, doublons entre campagnes, droits de supervision, reprises après panne et rapprochement des totaux.
+Module 5 — Fichier Général de la Population (FGP)
+État indicatif : Module central
+Objectif : Maintenir le référentiel de référence des personnes et de leurs événements.
+Fonctions : Dossier unique, données biographiques, références d’actes, liens familiaux, historique, dates d’effet, provenance des données, contrôle de cohérence et rectification.
+Règles : Le FGP doit séparer l’identifiant technique interne du NIN. Les changements sont versionnés ; les dossiers ne sont pas supprimés simplement parce qu’ils deviennent inactifs ou décédés.
+Tests : Unicité de référence, historisation, import contrôlé, événements concurrents, restauration et cohérence intermodules.
+Module 6 — Biométrie et déduplication
+État indicatif : Intégration ZK déjà commencée selon les notes
+Objectif : Contrôler la qualité des captures et repérer les correspondances potentielles.
+Fonctions : Acquisition d’empreintes, contrôle qualité, capture du visage si autorisée, gestion des templates, recherche 1:1 et 1:N, candidats potentiels, revue humaine et gestion des faux positifs.
+Architecture : Isoler le service biométrique et le coffre de données. Les écrans métier ne doivent pas afficher les templates bruts ni permettre leur export libre.
+Règles : Un score est un indice technique, pas une décision juridique. Toute fusion doit être autorisée, justifiée et réversible selon les règles approuvées.
+Tests : Captures de qualité différente, empreinte absente, doublon simulé, faux positif, indisponibilité du SDK et vérification des permissions.
+Module 7 — Attribution et gestion du NIN
+État indicatif : Priorité critique
+Objectif : Centraliser l’attribution et empêcher les doublons ou les réattributions non autorisées.
+Fonctions : Service sécurisé, contrôle des prérequis, unicité en base, association permanente au dossier, journal d’attribution, détection des appels répétés et procédure contrôlée de correction.
+Conformité : Les notes fournies indiquent que le NIN est généré automatiquement et aléatoirement par un module de sécurité et qu’il est individuel, incessible, non répétitif et permanent. Le format exact doit être confirmé dans la documentation officielle intégrale.
+Règles techniques : Transaction atomique, contrainte d’unicité, mécanisme cryptographiquement sûr selon validation, idempotence, gestion des collisions et contrôle d’accès séparé.
+Interdictions : Ne pas inventer un format, une longueur, une clé de contrôle ou une séquence. Ne pas attribuer de NIN définitif hors connexion sans procédure autorisée.
+Tests : Appels simultanés, répétition de requête, collision simulée, reprise après panne, accès non autorisé et vérification de l’audit.
+Module 8 — Interconnexion avec l’état civil
+État indicatif : Synchronisation déjà commencée selon les notes
+Objectif : Maintenir la cohérence entre les événements d’état civil autorisés et le FGP.
+Fonctions : Naissance, mariage, divorce, décès, rectification, références d’actes, contrôle de provenance, gestion des conflits, dates d’effet et suivi des erreurs.
+Règles : Vérifier l’autorité source et la référence de l’acte. Ne pas appliquer silencieusement une correction contradictoire ; créer un dossier de résolution.
+Tests : Événement dupliqué, acte non vérifié, événement tardif, conflit de valeurs, événement annulé et indisponibilité de l’API source.
+Module 9 — Carte d’identité nationale (CIN)
+État indicatif : Déjà commencé selon les notes
+Objectif : Suivre la demande, la production et la remise de la carte.
+Fonctions : Contrôle d’admissibilité, demande, approbation, personnalisation, lots d’impression, suivi de production, remise, preuve de délivrance, renouvellement, remplacement, perte et annulation selon procédure.
+Règles : La carte ne doit être associée qu’à un dossier validé et à un NIN confirmé. Les gabarits et fonctions d’impression sont des éléments sensibles.
+Tests : Éligibilité, impression test, carte annulée, carte non remise, remplacement et contrôle d’accès aux données imprimées.
+Module 10 — Cartographie et administration territoriale
+État indicatif : Déjà commencé selon les notes
+Objectif : Maintenir le référentiel géographique et superviser la couverture territoriale.
+Fonctions : Provinces, villes, territoires, communes, secteurs, chefferies, groupements, localités, centres, équipes mobiles et cartes de couverture.
+Règles : Conserver les versions du découpage administratif et la date d’effet. Les agents ne voient que les zones autorisées.
+Tests : Changement de rattachement, centre déplacé, données géographiques manquantes et filtrage par zone.
+Module 11 — Comptes, rôles et habilitations
+État indicatif : Déjà commencé selon les notes
+Objectif : Gérer les utilisateurs, les affectations et les permissions.
+Fonctions : Création/désactivation de comptes, affectation à un centre, MFA, expiration, suspension, révocation, rôles et permissions granulaires.
+Règles : Séparer l’administration technique, l’approbation d’identité, l’accès biométrique, l’attribution du NIN et la fusion des dossiers.
+Tests : Tentative d’accès hors périmètre, compte suspendu, élévation de privilèges, expiration de session et révocation immédiate.
+Module 12 — Portail citoyen
+État indicatif : À développer ou vérifier
+Objectif : Permettre les démarches que l’autorité autorise sans exposer les données du registre.
+Fonctions : Information sur les procédures, pré-enregistrement éventuel, rendez-vous, suivi de demande, consultation des données personnelles, rectification, dépôt de pièces et notifications.
+Règles : Vérification d’identité du demandeur, limitation des données visibles, protection contre l’énumération de dossiers et journalisation des demandes.
+Tests : Accès à son propre dossier, tentative d’accès à un tiers, récupération de compte et pièces malveillantes.
+Module 13 — API et interopérabilité
+État indicatif : À auditer et compléter
+Objectif : Permettre aux organismes habilités de vérifier des informations limitées.
+Fonctions : Gestion des partenaires, contrats d’API, versionnement, authentification forte, certificats/jetons, quotas, révocation, documentation et suivi des échanges.
+Réponse minimale : Une vérification doit retourner uniquement le résultat et les attributs autorisés nécessaires à la finalité ; elle ne doit pas exposer le dossier complet ni les données biométriques.
+Tests : Jeton expiré, partenaire non habilité, dépassement de quota, requête malformée, rejeu, révocation et journal d’accès.
+Module 14 — Sécurité et audit
+État indicatif : À renforcer en continu
+Objectif : Détecter les accès anormaux et assurer la traçabilité des opérations sensibles.
+Fonctions : Journal des connexions, consultations et modifications, alertes, gestion des incidents, chiffrement, gestion des secrets, supervision et exports autorisés.
+Règles : Les journaux ne doivent pas contenir de secrets ou de données biométriques en clair. Les opérateurs ordinaires ne doivent pas pouvoir modifier leurs propres traces.
+Tests : Intégrité du journal, accès refusé, alertes d’anomalie, rotation des clés et procédure de réponse à incident.
+Module 15 — Infrastructure, sauvegardes et continuité
+État indicatif : À vérifier
+Objectif : Assurer la disponibilité, la restauration et la reprise après sinistre.
+Fonctions : Sauvegardes chiffrées, réplication autorisée, tests de restauration, supervision, migrations, versions, plan de reprise et contrôle des accès d’administration.
+Règles : Définir les objectifs de reprise (RTO/RPO) avec les responsables. La localisation de stockage doit respecter les obligations juridiques applicables.
+Tests : Restauration complète dans un environnement de test, perte d’un nœud, corruption simulée et vérification de la cohérence.
+Module 16 — Anomalies et gestion des incidents
+État indicatif : Déjà commencé selon les notes
+Objectif : Centraliser les problèmes opérationnels et assurer leur résolution.
+Fonctions : Anomalies de dossiers, doublons, erreurs de synchronisation, problèmes de cartes, tickets, priorité, responsable, échéance, pièces, escalade et clôture.
+Règles : Toute décision de résolution sensible doit être justifiée et horodatée. Les incidents de sécurité suivent un circuit distinct si nécessaire.
+Tests : Création, assignation, escalade, clôture, réouverture et rapport d’incidents.
+Module 17 — Statistiques et rapports
+État indicatif : À développer ou vérifier
+Objectif : Produire des indicateurs fiables pour les responsables autorisés.
+Fonctions : Évolution des enregistrements, validation, cartes, couverture territoriale, qualité, doublons, rapports administratifs et exports autorisés.
+Règles : Distinguer données opérationnelles et statistiques agrégées. Contrôler les petits groupes susceptibles de réidentifier une personne.
+Tests : Réconciliation avec la base, filtres, export, droits d’accès et exactitude des périodes.
+Module 18 — Documents et archives
+État indicatif : À développer ou vérifier
+Objectif : Gérer les pièces justificatives et les références documentaires.
+Fonctions : Téléversement contrôlé, type de document, intégrité, version, date, provenance, décision liée, archivage et historique de consultation.
+Règles : Scanner les fichiers, limiter les formats, vérifier les tailles, stocker hors du répertoire public et protéger les liens de téléchargement.
+Tests : Fichier interdit, fichier trop volumineux, lien expiré, accès hors périmètre et intégrité du document.
+Module 19 — Frais et reçus administratifs
+État indicatif : Conditionnel — uniquement si légalement prévu
+Objectif : Tracer les paiements autorisés lorsqu’une base légale et un tarif officiel existent.
+Fonctions : Référence de paiement, reçu, rapprochement, exemptions prévues, suivi des transactions et rapports.
+Règles : Ne pas inventer de frais. Séparer perception, rapprochement et validation. Les paiements ne doivent pas modifier directement le statut d’identité.
+Tests : Paiement répété, remboursement ou annulation si prévu, reçu invalide et séparation des rôles.
+Module 20 — Administration technique
+État indicatif : À développer ou vérifier
+Objectif : Surveiller la santé des services et faciliter l’exploitation technique.
+Fonctions : Santé API/base/services biométriques, files d’attente, erreurs, migrations, versions, configuration, tâches planifiées, métriques et alertes.
+Règles : Les tableaux techniques ne doivent pas donner automatiquement accès aux dossiers métier. Les secrets doivent être masqués.
+Tests : Panne de service, saturation de file, migration échouée, alerte et reprise après incident.
+6. Modèle conceptuel de données
+Les noms de tables ci-dessous sont indicatifs. Ils doivent être rapprochés des modèles existants avant de créer de nouvelles tables ou de modifier des migrations.
+6.1 Relations essentielles
+Une personne peut posséder plusieurs adresses historiques, mais un seul dossier de référence actif selon les règles métier.
+Un NIN confirmé doit être lié à une personne de référence et protégé par une contrainte d’unicité.
+Une personne peut être liée à plusieurs événements d’état civil et à plusieurs documents justificatifs.
+Les données biométriques doivent être séparées logiquement et, si possible, physiquement du dossier administratif général.
+Une carte doit référencer le dossier et le NIN admissibles au moment de sa production.
+Chaque opération sensible doit produire un événement d’audit, sans recopier les secrets ni les biométries brutes.
+6.2 Principes de migration
+Créer une sauvegarde vérifiée avant toute migration.
+Inventorier les doublons, champs manquants, valeurs invalides et identifiants déjà utilisés.
+Établir une correspondance entre les anciens champs et le modèle cible.
+Migrer d’abord dans un environnement de test avec un échantillon anonymisé ou autorisé.
+Comparer les nombres de lignes, les relations, les statuts et les références après migration.
+Prévoir une procédure de retour arrière et ne pas supprimer l’ancienne donnée avant validation formelle.
+7. API et interopérabilité
+7.1 Familles d’API indicatives
+7.2 Exemple conceptuel de vérification
+Une administration autorisée pourrait transmettre un NIN et les attributs strictement nécessaires. La réponse doit être minimale, par exemple un indicateur de vérification et un statut autorisé. Cet exemple n’est ni une API officielle publiée ni une spécification contractuelle.
+Exemple conceptuel uniquement : {"verified": true, "identity_status": "ACTIVE"}
+7.3 Exigences transversales
+Authentification forte du partenaire et autorisation explicite par finalité.
+TLS, validation stricte des entrées et limites de taille.
+Quotas, limitation de débit, détection de rejeu et révocation des accès.
+Versionnement des contrats d’API et documentation des champs.
+Clé d’idempotence pour les opérations pouvant être répétées.
+Journalisation de l’acteur, de la finalité, du résultat et de la référence de la requête.
+Réponses d’erreur ne révélant pas l’existence d’un dossier à un utilisateur non autorisé.
+8. Sécurité, confidentialité et gouvernance des données
+8.1 Contrôle d’accès
+La plateforme doit combiner un contrôle par rôle (RBAC) et, si nécessaire, des attributs de contexte (ABAC) tels que la province, le centre, la finalité et la catégorie de données. Un rôle global ne doit pas être attribué simplement pour contourner une permission manquante.
+8.2 Protection des données
+Chiffrer les communications et les stockages sensibles.
+Séparer les données biographiques, les documents et les données biométriques.
+Gérer les clés et secrets dans un mécanisme dédié ; éviter les secrets dans le code source.
+Appliquer MFA aux comptes sensibles et aux opérations à haut risque.
+Masquer les données personnelles dans les journaux techniques et les erreurs.
+Protéger les sauvegardes et tester périodiquement leur restauration.
+Définir des politiques de conservation, d’archivage et de suppression conformes aux textes applicables.
+Tracer les consultations sensibles et détecter les accès inhabituels.
+Prévoir une procédure d’incident : détection, confinement, analyse, notification compétente et retour d’expérience.
+8.3 Données biométriques
+Les empreintes et les templates doivent être traités comme des données hautement sensibles. Le système ne doit pas les inclure dans les exports courants, les logs, les rapports ou les réponses d’API ordinaires. La capture, le stockage, la comparaison et la conservation doivent être limités aux opérations autorisées et documentés.
+8.4 Gouvernance
+Avant la mise en production, l’organisation doit désigner les responsables métier, les personnes habilitées à valider les dossiers, les responsables de la sécurité, les règles d’accès, les procédures de rectification et les responsables de la conservation. Les règles non publiques doivent être obtenues auprès de l’autorité compétente plutôt que déduites par le développeur.
+9. Fonctionnement hors connexion et synchronisation
+9.1 Objectif
+L’application mobile ou PWA peut permettre la collecte lorsque le réseau est indisponible, sous réserve d’une politique de sécurité approuvée. La collecte locale ne doit pas être confondue avec l’enregistrement définitif dans le FGP.
+9.2 Cycle de synchronisation
+L’appareil crée un identifiant de transaction local unique.
+Les données minimales sont stockées dans un espace local chiffré, avec expiration et verrouillage de session.
+Chaque élément porte la campagne, le centre, l’agent, l’horodatage et la version du formulaire.
+Lorsque la connexion revient, l’application envoie les événements par lots sécurisés.
+Le serveur vérifie l’authenticité, la permission, le format, l’idempotence et les conflits.
+Les événements acceptés reçoivent un accusé de réception ; les événements rejetés restent consultables avec un motif.
+Les doublons potentiels sont examinés avant toute création ou mise à jour de l’identité de référence.
+L’attribution définitive du NIN attend le processus central autorisé.
+9.3 Contrôles à prévoir
+Chiffrement local et effacement contrôlé après confirmation de synchronisation.
+Gestion des appareils perdus ou compromis.
+Reprise après coupure au milieu d’un lot.
+Résolution explicite des conflits de données.
+Protection contre la répétition d’un lot déjà reçu.
+Indicateurs de synchronisation en attente, en échec, réussie et nécessitant une intervention.
+10. Interfaces et navigation du portail ONIP
+10.1 Principes d’interface
+Afficher clairement le statut et la prochaine action attendue pour chaque dossier.
+Ne pas afficher les données biométriques dans les écrans non spécialisés.
+Demander une confirmation supplémentaire pour les opérations irréversibles ou sensibles.
+Expliquer les rejets par un motif opérationnel compréhensible, sans divulguer d’informations à un utilisateur non autorisé.
+Prévoir une interface utilisable sur ordinateur et mobile, y compris avec une connexion lente.
+Respecter les langues et règles de présentation approuvées par l’institution.
+11. Stack technique indicative
+Le choix technologique doit s’appuyer sur l’audit du dépôt existant, les compétences disponibles, les exigences d’hébergement et les contrats matériels. Il ne faut pas réécrire une application déjà fonctionnelle uniquement pour adopter une nouvelle technologie.
+11.1 Environnements
+Développement : données synthétiques uniquement.
+Test/recette : jeu de données anonymisé ou expressément autorisé.
+Préproduction : configuration proche de la production et validation de sécurité.
+Production : déploiement contrôlé, sauvegardes, surveillance, accès administratifs limités et plan de retour arrière.
+12. Tests, validation et critères d’acceptation
+12.1 Familles de tests
+12.2 Checklist d’acceptation
+☐ Le format et le mécanisme du NIN sont documentés à partir de la règle officielle validée.
+☐ L’attribution du NIN est atomique, centralisée, idempotente et auditée.
+☐ Les dossiers et événements conservent leur historique et leur provenance.
+☐ Les correspondances biométriques ambiguës sont soumises à revue humaine.
+☐ Le recensement, l’état civil, le FGP et la CIN utilisent des références cohérentes.
+☐ Les permissions sont testées sur les rôles et les périmètres territoriaux.
+☐ Les biométries, documents, secrets et sauvegardes sont protégés.
+☐ Les tests de non-régression passent sur les fonctionnalités existantes.
+☐ Une sauvegarde a été restaurée avec succès dans un environnement contrôlé.
+☐ Les procédures juridiques et les règles non publiques ont reçu une validation autorisée.
+13. Plan de réalisation par phases
+Phase 1 — Audit de l’existant
+Cartographier le dépôt, les routes, les composants, les modèles, les migrations, les endpoints et les intégrations. Identifier ce qui est opérationnel, partiel, absent ou inconnu. Ne pas modifier la production durant l’inventaire.
+Livrable : rapport d’audit avec preuves et liste priorisée des écarts.
+Phase 2 — Validation juridique et métier
+Rassembler les textes complets et annexes applicables ; confirmer le format NIN, les règles d’attribution, les catégories de personnes, les pièces, la carte, l’état civil et la conservation.
+Livrable : matrice exigences ↔ articles ↔ fonctions.
+Phase 3 — FGP et NIN
+Stabiliser l’identifiant interne, le modèle personne, l’historique, l’unicité, l’attribution centralisée et la gestion des erreurs. Migrer sans perte.
+Livrable : tests d’unicité, concurrence, idempotence et historique.
+Phase 4 — Parcours d’enrôlement
+Finaliser les statuts, contrôles documentaires, captures, revue de doublons et validation. Intégrer le transfert depuis les campagnes.
+Livrable : parcours testé du pré-enregistrement à la validation.
+Phase 5 — État civil et CIN
+Finaliser les événements d’état civil, la résolution des conflits, la production et la remise des cartes.
+Livrable : scénarios de naissance, rectification, décès et carte.
+Phase 6 — Sécurité et API
+Renforcer RBAC/ABAC, MFA, audit, protection biométrique, accès partenaires, quotas et gestion des secrets.
+Livrable : matrice de permissions et rapport de tests.
+Phase 7 — Hors connexion et exploitation
+Mettre en place synchronisation idempotente, supervision, sauvegardes et restauration.
+Livrable : test de coupure réseau et restauration documentée.
+Phase 8 — Pilote et déploiement progressif
+Tester avec données fictives ou autorisées, utilisateurs pilotes, critères de sortie et plan de retour arrière.
+Livrable : procès-verbal de recette métier, sécurité et exploitation.
+14. Risques et mesures de réduction
+15. Tableau d’audit de l’existant
+Ce tableau doit être rempli à partir de preuves techniques. Le statut ne doit pas être déduit du seul fait qu’un menu existe dans l’interface.
+15.1 Format du rapport d’audit
+Module et fonctionnalité concernée.
+Statut : terminé, partiel, absent, bloqué ou à vérifier.
+Fichiers, composants, routes, endpoints, tables et migrations concernés.
+Preuve reproductible : commande, test, capture ou réponse API.
+Risque métier, juridique, sécurité ou données.
+Correction proposée, dépendances et ordre de priorité.
+Tests à ajouter et résultat attendu.
+16. Prompt complet destiné à l’agent développeur
+Le texte ci-dessous peut être copié dans un agent de développement pour lancer l’audit et la réalisation progressive. Il demande explicitement de préserver l’existant et de ne pas inventer de règles officielles.
+Tu interviens sur le projet existant SIGPOP-RDC, notamment le portail ONIP et ses intégrations avec le recensement, le Fichier Général de la Population (FGP), l’état civil, la biométrie, le NIN et la carte d’identité nationale (CIN).
+
+OBJECTIF
+Auditer puis améliorer progressivement le système existant afin d’obtenir un portail ONIP cohérent, sécurisé, testable et traçable. Ne reconstruis pas l’application à partir de zéro et ne remplace pas une fonction opérationnelle sans preuve et plan de migration.
+
+RÈGLES ABSOLUES
+1. Commence par lire l’architecture, les README, les routes, les composants, les modèles, les migrations, les tests, les variables d’environnement et les intégrations.
+2. Ne supprime aucun fichier, aucune donnée, aucune route ni aucune fonctionnalité sans justification écrite et autorisation explicite.
+3. Avant toute modification de base, vérifie les sauvegardes et prépare un plan de migration et de retour arrière.
+4. Distingue clairement les faits observés dans le code, les hypothèses et les propositions.
+5. N’invente jamais le format, la longueur, le checksum ou l’algorithme officiel du NIN. Repère les règles dans les textes complets et annexes officielles ; si elles ne sont pas disponibles ou ambiguës, laisse le générateur définitif bloqué derrière une configuration non activée et signale la validation requise.
+6. N’attribue pas de NIN définitif à une fiche importée, incomplète, non validée ou potentiellement dupliquée.
+7. Toute attribution doit être centralisée, atomique, unique en base, idempotente, journalisée et protégée contre les appels simultanés.
+8. Les correspondances biométriques sont des candidats ; aucune fusion ni déclaration de fraude ne doit être automatique sans revue humaine autorisée.
+9. Protège les données biométriques séparément. N’inscris jamais empreintes, templates, secrets ou jetons en clair dans les logs.
+10. Utilise des données fictives ou anonymisées dans les tests et démos.
+
+PHASE A — AUDIT
+- Cartographie les pages du portail ONIP, routes frontend, endpoints API, modèles, migrations et services.
+- Pour chaque module, indique : terminé, partiel, absent, bloqué ou à vérifier.
+- Identifie les fichiers précis, les appels API et les tables impliquées.
+- Vérifie le dashboard, les campagnes, le transfert terrain vers ONIP, le FGP, le NIN/NIC existant, la biométrie ZK, l’état civil, la CIN, les anomalies et les rôles.
+- Exécute les tests existants et note les résultats réels.
+- Remets un tableau d’audit priorisé avant de faire des changements structurels.
+
+PHASE B — MODÈLE FGP ET IDENTITÉ
+- Vérifie l’existence d’un identifiant technique interne immuable.
+- Vérifie la gestion du dossier personne, des adresses, des références d’actes, des documents et de l’historique.
+- Assure-toi que les changements sensibles sont historisés avec auteur, date, motif et provenance.
+- Préserve les données et relations existantes.
+
+PHASE C — NIN
+- Confirme la règle officielle à partir de l’arrêté complet et de son annexe.
+- Vérifie les contraintes d’unicité et les transactions.
+- Centralise l’attribution derrière un service métier dédié.
+- Implémente les contrôles de prérequis, l’idempotence, la journalisation et les tests de concurrence.
+- Si la règle officielle ne peut pas être confirmée, ne prétends pas que le générateur est conforme et n’active pas l’attribution réelle.
+
+PHASE D — ENRÔLEMENT, CAMPAGNES ET BIOMÉTRIE
+- Vérifie les statuts et transitions de l’enrôlement.
+- Assure l’idempotence du transfert des campagnes.
+- Vérifie les contrôles de qualité des captures et les erreurs SDK.
+- Organise les correspondances biométriques comme une file de revue humaine.
+- Ajoute les tests de faux positifs, de capture insuffisante et d’indisponibilité du service.
+
+PHASE E — ÉTAT CIVIL ET CIN
+- Vérifie la provenance et les références de chaque événement d’état civil.
+- Traite les doublons d’événements, événements tardifs et conflits sans écrasement silencieux.
+- Vérifie que la CIN est liée à un dossier validé et à un NIN confirmé.
+- Trace la production, la remise, la perte, le remplacement et l’annulation selon les règles validées.
+
+PHASE F — SÉCURITÉ ET INTEROPÉRABILITÉ
+- Audite les rôles, permissions, périmètres territoriaux, sessions et MFA.
+- Sépare l’administration technique, la biométrie, la validation, l’attribution du NIN et la fusion des dossiers.
+- Protège les documents, les sauvegardes, les secrets et les journaux.
+- Pour les API partenaires, applique authentification forte, moindre privilège, quotas, révocation, versionnement et réponse minimale.
+- Ne publie jamais le FGP complet ou les données biométriques.
+
+PHASE G — TESTS ET LIVRAISON
+- Ajoute ou améliore tests unitaires, intégration, API, sécurité, concurrence, synchronisation et non-régression.
+- Exécute le lint, les tests et le build réellement disponibles dans le dépôt.
+- Fournis les commandes exécutées et les résultats exacts.
+- Fournis la liste des fichiers modifiés, migrations, risques résiduels et instructions de retour arrière.
+- Ne déclare pas une fonction terminée si elle n’est pas testée.
+- Avance par petits lots, demande une validation avant toute opération destructive ou tout déploiement en production.
+
+LIVRABLE INITIAL OBLIGATOIRE
+Un rapport d’audit avec : module, statut réel, preuves, fichiers/endpoints/tables concernés, écarts, risques, correction proposée, priorité et tests nécessaires. N’entame pas une réécriture globale avant la validation de ce rapport.
+17. Sources et limites
+Les documents transmis citent notamment les références suivantes. Leur présence dans ce plan ne remplace pas la vérification de la version officielle complète, de ses annexes, de ses éventuelles modifications et des instructions applicables.
+Décret n° 22/07 du 2 mars 2022 relatif au Fichier Général de la Population — référence citée dans les notes : https://mail.leganet.cd/Legislation/Droit%20Public/Identification/decret%2022.04.02.03.2022.html
+Documentation publiée sur le site de l’ONIP relative au FGP : https://www.onip.gouv.cd/docs/FGP.pdf
+Arrêté relatif à la CIN et au NIN, cité dans les notes : https://www.onip.gouv.cd/docs/ARRETE%20CIN%20ET%20NIN.pdf
+Article de l’ACP cité dans les notes concernant les paramètres techniques de l’identification : https://acp.cd/nation/identification-de-la-population-congolaise-la-finalisation-des-parametres-techniques-evoquee-a-accra/
+Limites
+Ce document est un plan de conception, pas une certification de conformité juridique.
+Les noms de tables, endpoints et statuts sont des propositions à adapter au dépôt existant.
+Le format exact du NIN et toute règle de génération restent à confirmer par les documents officiels complets.
+Les fonctions biométriques, la conservation, la résidence des données et les échanges institutionnels exigent une validation technique et juridique formelle.
+Les informations marquées « déjà commencé » viennent des notes transmises et doivent être vérifiées dans le code.
+Conclusion
+La priorité est d’auditer le système actuel, de protéger les données et de confirmer les règles officielles avant de poursuivre les développements critiques. L’ordre recommandé est : audit, validation juridique du NIN et du FGP, stabilisation du parcours d’enrôlement, intégration de l’état civil et de la CIN, renforcement de la sécurité, tests de non-régression, puis pilote contrôlé.
+Un système aussi sensible doit progresser par étapes vérifiables. Le succès ne se mesure pas au nombre de menus affichés, mais à la cohérence des données, à la sécurité, à la traçabilité, au respect des règles officielles et à la capacité de restaurer le service sans perte.
+
+--- TABLE 1 ---
+Domaine | Inclus dans la cible | Points à confirmer
+Identification | Dossiers individuels, contrôle documentaire, validation et historique. | Catégories exactes de personnes et pièces acceptées.
+FGP | Référentiel central et synchronisation des sources autorisées. | Schéma officiel, règles de conservation et procédures.
+Biométrie | Capture, contrôle qualité, références de templates et recherche de doublons. | Matériels, SDK, traitements et base légale précis.
+NIN | Service central d’attribution, unicité, traçabilité et permanence. | Format officiel complet et règle de génération.
+CIN | Demande, personnalisation, impression, remise et suivi. | Spécifications graphiques et conditions officielles de délivrance.
+État civil | Réception d’événements et rapprochement avec le FGP. | Protocoles, autorités sources et règles de correction.
+Interopérabilité | API d’identification pour organismes habilités. | Partenaires autorisés, champs et finalités permises.
+
+--- TABLE 2 ---
+Couche | Composants | Responsabilité principale
+Canaux | Portail ONIP, portail citoyen, application mobile/PWA d’enrôlement. | Interfaces adaptées aux agents, superviseurs, citoyens et appareils mobiles.
+Accès et API | API Gateway, authentification, autorisation, limitation de débit, journalisation. | Contrôler les appels, l’identité du demandeur et les permissions.
+Services métier | Dossiers, enrôlement, campagnes, FGP, NIN, cartes, état civil, anomalies. | Appliquer les règles métier de manière cohérente.
+Services spécialisés | Service biométrique/ABIS, gestion documentaire, notifications, cartographie. | Exécuter les traitements spécialisés sans exposer directement les données sensibles.
+Données | Base relationnelle, stockage documentaire chiffré, coffre biométrique, journaux d’audit. | Conserver les informations structurées, fichiers et traces séparément.
+Interopérabilité | Connecteurs autorisés, files d’événements, tâches de synchronisation. | Échanger uniquement les informations nécessaires avec les systèmes habilités.
+Infrastructure | Hébergement autorisé, sauvegardes, supervision, site de reprise. | Assurer disponibilité, restauration, sécurité et continuité.
+
+--- TABLE 3 ---
+Situation | Comportement attendu | Interdiction
+Dossier incomplet | Statut « à compléter », liste des pièces manquantes et suivi. | Attribuer le NIN uniquement pour faire disparaître le statut incomplet.
+Doublon potentiel | Bloquer l’attribution automatique et ouvrir une revue habilitée. | Fusion automatique basée uniquement sur un score.
+Échec biométrique | Enregistrer l’échec, le motif et permettre une nouvelle capture ou une procédure autorisée. | Créer plusieurs identités pour contourner l’échec.
+Erreur de synchronisation | Mettre l’événement en attente, réessayer de façon idempotente et alerter si nécessaire. | Réimporter sans clé d’idempotence.
+Rectification | Créer une demande, joindre les justificatifs et enregistrer décision et historique. | Écraser sans trace l’ancienne valeur.
+Fusion de dossiers | Validation renforcée, référence du dossier survivant et journal complet. | Supprimer l’historique ou réattribuer le NIN à une autre personne.
+
+--- TABLE 4 ---
+Entité/table indicative | Données et responsabilité | Contrôles importants
+persons | Identifiant interne immuable, attributs biographiques, statut et dates d’effet. | Identifiant technique stable ; historique des modifications.
+national_ids | NIN, état, date d’attribution, référence de la personne. | Unicité stricte ; pas de réutilisation ni de génération ad hoc.
+nin_allocations | Demande, résultat, date, service, agent autorisé et référence d’audit. | Idempotence, trace des échecs, accès restreint.
+person_addresses | Adresses successives et rattachement administratif. | Historique et date d’effet.
+person_relationships | Filiation, parents, tuteurs ou relations autorisées. | Accès limité et validation des sources.
+biometric_records | Références de templates, qualité, type, fournisseur et métadonnées. | Pas de biométrie en clair dans les journaux ; accès séparé.
+civil_events | Naissance, mariage, divorce, décès et rectifications. | Provenance, référence d’acte, date d’effet, idempotence.
+identity_documents | Pièces justificatives et métadonnées d’intégrité. | Stockage privé, antivirus, contrôle d’accès.
+identity_reviews | Revue, doublons potentiels, décisions et motifs. | Séparation du rôle de proposition et de décision.
+identity_cards | Demande, personnalisation, impression, remise et statut. | Lien vers dossier validé et NIN confirmé.
+enrollments | Campagne, centre, agent, collecte et état de transmission. | Source, lot et clé d’idempotence.
+campaigns / field_teams | Campagnes, objectifs, zones, équipes et affectations. | Périmètre territorial et dates.
+administrative_areas | Référentiel des provinces et subdivisions. | Version et date d’effet.
+onip_users / roles / permissions | Comptes, rôles et habilitations. | MFA, révocation, séparation des privilèges.
+api_clients / api_access_logs | Partenaires, droits, appels et résultats. | Quota, révocation et minimisation des données.
+audit_events | Acteur, action, cible, horodatage, résultat et motif. | Protection contre l’altération et absence de secrets.
+sync_jobs | Événements entrants, état de traitement, tentatives et erreurs. | Rejeu idempotent et file de quarantaine.
+security_incidents | Incident, gravité, responsable, actions et clôture. | Accès limité et conservation maîtrisée.
+correction_requests | Demande, justificatifs, décision et historique. | Validation, motif et traçabilité.
+document_issuance_events | Production, remise, perte, remplacement ou annulation. | Historique des événements de carte.
+
+--- TABLE 5 ---
+Famille | Exemples conceptuels | Garde-fous
+Dossiers | GET/POST/PATCH /api/v1/persons | Permissions par champ, rôle et zone ; audit des lectures sensibles.
+Enrôlement | /api/v1/enrollments | Clé d’idempotence, statuts contrôlés et validation.
+FGP | /api/v1/fgp/records | Accès restreint ; pas d’export global par défaut.
+Vérification | POST /api/v1/identity/verify | Retour minimal : résultat et attributs explicitement autorisés.
+NIN | Endpoints internes d’attribution | Aucun endpoint public de génération libre ; autorisation dédiée.
+État civil | /api/v1/civil-events | Provenance, référence d’acte, déduplication et gestion des conflits.
+Cartes | /api/v1/identity-cards | Admissibilité, traçabilité de production et de remise.
+Campagnes | /api/v1/campaigns | Permissions par campagne, centre et zone.
+Audit | Endpoints réservés aux auditeurs habilités | Consultation en lecture seule et export limité.
+
+--- TABLE 6 ---
+Rôle indicatif | Droits principaux | Limites à imposer
+Administrateur national | Paramétrage institutionnel et supervision. | Opérations biométriques et attribution du NIN séparées.
+Administrateur technique | Infrastructure, configuration et maintenance. | Pas d’accès métier systématique.
+Responsable provincial | Suivi des opérations autorisées de sa province. | Pas de consultation hors périmètre.
+Responsable de centre | Affectations, dossiers et activité du centre. | Pas de privilèges nationaux automatiques.
+Agent d’enrôlement | Création et collecte. | Ne valide pas nécessairement son propre dossier.
+Opérateur biométrique | Captures et opérations biométriques autorisées. | Pas d’export libre de templates.
+Validateur | Examen et décision de validation. | Pas d’administration des comptes par défaut.
+Agent d’état civil | Transmission et suivi des événements. | Pas de modification arbitraire du FGP.
+Responsable des cartes | Production et remise. | Accès limité aux champs nécessaires à la carte.
+Auditeur | Journaux et rapports autorisés. | Lecture seule, exports contrôlés.
+Support | Assistance technique limitée. | Pas de visibilité complète sur les données sensibles.
+Citoyen | Consultation de son dossier et demandes autorisées. | Aucun accès au dossier d’un tiers.
+Organisme partenaire | Vérification d’attributs précis. | Accès contractuel, limité et révocable.
+
+--- TABLE 7 ---
+Menu proposé | Écrans | Actions principales
+Dashboard | Vue nationale, indicateurs, alertes. | Filtrer, consulter les détails autorisés, exporter selon droits.
+Personnes / FGP | Recherche, fiche individuelle, historique. | Consulter, vérifier, demander une rectification.
+Enrôlements | Nouveaux dossiers, dossiers en cours, rejets. | Saisir, contrôler, soumettre et suivre.
+Biométrie | Capture, qualité, candidats de doublon. | Capturer, relancer, soumettre une correspondance à revue.
+NIN | Dossiers éligibles, attributions, historique. | Attribuer via service central autorisé, consulter les traces.
+État civil | Événements entrants, erreurs, conflits. | Vérifier les références et traiter les exceptions.
+CIN | Demandes, production, remise, annulations. | Approuver, suivre, imprimer et enregistrer la remise.
+Campagnes | Campagnes, équipes, coupons, couverture. | Créer, affecter, suivre et clôturer.
+Cartographie | Centres, zones et couverture. | Consulter les statistiques agrégées et les zones à traiter.
+Comptes et rôles | Utilisateurs, centres, permissions. | Affecter, suspendre, révoquer et auditer.
+Anomalies | Doublons, erreurs, tickets. | Assigner, escalader, décider et clôturer.
+Rapports | Indicateurs et exports. | Générer des rapports autorisés.
+Audit / Sécurité | Journaux, incidents et alertes. | Consulter les traces selon habilitation.
+Administration technique | Santé, tâches, files, versions. | Superviser les services sans accès métier automatique.
+
+--- TABLE 8 ---
+Composant | Option indicative | Points de décision
+Portail web | React/Next.js ou frontend existant, Tailwind CSS, PWA. | Réutiliser les composants et routes existants.
+Application terrain | Flutter/Android ou PWA selon le matériel. | Mode hors connexion, sécurité locale et périphériques.
+Backend | Python/FastAPI ou framework existant. | Cohérence du code, tests, compétences et maintenance.
+Base relationnelle | PostgreSQL ou base existante compatible. | Contraintes d’unicité, transactions, sauvegarde et migration.
+Cache/queues | Redis ou système de files adapté. | Nécessité réelle, reprise et idempotence.
+Biométrie | SDK/moteur dédié compatible avec le matériel et les autorisations. | Licences, précision, intégration, sécurité et audit.
+Documents | Stockage objet privé avec chiffrement. | Localisation, intégrité, antivirus et politique de conservation.
+Identité des agents | OIDC/OAuth2 ou mécanisme institutionnel approuvé, MFA. | Gestion des sessions, révocation et comptes de service.
+Supervision | Métriques, logs protégés, alertes et SIEM si disponible. | Ne jamais exposer les secrets ou données sensibles.
+
+--- TABLE 9 ---
+Type | But | Exemples
+Unitaires | Vérifier les fonctions métier isolées. | Validation des champs, transitions de statut, règles d’accès.
+Intégration | Vérifier les échanges entre services. | Enrôlement → FGP, événement d’état civil → dossier, CIN → NIN.
+API | Vérifier contrats, erreurs et permissions. | Jeton expiré, entrée invalide, quota, idempotence.
+Sécurité | Détecter les accès et configurations faibles. | Accès hors périmètre, secrets, fuite dans les logs.
+Concurrence | Protéger les opérations sensibles simultanées. | Attribution NIN et import répété.
+Biométrie | Évaluer la qualité et le processus de revue. | Capture insuffisante, faux positif, service indisponible.
+Non-régression | Préserver les fonctions existantes. | Routes, pages, migrations et synchronisation actuelle.
+Restauration | Prouver que les sauvegardes sont utilisables. | Restaurer la base et vérifier relations et pièces.
+Recette métier | Valider le parcours réel avec les responsables. | Dossier complet, incomplet, doublon, rectification, décès.
+
+--- TABLE 10 ---
+Risque | Impact | Mesure de réduction
+Format NIN supposé ou incorrect | Élevé : identifiants non conformes. | Ne pas coder le générateur final avant validation de l’annexe officielle.
+Modification destructive de l’existant | Élevé : perte de données ou interruption. | Audit, sauvegarde vérifiée, migrations réversibles, tests de non-régression.
+Doublon non détecté | Élevé : dossiers multiples. | Recherche biographique et biométrique, revue humaine et suivi des cas ambigus.
+Faux positif biométrique | Élevé : fusion injustifiée. | Seuils évalués, validation humaine, recours et conservation des preuves.
+Accès trop large | Élevé : fuite ou abus. | Moindre privilège, MFA, contrôle territorial et audit.
+Synchronisation répétée | Moyen/élevé : doublons ou données incohérentes. | Clés d’idempotence, file de reprise et détection des événements déjà traités.
+Perte de documents | Élevé : dossier incomplet. | Stockage protégé, intégrité, sauvegarde et politique de conservation.
+Panne ou ransomware | Élevé : indisponibilité. | Segmentation, sauvegardes isolées, restauration testée et plan de reprise.
+Règles métier non confirmées | Élevé : logiciel non conforme. | Validation écrite par l’autorité compétente avant activation en production.
+
+--- TABLE 11 ---
+Module | Statut réel | Preuves à recueillir | Écart / action | Tests
+Dashboard | À vérifier | Page, requête API, calcul des indicateurs. | Comparer chiffres et sources. | Filtres et cohérence.
+Personnes/FGP | À vérifier | Modèles, routes, migrations, règles de recherche. | Vérifier unicité et historique. | Recherche et modification.
+Enrôlement | À vérifier | Formulaires, statuts, validation. | Vérifier transitions. | Parcours complet.
+Campagnes | Partiel selon notes | API de transfert, identifiants de lot. | Vérifier idempotence et rapprochement. | Import répété.
+Biométrie | Partiel selon notes | SDK ZK, stockage, endpoints, logs. | Isoler données et accès. | Qualité et doublons simulés.
+NIN | Priorité critique / à vérifier | Service, contraintes SQL, format validé. | Confirmer règle officielle et unicité. | Concurrence/idempotence.
+État civil | Partiel selon notes | Connecteur, événements, mapping. | Gérer conflits et provenance. | Événement répété/tardif.
+CIN | Partiel selon notes | Gabarit, impression, workflow. | Vérifier admissibilité et traçabilité. | Production/remise.
+RBAC | À vérifier | Middleware, politiques, rôles. | Séparer les privilèges. | Tests négatifs.
+API partenaires | À vérifier | Routes, jetons, quotas. | Limiter les réponses. | Authentification et quota.
+Sauvegardes | À vérifier | Scripts, logs, preuves de restauration. | Documenter RPO/RTO. | Restauration réelle.
