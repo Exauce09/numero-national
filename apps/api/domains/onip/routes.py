@@ -29,8 +29,7 @@ from apps.api.domains.core_registry.national_identity_number_service import (
     OfficialNinFormatUnresolvedError,
     NationalIdentityNumberService,
     ProvisionalNinPrerequisitesError,
-    assign_official_nin,
-    assign_provisional_nic,
+    nin_catalog,
 )
 from apps.api.domains.onip import service
 from apps.api.domains.onip.scope import resolve_scoped_filters
@@ -343,6 +342,8 @@ async def nin_compliance_status() -> dict[str, Any]:
         "block_reason": OFFICIAL_BLOCK_REASON if not OFFICIAL_NIN_FORMAT_CONFIRMED else None,
         "provisional_algorithm": "PROVISIONAL-v3-rdc-14-NOT-OFFICIAL",
         "audit_doc": "docs/legal/onip/AUDIT_CONFORMITE_FGP_NIN.md",
+        "module7_audit": "docs/legal/onip/MODULE_7_AUDIT.md",
+        "catalog": "GET /api/v1/onip/nin/catalog",
         "plan_matrix": "docs/legal/onip/MATRICE_PLAN_VS_EXISTANT.md",
         "detail_audit": "docs/legal/onip/RAPPORT_AUDIT_ONIP_DETAIL.md",
         "decree_ref": "Décret n° 22/07 du 2 mars 2022, art. 8",
@@ -378,6 +379,153 @@ class NinAssignRequest(BaseModel):
         default="official",
         description="official = règle légale (bloqué tant que non confirmée) ; provisional = DEV uniquement",
     )
+    idempotency_key: str | None = Field(
+        default=None,
+        max_length=128,
+        description="Clé de reprise — même clé = même résultat, pas de second NIN",
+    )
+    request_source: str | None = Field(
+        default="ONIP_UI",
+        max_length=64,
+        description="Module demandeur (ONIP_UI, CENSUS, CIVIL, FGP, …)",
+    )
+
+
+class NinExceptionOpenRequest(BaseModel):
+    citizen_id: UUID
+    exception_type: Literal[
+        "COLLISION",
+        "WRONG_ASSOCIATION",
+        "MERGE_CONFLICT",
+        "DEATH_REVIEW",
+        "CORRECTION_REVIEW",
+    ]
+    reason: str = Field(min_length=8, max_length=2000)
+    related_citizen_id: UUID | None = None
+
+
+class NinExceptionDecisionRequest(BaseModel):
+    decision: Literal["ACKNOWLEDGED", "ESCALATED", "CLOSED"]
+    motif: str = Field(min_length=8, max_length=2000)
+
+
+@router.get(
+    "/nin/catalog",
+    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
+)
+async def nin_catalog_endpoint() -> dict[str, Any]:
+    """Module 7 — règles centrales (pas de NIN inventé ; officiel bloqué)."""
+    return nin_catalog()
+
+
+@router.get(
+    "/nin/status/{citizen_id}",
+    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
+)
+async def nin_national_id_status(
+    citizen_id: UUID,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Statut NIN / éligibilité pour un dossier (cahier §13 national-id-status)."""
+    citizen = await db.get(Citizen, citizen_id)
+    if citizen is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Citizen not found")
+    return await NationalIdentityNumberService.get_national_id_status(db, citizen)
+
+
+@router.get(
+    "/nin/allocations/{idempotency_key}",
+    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
+)
+async def nin_allocation_by_key(
+    idempotency_key: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Reprise d'une demande d'attribution par clé d'idempotence."""
+    row = await NationalIdentityNumberService.find_allocation_by_key(db, idempotency_key)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Allocation request not found",
+        )
+    payload = row.payload or {}
+    return {
+        "request_id": str(row.id),
+        "idempotency_key": payload.get("idempotency_key"),
+        "citizen_id": str(row.citizen_id),
+        "outcome": payload.get("outcome"),
+        "nin": payload.get("nin"),
+        "nin_status": payload.get("nin_status"),
+        "official": bool(payload.get("official", False)),
+        "mode": payload.get("mode"),
+        "algorithm_version": payload.get("algorithm_version"),
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+    }
+
+
+@router.get(
+    "/nin/exceptions",
+    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
+)
+async def nin_exceptions_list(
+    limit: int = Query(default=50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """File d'exceptions NIN (audit) — ne mute pas les numéros."""
+    items = await NationalIdentityNumberService.list_exceptions(db, limit=limit)
+    return {"count": len(items), "items": items, "nic_mutation_forbidden": True}
+
+
+@router.post(
+    "/nin/exceptions",
+    dependencies=[Depends(require_permissions(PERM_CITIZEN_VALIDATE, PERM_ONIP_DASHBOARD))],
+)
+async def nin_exceptions_open(
+    body: NinExceptionOpenRequest,
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(require_permissions(PERM_CITIZEN_VALIDATE, PERM_ONIP_DASHBOARD)),
+) -> dict[str, Any]:
+    try:
+        opened = await NationalIdentityNumberService.open_exception(
+            db,
+            citizen_id=body.citizen_id,
+            exception_type=body.exception_type,
+            reason=body.reason,
+            related_citizen_id=body.related_citizen_id,
+            actor_id=principal.actor_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    await db.commit()
+    return opened
+
+
+@router.post(
+    "/nin/exceptions/{exception_id}/decision",
+    dependencies=[Depends(require_permissions(PERM_CITIZEN_VALIDATE, PERM_ONIP_DASHBOARD))],
+)
+async def nin_exceptions_decide(
+    exception_id: UUID,
+    body: NinExceptionDecisionRequest,
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(require_permissions(PERM_CITIZEN_VALIDATE, PERM_ONIP_DASHBOARD)),
+) -> dict[str, Any]:
+    try:
+        decided = await NationalIdentityNumberService.decide_exception(
+            db,
+            exception_id=exception_id,
+            decision=body.decision,
+            motif=body.motif,
+            actor_id=principal.actor_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    await db.commit()
+    return decided
 
 
 @router.get(
@@ -471,44 +619,38 @@ async def nin_assign(
     if citizen is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Citizen not found")
 
-    if body.mode == "official":
-        try:
-            result = await assign_official_nin(
-                db, citizen=citizen, actor_id=principal.actor_id
-            )
-        except OfficialNinFormatUnresolvedError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_423_LOCKED,
-                detail={
-                    "message": str(exc),
-                    "official_nin_format_confirmed": False,
-                    "hint": "Fournir l'arrêté + annexe NIN signés pour débloquer.",
-                },
-            ) from exc
-    else:
-        try:
-            result = await assign_provisional_nic(
-                db, citizen=citizen, actor_id=principal.actor_id
-            )
-        except ProvisionalNinPrerequisitesError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "message": str(exc),
-                    "code": exc.code,
-                    **exc.details,
-                },
-            ) from exc
+    try:
+        result = await NationalIdentityNumberService.assign_with_request(
+            db,
+            citizen=citizen,
+            mode=body.mode,
+            actor_id=principal.actor_id,
+            idempotency_key=body.idempotency_key,
+            request_source=body.request_source,
+        )
+    except OfficialNinFormatUnresolvedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_423_LOCKED,
+            detail={
+                "message": str(exc),
+                "official_nin_format_confirmed": False,
+                "hint": "Fournir l'arrêté + annexe NIN signés pour débloquer.",
+            },
+        ) from exc
+    except ProvisionalNinPrerequisitesError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": str(exc),
+                "code": exc.code,
+                **exc.details,
+            },
+        ) from exc
 
     await db.commit()
     mfa = mfa_status_for(principal)
     return {
-        "nin": result.nin,
-        "citizen_id": str(result.citizen_id),
-        "algorithm_version": result.algorithm_version,
-        "official": result.official,
-        "already_assigned": result.already_assigned,
-        "nin_status": getattr(result, "nin_status", "PROVISIONAL"),
+        **result,
         "service": NationalIdentityNumberService.__name__,
         "mfa_warning": mfa["mfa_recommended"] or None,
     }

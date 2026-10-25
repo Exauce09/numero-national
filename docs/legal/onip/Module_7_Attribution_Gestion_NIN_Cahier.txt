@@ -1,0 +1,708 @@
+SIGPOP-RDC
+MODULE 7ATTRIBUTION ET GESTION DU NIN
+Cahier des charges fonctionnel et technique détailléService central d’attribution, unicité, permanence, historique et contrôle
+Version de travail — octobre 2026
+Document destiné à l’audit et à l’évolution progressive du système existant.
+Avertissement et statut du document
+Ce cahier des charges développe le Module 7 — Attribution et gestion du Numéro d’Identification Nationale (NIN) — à partir des exigences décrites pour SIGPOP-RDC / ONIP. Il s’agit d’une proposition fonctionnelle et technique pour guider le développement d’un logiciel existant, et non d’une certification juridique ni d’une description de l’infrastructure interne réelle de l’ONIP.
+Le décret n° 22/07 du 2 mars 2022 indique qu’un NIN est attribué à chaque personne physique lors de son premier enregistrement au FGP et que les règles de composition relèvent de l’autorité compétente sur proposition de l’ONIP. L’arrêté et l’annexe publiés en ligne sur le site de l’ONIP doivent être examinés dans leur version complète et officiellement validée avant d’activer un générateur de production.
+Point de vigilance : l’annexe du NIN accessible en ligne semble contenir des incohérences internes de comptage et de description de la clé de contrôle. Ce document n’essaie donc pas de déduire ou de corriger cette formule. Tant que l’autorité compétente n’a pas confirmé par écrit la longueur, les positions, l’algorithme, la clé et les règles de traitement, la génération définitive doit rester désactivée dans les environnements de production.
+Le module NIN doit être un service central, sécurisé, atomique, auditable et idempotent. Aucun écran, import, appareil terrain ou service tiers ne doit fabriquer ou attribuer un NIN définitif en contournant ce service.
+Sommaire
+1. Finalité, objectifs et périmètre
+2. Références de conformité et décisions à confirmer
+3. Principes non négociables
+4. Architecture fonctionnelle du service NIN
+5. Conditions préalables à l’attribution
+6. Workflow complet d’attribution
+7. Génération sécurisée et validation du NIN
+8. Unicité, atomicité, concurrence et idempotence
+9. Association personne–NIN et permanence
+10. Correction, fusion, décès et cas exceptionnels
+11. Gestion des erreurs et incidents
+12. Modèle de données indicatif
+13. API, permissions et intégrations
+14. Sécurité, audit et protection des secrets
+15. Interfaces et supervision
+16. Scénarios métier détaillés
+17. Tests et critères d’acceptation
+18. Plan de développement progressif
+19. Prompt complet pour l’agent développeur
+20. Sources, limites et validations requises
+1. Finalité, objectifs et périmètre
+1.1 Finalité
+Le module Attribution et gestion du NIN fournit le service central chargé d’attribuer un numéro au dossier admissible selon la règle officielle confirmée. Il contrôle les prérequis, empêche les doubles attributions, associe le numéro au dossier de référence, conserve les traces, gère les résultats d’erreur et fournit aux autres modules un moyen autorisé de consulter le statut du NIN.
+1.2 Objectifs
+Garantir qu’une attribution s’effectue uniquement après les validations requises du processus FGP.
+Centraliser la génération et empêcher les modules d’effectuer une attribution parallèle.
+Assurer l’unicité du NIN au niveau applicatif et au niveau de la base de données.
+Protéger l’opération contre les appels simultanés, les répétitions, les timeouts et les reprises.
+Associer de façon traçable le numéro à une personne de référence et conserver l’historique de l’attribution.
+Fournir des statuts et erreurs compréhensibles aux modules habilités sans révéler d’informations sensibles.
+Préserver la permanence et le caractère personnel du NIN conformément aux règles applicables.
+Permettre audit, supervision, contrôle de conformité et récupération après incident.
+1.3 Périmètre
+Fonction
+Dans le périmètre
+Hors périmètre / dépendance
+Éligibilité
+Vérifier les prérequis et le statut du dossier.
+Définir des critères juridiques non approuvés.
+Génération
+Utiliser le générateur configuré selon la règle officielle validée.
+Inventer la longueur, les positions ou la clé de contrôle.
+Unicité
+Empêcher les collisions et doubles attributions.
+Se fier uniquement à une recherche préalable dans le code.
+Association
+Lier le NIN attribué à un dossier de référence.
+Réutiliser le numéro pour une autre personne.
+Historique
+Tracer demande, résultat, source, date et acteur/service.
+Inscrire des secrets cryptographiques dans les logs.
+Consultation
+Retourner le statut et les informations autorisées.
+Fournir un endpoint public de génération libre.
+Exceptions
+Gérer les collisions, échecs et conflits.
+Modifier manuellement un NIN sans procédure et audit.
+1.4 Composants en aval
+Les modules d’enrôlement, de gestion des personnes, de biométrie, de recensement, du FGP et de la CIN peuvent demander une attribution ou consulter le résultat lorsqu’ils sont autorisés. Ils ne doivent pas réimplémenter la génération. Le service NIN applique les règles approuvées et laisse aux autres services leurs responsabilités propres.
+2. Références de conformité et décisions à confirmer
+2.1 Règle générale
+L’article 8 du décret n° 22/07 du 2 mars 2022 indique que le NIN est attribué à chaque personne physique lors de son premier enregistrement au FGP et que sa composition est fixée par l’autorité ministérielle compétente sur proposition de l’ONIP. Le système doit traduire cette règle uniquement après confirmation de la procédure opérationnelle exacte.
+2.2 Annexes techniques et incohérences à résoudre
+L’annexe du NIN publiée en ligne par l’ONIP présente une structure avec chiffres de base et clé de contrôle, mais le texte consultable semble incohérent sur le nombre de chiffres de la partie aléatoire et sur la description de l’algorithme de contrôle. Cette constatation impose de demander une version officiellement validée et, si nécessaire, une clarification écrite. Le développeur ne doit ni choisir arbitrairement une interprétation ni corriger lui-même le texte.
+Élément à confirmer
+Question à faire trancher
+Condition avant production
+Longueur totale
+Nombre exact de chiffres du numéro transmis et stocké.
+Spécification officielle signée/confirmée.
+Positions des champs
+Ordre et nombre de chiffres de chaque composante.
+Annexe technique approuvée.
+Partie aléatoire
+Longueur réelle, plage et méthode d’obtention.
+Règle confirmée par l’autorité.
+Clé de contrôle
+Algorithme exact, formule, ordre et exemples validés.
+Vecteurs de test officiels.
+Attributs intégrés au numéro
+Attributs encodés et conséquences en cas de correction.
+Procédure officielle de traitement des changements.
+Collision
+Procédure en cas de numéro déjà utilisé.
+Règle de rejet/régénération explicitement approuvée.
+NIN attribué par erreur
+Procédure de rectification, invalidation ou traitement d’une erreur.
+Autorité et procédure de décision identifiées.
+Décès et permanence
+Traitement du numéro après décès et des dossiers historiques.
+Texte intégral et procédure métier validés.
+2.3 Références de travail
+Décret n° 22/07 du 2 mars 2022 portant création d’un Fichier Général de la Population : https://www.onip.gouv.cd/docs/FGP.pdf
+Arrêté et annexe relatifs à la CIN et au NIN publiés sur le site de l’ONIP : https://www.onip.gouv.cd/docs/ARRETE%20CIN%20ET%20NIN.pdf
+Texte du décret disponible sur LegaNet : https://mail.leganet.cd/Legislation/Droit%20Public/Identification/decret%2022.04.02.03.2022.html
+Les liens ci-dessus sont des références de travail. Avant mise en production, il faut confirmer la version en vigueur, les signatures, les annexes, les éventuelles modifications et les instructions officielles complémentaires.
+3. Principes non négociables
+Un seul service d’attribution
+Toute attribution définitive passe par un service métier unique. Les autres modules transmettent une demande et reçoivent un résultat.
+Dossier admissible seulement
+Une fiche importée, incomplète, non validée ou potentiellement dupliquée ne peut pas déclencher automatiquement une attribution définitive.
+Identifiant interne distinct
+La personne possède une clé technique interne immuable, différente du NIN officiel.
+Unicité au niveau base
+Une contrainte de base de données protège le NIN contre les duplications, même si plusieurs requêtes arrivent simultanément.
+Transaction atomique
+La création de l’association personne–NIN et son historique doivent être cohérents : tout est validé ensemble ou annulé.
+Idempotence
+La répétition de la même demande doit retourner le résultat de l’opération existante ou un résultat cohérent, sans nouvelle attribution.
+Pas de réutilisation
+Un NIN déjà attribué ne doit pas être attribué à une autre personne. La gestion des erreurs suit une procédure officielle spécifique.
+Aucune modification manuelle silencieuse
+Les opérations exceptionnelles doivent être réalisées par une procédure dédiée avec autorisation, motif et audit.
+Secret minimal
+Le générateur et les secrets de sécurité ne doivent pas être exposés aux interfaces, aux clients ou aux journaux.
+Blocage si la règle n’est pas confirmée
+Le système doit permettre les essais en mode simulé, mais ne doit pas prétendre générer des NIN officiels sans la règle certifiée.
+4. Architecture fonctionnelle du service NIN
+Composant
+Responsabilité
+Contrôles attendus
+API de demande
+Recevoir une demande d’attribution d’un module habilité.
+Authentification, permission dédiée, identifiant de corrélation.
+Contrôle d’éligibilité
+Vérifier le statut du dossier et les prérequis.
+Règles versionnées et résultat explicite.
+Contrôle de doublon
+Vérifier qu’un NIN n’a pas déjà été associé et que le dossier est admissible.
+Ne remplace pas le moteur national de déduplication.
+Générateur sécurisé
+Produire un candidat selon le format officiel configuré.
+Règle validée, source d’aléa appropriée et secret isolé si requis.
+Validateur du format
+Vérifier longueur, positions, caractères et clé selon la spécification.
+Vérificateur indépendant du chemin de génération.
+Association et base
+Enregistrer le NIN et son lien au dossier sous transaction.
+Contrainte d’unicité et intégrité référentielle.
+Journal d’attribution
+Conserver demande, résultat, statut et références utiles.
+Pas de secret ou de données sensibles inutiles.
+Réponse / événement
+Notifier le module demandeur du résultat.
+Idempotence, retry et contrat versionné.
+Supervision
+Suivre les volumes, erreurs, collisions et délais.
+Données agrégées et accès restreint.
+4.1 Séquence logique
+Le module habilité soumet une demande avec la référence interne de la personne, la référence du dossier admissible et une clé d’idempotence.
+Le service authentifie le demandeur et vérifie la permission d’attribution.
+Le service contrôle le statut du dossier, l’existence d’un NIN déjà associé et les prérequis métier.
+Si un NIN existe déjà pour ce dossier, le service retourne le résultat existant au lieu d’en créer un autre, selon la règle approuvée.
+Si le dossier est admissible, le générateur configuré produit un candidat conforme à la spécification officielle validée.
+Le validateur vérifie le candidat, puis la base applique la contrainte d’unicité lors de l’écriture.
+En cas de collision, le système suit la procédure confirmée sans réutiliser un numéro existant.
+La liaison personne–NIN et le journal d’attribution sont enregistrés dans une transaction cohérente.
+Le service retourne la référence d’attribution et le statut au demandeur.
+5. Conditions préalables à l’attribution
+5.1 Contrôles d’éligibilité
+Contrôle
+Question
+Réponse attendue en cas d’échec
+Dossier de référence
+La personne possède-t-elle une référence interne stable ?
+Refus avec motif technique/métier ; aucune génération.
+Statut métier
+Le dossier a-t-il atteint l’état autorisant l’attribution ?
+Demande en attente ou refus selon la procédure.
+Complétude
+Les champs et justificatifs requis sont-ils présents et contrôlés ?
+Liste des éléments manquants ou statut à compléter.
+Déduplication
+Un doublon potentiel non résolu existe-t-il ?
+Bloquer l’attribution automatique et renvoyer vers la revue.
+NIN existant
+Le dossier possède-t-il déjà un NIN ?
+Retourner le NIN existant selon les permissions, sans réattribuer.
+Permission
+Le demandeur est-il habilité à demander l’attribution ?
+Refus et audit.
+Règle officielle
+La configuration de génération est-elle activée et validée ?
+Bloquer l’attribution définitive.
+Version du dossier
+Le dossier a-t-il changé pendant la demande ?
+Recontrôle ou conflit de version.
+5.2 Idée de contrat d’éligibilité
+Le résultat du contrôle doit être lisible et structuré : admissible, non admissible, en attente de validation, doublon à examiner, NIN déjà associé, règle non activée ou erreur technique. La réponse ne doit pas révéler les détails non nécessaires à un appelant non autorisé.
+5.3 Attribution différée
+Si les règles officielles le permettent, une demande non prête peut être enregistrée comme « en attente » sans créer de NIN. L’état d’attente doit posséder un motif, une date, un responsable ou une file de traitement et une condition claire de reprise.
+6. Workflow complet d’attribution
+6.1 Parcours standard
+Le dossier est créé puis contrôlé par le module compétent.
+Les informations et pièces nécessaires sont vérifiées selon le processus approuvé.
+La déduplication et les éventuelles anomalies sont traitées.
+Le dossier atteint un statut admissible à l’attribution.
+Un module habilité envoie une demande au service NIN.
+Le service applique les contrôles préalables et vérifie l’idempotence.
+Le générateur conforme à la spécification officielle produit un candidat.
+Le validateur indépendant vérifie le format et la clé de contrôle, si une clé est prévue.
+La base tente l’association dans une transaction avec contraintes d’unicité.
+Le service inscrit l’opération dans l’historique et retourne un résultat confirmé.
+Le FGP et les modules autorisés consultent le statut ou reçoivent un événement de mise à jour.
+6.2 États de la demande
+État indicatif
+Signification
+Règle de transition
+RECEIVED
+Demande reçue par le service.
+Vérifier l’authentification et la clé d’idempotence.
+ELIGIBILITY_CHECK
+Contrôle des prérequis en cours.
+Ne pas générer tant que les contrôles ne sont pas terminés.
+PENDING
+Dossier pas encore admissible ou action en attente.
+Motif explicite et reprise autorisée.
+GENERATION_READY
+Préconditions remplies et configuration officielle activée.
+Génération uniquement sur ce statut.
+GENERATING
+Opération contrôlée en cours.
+Protéger contre les doublons et la concurrence.
+ASSIGNED
+Attribution confirmée et transaction validée.
+Résultat définitif consultable selon permissions.
+ALREADY_ASSIGNED
+Le dossier a déjà un NIN attribué.
+Retourner le résultat existant selon les droits.
+REJECTED
+Demande refusée pour une raison métier.
+Motif, date et possibilité de correction.
+RETRYABLE_ERROR
+Erreur technique temporaire.
+Reprise idempotente avec limites de tentatives.
+COLLISION
+Le candidat existe déjà et ne peut pas être utilisé.
+Appliquer la procédure officielle confirmée.
+RULE_NOT_CONFIGURED
+La règle de génération n’est pas validée/activée.
+Bloquer la production réelle.
+MANUAL_REVIEW
+Un conflit ou une exception requiert un contrôle.
+Assigner à un rôle habilité.
+6.3 Séparation génération et confirmation
+Une candidate de numéro généré n’est pas un NIN attribué. Le statut ne doit devenir « attribué » qu’après validation du format, écriture transactionnelle, vérification des contraintes et création réussie de l’association au dossier. Une erreur entre ces étapes ne doit laisser ni numéro orphelin ni association partielle.
+7. Génération sécurisée et validation du NIN
+7.1 Spécification paramétrée
+Le générateur doit s’appuyer sur une spécification versionnée, approuvée et testable. Les paramètres ne doivent pas être disséminés dans les formulaires, les interfaces ou plusieurs services. Toute nouvelle version de la règle doit être approuvée, testée et activée selon un processus de changement contrôlé.
+Paramètre
+Contenu à documenter
+Version de spécification
+Référence de la règle officielle appliquée.
+Longueur et alphabet
+Nombre exact de chiffres ou caractères et valeurs permises.
+Composantes
+Positions, ordre, signification et règles de remplissage, si confirmés.
+Aléa / génération
+Méthode autorisée et exigences de sécurité confirmées.
+Clé de contrôle
+Algorithme exact, étapes et cas de test officiels, si applicable.
+Entrées requises
+Attributs nécessaires à la génération, leur source et leur statut.
+Validation
+Règle indépendante de vérification de la valeur finale.
+Gestion des collisions
+Nombre de tentatives, critères de blocage et voie d’escalade validés.
+Journalisation
+Éléments auditables sans révéler les secrets du générateur.
+7.2 Validation indépendante
+Le vérificateur utilise la même spécification officielle mais doit être distinct du code qui génère le numéro, afin de réduire le risque d’erreur commune.
+La validation vérifie les contraintes exactes de longueur et de format.
+Si une clé de contrôle existe, elle est recalculée avec les vecteurs de test officiels.
+Le système doit refuser les candidats qui ne passent pas la validation.
+Les cas limites (valeurs de début/fin, mois, années, caractères interdits) doivent être fournis et approuvés par le propriétaire de la règle.
+7.3 Mode de simulation
+Avant confirmation officielle, le logiciel peut proposer un mode de simulation clairement marqué « test uniquement », alimenté par des données fictives. Ce mode ne doit pas produire des valeurs qui pourraient être prises pour des NIN officiels ni permettre l’attribution en production. L’interface et les journaux doivent rendre cette séparation incontestable.
+8. Unicité, atomicité, concurrence et idempotence
+8.1 Unicité en base
+La contrainte d’unicité au niveau de la base de données est obligatoire sur le champ ou la représentation qui stocke le NIN officiel. Un contrôle préalable applicatif améliore l’expérience utilisateur, mais ne remplace jamais cette contrainte.
+8.2 Atomicité
+L’écriture du NIN, l’association à la personne et la création du journal de résultat doivent être dans une transaction cohérente lorsque la base et l’architecture le permettent.
+Si l’une des opérations critiques échoue, la transaction doit être annulée ou compensée de manière contrôlée.
+Les événements de notification doivent utiliser un mécanisme fiable, par exemple un outbox transactionnel ou un mécanisme équivalent déjà présent.
+Une réponse d’échec après un timeout ne doit pas être considérée comme preuve que l’opération n’a pas été exécutée ; le demandeur doit interroger le résultat avec la même référence d’opération.
+8.3 Appels concurrents
+Deux appels simultanés sur le même dossier ne doivent pas créer deux NIN. Le service doit verrouiller ou vérifier l’état du dossier selon le mécanisme de concurrence adapté, puis s’appuyer sur les contraintes transactionnelles de la base. En cas de concurrence, un appel peut obtenir le résultat attribué par l’autre au lieu de déclencher une seconde attribution.
+8.4 Idempotence
+Cas
+Comportement attendu
+Même clé, même dossier, même demande
+Retourner le résultat enregistré sans relancer la génération.
+Même clé avec contenu différent
+Refuser et signaler un conflit d’idempotence.
+Nouvelle clé sur un dossier déjà attribué
+Retourner l’état existant selon le contrat, sans nouvelle attribution.
+Timeout après une attribution confirmée
+Permettre au demandeur de récupérer le résultat existant.
+Collision pendant l’écriture
+Ne jamais écraser le numéro existant ; suivre la procédure validée.
+Service redémarré pendant le traitement
+Reprendre à partir d’un état durable et cohérent.
+8.5 Garanties mesurables
+Aucun NIN dupliqué malgré des appels simultanés.
+Aucun dossier ne reçoit plusieurs NIN actifs par répétition normale d’une requête.
+Aucune association partielle ou orpheline après un échec transactionnel.
+Toute opération confirmée peut être retrouvée via une référence d’opération.
+Les erreurs sont reproductibles en test et le résultat est vérifiable par audit.
+9. Association personne–NIN et permanence
+9.1 Association
+Le service associe le NIN à l’identifiant interne stable du dossier de référence. Il faut éviter de lier l’identifiant uniquement à une ligne temporaire d’enrôlement ou à un dossier de campagne. Les modules d’origine conservent leurs références, puis se relient au dossier et au NIN confirmé au moyen de contrats documentés.
+9.2 Attributs du registre NIN
+Champ indicatif
+But
+ID technique
+Clé interne de l’enregistrement NIN.
+Person ID
+Référence interne de la personne associée.
+NIN officiel
+Valeur attribuée selon la règle officielle confirmée.
+État
+En cours, attribué, en revue ou autre statut prévu.
+Date d’attribution
+Horodatage de la confirmation.
+Référence d’opération
+Récupération du résultat et idempotence.
+Version de règle
+Spécification officielle utilisée.
+Source de demande
+Module/service à l’origine de la demande.
+Référence d’audit
+Lien vers l’événement de journalisation.
+9.3 Permanence et corrections
+Le système doit respecter la permanence du NIN telle que déterminée par le texte applicable. Une erreur sur un attribut de la personne ne doit pas conduire le développeur à recalculer ou remplacer arbitrairement le NIN. Si le numéro incorpore des attributs susceptibles d’être corrigés, leur traitement doit suivre la procédure officiellement définie, après confirmation de l’autorité compétente.
+9.4 Décès et statut du dossier
+Le traitement du NIN au décès doit suivre les textes officiels applicables. Le logiciel doit pouvoir enregistrer un statut ou un événement de décès sans supprimer mécaniquement le dossier ni réutiliser le numéro. La durée et les modalités de conservation doivent être paramétrées à partir des obligations validées.
+10. Correction, fusion, décès et cas exceptionnels
+Situation
+Comportement système
+Action interdite
+NIN déjà attribué
+Retourner le résultat existant au demandeur autorisé.
+Créer un autre NIN par défaut.
+Dossier en doublon potentiel
+Suspendre l’attribution et déclencher la revue prévue.
+Attribuer un numéro à chaque fiche avant le rapprochement.
+NIN invalide selon vérificateur
+Bloquer, créer une anomalie technique et alerter.
+Corriger les chiffres automatiquement sans règle autorisée.
+Collision
+Enregistrer l’événement et suivre la procédure validée de nouvelle tentative ou d’escalade.
+Écraser le NIN déjà présent.
+Erreur d’association
+Ouvrir un incident avec approbation renforcée et historique.
+Déplacer ou réattribuer silencieusement le numéro.
+Fusion de personnes
+Suivre une procédure métier distincte et appliquer le traitement du NIN confirmé.
+Réutiliser le NIN d’une personne pour une autre.
+Correction biographique
+Traiter via rectification et appliquer l’effet sur le NIN seulement si une règle officielle le prévoit.
+Régénérer le NIN au simple changement d’un champ.
+Décès
+Appliquer le statut prévu et préserver l’historique.
+Supprimer ou recycler le numéro.
+Restauration de sauvegarde
+Vérifier l’unicité et réconcilier les opérations de la période restaurée.
+Relancer aveuglément toutes les demandes en attente.
+10.1 Opérations exceptionnelles
+Les opérations sensibles doivent utiliser des écrans dédiés, une permission distincte, un motif obligatoire et, lorsque requis, une double approbation. Le développeur ne doit pas créer une fonction générique « modifier le NIN » accessible aux administrateurs ordinaires.
+11. Gestion des erreurs et incidents
+Erreur / incident
+Réponse attendue
+Suivi
+Dossier non admissible
+Refuser l’attribution ou placer en attente.
+Motif métier et condition de reprise.
+Règle de génération non configurée
+Bloquer toute attribution réelle.
+Alerte de configuration / validation.
+Collision d’unicité
+Annuler l’écriture candidate et suivre la procédure approuvée.
+Journal d’incident sans exposer de secrets.
+Timeout
+Permettre de retrouver l’état par référence d’opération.
+Ne pas relancer une nouvelle attribution avec une nouvelle clé par défaut.
+Panne de base
+Rollback et marquer l’opération comme récupérable si possible.
+Reprise idempotente et surveillance.
+Droits insuffisants
+Refuser la demande.
+Audit et alerte si l’usage est anormal.
+Dossier modifié en parallèle
+Détecter la version changée et réévaluer l’éligibilité.
+Résultat de conflit explicite.
+Notification échouée
+Conserver l’attribution confirmée et relancer la notification.
+Outbox/file et surveillance des messages.
+Incohérence découverte après attribution
+Ouvrir un incident de traitement officiel.
+Conserver les données avant/après et la décision.
+11.1 Niveaux d’incident
+Critique : risque de doublon NIN, fuite de secrets, association erronée ou génération non conforme.
+Élevé : interruptions affectant les attributions, collisions répétées, résultats inconnus après timeout.
+Moyen : retards de notifications, erreurs récupérables ou demandes en attente.
+Faible : problème de présentation ou diagnostic sans impact sur l’intégrité.
+Les niveaux sont indicatifs. Les délais de réponse, responsabilités et modalités d’escalade doivent être fixés par l’organisation.
+12. Modèle de données indicatif
+Les noms de tables sont conceptuels. Avant toute migration, l’agent développeur doit analyser le schéma actuel, les contraintes, les index et les données déjà utilisées.
+Entité/table
+Responsabilité
+Contrôles recommandés
+persons
+Dossier de référence avec identifiant interne immuable.
+Ne pas réutiliser l’identifiant interne.
+national_ids
+Association entre NIN officiel et personne.
+Unicité stricte et lien référentiel contrôlé.
+nin_allocation_requests
+Demandes d’attribution, état, clé d’idempotence et résultat.
+Unique sur la clé appropriée ; pas de nouvelle attribution sur répétition.
+nin_allocation_events
+Historique des étapes, résultats et incidents.
+Événements immuables ou protégés contre l’altération.
+nin_rule_versions
+Versions approuvées de la spécification du NIN.
+Activation contrôlée et historique des changements.
+nin_validation_results
+Résultat du contrôle de format / clé de contrôle.
+Version du vérificateur et résultat reproductible.
+nin_exceptions
+Collisions, conflits, anomalies et décisions.
+Responsable, motif et historique.
+audit_events
+Acteur/service, opération, date, cible et résultat.
+Aucun secret cryptographique dans les journaux.
+outbox_events
+Notifications à envoyer après transaction.
+Reprise sans double publication métier.
+12.1 Contraintes d’intégrité
+Une personne ne peut avoir qu’une association officielle active selon les règles confirmées.
+Un NIN attribué doit être unique et lié à une personne interne valide.
+La référence d’opération et la clé d’idempotence doivent permettre de retrouver les demandes répétées.
+Une règle de génération utilisée doit être identifiable par version.
+Les exceptions ne doivent pas être effacées après résolution : leur état peut évoluer, mais l’historique est conservé.
+Les références d’audit ne doivent pas exposer le NIN en clair dans les systèmes qui n’en ont pas besoin.
+13. API, permissions et intégrations
+Les routes ci-dessous sont des exemples conceptuels ; il faut réutiliser les endpoints existants quand c’est possible et documenter le contrat avant toute modification.
+Capacité
+Exemple conceptuel
+Garde-fous
+Demande d’attribution
+POST /api/v1/nin/allocations
+Service interne authentifié, permission dédiée, clé d’idempotence.
+Consulter résultat
+GET /api/v1/nin/allocations/{requestId}
+Accès limité au demandeur autorisé et aux rôles habilités.
+Statut du NIN
+GET /api/v1/persons/{personId}/national-id-status
+Ne renvoyer que les champs nécessaires.
+Valider la configuration
+Endpoint interne d’administration contrôlée
+Double contrôle, audit et interdiction d’activation non approuvée.
+Traiter une exception
+POST /api/v1/nin/exceptions/{id}/decision
+Rôle spécialisé, motif et journalisation.
+Audit
+Lecture par service autorisé
+Lecture seule, pagination et masquage approprié.
+13.1 Contrat de demande indicatif
+La demande devrait contenir uniquement : une référence stable de la demande, l’identifiant interne de la personne, une référence au dossier admissible, le système demandeur, la version du contrat et la clé d’idempotence. Elle ne doit pas contenir une valeur NIN proposée par le navigateur ni un algorithme de génération imposé par un client.
+13.2 Contrat de réponse indicatif
+La réponse devrait distinguer : demande reçue, attente, refus métier, attribution confirmée, résultat existant, collision, configuration non activée ou erreur technique. La valeur complète du NIN ne doit être renvoyée qu’aux modules et rôles explicitement habilités et uniquement lorsque nécessaire.
+13.3 Sécurité API
+Authentification robuste entre services et contrôle des permissions côté serveur.
+TLS et protections adaptées aux jetons et secrets.
+Rate limiting et quotas raisonnables pour éviter les abus ou erreurs répétées.
+Validation stricte des entrées et réponses d’erreur non sensibles.
+Idempotence obligatoire pour toute demande d’attribution.
+Journalisation des appels, sans stocker de secrets du générateur.
+Révocation des comptes de service et rotation des secrets selon la politique institutionnelle.
+14. Sécurité, audit et protection des secrets
+14.1 Protection du générateur
+Centraliser la règle et le code de génération dans le service sécurisé.
+Ne jamais inclure la logique de génération officielle dans le frontend ou l’application mobile.
+Ne pas stocker des clés ou secrets dans le dépôt, les fichiers de configuration publiés ou les logs.
+Limiter l’accès à la configuration active aux personnes explicitement habilitées.
+Tracer la version de règle, les changements d’activation et les résultats d’audit.
+Prévoir une procédure de rotation ou de mise à jour si la spécification officielle évolue.
+14.2 Journal d’audit
+Événement
+Éléments à conserver
+Demande
+Référence de demande, acteur/service, dossier ciblé, date et résultat.
+Contrôle d’éligibilité
+Version des règles appliquées et statut de résultat, sans champs superflus.
+Génération
+Référence d’opération, version de règle et résultat, sans secret d’aléa.
+Attribution confirmée
+Référence d’association, date, source et service responsable.
+Collision / erreur
+Type d’erreur, identifiant de corrélation et résultat de la reprise.
+Exception
+Responsable, décision, motif, date et historique.
+Changement de configuration
+Auteur, approbateur, ancienne/nouvelle version et date d’effet.
+14.3 Supervision et alertes
+Alerter en cas de hausse anormale des collisions ou des attributions refusées.
+Alerter si la règle de génération n’est pas activée ou si la version n’est pas reconnue.
+Surveiller les demandes bloquées, les retries et les notifications non livrées.
+Détecter les demandes répétées anormales ou les appels provenant d’un service non autorisé.
+Protéger le tableau de supervision : les métriques agrégées sont privilégiées et le NIN complet est masqué par défaut.
+15. Interfaces et supervision
+Écran
+Contenu
+Actions autorisées
+État du service NIN
+Disponibilité, règle active, version, file d’attente et erreurs agrégées.
+Consulter l’état ; pas de génération depuis cet écran.
+Dossiers admissibles
+Liste des dossiers qui ont satisfait les contrôles préalables.
+Consulter ou déclencher une demande via le workflow autorisé.
+Demandes d’attribution
+Référence, dossier, date, statut et résultat.
+Consulter, reprendre une demande idempotente si habilité.
+Exceptions
+Collisions, erreurs, conflits et dossiers bloqués.
+Assigner, examiner, résoudre selon procédure approuvée.
+Historique d’attribution
+Événements, date, version de règle et source.
+Consultation d’audit autorisée.
+Configuration officielle
+Version de la spécification et état d’activation.
+Changement soumis à approbation renforcée.
+Rapports
+Volumes, délais, succès, refus, collisions et erreurs.
+Rapports agrégés et exports limités.
+15.1 KPI de supervision
+Indicateur
+Définition indicative
+Avertissement
+Demandes reçues
+Nombre de demandes sur une période.
+Ne correspond pas au nombre de NIN attribués.
+Attributions confirmées
+Nombre d’opérations validées et inscrites.
+Distinguer des demandes reçues.
+Dossiers en attente
+Dossiers non admissibles ou en revue.
+Ventiler par motif.
+Taux de refus métier
+Demandes refusées pour prérequis non satisfaits.
+La formule et la catégorie doivent être documentées.
+Collisions
+Tentatives de candidat déjà utilisé.
+Une hausse peut indiquer une erreur technique ou une règle incorrecte.
+Retries techniques
+Reprises après erreur transitoire.
+Distinguer notification échouée et attribution non confirmée.
+Temps de traitement
+Durée entre demande et résultat.
+Définir le point de départ et l’état final.
+Les statistiques ne doivent jamais être utilisées seules pour inférer une fraude ou évaluer un agent sans contexte métier.
+16. Scénarios métier détaillés
+Scénario A — Attribution standard
+Un dossier FGP atteint le statut autorisant l’attribution.
+Le service demandeur envoie une demande authentifiée avec une clé d’idempotence.
+Le service NIN vérifie que le dossier ne possède pas déjà de numéro et que la règle officielle est activée.
+Le générateur crée un candidat puis le vérificateur indépendant applique les contrôles attendus.
+La base tente l’association sous transaction et impose l’unicité.
+L’attribution est confirmée et journalisée ; le service retourne la référence et le résultat au demandeur autorisé.
+Scénario B — Même demande envoyée deux fois
+Le client envoie une demande, mais le délai d’attente expire avant de recevoir la réponse.
+Il réémet la même demande avec la même clé d’idempotence.
+Le service retrouve l’opération précédente.
+Si elle a réussi, il retourne le résultat existant ; si elle est en cours, il retourne un statut de traitement.
+Aucun second numéro n’est généré pour cette même opération.
+Scénario C — Deux demandes simultanées
+Deux clients habilités soumettent une demande pour la même personne presque en même temps.
+Le service coordonne les opérations et la base garantit l’unicité.
+Une seule attribution est confirmée.
+L’autre demande récupère le résultat existant ou reçoit un statut de conflit contrôlé.
+L’audit permet de reconstituer les deux demandes et la résolution.
+Scénario D — Dossier avec doublon potentiel
+Le dossier est marqué comme nécessitant une revue de rapprochement.
+Le service NIN refuse l’attribution automatique et retourne un état d’attente avec motif.
+Le module de déduplication traite le cas selon la procédure habilitée.
+Après décision, le workflow peut être repris si les conditions d’attribution sont satisfaites.
+Scénario E — Règle officielle non confirmée
+Le service démarre et constate qu’aucune spécification de production validée n’est activée.
+Toute demande réelle est bloquée avec un état explicite de configuration non validée.
+Les tests peuvent continuer en mode simulé avec des valeurs clairement fictives.
+Le rapport mentionne la validation requise avant activation réelle.
+Scénario F — Collision
+Le générateur produit un candidat déjà présent en base.
+La contrainte d’unicité refuse l’écriture.
+La transaction est annulée ou la reprise est contrôlée.
+Le service suit uniquement la procédure de collision officiellement approuvée.
+Le candidat et les secrets ne sont pas exposés dans les logs ; l’incident est traçable.
+17. Tests et critères d’acceptation
+Catégorie
+Test
+Résultat attendu
+Éligibilité
+Demande provenant d’un dossier incomplet.
+Aucun NIN attribué ; motif enregistré.
+Configuration
+Règle officielle non activée.
+Attribution réelle bloquée.
+Format
+Candidat invalide selon les vecteurs officiels.
+Refus et trace ; aucune association créée.
+Unicité
+Simuler une valeur déjà attribuée.
+Contrainte de base empêche le doublon.
+Atomicité
+Forcer une erreur entre association et audit.
+Pas d’état partiel incohérent ; procédure de reprise vérifiable.
+Idempotence
+Répéter la même demande et la même clé.
+Même résultat ; aucune deuxième attribution.
+Concurrence
+Lancer des demandes simultanées pour le même dossier.
+Une seule attribution confirmée.
+Dossier déjà attribué
+Envoyer une nouvelle demande sur le même dossier.
+Résultat existant retourné selon les permissions.
+Timeout
+Couper la connexion après validation côté serveur.
+Résultat récupérable sans nouvelle attribution.
+Collision
+Forcer un candidat déjà utilisé.
+Erreur contrôlée, sans écrasement.
+Permissions
+Appel depuis un service non habilité.
+Refus côté serveur et événement de sécurité.
+Audit
+Examiner les logs après plusieurs opérations.
+Trace complète sans secret générateur.
+Migration
+Restaurer ou migrer les données de test.
+Unicité et associations préservées.
+Non-régression
+Exécuter les parcours existants.
+Les fonctionnalités précédentes restent opérationnelles.
+17.1 Checklist d’acceptation
+☐ La règle officielle et sa version ont été confirmées et documentées.
+☐ Le générateur définitif reste désactivé tant que les points juridiques non résolus subsistent.
+☐ Seul le service NIN autorisé peut effectuer une attribution définitive.
+☐ Le NIN est unique en base et la transaction empêche les états partiels.
+☐ Les demandes répétées et concurrentes sont idempotentes et contrôlées.
+☐ Un dossier non admissible ou en doublon potentiel ne reçoit pas de NIN automatiquement.
+☐ L’association NIN–personne et l’historique peuvent être audités.
+☐ Les exceptions sont traitées par une procédure autorisée et conservées dans l’historique.
+☐ Les permissions, alertes, sauvegardes et tests de non-régression sont vérifiés.
+☐ Aucun secret ou donnée sensible inutile n’apparaît dans les logs et exports.
+18. Plan de développement progressif
+Phase 1 — Audit et vérification officielle
+Inspecter le code existant, les modèles, services, endpoints, migrations et documents. Identifier la logique NIN actuelle et comparer son comportement aux textes complets, en documentant les incohérences de l’annexe.
+Livrable : rapport de conformité et liste de décisions bloquantes.
+Phase 2 — Modèle et unicité
+Stabiliser l’association personne–NIN et les contraintes de base sans perdre les données existantes.
+Livrable : modèle validé et tests d’unicité.
+Phase 3 — Service central et idempotence
+Centraliser les demandes, contrôler les prérequis et rendre les répétitions récupérables.
+Livrable : tests de répétition, timeout et concurrence.
+Phase 4 — Générateur et vérificateur
+Implémenter les règles uniquement après validation officielle, avec une configuration versionnée et des vecteurs de test certifiés.
+Livrable : générateur/vérificateur testés selon la spécification validée.
+Phase 5 — Historique et exceptions
+Stabiliser les collisions, erreurs d’association, rectifications et procédures administratives.
+Livrable : workflows d’exception avec audit.
+Phase 6 — Intégration des modules
+Connecter enrôlement, FGP et CIN par les contrats existants.
+Livrable : tests d’intégration et absence de génération parallèle.
+Phase 7 — Sécurité et supervision
+Vérifier les permissions, secrets, logs, alertes et sauvegardes.
+Livrable : rapport de sécurité.
+Phase 8 — Recette et activation contrôlée
+Exécuter les tests avec données fictives ou autorisées, obtenir les validations et activer progressivement selon décision compétente.
+Livrable : procès-verbal de recette et décision explicite d’activation.
+19. Prompt complet pour l’agent développeur
+Tu interviens sur le projet existant SIGPOP-RDC / ONIP, Module 7 — Attribution et gestion du NIN. Ton objectif est d’auditer puis de fiabiliser le service NIN sans reconstruire le système ni casser les fonctions existantes.RÈGLES ABSOLUES1. Commence par inspecter le dépôt, README, services, endpoints, modèles, migrations, tests, variables d’environnement et historique Git.2. Identifie toute logique existante de création, génération, association, affichage et validation du NIN/NIC. Distingue clairement faits observés, hypothèses et propositions.3. Ne supprime ni ne remplace une route, table, donnée ou fonction sans justification, sauvegarde, plan de migration et retour arrière.4. N’invente jamais la longueur, le format, les positions, la partie aléatoire ou l’algorithme de contrôle du NIN.5. La documentation publique consultée comporte des incohérences apparentes dans le comptage des chiffres et la description de la clé. Documente ces points et exige une spécification officielle complète et validée avant d’activer le générateur en production.6. Tant que la règle n’est pas confirmée, bloque l’attribution réelle et autorise seulement un mode de simulation marqué test, utilisant des données fictives.7. Toute attribution définitive passe par un service central unique. Aucun frontend, mobile, formulaire, import ou module ne doit fabriquer son propre NIN.8. Vérifie l’éligibilité, la validation du dossier, l’état de déduplication et l’absence d’un NIN existant avant attribution.9. Utilise une contrainte d’unicité en base, une transaction cohérente et des mécanismes d’idempotence.10. Protège les demandes simultanées et les timeouts : une demande répétée doit retrouver son résultat, pas générer un autre numéro.11. Ne réattribue jamais un NIN à une autre personne ; toute erreur suit une procédure officielle contrôlée.12. Ne génère pas automatiquement un NIN pour un dossier incomplet, importé seulement ou marqué doublon potentiel.13. Ne journalise pas les secrets du générateur, les clés ou les données personnelles inutiles.14. Utilise des données fictives/anonymisées pour les tests.PHASE A — AUDIT- Cartographie les écrans, endpoints, services, modèles, migrations et dépendances liés au NIN/NIC.- Identifie le générateur actuel et vérifie s’il existe plusieurs chemins d’attribution.- Inspecte les contraintes d’unicité, les transactions, clés d’idempotence, journaux et notifications.- Documente les effets sur les modules FGP, enrôlement, biométrie et CIN.- Exécute les tests existants et rapporte les résultats exacts.- Remets un rapport priorisé avec fichiers, preuves, écarts, risques et tests nécessaires avant tout changement structurel.PHASE B — RÈGLE OFFICIELLE- Compare les règles du code à la version intégrale et officiellement confirmée du décret, de l’arrêté et de l’annexe technique.- Si une ambiguïté subsiste, n’invente pas une interprétation : maintiens le générateur réel désactivé et documente la décision requise.- Implémente une spécification versionnée et des cas de test officiels seulement après validation.PHASE C — SERVICE D’ATTRIBUTION- Centralise le processus derrière un service métier sécurisé.- Vérifie statut du dossier, doublons non résolus, permission, NIN existant et version du dossier.- Utilise idempotence, transactions et contraintes de base.- Traite les collisions et interruptions selon la procédure approuvée.- Stocke le résultat avec une référence d’opération et un historique contrôlable.PHASE D — INTÉGRATIONS ET AUDIT- Connecte les modules par les contrats API existants.- Empêche toute génération parallèle côté frontend ou mobile.- Distingue demande reçue, opération en cours et attribution confirmée.- Ajoute des alertes pour collisions, erreurs répétées et règles non configurées.- Protège les logs et les exports.PHASE E — TESTS ET LIVRAISON- Ajoute tests de format basé sur vecteurs validés, unicité, concurrence, idempotence, timeout, rollback, permissions, restauration et non-régression.- Exécute les tests, lint et build réellement disponibles et donne les commandes/résultats exacts.- Liste fichiers modifiés, migrations, risques résiduels et retour arrière.- Aucun déploiement, activation du générateur officiel ou changement destructif sans autorisation explicite.LIVRABLE INITIAL OBLIGATOIREUn rapport d’audit fondé sur des preuves, et une liste des questions officielles bloquantes concernant le format et l’algorithme du NIN. N’active pas la génération réelle tant que ces questions ne sont pas résolues par une source autorisée.
+20. Sources, limites et validations requises
+20.1 Sources de travail
+Décret n° 22/07 du 2 mars 2022 portant création du Fichier Général de la Population, notamment l’article 8 sur l’attribution au premier enregistrement et la compétence de fixation des règles de composition : https://www.onip.gouv.cd/docs/FGP.pdf
+Arrêté et annexe technique relatifs à la CIN et au NIN publiés sur le site de l’ONIP : https://www.onip.gouv.cd/docs/ARRETE%20CIN%20ET%20NIN.pdf
+Copie du décret disponible sur LegaNet : https://mail.leganet.cd/Legislation/Droit%20Public/Identification/decret%2022.04.02.03.2022.html
+20.2 Décisions indispensables avant production
+Obtenir et valider la version officielle complète de l’arrêté et de son annexe technique.
+Confirmer par écrit la longueur exacte, les positions, le nombre de chiffres de la partie variable et l’algorithme de contrôle.
+Obtenir des vecteurs de test officiels qui permettent de vérifier indépendamment le générateur et le validateur.
+Confirmer les règles de collision, de correction d’une erreur, de fusion et de traitement au décès.
+Valider les catégories de personnes, les conditions du premier enregistrement et les rôles autorisés à demander une attribution.
+Valider les exigences de protection des données, de stockage, de conservation, d’audit et de contrôle d’accès.
+Conclusion
+Le service NIN est l’un des composants les plus critiques de SIGPOP-RDC. Sa qualité dépend de trois garanties : conformité à la règle officielle, unicité technique et traçabilité des décisions. La priorité est d’auditer l’implémentation actuelle et de confirmer les règles officielles avant d’activer la génération définitive.
+Un module NIN ne doit jamais considérer une demande, une capture biométrique ou une fiche importée comme une preuve suffisante d’admissibilité. Il doit contrôler l’état du dossier, éviter les attributions doubles, enregistrer les opérations de manière atomique et renvoyer des résultats idempotents. Le format officiel et l’algorithme de contrôle ne doivent pas être inventés ou « corrigés » par le développeur.

@@ -899,7 +899,49 @@ export type NinEligibleItem = {
   nin_status: string | null;
 };
 
+export type NinCatalog = {
+  module: number;
+  title: string;
+  official_nin_format_confirmed: boolean;
+  official_generation_enabled: boolean;
+  provisional_allowed: boolean;
+  offline_nin_forbidden: boolean;
+  invent_nin_forbidden: boolean;
+  client_proposed_nin_forbidden: boolean;
+  block_reason: string | null;
+  provisional_algorithm: string;
+  note: string;
+  exception_types: string[];
+  endpoints: Record<string, string>;
+};
+
+export type NinStatus = {
+  citizen_id: string;
+  has_nin: boolean;
+  nin: string | null;
+  nin_status: string | null;
+  eligible_provisional: boolean;
+  block_codes: string[];
+  open_duplicates: number;
+  official_assign_available: boolean;
+  official: boolean;
+  algorithm_version?: string | null;
+  note?: string;
+};
+
+export type NinExceptionItem = {
+  id: string;
+  citizen_id: string;
+  exception_type?: string | null;
+  status: string;
+  reason?: string | null;
+  nic_mutated: boolean;
+  created_at?: string | null;
+};
+
 export const ninOnipApi = {
+  catalog: () => request<NinCatalog>("/onip/nin/catalog"),
+  status: (citizenId: string) => request<NinStatus>(`/onip/nin/status/${citizenId}`),
   eligible: (limit = 50) =>
     request<{ count: number; items: NinEligibleItem[]; official_assign_available: boolean; note: string }>(
       `/onip/nin/eligible?limit=${limit}`,
@@ -916,17 +958,47 @@ export const ninOnipApi = {
         official: boolean;
       }>;
     }>(`/onip/nin/issuance-log?limit=${limit}`),
-  assignProvisional: (citizenId: string) =>
+  assignProvisional: (citizenId: string, idempotencyKey?: string) =>
     request<{
       nin: string;
       already_assigned: boolean;
+      already_processed?: boolean;
       nin_status: string;
       official: boolean;
+      request_id?: string;
+      idempotency_key?: string | null;
       mfa_warning?: boolean | null;
     }>("/onip/nin/assign", {
       method: "POST",
-      body: JSON.stringify({ citizen_id: citizenId, mode: "provisional" }),
+      body: JSON.stringify({
+        citizen_id: citizenId,
+        mode: "provisional",
+        request_source: "ONIP_UI",
+        ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
+      }),
     }),
+  exceptions: (limit = 50) =>
+    request<{ count: number; items: NinExceptionItem[]; nic_mutation_forbidden: boolean }>(
+      `/onip/nin/exceptions?limit=${limit}`,
+    ),
+  openException: (body: {
+    citizen_id: string;
+    exception_type: string;
+    reason: string;
+    related_citizen_id?: string;
+  }) =>
+    request<NinExceptionItem>("/onip/nin/exceptions", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  decideException: (id: string, decision: string, motif: string) =>
+    request<{ id: string; status: string; nic_mutated: boolean; message: string }>(
+      `/onip/nin/exceptions/${id}/decision`,
+      {
+        method: "POST",
+        body: JSON.stringify({ decision, motif }),
+      },
+    ),
 };
 
 export const biometricApi = {
