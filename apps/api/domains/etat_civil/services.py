@@ -398,7 +398,8 @@ async def create_act(
     # NIC national unique porté dans l'acte (jamais dans le QR brut comme PII étendu)
     national_id = payload.get("national_id") or payload.get("nic")
     if not national_id:
-        # Provisoire 14 chiffres (province Kinshasa=15) — remplacé à la validation par assign_nic
+        # Provisoire 14 chiffres (province Kinshasa=15) — format NON officiel FGP ;
+        # remplacé à la validation via NationalIdentityNumberService (provisoire).
         from apps.api.domains.core_registry.nic_service import generate_candidate_nic
 
         national_id = generate_candidate_nic(province_code="KIN")
@@ -1209,12 +1210,13 @@ async def apply_registry_on_validation(
             act.citizen_id = citizen.id
             nic_assigned: str | None = None
             try:
-                from apps.api.domains.core_registry.nic_service import (
-                    NicGenerationError,
-                    assign_nic,
+                from apps.api.domains.core_registry.national_identity_number_service import (
+                    assign_provisional_nic,
                 )
+                from apps.api.domains.core_registry.nic_service import NicGenerationError
 
-                nic_assigned = await assign_nic(db, citizen=citizen, actor_id=actor_id)
+                assigned = await assign_provisional_nic(db, citizen=citizen, actor_id=actor_id)
+                nic_assigned = assigned.nin
             except Exception as nic_exc:  # noqa: BLE001 — duplicates / generation
                 logger.info("NIC assign deferred for birth citizen %s: %s", citizen.id, nic_exc)
                 result["nic_note"] = str(nic_exc)
