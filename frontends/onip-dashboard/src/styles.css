@@ -675,6 +675,30 @@ body {
   letter-spacing: 0.02em;
 }
 
+.dash-filters-grid input:disabled,
+.dash-filters-grid select:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+  background: #f3f5f8;
+}
+
+a.metric {
+  display: block;
+  cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .dash-filters-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .dash-filters-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ——— Stats charts ——— */
 .stats-charts {
   display: grid;
