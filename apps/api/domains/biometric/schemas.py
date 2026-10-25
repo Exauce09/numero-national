@@ -23,6 +23,9 @@ class TemplateEnroll(BaseModel):
     quality_score: float | None = Field(default=None, ge=0, le=100)
     algorithm_version: str = "mvp-hash-v1"
     finger_position: str | None = None
+    # Module 6 — legacy bypass explicite (sinon 409 → utiliser /enrollments)
+    skip_dedup_ack: bool = False
+    skip_dedup_reason: str | None = Field(default=None, max_length=2000)
 
 
 class TemplateOut(BaseModel):
@@ -104,9 +107,30 @@ class DedupSessionOut(BaseModel):
     candidates: list[Any] | None
     scores: list[Any] | None
     decision: DedupDecision | None
+    notes: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class DedupReviewRequest(BaseModel):
+    """Décision cahier §11 — pas de fusion auto, pas de fraude auto."""
+
+    decision: DedupDecision
+    reason: str = Field(min_length=10, max_length=4000)
+
+
+class BiometricCatalogOut(BaseModel):
+    module: int = 6
+    title: str = "Biométrie et déduplication"
+    offline_nin_forbidden: bool = True
+    invent_nin_forbidden: bool = True
+    auto_merge_forbidden: bool = True
+    auto_fraud_forbidden: bool = True
+    raw_templates_in_api_forbidden: bool = True
+    matcher_note: str
+    endpoints: dict[str, str]
+    note: str
 
 
 class EnrollmentCreate(BaseModel):
@@ -143,6 +167,10 @@ class MatchOut(BaseModel):
     matched_finger_label: str | None = None
     review_status: str
     created_at: datetime
+    # Module 6 — contexte revue (jamais de template)
+    source_citizen_id: uuid.UUID | None = None
+    enrollment_id: uuid.UUID | None = None
+    engine_version: str | None = "mvp-hash-v1-NOT-CERTIFIED"
 
 
 class CaptureFingerResponse(BaseModel):

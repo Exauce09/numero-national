@@ -930,25 +930,41 @@ export const ninOnipApi = {
 };
 
 export const biometricApi = {
+  catalog: () =>
+    request<{
+      module: number;
+      title: string;
+      offline_nin_forbidden: boolean;
+      auto_merge_forbidden: boolean;
+      auto_fraud_forbidden: boolean;
+      raw_templates_in_api_forbidden: boolean;
+      matcher_note: string;
+      note: string;
+    }>("/biometric/catalog"),
   stats: () =>
     request<{
       enrollments?: number;
       fingerprints?: number;
       open_matches?: number;
       pending_reviews?: number;
+      blocked_enrollments?: number;
       [k: string]: unknown;
     }>("/biometric/stats"),
-  thresholds: () => request<Array<{ code?: string; value?: number; active?: boolean }>>("/biometric/thresholds"),
+  thresholds: () => request<Array<{ code?: string; name?: string; value?: number; active?: boolean }>>("/biometric/thresholds"),
   pendingMatches: (limit = 50) =>
     request<
       Array<{
         id: string;
         matched_citizen_id: string;
+        source_citizen_id?: string | null;
+        enrollment_id?: string | null;
         match_score: number;
         threshold_used: number;
         decision: string;
         finger_position?: string | null;
+        matched_finger_label?: string | null;
         review_status: string;
+        engine_version?: string | null;
         created_at: string;
       }>
     >(`/biometric/matches/pending?limit=${limit}`),
@@ -956,6 +972,23 @@ export const biometricApi = {
     request(`/biometric/matches/${matchId}/review`, {
       method: "POST",
       body: JSON.stringify({ approve_exception: approveException, reason: reason || null }),
+    }),
+  pendingDedup: (limit = 50) =>
+    request<
+      Array<{
+        id: string;
+        probe_citizen_id?: string | null;
+        modality: string;
+        decision?: string | null;
+        candidates?: unknown;
+        scores?: unknown;
+        created_at: string;
+      }>
+    >(`/biometric/dedup/pending?limit=${limit}`),
+  reviewDedup: (sessionId: string, decision: "NO_MATCH" | "MATCH_CONFIRMED", reason: string) =>
+    request(`/biometric/dedup/${sessionId}/review`, {
+      method: "POST",
+      body: JSON.stringify({ decision, reason }),
     }),
 };
 

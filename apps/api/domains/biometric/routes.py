@@ -20,8 +20,10 @@ from apps.api.domains.biometric import enrollment_service as enroll
 from apps.api.domains.biometric import service
 from apps.api.domains.biometric.models import BiometricEnrollment, BiometricTemplate, FingerprintStatus
 from apps.api.domains.biometric.schemas import (
+    BiometricCatalogOut,
     CaptureFingerRequest,
     CaptureFingerResponse,
+    DedupReviewRequest,
     DedupSessionOut,
     EnrollmentCreate,
     EnrollmentOut,
@@ -48,13 +50,32 @@ PERM_BIOMETRIC_REVIEW = "biometric:review"
 router = APIRouter(prefix="/biometric", tags=["biometric"])
 
 
+@router.get("/catalog", response_model=BiometricCatalogOut)
+async def biometric_catalog() -> BiometricCatalogOut:
+    """Module 6 — règles (pas de NIN/fusion/fraude auto ; pas de templates bruts)."""
+    return BiometricCatalogOut.model_validate(enroll.biometric_catalog())
+
+
 @router.post("/templates", response_model=TemplateOut, status_code=status.HTTP_201_CREATED)
 async def enroll_template(
     body: TemplateEnroll,
     db: AsyncSession = Depends(get_db),
     principal: Principal = Depends(require_permissions(PERM_BIOMETRIC_ENROLL)),
 ) -> TemplateOut:
-    """Legacy single-template enroll — prefer /enrollments + capture."""
+    """Legacy — bloqué sans ack explicite ; préférer /enrollments + capture (1:N)."""
+    if not body.skip_dedup_ack:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "Legacy /templates refuse sans skip_dedup_ack — utiliser /enrollments + capture (1:N obligatoire)",
+                "hint": "Passer skip_dedup_ack=true + skip_dedup_reason (≥10) uniquement en exception auditée",
+            },
+        )
+    if not body.skip_dedup_reason or len(body.skip_dedup_reason.strip()) < 10:
+        raise HTTPException(
+            status_code=400,
+            detail="skip_dedup_reason required (min 10 chars) when skip_dedup_ack=true",
+        )
     row = await service.enroll_template(db, body, actor_id=principal.actor_id)
     return TemplateOut.model_validate(row)
 
@@ -87,6 +108,17 @@ async def register_media(
     return await service.register_media(db, body)  # type: ignore[return-value]
 
 
+@router.get("/dedup/pending", response_model=list[DedupSessionOut])
+async def list_pending_dedup(
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+    _: Principal = Depends(require_permissions(PERM_BIOMETRIC_MATCH)),
+) -> list[DedupSessionOut]:
+    """Sessions 1:N en MANUAL_REVIEW (file distincte des matches)."""
+    rows = await enroll.list_pending_dedup_sessions(db, limit=min(max(limit, 1), 200))
+    return [DedupSessionOut.model_validate(r) for r in rows]
+
+
 @router.get("/dedup/{session_id}", response_model=DedupSessionOut)
 async def get_dedup_session(
     session_id: uuid.UUID,
@@ -96,6 +128,27 @@ async def get_dedup_session(
     row = await service.get_dedup_session(db, session_id)
     if not row:
         raise HTTPException(status_code=404, detail="Dedup session not found")
+    return DedupSessionOut.model_validate(row)
+
+
+@router.post("/dedup/{session_id}/review", response_model=DedupSessionOut)
+async def review_dedup_session(
+    session_id: uuid.UUID,
+    body: DedupReviewRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> DedupSessionOut:
+    perms = {p.code for r in user.roles for p in r.permissions}
+    if PERM_BIOMETRIC_REVIEW not in perms and PERM_BIOMETRIC_MATCH not in perms:
+        if not any(r.code in {"CENTRAL_ADMIN", "SUPER_ADMIN_NATIONAL", "ONIP_OPS"} for r in user.roles):
+            raise HTTPException(status_code=403, detail="Missing biometric review permission")
+    row = await enroll.review_dedup_session(
+        db,
+        session_id,
+        decision=body.decision,
+        reason=body.reason,
+        actor_id=user.id,
+    )
     return DedupSessionOut.model_validate(row)
 
 
@@ -171,19 +224,7 @@ async def list_pending_matches(
 ) -> list[MatchOut]:
     """File ONIP de revue humaine — scores uniquement, jamais de templates."""
     rows = await enroll.list_pending_reviews(db, limit=min(max(limit, 1), 200))
-    return [
-        MatchOut(
-            id=row.id,
-            matched_citizen_id=row.matched_citizen_id,
-            match_score=row.match_score,
-            threshold_used=row.threshold_used,
-            decision=row.decision,
-            finger_position=row.finger_position,
-            review_status=row.review_status,
-            created_at=row.created_at,
-        )
-        for row in rows
-    ]
+    return [enroll.match_to_out(row) for row in rows]
 
 
 @router.post("/matches/{match_id}/review", response_model=MatchOut)
@@ -198,16 +239,7 @@ async def review_match(
         if not any(r.code in {"CENTRAL_ADMIN", "SUPER_ADMIN_NATIONAL", "ONIP_OPS"} for r in user.roles):
             raise HTTPException(status_code=403, detail="Missing biometric review permission")
     row = await enroll.review_match(db, match_id, body, actor_id=user.id)
-    return MatchOut(
-        id=row.id,
-        matched_citizen_id=row.matched_citizen_id,
-        match_score=row.match_score,
-        threshold_used=row.threshold_used,
-        decision=row.decision,
-        finger_position=row.finger_position,
-        review_status=row.review_status,
-        created_at=row.created_at,
-    )
+    return enroll.match_to_out(row)
 
 
 @router.post("/fingerprints/{fingerprint_id}/revoke", response_model=FingerprintListItem)

@@ -595,13 +595,26 @@ async def review_match(
         match.review_status = "APPROVED"
         match.reason = body.reason.strip()
         action = "BIOMETRIC_EXCEPTION_APPROVED"
+        # Override : personnes distinctes / exception → reprendre enrôlement
+        reopen = True
     else:
         match.decision = MatchDecision.REJECTED
         match.review_status = "REJECTED"
         match.reason = (body.reason or "").strip() or None
         action = "BIOMETRIC_REVIEW_COMPLETED"
+        # Rejet du match algo = faux positif → reprendre capture
+        reopen = True
     match.reviewed_by = actor_id
     match.reviewed_at = datetime.now(UTC)
+
+    enrollment_reopened = False
+    if reopen and match.enrollment_id:
+        enrollment = await db.get(BiometricEnrollment, match.enrollment_id)
+        if enrollment is not None and enrollment.status == EnrollmentStatus.BLOCKED:
+            enrollment.status = EnrollmentStatus.OPEN
+            enrollment.updated_at = datetime.now(UTC)
+            enrollment_reopened = True
+
     await write_audit(
         db,
         action=action,
@@ -609,12 +622,108 @@ async def review_match(
         resource_type="biometric_match",
         resource_id=str(match.id),
         justification=match.reason,
-        new_value={"review_status": match.review_status, "decision": match.decision.value},
+        new_value={
+            "review_status": match.review_status,
+            "decision": match.decision.value,
+            "enrollment_reopened": enrollment_reopened,
+            "auto_merge": False,
+            "auto_fraud": False,
+        },
         commit=False,
     )
     await db.commit()
     await db.refresh(match)
     return match
+
+
+async def list_pending_dedup_sessions(
+    db: AsyncSession, *, limit: int = 50
+) -> list[DedupSession]:
+    stmt = (
+        select(DedupSession)
+        .where(DedupSession.decision == DedupDecision.MANUAL_REVIEW)
+        .order_by(DedupSession.created_at.desc())
+        .limit(limit)
+    )
+    return list((await db.execute(stmt)).scalars().all())
+
+
+async def review_dedup_session(
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    *,
+    decision: DedupDecision,
+    reason: str,
+    actor_id: uuid.UUID,
+) -> DedupSession:
+    if decision == DedupDecision.MANUAL_REVIEW:
+        raise HTTPException(status_code=400, detail="decision must be NO_MATCH or MATCH_CONFIRMED")
+    row = await db.get(DedupSession, session_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Dedup session not found")
+    if row.decision != DedupDecision.MANUAL_REVIEW:
+        raise HTTPException(status_code=409, detail=f"Session already decided ({row.decision})")
+    row.decision = decision
+    row.notes = reason.strip()
+    await write_audit(
+        db,
+        action="BIOMETRIC_DEDUP_REVIEW",
+        actor_id=actor_id,
+        resource_type="dedup_session",
+        resource_id=str(row.id),
+        justification=reason.strip(),
+        new_value={
+            "decision": decision.value,
+            "probe_citizen_id": str(row.probe_citizen_id) if row.probe_citizen_id else None,
+            "auto_merge": False,
+            "auto_fraud": False,
+        },
+        commit=False,
+    )
+    await db.commit()
+    await db.refresh(row)
+    return row
+
+
+def biometric_catalog() -> dict[str, object]:
+    from apps.api.domains.biometric.schemas import BiometricCatalogOut
+
+    return BiometricCatalogOut(
+        matcher_note="LocalHashProvider / demo — NOT a certified ABIS matcher",
+        endpoints={
+            "enrollments": "POST /api/v1/biometric/enrollments",
+            "capture": "POST /api/v1/biometric/enrollments/{id}/capture",
+            "identify": "POST /api/v1/biometric/identify",
+            "matches_pending": "GET /api/v1/biometric/matches/pending",
+            "match_review": "POST /api/v1/biometric/matches/{id}/review",
+            "dedup_pending": "GET /api/v1/biometric/dedup/pending",
+            "dedup_review": "POST /api/v1/biometric/dedup/{id}/review",
+            "stats": "GET /api/v1/biometric/stats",
+            "catalog": "GET /api/v1/biometric/catalog",
+        },
+        note=(
+            "Correspondance biométrique = candidat à revue humaine. "
+            "Pas de fusion auto, pas de fraude auto, pas de NIN inventé, "
+            "templates jamais exposés dans les réponses API."
+        ),
+    ).model_dump()
+
+
+def match_to_out(row: BiometricMatch) -> MatchOut:
+    return MatchOut(
+        id=row.id,
+        matched_citizen_id=row.matched_citizen_id,
+        match_score=row.match_score,
+        threshold_used=row.threshold_used,
+        decision=row.decision,
+        finger_position=row.finger_position,
+        matched_finger_label=FINGER_LABELS_FR.get(row.finger_position or "", None),
+        review_status=row.review_status,
+        created_at=row.created_at,
+        source_citizen_id=row.source_citizen_id,
+        enrollment_id=row.enrollment_id,
+        engine_version="mvp-hash-v1-NOT-CERTIFIED",
+    )
 
 
 async def revoke_fingerprint(

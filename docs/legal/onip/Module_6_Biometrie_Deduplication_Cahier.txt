@@ -1,0 +1,714 @@
+SIGPOP-RDC
+MODULE 6BIOMÉTRIE ET DÉDUPLICATION
+Cahier des charges fonctionnel et technique détailléCapture, contrôle qualité, recherche biométrique et revue des doublons
+Version de travail — octobre 2026
+Document destiné à l’audit et à l’évolution progressive du module existant.
+
+Avertissement et statut du document
+Ce cahier des charges développe le Module 6 — Biométrie et déduplication — à partir des informations transmises sur SIGPOP-RDC / ONIP, notamment l’intégration biométrique ZK déjà commencée et la volonté de rechercher les doublons avant de créer ou valider une identité.
+Il s’agit d’une proposition de conception, pas d’une certification de conformité, d’une description de l’architecture interne de l’ONIP ni d’une garantie de précision biométrique. Les capacités exactes du lecteur, du SDK, du logiciel biométrique et des formats de templates doivent être confirmées par inspection du dépôt et de la documentation du fournisseur.
+Les données biométriques sont hautement sensibles. Leur collecte et leur traitement doivent reposer sur une finalité autorisée, des habilitations précises, une protection forte et une procédure de revue humaine. Une correspondance algorithmique ne constitue pas, à elle seule, une preuve de fraude ni une décision juridique.
+Le module ne génère pas le NIN, ne valide pas seul l’identité et ne fusionne pas automatiquement des dossiers. Il produit des résultats techniques et des candidats que les services autorisés peuvent examiner.
+Sommaire
+1. Finalité, objectifs et périmètre
+2. Principes fondamentaux et limites du système
+3. Architecture fonctionnelle
+4. Acteurs, rôles et séparation des tâches
+5. Gestion du matériel et du SDK biométrique
+6. Capture des empreintes digitales
+7. Capture du visage et autres modalités éventuelles
+8. Contrôle qualité des captures
+9. Templates, stockage et cycle de vie biométrique
+10. Recherche 1:1 et 1:N
+11. Déduplication et gestion des candidats
+12. Revue humaine, décisions et recours
+13. Modèle de données indicatif
+14. API et intégrations avec les modules ONIP
+15. Sécurité, confidentialité et gouvernance
+16. Fonctionnement hors connexion et incidents
+17. Interfaces et navigation
+18. Scénarios métier détaillés
+19. Tests et critères d’acceptation
+20. Plan de développement progressif
+21. Prompt complet pour l’agent développeur
+22. Limites et décisions à valider
+
+1. Finalité, objectifs et périmètre
+1.1 Finalité
+Le module Biométrie et déduplication prend en charge les opérations autorisées de capture, de contrôle qualité, de gestion des références biométriques et de recherche de correspondances. Il contribue à repérer les situations où plusieurs dossiers pourraient concerner une même personne, avant la création définitive ou la validation d’un dossier au FGP.
+1.2 Objectifs
+Connecter de manière fiable le matériel biométrique pris en charge par le projet, en commençant par l’intégration ZK existante.
+Permettre l’acquisition des empreintes et, seulement si cela est autorisé et techniquement pris en charge, d’autres modalités comme le visage.
+Vérifier la qualité de chaque capture et guider l’opérateur en cas d’échec.
+Séparer les fichiers bruts, les templates, les métadonnées et les références techniques.
+Gérer la vérification 1:1 et la recherche 1:N lorsque le moteur biométrique autorisé les prend réellement en charge.
+Produire une liste de candidats potentiels avec un contexte d’examen plutôt qu’une décision automatique de fraude.
+Tracer les captures, recherches, consultations, décisions et incidents.
+Limiter les accès aux biométries aux personnes, services et opérations explicitement autorisés.
+1.3 Périmètre et dépendances
+Domaine
+Responsabilité du module
+Dépendance / limite
+Matériel
+Détecter, initialiser et utiliser le lecteur pris en charge.
+Modèle exact, pilote, version SDK, OS et licence à vérifier.
+Capture
+Acquérir une empreinte ou une modalité autorisée.
+Consentement/information et base légale selon procédure applicable.
+Qualité
+Évaluer la capture avec les capacités du SDK ou d’un moteur qualifié.
+Ne pas inventer une métrique de qualité si l’outil ne la fournit pas.
+Template
+Conserver une référence et des métadonnées protégées.
+Format et compatibilité définis par le fournisseur/moteur.
+Recherche 1:1
+Comparer deux échantillons selon le moteur intégré.
+La fonction exacte doit être confirmée.
+Recherche 1:N
+Chercher des candidats dans un ensemble autorisé.
+Nécessite un moteur adapté et un environnement dimensionné.
+Revue
+Présenter les candidats et enregistrer la décision habilitée.
+Pas de fusion automatique ni de décision judiciaire algorithmique.
+NIN / FGP
+Fournir des résultats aux workflows autorisés.
+Le NIN et la validation finale restent sous la responsabilité des services dédiés.
+
+1.4 Hors périmètre
+L’attribution ou la génération du NIN.
+La déclaration automatique qu’une personne est fraudeuse sur la base d’un score biométrique.
+La fusion irréversible de deux dossiers sans vérification et autorisation humaines.
+L’accès libre ou l’export massif des empreintes ou templates.
+L’affirmation d’une précision ou d’une conformité du moteur sans mesures et documents vérifiables.
+2. Principes fondamentaux et limites du système
+Finalité autorisée
+N’utiliser les données biométriques que pour les fonctions expressément autorisées et documentées.
+Minimisation
+Ne collecter et conserver que les modalités et références nécessaires ; éviter les copies superflues.
+Séparation des responsabilités
+Séparer capture, décision de qualité, recherche, revue, fusion et administration.
+Résultat algorithmique indicatif
+Un score ou rang produit une correspondance potentielle, pas une décision définitive.
+Pas de blocage irréversible automatique
+Un résultat incertain doit pouvoir être vérifié, contesté et corrigé par une procédure autorisée.
+Traçabilité
+Chaque capture et recherche doit pouvoir être reliée à un dossier, un agent, un appareil et une date, selon la politique approuvée.
+Sécurité dès la conception
+Les captures et templates ne doivent pas circuler dans les logs, notifications ou interfaces ordinaires.
+Compatibilité
+Les formats de templates dépendent du SDK et du moteur ; ne pas supposer qu’un template exporté est portable.
+Tests contrôlés
+Évaluer le fonctionnement sur des jeux de test autorisés et des scénarios représentatifs avant toute utilisation opérationnelle.
+3. Architecture fonctionnelle
+Composant
+Fonction
+Limites de responsabilité
+Interface de capture
+Guider l’agent et afficher l’état du matériel, les instructions et le résultat de capture.
+N’expose pas directement la base biométrique.
+Adaptateur matériel/SDK
+Encapsuler les appels du pilote et du SDK du lecteur.
+Ne doit pas être appelé directement depuis des pages non fiables.
+Service de capture
+Créer une session, recevoir le résultat, vérifier le format et la qualité.
+Accès restreint ; pas d’attribution NIN.
+Service de templates
+Créer, versionner, protéger et référencer les templates nécessaires.
+Ne stocke pas les secrets ou images brutes dans les journaux.
+Moteur de comparaison
+Exécuter une vérification 1:1 ou recherche 1:N selon contrat.
+Retourne un résultat technique avec version de moteur et paramètres utiles.
+File de candidats
+Gérer les correspondances potentielles à examiner.
+Un candidat n’est pas une décision de fraude.
+Console de revue
+Présenter les éléments autorisés aux réviseurs et enregistrer leurs décisions.
+Ne permet pas une fusion par un simple clic non autorisé.
+Coffre biométrique
+Stockage protégé des échantillons/templates si requis.
+Séparé logiquement/physiquement du dossier administratif ordinaire.
+Journal d’audit
+Tracer les accès et opérations.
+N’enregistre pas d’échantillons biométriques en clair.
+Intégration ONIP/FGP
+Transmettre l’état de revue aux services concernés.
+Ne décide pas du NIN et respecte les contrats existants.
+
+3.1 Flux de capture et de rapprochement
+1. L’agent autorisé ouvre une session biométrique associée au dossier ou à l’enrôlement.
+2. Le système vérifie l’autorisation, la campagne/centre et la disponibilité du matériel.
+3. Le SDK acquiert l’échantillon et renvoie un résultat technique.
+4. Le service vérifie le type, la qualité disponible et les métadonnées indispensables.
+5. Le système exécute les contrôles autorisés et cherche des candidats dans la population admissible.
+6. Les résultats sont classés selon le contrat du moteur et envoyés à la file de revue si nécessaire.
+7. Un réviseur autorisé examine le dossier et enregistre une décision motivée.
+8. Le résultat est transmis au workflow FGP/enrôlement ; l’attribution du NIN demeure distincte.
+4. Acteurs, rôles et séparation des tâches
+Rôle indicatif
+Droits possibles
+Restrictions recommandées
+Agent d’enrôlement
+Démarrer une session et consulter le résultat de capture lié au dossier.
+Pas d’accès aux templates ni aux recherches nationales libres.
+Opérateur biométrique
+Capturer, vérifier la qualité et reprendre une capture dans son périmètre.
+Pas de fusion ni de décision finale sur les cas ambigus si la séparation est requise.
+Réviseur de doublons
+Examiner les candidats, consulter les éléments autorisés et motiver la décision.
+Pas d’accès à l’administration technique globale.
+Validateur identité
+Utiliser le résultat de revue dans le processus de validation d’identité.
+Ne modifie pas les résultats techniques du moteur.
+Administrateur biométrique
+Administrer la configuration autorisée du service et surveiller le moteur.
+Accès aux données métier limité au strict nécessaire.
+Administrateur technique
+Configurer service, pilotes et journaux techniques.
+Pas de consultation de masse des empreintes par défaut.
+Auditeur
+Consulter les traces autorisées et rapports agrégés.
+Lecture seule ; pas d’accès systématique aux images ou templates.
+Partenaire / service appelant
+Utiliser une fonction de comparaison explicitement autorisée.
+Pas de recherche nationale ouverte ni de téléchargement des templates.
+
+4.1 Permissions granulaires indicatives
+biometric.capture — effectuer une capture dans le périmètre autorisé.
+biometric.view.capture_status — consulter le statut et la qualité autorisée.
+biometric.template.create — déclencher la création d’un template par le service spécialisé.
+biometric.verify_1to1 — demander une vérification 1:1 autorisée.
+biometric.search_1toN — demander une recherche 1:N dans un périmètre approuvé.
+biometric.review.candidates — consulter les candidats associés à une tâche de revue.
+biometric.review.decide — enregistrer une décision de revue.
+biometric.merge.propose / biometric.merge.approve — proposer puis autoriser une fusion selon la politique applicable.
+biometric.admin.config — modifier une configuration technique protégée.
+biometric.audit.read — lire les événements d’audit biométrique autorisés.
+5. Gestion du matériel et du SDK biométrique
+5.1 Audit préalable de l’intégration ZK
+Les notes du projet indiquent qu’une intégration ZK est déjà commencée. Avant toute modification, il faut identifier le modèle exact du lecteur, le SDK réellement utilisé, le système d’exploitation, l’architecture 32/64 bits, les bibliothèques natives, les versions et les composants applicatifs qui communiquent avec le périphérique. Un nom de gamme ne suffit pas à confirmer la compatibilité ou les fonctions disponibles.
+Identifier le périphérique détecté par le système et la version du pilote.
+Recenser les DLL, bibliothèques natives, fichiers de configuration et licences du SDK.
+Confirmer les plateformes et architectures réellement supportées.
+Vérifier le chemin actuel entre l’interface, le service local éventuel et le SDK.
+Documenter les codes d’erreur, timeouts, permissions système et procédure de libération du périphérique.
+Tester les scénarios de lecteur absent, lecteur occupé, capture annulée, erreur de pilote et fermeture brutale.
+5.2 Adaptateur matériel
+Le reste de l’application devrait appeler un adaptateur ou service métier défini plutôt que manipuler directement les détails du SDK dans plusieurs pages. Cet adaptateur encapsule l’initialisation, la capture, le retour de résultat, la libération des ressources et la normalisation des erreurs.
+Interface conceptuelle
+Rôle
+Résultat attendu
+initialize()
+Détecter et initialiser le périphérique.
+État prêt ou erreur structurée.
+capture()
+Démarrer une session d’acquisition autorisée.
+Résultat de capture, état et métadonnées permises.
+checkQuality()
+Demander au SDK/moteur un contrôle si disponible.
+Mesure ou état documenté ; pas de valeur inventée.
+cancelCapture()
+Interrompre une acquisition.
+Session arrêtée proprement.
+release()
+Libérer les ressources et handles.
+Aucun verrou ni processus bloqué.
+getDeviceStatus()
+Retourner l’état de disponibilité.
+Diagnostic minimal sans données sensibles.
+
+Les noms sont illustratifs : il faut adapter l’interface aux contrats du SDK et au code réellement existant.
+6. Capture des empreintes digitales
+6.1 Parcours opérateur
+1. L’agent ouvre le dossier et vérifie qu’il a le droit d’effectuer la capture.
+2. Le système affiche l’état du lecteur et les instructions de préparation.
+3. L’agent choisit le doigt ou la séquence prévue par la procédure officielle.
+4. Le lecteur acquiert l’échantillon et renvoie un résultat ou une erreur.
+5. Le système vérifie que la capture peut être traitée et que ses métadonnées sont cohérentes.
+6. Si la capture n’est pas exploitable, l’interface affiche un motif et propose une nouvelle tentative selon les limites définies.
+7. Si elle est exploitable, le résultat est transmis au service biométrique sécurisé pour la suite autorisée.
+8. Le système conserve l’état de la session et les traces, sans afficher ni journaliser inutilement les données brutes.
+6.2 États de capture proposés
+État
+Signification
+Action
+NOT_READY
+Le lecteur n’est pas disponible.
+Vérifier connexion, pilote ou service.
+READY
+Lecteur prêt.
+Autoriser la capture si l’agent et le dossier sont habilités.
+CAPTURING
+Acquisition en cours.
+Afficher les instructions et permettre l’annulation contrôlée.
+CAPTURED
+Un échantillon a été acquis.
+Passer les contrôles nécessaires avant stockage ou comparaison.
+QUALITY_REVIEW
+Qualité insuffisante ou incertaine.
+Nouvelle capture ou procédure alternative autorisée.
+ERROR
+Erreur technique.
+Enregistrer un code non sensible et permettre un diagnostic.
+CANCELLED
+Capture annulée.
+Libérer les ressources et conserver le statut si nécessaire.
+STORED_REFERENCE
+La référence biométrique a été créée avec succès.
+Ne pas présenter cela comme une identité validée.
+
+6.3 Gestion des erreurs
+Distinguer erreur matérielle, erreur de permission, timeout, mauvaise qualité et erreur du service.
+Ne pas afficher une trace technique complète ou un chemin local à l’opérateur ordinaire.
+Enregistrer un identifiant de corrélation pour permettre le diagnostic.
+Limiter les tentatives répétées lorsque cela est nécessaire pour protéger le matériel et la qualité.
+Prévoir la capture échouée, le lecteur débranché, le SDK indisponible et la session interrompue.
+7. Capture du visage et autres modalités éventuelles
+La capture du visage, la signature ou d’autres modalités ne sont à intégrer que si elles sont prévues par les exigences applicables, autorisées et supportées techniquement. Leur simple présence dans un formulaire ne doit pas être considérée comme une autorisation suffisante.
+Distinguer image photographique destinée au dossier/carte et template utilisé par une fonction de comparaison.
+Définir les contraintes de format, résolution et qualité à partir du système retenu.
+Limiter l’accès et la conservation aux besoins approuvés.
+Si une comparaison faciale est utilisée, mesurer les performances et risques du moteur dans les conditions réelles et sur les groupes pertinents, avec un protocole d’évaluation autorisé.
+Ne pas combiner plusieurs modalités sans définir comment les scores sont interprétés et examinés.
+8. Contrôle qualité des captures
+8.1 Objectif
+Le contrôle qualité réduit les comparaisons inutiles et les risques de résultat incorrect. Les critères doivent être ceux du SDK ou du moteur biométrique retenu, documentés et mesurés. Si le matériel ne fournit aucune mesure fiable, le système doit indiquer un état de contrôle limité plutôt que fabriquer un score.
+Contrôle
+Exemple de problème
+Réponse du système
+Acquisition
+Aucune image exploitable ou capture interrompue.
+État d’échec et nouvelle tentative contrôlée.
+Qualité retournée
+Mesure sous le seuil documenté du moteur.
+Afficher une instruction et demander une reprise si possible.
+Cohérence de session
+Doigt ou modalité non conforme à la séquence demandée.
+Signaler la divergence sans modifier silencieusement les métadonnées.
+Intégrité du résultat
+Donnée tronquée, format inattendu ou checksum fourni par le fournisseur invalide.
+Rejeter la donnée et journaliser l’erreur technique.
+Disponibilité
+SDK ou moteur indisponible.
+Mettre en attente ; ne pas marquer la vérification comme réussie.
+Répétition
+Même session renvoyée plusieurs fois.
+Idempotence et protection contre la création multiple.
+
+8.2 Mesures à documenter
+Nom et version du SDK ou moteur qui a calculé la qualité.
+Mesure brute fournie par le fournisseur, si elle peut être conservée et si la politique l’autorise.
+Seuil de qualité appliqué et version de la configuration.
+Motif de rejet ou de reprise.
+Nombre de tentatives et résultat final, dans les limites de conservation autorisées.
+8.3 Pas de règle universelle inventée
+Les seuils de qualité, les nombres de captures, la liste des doigts et la procédure en cas d’impossibilité biométrique doivent être validés avec les règles officielles et les capacités du matériel. Le logiciel ne doit pas coder ces valeurs comme universelles sans spécification.
+9. Templates, stockage et cycle de vie biométrique
+9.1 Distinguer les objets
+Objet
+Description
+Mesure de protection
+Image brute
+Échantillon initial issu de la capture.
+Conservation seulement si nécessaire et autorisée ; accès très restreint.
+Template biométrique
+Représentation produite par un SDK ou un moteur.
+Protection forte, format/version documentés et compatibilité contrôlée.
+Métadonnées
+Type, doigt/modalité, qualité, date, appareil, version du moteur.
+Pas d’informations supplémentaires non nécessaires.
+Référence de stockage
+Identifiant de l’objet ou du template protégé.
+Ne pas exposer le chemin réel ni un lien public.
+Résultat de comparaison
+Score/rang, version de moteur, candidats et paramètres autorisés.
+Accès limité, durée de conservation définie et audit.
+
+9.2 Cycle de vie
+1. Création à l’issue d’une capture acceptée selon le processus applicable.
+2. Association à la personne ou au dossier provisoire par une référence stable.
+3. Changement d’état si la qualité est insuffisante, la capture contestée ou une correction nécessaire.
+4. Versionnement lorsque le moteur, le format ou la capture change.
+5. Archivage, retrait ou suppression uniquement selon une politique autorisée et documentée.
+9.3 Compatibilité et migration
+Les templates sont souvent liés à une version de SDK ou de moteur. Le projet doit conserver les informations de compatibilité nécessaires et prévoir une migration contrôlée si le fournisseur ou la version change. Il ne faut pas présumer que les templates peuvent être convertis sans perte ni que des templates d’un fournisseur sont interchangeables avec ceux d’un autre.
+10. Recherche 1:1 et 1:N
+10.1 Vérification 1:1
+La vérification 1:1 compare un échantillon présenté à une référence biométrique déterminée. Elle répond à une question du type « les deux échantillons sont-ils suffisamment compatibles selon le moteur et les règles autorisées ? ». Elle ne confirme pas à elle seule tous les attributs administratifs de la personne.
+10.2 Recherche 1:N
+La recherche 1:N compare un échantillon à un ensemble de références biométriques admissibles afin de classer des candidats potentiels. Elle exige un moteur adapté, des règles d’accès au périmètre de recherche, une gestion des performances et un processus de revue. La capacité 1:N ne doit pas être supposée d’un simple lecteur d’empreintes ; elle dépend de l’ensemble du système biométrique.
+10.3 Paramètres et résultats
+Élément
+Description attendue
+Identifiant de recherche
+Référence de corrélation unique.
+Type de recherche
+1:1 ou 1:N.
+Modalité
+Empreinte, visage ou autre modalité réellement supportée.
+Version du moteur
+Identifie le logiciel et le modèle qui ont calculé le résultat.
+Périmètre autorisé
+Collection ou ensemble que la recherche est autorisée à consulter.
+Paramètres / seuils
+Version de la configuration appliquée et justification métier.
+Candidats retournés
+Références minimales des candidats, score/rang si autorisé et état de traitement.
+Statut de recherche
+Terminée, aucune correspondance candidate, candidats trouvés, échec ou revue nécessaire.
+
+10.4 Gestion des seuils
+Les seuils déterminent le compromis entre fausses correspondances et correspondances manquées. Ils doivent être configurés à partir de tests et de validations documentées. La valeur ne doit pas être choisie uniquement pour réduire le nombre d’alertes ou faciliter le passage des dossiers.
+10.5 Limites du résultat
+« Aucun candidat retourné » ne prouve pas à lui seul qu’aucune autre identité n’existe.
+« Candidat trouvé » ne prouve pas que deux dossiers représentent la même personne.
+Les scores ne sont pas nécessairement comparables entre versions de moteur ou modalités différentes.
+Une indisponibilité du moteur ne peut pas être interprétée comme un résultat négatif.
+Toute décision métier s’appuie sur la procédure de revue applicable et des éléments additionnels lorsque requis.
+11. Déduplication et gestion des candidats
+11.1 Types de cas
+Type
+Exemple
+Traitement attendu
+Doublon technique
+Même demande ou événement envoyé plusieurs fois.
+Résoudre par idempotence ; ne pas exécuter plusieurs comparaisons inutilement.
+Correspondance 1:1 potentielle
+Nouvelle capture proche de la référence ciblée.
+Présenter le résultat au workflow autorisé.
+Candidat 1:N
+Un ou plusieurs dossiers classés par le moteur.
+Créer une tâche de revue si les règles le prévoient.
+Doublon biographique
+Noms, dates ou autres champs similaires.
+Rapprochement biographique ; le nom seul ne suffit pas.
+Conflit intercampagnes
+Deux collectes semblent liées à une personne.
+Comparer les références sources et orienter vers la revue.
+Faux positif confirmé
+Deux personnes différentes ont été signalées comme candidates.
+Enregistrer la décision de séparation et prévenir les traitements automatisés concernés.
+
+11.2 File de candidats
+Référence de la tâche et date de création.
+Dossier en cours de traitement et références des candidats.
+Source et contexte de la capture, dans les limites du besoin.
+État de la comparaison, version de moteur et résultat technique.
+Priorité et ancienneté selon une règle approuvée.
+Agent ou équipe responsable de la revue.
+Décision, motif, pièces consultées et date de clôture.
+Indication des actions suivantes : nouvelle capture, contrôle documentaire, validation métier ou escalade.
+11.3 Résultats de revue possibles
+Décision indicative
+Sens
+Effet métier
+PERSONNES_DISTINCTES
+Le rapprochement est écarté après examen.
+Conserver l’évaluation et permettre la poursuite du workflow si tous les autres contrôles sont satisfaits.
+CORRESPONDANCE_A_CONFIRMER
+Les éléments disponibles ne suffisent pas.
+Demander une nouvelle vérification ou un contrôle complémentaire.
+DOUBLON_PROBABLE
+Les preuves justifient une escalade.
+Transmettre au workflow d’identité habilité ; pas de fusion automatique.
+NOUVELLE_CAPTURE
+Qualité insuffisante ou résultat non concluant.
+Autoriser une reprise conforme aux règles.
+ERREUR_TECHNIQUE
+Le service n’a pas pu effectuer la comparaison.
+Mettre en attente et réparer le service ; ne pas traiter comme résultat négatif.
+
+Les libellés définitifs des décisions doivent être approuvés par les responsables métier. Le module conserve le résultat du processus, sans remplacer les règles officielles de décision.
+12. Revue humaine, décisions et recours
+12.1 Procédure de revue
+1. Le réviseur reçoit un cas dans une file autorisée et vérifie son périmètre d’accès.
+2. Il examine le résultat de comparaison, la qualité de capture et les informations minimales nécessaires.
+3. Il peut demander une nouvelle capture ou des contrôles complémentaires.
+4. Il choisit une décision autorisée et fournit un motif, selon les règles métier.
+5. Le système consigne l’identité du réviseur, la date, la version du moteur et le résultat.
+6. Les actions suivantes — validation de personne, fusion contrôlée ou attribution NIN — sont exécutées par les modules et rôles compétents.
+12.2 Séparation du résultat technique et de la décision métier
+Il faut stocker deux niveaux distincts : (1) le résultat technique du moteur et (2) la décision métier d’un agent habilité. Les écrans et les rapports ne doivent pas confondre un score, un candidat, une décision de revue et une identité officiellement validée.
+12.3 Recours et correction
+La procédure officielle doit déterminer comment une personne peut contester un rapprochement erroné, demander une nouvelle capture ou faire corriger un dossier. Le logiciel doit pouvoir enregistrer la demande, les pièces, la décision et l’historique sans inventer le cadre juridique du recours.
+13. Modèle de données indicatif
+Les noms d’entités ci-dessous sont des propositions. L’audit du modèle existant est obligatoire avant toute migration ; des tables équivalentes peuvent déjà exister.
+Entité indicative
+Contenu
+Contrôles clés
+biometric_devices
+Périphérique, modèle, version pilote/SDK, statut et site.
+Secrets limités, configuration auditable.
+biometric_sessions
+Dossier associé, agent, appareil, modalité, date et état.
+Session unique et permissions vérifiées.
+biometric_captures
+Référence de capture, qualité, résultat, version de SDK.
+Éviter les échantillons bruts dans les tables ordinaires.
+biometric_templates
+Référence du template, version, type, statut et référence sécurisée.
+Accès très restreint ; format et version connus.
+biometric_searches
+Type 1:1/1:N, moteur, paramètres, statut et dates.
+Périmètre de recherche et audit.
+biometric_candidates
+Références de candidats, rang/score si autorisé et état de revue.
+Un candidat n’est pas une décision finale.
+biometric_reviews
+Réviseur, décision, motif, date et résultat.
+Séparation des tâches et historique.
+biometric_device_events
+Erreurs, connexion, déconnexion et état du matériel.
+Pas de données biométriques brutes dans les logs.
+biometric_access_events
+Accès aux fonctions sensibles.
+Traçabilité et protection contre l’altération.
+audit_events
+Référence de corrélation, acteur, opération et résultat.
+Ne pas inclure secrets ou templates.
+
+13.1 Relations importantes
+Une session de capture est liée au dossier ou à l’enrôlement, à l’agent et au périphérique concernés.
+Une référence de template pointe vers un stockage biométrique protégé plutôt que vers un fichier public.
+Une recherche peut retourner plusieurs candidats et être reliée à une ou plusieurs décisions de revue selon la procédure.
+Une décision de revue est séparée du résultat brut du moteur et ne modifie pas automatiquement le dossier de référence.
+Toute action de fusion doit référencer le workflow d’identité distinct et sa décision autorisée.
+14. API et intégrations avec les modules ONIP
+Les endpoints ci-dessous sont conceptuels et ne représentent pas la liste confirmée des routes existantes. Il faut d’abord auditer le code, les API, l’intégration ZK et les services associés.
+Capacité
+Exemple conceptuel
+Garde-fous
+État du périphérique
+GET /api/v1/biometrics/devices/{id}/status
+Réponse technique minimale ; pas de secrets.
+Session de capture
+POST /api/v1/biometrics/sessions
+Authentification, autorisation du dossier et de l’agent.
+Résultat de capture
+POST /api/v1/biometrics/captures
+Référence stable, validation du format et contrôle qualité.
+Vérification 1:1
+POST /api/v1/biometrics/verify
+Périmètre précis, accès autorisé et résultat clairement qualifié.
+Recherche 1:N
+POST /api/v1/biometrics/search
+Recherche autorisée seulement, quotas, audit et contrôle de finalité.
+Candidats
+GET /api/v1/biometrics/reviews/{id}
+Accès réviseur seulement et données minimales.
+Décision de revue
+POST /api/v1/biometrics/reviews/{id}/decision
+Rôle dédié, motif, version attendue et journalisation.
+Intégration FGP
+Événement interne / contrat existant
+Retourner le statut de revue ; ne pas générer de NIN.
+
+14.1 Contrat d’erreur
+Distinguer lecteur absent, permission refusée, mauvaise qualité, moteur indisponible et conflit de version.
+Employer des codes d’erreur stables et des messages non sensibles.
+Prévoir des identifiants de corrélation pour le support.
+Ne pas exposer au navigateur les chemins des fichiers, le contenu des templates ou les traces du SDK.
+Utiliser des clés d’idempotence si une opération de capture ou de recherche peut être répétée.
+14.2 Intégration avec le flux existant
+Si les composants ZK, le service local ou le pont HTTP existant sont déjà utilisés dans le projet, les conserver s’ils sont sûrs et compatibles. Documenter précisément le flux actuel : navigateur ou application, service intermédiaire, SDK, périphérique, réponse, sécurisation et limites. Éviter de multiplier les accès directs au matériel ou d’exposer un serveur local sans authentification et restrictions de requêtes.
+15. Sécurité, confidentialité et gouvernance
+15.1 Protection des données biométriques
+Chiffrer les communications et le stockage sensible selon une politique approuvée.
+Séparer les permissions de capture, consultation, recherche, export et administration.
+Limiter strictement l’accès aux images brutes et templates.
+Ne pas placer les biométries dans les logs, les notifications, les exports de statistiques ou les messages d’erreur.
+Protéger les sauvegardes et vérifier les accès au coffre biométrique.
+Définir une politique de conservation, de renouvellement et de suppression sous contrôle autorisé.
+Enregistrer les consultations et recherches sensibles pour audit.
+Révoquer les comptes et appareils compromis et gérer les incidents d’accès.
+15.2 Principes d’accès
+Une recherche 1:N doit être limitée à un périmètre et une finalité approuvés. Le fait qu’un utilisateur puisse capturer une empreinte ne signifie pas qu’il doit pouvoir lancer une recherche nationale, parcourir les candidats ou exporter des résultats. L’administration du système doit être séparée de la consultation métier des biométries.
+15.3 Gouvernance
+Avant la production, les responsables doivent approuver les finalités, habilitations, durées de conservation, seuils d’acceptation, procédures de revue, mesures de sécurité, gestion des faux positifs et voie de recours. Le document ne remplace pas une évaluation juridique, de protection des données ou de sécurité.
+16. Fonctionnement hors connexion et incidents
+16.1 Hors connexion
+Si la capture locale est autorisée hors connexion, le système doit enregistrer un identifiant de session stable, le contexte d’agent/appareil et l’état de traitement. Il faut distinguer clairement une capture conservée localement d’une capture reçue par le service central. Une recherche 1:N nationale ne doit pas être simulée hors connexion si le moteur central et l’ensemble de référence ne sont pas disponibles.
+Stockage local chiffré lorsque requis et suppression contrôlée après confirmation de traitement.
+File de synchronisation avec tentatives, erreurs et états visibles.
+Protection contre les réémissions qui créeraient plusieurs sessions ou références.
+Gestion des appareils perdus, partagés ou révoqués.
+Transmission des données minimales et reprise après coupure.
+16.2 Gestion des incidents
+Incident
+Réponse attendue
+Lecteur indisponible
+Afficher un diagnostic simple, créer une trace technique et éviter de simuler une capture réussie.
+SDK incompatible ou absent
+Bloquer l’opération biométrique et documenter la configuration attendue.
+Moteur de comparaison hors service
+Mettre la tâche en attente ; ne pas traiter comme absence de correspondance.
+Résultat contradictoire
+Conserver le résultat et ouvrir une revue.
+Fuite ou accès anormal
+Appliquer la procédure d’incident et limiter les accès concernés.
+Donnée corrompue
+Mettre en quarantaine, éviter l’écrasement et proposer une reprise autorisée.
+
+17. Interfaces et navigation
+Écran
+Contenu
+Actions autorisées
+État des périphériques
+Lecteur détecté, état, version SDK et diagnostic limité.
+Tester la disponibilité ou consulter l’aide.
+Nouvelle capture
+Dossier, agent, modalité, instructions et statut.
+Lancer, annuler ou reprendre une capture selon les droits.
+Contrôle qualité
+Résultat qualité fourni par le moteur, motif et historique des tentatives.
+Reprendre la capture ou escalader.
+Recherche biométrique
+Type 1:1 ou 1:N, statut et périmètre autorisé.
+Lancer uniquement les recherches permises.
+Candidats à examiner
+Références candidates, état, version moteur et informations minimales.
+Ouvrir une revue et documenter la décision.
+Revue de doublons
+Comparaison des preuves autorisées, motifs et historique.
+Décider, demander une nouvelle capture ou escalader.
+Incidents techniques
+Erreurs matérielles, SDK, service ou synchronisation.
+Assigner, diagnostiquer et clôturer.
+Audit biométrique
+Journal des opérations sensibles.
+Consulter selon habilitation, sans exporter de biométrie brute.
+
+17.1 Principes d’ergonomie
+Afficher visiblement le nom de l’action, le dossier concerné et le statut de la capture.
+Ne pas montrer le score seul sans expliquer qu’il s’agit d’un résultat technique.
+Distinguer « aucun candidat », « moteur indisponible » et « revue nécessaire ».
+Demander confirmation pour les actions sensibles et exiger un motif pour les décisions importantes.
+Ne pas rendre l’export de données biométriques disponible dans l’interface standard.
+Prévoir des messages compréhensibles pour les agents et des détails techniques limités aux administrateurs habilités.
+18. Scénarios métier détaillés
+Scénario A — Capture standard d’une empreinte
+1. L’agent autorisé ouvre un dossier en état permettant la capture.
+2. Le service vérifie la session et le lecteur pris en charge.
+3. L’échantillon est acquis et contrôlé selon les capacités documentées du SDK.
+4. Si la qualité est insuffisante, l’application demande une nouvelle tentative et conserve l’état de la session.
+5. Si les contrôles réussissent, le service biométrique enregistre une référence protégée et retourne un statut.
+6. Le dossier poursuit son workflow ; l’identité n’est pas validée automatiquement par la seule capture.
+Scénario B — Recherche 1:N avec candidats
+1. Un utilisateur habilité demande une recherche dans un périmètre approuvé.
+2. Le moteur confirme qu’il est disponible et applique la configuration autorisée.
+3. Le moteur renvoie zéro, un ou plusieurs candidats selon son résultat.
+4. Le système conserve la version du moteur, le statut et les références nécessaires.
+5. Les candidats sont envoyés dans une file de revue ; aucun dossier n’est fusionné automatiquement.
+6. Un réviseur autorisé examine le cas et enregistre une décision motivée.
+Scénario C — Faux positif
+1. Le moteur propose deux dossiers comme candidats.
+2. Le réviseur constate, à partir des éléments autorisés, qu’il s’agit de personnes distinctes.
+3. Il marque le résultat comme candidat écarté selon la procédure.
+4. Le système conserve le résultat technique et la décision humaine séparément.
+5. Le dossier peut poursuivre son parcours si les autres contrôles sont satisfaits.
+Scénario D — Lecteur absent
+1. L’agent tente d’ouvrir une session de capture.
+2. Le service ne détecte pas le lecteur ou le SDK renvoie une erreur.
+3. L’application affiche un état d’échec et un identifiant de diagnostic.
+4. La tentative n’est pas considérée comme une capture réussie ou une absence de correspondance.
+5. Le problème est suivi jusqu’à sa résolution.
+Scénario E — Moteur indisponible
+1. La capture est disponible mais le service de recherche ne répond pas.
+2. Le système garde la référence de la demande et marque la recherche comme en attente ou échouée techniquement.
+3. Une reprise idempotente est exécutée lorsque le service redevient disponible.
+4. L’application ne transforme pas l’erreur technique en résultat négatif.
+19. Tests et critères d’acceptation
+Catégorie
+Test
+Résultat attendu
+Matériel
+Lecteur absent, débranché, occupé ou réinitialisé.
+État explicite, ressources libérées et pas de capture fantôme.
+SDK
+Bibliothèque native manquante ou mauvaise architecture.
+Erreur structurée et diagnostic limité.
+Capture
+Capture annulée, interrompue ou non exploitable.
+État correct, aucune validation implicite.
+Qualité
+Retour qualité sous le seuil documenté.
+Nouvelle tentative ou procédure autorisée.
+Sécurité
+Agent non autorisé demande une capture.
+Refus côté serveur et trace appropriée.
+1:1
+Échantillon de test correspond ou ne correspond pas à la référence attendue.
+Résultat enregistré avec version du moteur et limites clairement définies.
+1:N
+Jeu de test avec candidats connus, absence de candidat et cas ambigu.
+Résultats documentés ; les candidats ne sont pas convertis en décisions automatiques.
+Faux positif
+Deux personnes distinctes sont signalées comme candidates.
+Revue humaine possible et décision historisée.
+Indisponibilité
+Moteur arrêté pendant une requête.
+Statut technique distinct d’« aucune correspondance ».
+Idempotence
+Réémission d’une même session ou demande.
+Pas de duplication non contrôlée.
+Permissions
+Accès au template ou export sans habilitation.
+Refus et absence de fuite de contenu.
+Audit
+Examen des logs après une capture et une recherche.
+Acteur, date, référence et résultat présents ; aucune biométrie brute.
+Non-régression
+Exécuter les tests et parcours de l’intégration ZK déjà existante.
+Les fonctionnalités précédentes continuent de fonctionner.
+
+19.1 Critères d’acceptation
+☐ Le matériel et les versions SDK supportées sont documentés et les erreurs courantes sont gérées.
+☐ Les captures ont un statut fiable et ne sont pas marquées réussies si le processus a échoué.
+☐ Les règles de qualité et les seuils proviennent de la configuration documentée du moteur.
+☐ Les templates et images sont protégés et accessibles uniquement selon les permissions.
+☐ Les fonctions 1:1 et 1:N ne sont activées que si le moteur les prend effectivement en charge.
+☐ Les candidats sont distincts des décisions humaines et les faux positifs peuvent être écartés.
+☐ Une indisponibilité du moteur n’est jamais interprétée comme un résultat négatif.
+☐ La recherche 1:N est limitée à un périmètre et une finalité approuvés.
+☐ Aucune fusion ni attribution du NIN ne résulte automatiquement du score biométrique.
+☐ Les opérations sensibles sont journalisées sans conserver les biométries brutes dans les logs.
+☐ Les tests de sécurité, d’intégration et de non-régression sont passés et documentés.
+20. Plan de développement progressif
+Phase 1 — Audit de l’intégration existante
+Cartographier le modèle du lecteur, le SDK, les bibliothèques natives, les services intermédiaires, les écrans et les endpoints. Vérifier les environnements de développement et les tests existants.
+Livrable : diagramme du flux réel et rapport d’écarts.
+Phase 2 — Stabilisation de la capture
+Encapsuler les appels matériels, gérer les sessions, statuts, erreurs, ressources et audit.
+Livrable : capture fiable et testée sur le matériel pris en charge.
+Phase 3 — Qualité et références biométriques
+Documenter les contrôles du SDK, la création des références, le stockage et la compatibilité.
+Livrable : cycle de vie documenté et tests qualité.
+Phase 4 — Recherche 1:1
+Implémenter ou vérifier la comparaison ciblée si le moteur la supporte et si elle est autorisée.
+Livrable : résultats et erreurs testés avec moteur versionné.
+Phase 5 — Recherche 1:N et candidats
+Évaluer le moteur de recherche, le périmètre, les seuils, les volumes, la latence et la file de candidats.
+Livrable : évaluation documentée et workflow de revue.
+Phase 6 — Revue humaine et intégration FGP
+Séparer résultat technique, décision métier, correction et fusion éventuelle.
+Livrable : cas faux positif, ambigu et escalade validés.
+Phase 7 — Sécurité et audit
+Renforcer permissions, chiffrement, gestion des clés, logs et procédure d’incident.
+Livrable : matrice de droits et rapport de tests.
+Phase 8 — Pilote contrôlé
+Valider avec données synthétiques ou autorisées, mesure des erreurs et procédure de recours.
+Livrable : rapport de recette et décision explicite sur l’activation.
+21. Prompt complet pour l’agent développeur
+Tu travailles sur le projet existant SIGPOP-RDC / ONIP, Module 6 — Biométrie et déduplication. L’intégration biométrique ZK est indiquée comme déjà commencée : audite les composants existants et améliore-les sans réécrire globalement le système.OBJECTIFFiabiliser la capture biométrique, l’intégration matérielle/SDK, le contrôle qualité, les références de templates, la recherche 1:1 et 1:N si elle est réellement supportée, la file de candidats, la revue humaine et les intégrations avec l’enrôlement/FGP.RÈGLES ABSOLUES1. Commence par lire les README, routes, composants UI, services, modèles, migrations, tests, scripts et variables d’environnement.2. Identifie le modèle exact du périphérique, le SDK, ses versions, les bibliothèques natives, l’OS et l’architecture réellement utilisés. Ne suppose pas qu’un lecteur assure la recherche 1:N.3. Cartographie le flux réel entre l’interface, les services intermédiaires, le SDK, le lecteur, le stockage et le backend.4. Ne supprime ni ne remplace une intégration fonctionnelle sans preuve, sauvegarde, plan de migration et tests de non-régression.5. Distingue faits observés, hypothèses et propositions.6. N’invente pas des seuils de qualité, scores, taux de précision, listes de doigts, règles de conservation ou règles officielles.7. Une capture ou une correspondance biométrique n’attribue pas le NIN et ne valide pas à elle seule l’identité.8. Les candidats algorithmiques ne doivent pas déclencher automatiquement de fusion ni de déclaration de fraude. Prévois une revue humaine habilitée et une décision motivée.9. Protège les images, templates, clés, jetons et documents. N’inscris pas de données biométriques brutes ou de secrets dans les logs.10. Sépare les permissions de capture, comparaison 1:1, recherche 1:N, revue, fusion, export et administration.11. N’active pas la recherche 1:N si le moteur adapté n’existe pas, si le contrat n’est pas documenté ou si la finalité et les accès ne sont pas approuvés.12. Utilise des données synthétiques ou dûment autorisées pour les tests.PHASE A — AUDIT- Inventorie les pages, endpoints, services, tables et bibliothèques liés à la biométrie.- Vérifie l’intégration ZK, les méthodes disponibles, la compatibilité SDK/OS/architecture et la gestion des erreurs.- Vérifie le stockage des images/templates, les permissions, le chiffrement, les journaux et la sauvegarde.- Identifie ce qui existe réellement pour la capture, la qualité, 1:1, 1:N et la revue de candidats.- Exécute les tests existants.- Remets d’abord un tableau d’audit : fonction, statut réel, preuve, fichiers/endpoints/tables, écart, risque, correction, priorité et tests.PHASE B — CAPTURE ET QUALITÉ- Encapsule le SDK dans un service/adaptateur compatible avec l’architecture actuelle.- Gère le cycle de vie du périphérique, les sessions, le timeout, l’annulation et la libération des ressources.- Distingue capture réussie, qualité insuffisante, erreur technique, annulation et service indisponible.- Utilise uniquement les mesures et seuils documentés du SDK/moteur.PHASE C — TEMPLATES ET STOCKAGE- Documente les formats et versions réellement pris en charge.- Sépare données brutes, templates, métadonnées et références.- Mets en place les permissions et protections appropriées.- Prévois la compatibilité lors des mises à jour de SDK ou de moteur.PHASE D — COMPARAISON ET REVUE- Implémente ou vérifie 1:1 seulement si le moteur le supporte.- Vérifie les conditions techniques, de capacité, de périmètre et d’autorisation avant d’ajouter 1:N.- Enregistre la version du moteur, le statut et les paramètres nécessaires.- Distingue résultat technique et décision métier.- Crée une file de candidats avec décision humaine ; aucune fusion automatique.PHASE E — INTÉGRATION ONIP- Envoie au FGP ou à l’enrôlement uniquement le statut et les références nécessaires.- Garde la génération du NIN dans le service autorisé distinct.- Utilise les contrats API existants et garantis l’idempotence.- Protège les données sensibles dans les messages et les logs.PHASE F — TESTS ET LIVRAISON- Ajoute tests pour lecteur absent, SDK manquant, capture interrompue, qualité insuffisante, moteur indisponible, erreurs 1:1/1:N, permissions, faux positifs, idempotence et non-régression.- Exécute les tests, lint et build disponibles et fournis les commandes/résultats exacts.- Liste les fichiers modifiés, dépendances, migrations, risques résiduels et procédure de retour arrière.- Ne déclare pas terminé ce qui n’est pas testé.- N’effectue aucun déploiement ni changement destructif sans autorisation explicite.LIVRABLE INITIALUn rapport d’audit fondé sur des preuves et une proposition priorisée. Ne commence pas par réécrire l’intégration ou à activer le 1:N sans confirmer le moteur et les règles applicables.
+22. Limites et décisions à valider
+Finalité et base juridique de la collecte et du traitement de chaque modalité biométrique.
+Modèle exact du lecteur, SDK, licences, OS et architecture supportés.
+Mesures et seuils de qualité fournis par le moteur ; protocole de validation des seuils.
+Formats, versions, stockage, conservation et suppression des images et templates.
+Fonctions effectivement disponibles : capture, comparaison 1:1, recherche 1:N et modalités prises en charge.
+Périmètre autorisé des recherches 1:N et rôles autorisés à les exécuter.
+Procédure humaine pour les faux positifs, les cas ambigus, les fusions et les contestations.
+Exigences d’hébergement, protection, sauvegardes et accès aux données biométriques.
+Contrats d’intégration et champs qui peuvent être renvoyés aux modules ONIP/FGP.
+Conclusion
+Le Module 6 doit fournir un service biométrique fiable, cloisonné et auditable qui aide à repérer les correspondances potentielles, tout en évitant qu’un score soit confondu avec une décision d’identité. La priorité est d’auditer le matériel et le SDK déjà intégrés, de fiabiliser la capture et ses erreurs, puis de valider séparément les fonctions 1:1 et 1:N.
+L’activation en production doit dépendre de résultats de tests documentés, d’une gouvernance claire des données biométriques, d’habilitations adaptées et d’une procédure de revue humaine. La collecte, la décision de fusion, la validation FGP et l’attribution du NIN restent des responsabilités distinctes.
