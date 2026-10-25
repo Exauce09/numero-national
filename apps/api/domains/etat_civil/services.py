@@ -395,16 +395,10 @@ async def create_act(
         db, commune_code=data.commune_code, act_type=data.act_type.value
     )
     payload = dict(data.payload or {})
-    # NIC national unique porté dans l'acte (jamais dans le QR brut comme PII étendu)
-    national_id = payload.get("national_id") or payload.get("nic")
-    if not national_id:
-        # Provisoire 14 chiffres (province Kinshasa=15) — format NON officiel FGP ;
-        # remplacé à la validation via NationalIdentityNumberService (provisoire).
-        from apps.api.domains.core_registry.nic_service import generate_candidate_nic
-
-        national_id = generate_candidate_nic(province_code="KIN")
-        payload["national_id"] = national_id
-        payload["nic"] = national_id
+    # Module 8 / NIN : ne jamais inventer de NIC à la création d'un brouillon.
+    # Attribution uniquement via NationalIdentityNumberService à la validation FGP.
+    for _k in ("national_id", "nic", "nin"):
+        payload.pop(_k, None)
     act = CivilAct(
         act_type=data.act_type.value,
         act_number=number,

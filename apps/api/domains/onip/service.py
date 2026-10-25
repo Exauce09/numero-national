@@ -904,15 +904,15 @@ async def build_dashboard_health(db: AsyncSession) -> dict[str, Any]:
 
 
 async def list_civil_conflicts(db: AsyncSession, *, limit: int = 50) -> dict[str, Any]:
-    """Corrections / déclarations en tension — exposition ONIP sans écrasement."""
+    """Corrections / événements interconnectés en tension — pas d'écrasement silencieux."""
     items: list[dict[str, Any]] = []
     try:
         result = await db.execute(
             text(
                 """
-                SELECT id::text, status, reason, created_at
+                SELECT id::text, status, justification AS reason, created_at
                 FROM etat_civil.correction_requests
-                WHERE status IN ('PENDING', 'PENDING_OFFICER', 'CONFLICT', 'REJECTED', 'OPEN')
+                WHERE status IN ('SUBMITTED', 'PENDING', 'REJECTED')
                 ORDER BY created_at DESC
                 LIMIT :lim
                 """
@@ -936,12 +936,40 @@ async def list_civil_conflicts(db: AsyncSession, *, limit: int = 50) -> dict[str
         logger.debug("civil conflicts fallback: %s", exc)
         await db.rollback()
 
+    # Module 8 — file interconnexion (process store)
+    try:
+        from apps.api.domains.civil_interconnect import store as civ_store
+
+        for ev in civ_store.list_events(limit=limit):
+            if ev.get("processing_status") in {
+                "QUARANTINED",
+                "MATCH_REVIEW",
+                "REJECTED",
+            }:
+                items.append(
+                    {
+                        "kind": "civil_inbound",
+                        "id": ev["id"],
+                        "status": ev["processing_status"],
+                        "reason": ev.get("quarantine_reason")
+                        or ev.get("event_type"),
+                        "created_at": (
+                            ev["received_at"].isoformat()
+                            if hasattr(ev.get("received_at"), "isoformat")
+                            else ev.get("received_at")
+                        ),
+                        "resolution": "manual_review_required",
+                    }
+                )
+    except Exception as exc:
+        logger.debug("civil inbound conflicts: %s", exc)
+
     return {
         "count": len(items),
-        "items": items,
+        "items": items[:limit],
         "policy": "no_silent_overwrite",
-        "note": "Les événements EC dupliqués sont refusés côté API (find_duplicate_act) ; "
-        "les conflits ouverts restent en file jusqu'à décision humaine.",
+        "note": "Module 8 : pas de last-message-wins ; idempotence source_event_id ; "
+        "accusé technique ≠ APPLIED ; pas de NIN inventé.",
     }
 
 

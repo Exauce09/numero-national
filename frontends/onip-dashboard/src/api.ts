@@ -1064,7 +1064,73 @@ export const biometricApi = {
     }),
 };
 
+export type CivilEventsCatalog = {
+  module: number;
+  title: string;
+  invent_nin_forbidden: boolean;
+  silent_overwrite_forbidden: boolean;
+  census_to_act_forbidden: boolean;
+  last_message_wins_forbidden: boolean;
+  technical_ack_distinct_from_applied: boolean;
+  note: string;
+  authorized_sources: Array<{
+    source_id: string;
+    label: string;
+    active: boolean;
+    allowed_event_types: string[];
+  }>;
+  processing_statuses: string[];
+};
+
+export type CivilInboundEvent = {
+  id: string;
+  source_id: string;
+  source_event_id: string;
+  event_type: string;
+  processing_status: string;
+  act_reference?: string | null;
+  citizen_id?: string | null;
+  technical_ack: boolean;
+  business_applied: boolean;
+  quarantine_reason?: string | null;
+};
+
+export type CivilMatchingCase = {
+  id: string;
+  event_id: string;
+  status: string;
+  reason?: string;
+  candidate_citizen_ids?: string[];
+};
+
 export const civilOnipApi = {
+  catalog: () => request<CivilEventsCatalog>("/civil-events/catalog"),
+  listInbound: (limit = 40, status?: string) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (status) params.set("status", status);
+    return request<CivilInboundEvent[]>(`/civil-events?${params}`);
+  },
+  matchingCases: (limit = 40) =>
+    request<{ count: number; items: CivilMatchingCase[]; invent_nin_forbidden: boolean }>(
+      `/civil-matching-cases?limit=${limit}`,
+    ),
+  decideMatching: (
+    caseId: string,
+    decision: "LINK_CITIZEN" | "QUARANTINE" | "REJECT" | "ESCALATE",
+    motif: string,
+    citizenId?: string,
+  ) =>
+    request<{ case_status: string; processing_status: string; nin_mutated: boolean; message: string }>(
+      `/civil-matching-cases/${caseId}/decision`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          decision,
+          motif,
+          ...(citizenId ? { citizen_id: citizenId } : {}),
+        }),
+      },
+    ),
   searchActs: (q?: string, limit = 50) => {
     const params = new URLSearchParams({ limit: String(limit) });
     if (q?.trim()) params.set("q", q.trim());

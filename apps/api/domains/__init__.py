@@ -8,6 +8,7 @@ core_registry, etat_civil, cards, …) are mounted via soft-import in
 from apps.api.domains.analytics.routes import router as analytics_router
 from apps.api.domains.analytics.verify_routes import router as identity_verify_router
 from apps.api.domains.biometric.routes import router as biometric_router
+from apps.api.domains.civil_interconnect.router import router as civil_interconnect_router
 from apps.api.domains.health.routes import router as health_domain_router
 from apps.api.domains.notifications.routes import router as notifications_router
 from apps.api.domains.onip.routes import router as onip_router
@@ -21,6 +22,7 @@ PHASE_3_6_9_ROUTERS = (
     analytics_router,
     identity_verify_router,
     notifications_router,
+    civil_interconnect_router,
 )
 
 __all__ = [
@@ -32,4 +34,5 @@ __all__ = [
     "analytics_router",
     "identity_verify_router",
     "notifications_router",
+    "civil_interconnect_router",
 ]

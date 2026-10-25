@@ -1,0 +1,680 @@
+SIGPOP-RDC
+MODULE 8INTERCONNEXION AVEC L’ÉTAT CIVIL
+Cahier des charges fonctionnel et technique détailléÉvénements, références d’actes, synchronisation avec le FGP et gestion des conflits
+Version de travail — octobre 2026
+Document destiné à l’audit et à l’évolution progressive du système existant.
+Avertissement et statut du document
+Ce document développe le Module 8 — Interconnexion avec l’état civil — dans le cadre de SIGPOP-RDC / ONIP. Il décrit une conception cible pour recevoir, vérifier, rapprocher et traiter des événements provenant de sources d’état civil autorisées, puis synchroniser les conséquences admises dans le Fichier Général de la Population (FGP).
+Il ne certifie pas l’architecture interne de l’ONIP et ne remplace pas les procédures légales d’état civil. Les actes, autorités émettrices, preuves recevables, délais, responsabilités, habilitations et règles de rectification doivent être confirmés auprès des responsables compétents et à partir des textes applicables dans leur version complète.
+Principe essentiel : l’état civil reste la source compétente pour ses actes et décisions ; le FGP conserve les informations et applique les mises à jour autorisées. Une fiche issue du recensement ne devient pas automatiquement un acte d’état civil. De même, un message reçu d’un système tiers ne doit pas être considéré comme authentique uniquement parce que son format est valide.
+Les parcours et statuts proposés sont indicatifs. Avant de les coder, il faut auditer les routes, tables, connecteurs et traitements existants afin de préserver la compatibilité et d’éviter la création d’une seconde source de vérité.
+Sommaire
+1. Finalité, objectifs et périmètre
+2. Cadre de référence et principes de séparation
+3. Architecture fonctionnelle de l’interconnexion
+4. Sources autorisées et gouvernance des événements
+5. Catalogue des événements d’état civil
+6. Modèle d’un événement et références d’actes
+7. Cycle de traitement et synchronisation avec le FGP
+8. Rapprochement de l’événement avec une personne
+9. Gestion des conflits, corrections et annulations
+10. Gestion des erreurs et files d’exception
+11. Modèle de données indicatif
+12. API et contrats d’interopérabilité
+13. Sécurité, confidentialité et audit
+14. Interfaces et tableaux de suivi
+15. Scénarios métier détaillés
+16. Tests et critères d’acceptation
+17. Plan de développement progressif
+18. Prompt complet pour l’agent développeur
+19. Sources, limites et décisions à valider
+1. Finalité, objectifs et périmètre
+1.1 Finalité
+Le module d’interconnexion avec l’état civil relie les événements d’état civil aux dossiers individuels du FGP. Il assure la réception des messages, l’authentification de la source, la vérification des références d’actes, le rapprochement avec la personne concernée, le traitement des événements et le suivi des erreurs.
+1.2 Objectifs fonctionnels
+Recevoir les événements autorisés provenant de systèmes ou d’officiers d’état civil habilités.
+Distinguer l’événement déclaré, le message transmis, l’acte vérifié et la mise à jour effectivement appliquée au FGP.
+Relier chaque événement à une référence source stable, à une date d’effet et à une date de réception.
+Mettre à jour le FGP uniquement selon les règles autorisées et documentées.
+Gérer les événements tardifs, répétitions, annulations, corrections et conflits sans écrasement silencieux.
+Repérer les cas où plusieurs personnes ou actes pourraient correspondre et les envoyer à un processus de revue habilité.
+Fournir des accusés de réception et des statuts compréhensibles à la source émettrice.
+Conserver un historique permettant de comprendre l’origine d’une donnée et les raisons d’une mise à jour.
+1.3 Périmètre
+Domaine
+Responsabilité du module
+Limite ou dépendance
+Réception
+Accepter les messages depuis des sources configurées.
+La source doit être authentifiée et habilitée.
+Naissance
+Rapprocher une référence d’acte de naissance et transmettre les changements admissibles au FGP.
+La validité de l’acte relève de la procédure compétente.
+Mariage
+Traiter les informations et mentions autorisées liées au mariage.
+Ne pas inventer les conséquences sur le nom ou la situation civile.
+Divorce
+Traiter la décision ou l’acte et les mises à jour autorisées.
+La décision doit provenir d’une source vérifiable.
+Décès
+Mettre à jour le statut selon les règles validées et conserver l’historique.
+Ne pas supprimer le dossier ni recycler le NIN.
+Rectification
+Enregistrer la demande ou décision et assurer la propagation autorisée.
+Les rectifications suivent la procédure juridique compétente.
+Synchronisation FGP
+Appliquer, différer ou mettre en quarantaine un événement selon son état.
+Aucun écrasement automatique en cas de conflit non résolu.
+Traçabilité
+Conserver le message et les résultats de traitement de manière contrôlée.
+Minimiser les données et restreindre les accès.
+1.4 Hors périmètre
+Remplacer le registre légal ou l’officier compétent d’état civil.
+Créer automatiquement un acte juridique à partir d’une fiche de recensement.
+Modifier une décision judiciaire ou administrative sans pièce et procédure autorisées.
+Créer, calculer ou réattribuer un NIN en dehors du service dédié.
+Écraser automatiquement des données contradictoires selon la règle « dernier message reçu ».
+2. Cadre de référence et principes de séparation
+2.1 FGP et événements d’état civil
+Le décret n° 22/07 du 2 mars 2022 relatif au FGP décrit celui-ci comme un fichier entretenu par l’ONIP et prévoit notamment une mise à jour continue à travers l’état civil, la communication régulière de données par les organismes responsables et la préservation de l’historique. Il mentionne aussi les références d’actes de naissance et de décès parmi les données du FGP. Ces éléments constituent une base pour la conception, sous réserve de vérifier les textes complets en vigueur.
+2.2 État civil comme source juridique
+Le Code de la famille, modifié notamment par la loi n° 16/008 du 15 juillet 2016, prévoit des registres distincts pour les naissances, mariages et décès. Le logiciel doit donc distinguer la référence d’un acte provenant d’une autorité compétente d’une simple donnée déclarée ou d’une fiche de recensement. Les règles exactes de preuve, de rectification et de transcription doivent être validées sur les textes applicables.
+2.3 Principes non négociables
+Source identifiée
+Chaque message doit être rattaché à un système ou une autorité habilitée, avec une référence vérifiable.
+Acte distinct du message
+La réception technique d’un message ne prouve pas automatiquement la validité juridique de l’acte.
+Recensement distinct
+Un dossier de campagne ou d’enrôlement n’est pas converti automatiquement en acte d’état civil.
+Historique conservé
+Une correction ou annulation crée une trace ; elle n’efface pas silencieusement l’événement initial.
+Idempotence
+Le même événement source envoyé plusieurs fois ne doit pas produire plusieurs mises à jour métier.
+Dates distinctes
+La date de l’événement, la date de l’acte, la date de réception et la date d’application au FGP sont distinctes.
+Conflit explicite
+Les événements contradictoires sont mis en revue et ne sont pas arbitrés par une simple règle technique.
+Accès minimal
+La source et chaque utilisateur ne reçoivent que les informations nécessaires à leur mission.
+3. Architecture fonctionnelle de l’interconnexion
+Composant
+Responsabilité
+Contrôle attendu
+Connecteur source
+Communiquer avec le système d’état civil par le contrat validé.
+Authentification et validation du schéma.
+API d’entrée sécurisée
+Recevoir les messages, appliquer quotas et droits.
+TLS, limitation de débit, validation des entrées.
+Registre des événements
+Conserver la référence source, les métadonnées et le statut.
+Idempotence et intégrité.
+Vérification de provenance
+Vérifier l’identité technique et l’habilitation de la source.
+Un message non authentifié ne modifie pas le FGP.
+Vérification de l’acte
+Contrôler références, autorité, pièces et règles prévues.
+Un format valide ne suffit pas.
+Rapprochement
+Identifier le dossier FGP concerné ou les candidats.
+Les cas ambigus passent en revue.
+Moteur de traitement
+Appliquer les règles de création/mise à jour autorisées.
+Transactions, versions et dates d’effet.
+File d’exception
+Traiter erreurs, conflits et cas manuels.
+Responsable, motif, état et historique.
+Notifications
+Retourner accusé et statut de traitement à la source.
+Reprise idempotente.
+Journal d’audit
+Tracer opérations, décisions et changements.
+Pas de divulgation excessive des données personnelles.
+3.1 Flux logique
+La source émet un message authentifié avec une référence d’acte et un identifiant d’événement stable.
+L’entrée sécurisée vérifie le format, la provenance, la version et l’idempotence.
+Le registre des événements conserve l’état initial de réception et ouvre une tâche de traitement.
+La vérification métier contrôle l’acte et rapproche l’événement avec le FGP.
+Le système applique la mise à jour, la met en attente, la rejette avec motif ou la place en quarantaine.
+Le FGP enregistre le changement dans une transaction cohérente et conserve les références d’historique.
+La source reçoit un accusé technique puis, lorsqu’il est disponible, un résultat métier distinct.
+3.2 Architecture cible et existant
+Cette architecture est une recommandation fonctionnelle. Elle ne décrit pas l’architecture interne confirmée de l’ONIP. L’agent développeur doit d’abord documenter les routes, services et connecteurs existants avant d’ajouter un nouveau flux.
+4. Sources autorisées et gouvernance des événements
+Attribut de source
+Description
+Source ID
+Identifiant interne stable de la source.
+Nom / organisme
+Système, bureau ou organisme d’origine.
+Types autorisés
+Naissance, mariage, décès, rectification ou autres catégories approuvées.
+Périmètre
+Zones territoriales ou bureaux relevant de la source.
+Authentification
+Certificat, jeton institutionnel ou autre mécanisme approuvé.
+Version du contrat
+Schéma de message accepté.
+Statut
+Actif, suspendu, révoqué ou en test.
+Dates de validité
+Période durant laquelle l’habilitation est valide.
+4.1 Règles de gouvernance
+Désigner quelle autorité peut émettre chaque type d’événement.
+Définir qui peut vérifier une référence d’acte et selon quelle méthode.
+Préciser les éléments qui permettent une mise à jour automatique et ceux qui exigent une validation humaine.
+Définir le traitement des actes annulés, rectifiés ou transcrits.
+Déterminer les rôles qui peuvent consulter les messages, pièces et historiques.
+Fixer les délais opérationnels et les règles d’escalade avec les responsables métier.
+5. Catalogue des événements d’état civil
+Événement
+Données à relier
+Traitement cible
+Précautions
+Naissance
+Référence d’acte, date/lieu, source, données d’identification disponibles.
+Rapprocher une personne existante ou créer/mettre à jour selon procédure.
+Vérifier la source et l’acte.
+Mariage
+Référence, date, autorité, parties concernées.
+Ajouter l’événement et appliquer les modifications autorisées.
+Ne pas déduire automatiquement nom ou résidence.
+Divorce
+Référence d’acte/décision, date d’effet, parties concernées.
+Enregistrer la décision et appliquer les effets prévus.
+Confirmer l’autorité et la procédure.
+Décès
+Référence d’acte, date/lieu, personne, source.
+Mettre à jour le statut du FGP selon la règle validée.
+Conserver le dossier et le NIN historique.
+Rectification
+Référence de décision, champs concernés et valeurs corrigées.
+Créer une version du dossier après vérification.
+Ne pas écraser l’historique.
+Annulation
+Référence de l’événement concerné, décision et motif.
+Lier l’annulation à l’événement initial.
+Ne pas supprimer sa trace.
+Transcription / mention
+Acte source, acte concerné, référence de transcription.
+Relier les actes et appliquer les effets autorisés.
+Les règles exactes relèvent du cadre légal.
+5.1 Un événement n’est pas l’état courant
+Un événement constitue un fait ou une décision datée. Le statut actuel de la personne est une vue résultante après l’application des événements autorisés. Cette séparation facilite l’audit et le traitement d’une annulation ou d’une rectification.
+5.2 Types inconnus
+Si la source transmet un type d’événement inconnu ou une version de schéma non prise en charge, le système ne doit pas interpréter arbitrairement les champs. Il doit rejeter ou mettre en quarantaine le message selon le contrat d’interopérabilité.
+6. Modèle d’un événement et références d’actes
+Champ indicatif
+Description / règle
+event_id
+Identifiant technique interne de l’événement.
+source_id
+Source authentifiée qui a émis le message.
+source_event_id
+Référence stable attribuée par la source.
+source_version
+Version du message ou de l’enregistrement source.
+event_type
+Type d’événement dans un vocabulaire approuvé.
+act_reference
+Référence de l’acte ou de la décision.
+issuing_authority
+Autorité émettrice, déclarée puis vérifiée.
+event_date
+Date de l’événement juridique ou factuel.
+effective_date
+Date d’effet si elle est définie.
+received_at
+Date/heure de réception par l’interconnexion.
+processed_at
+Date/heure de décision de traitement.
+person_reference
+Référence FGP reliée après rapprochement.
+verification_status
+Statut de provenance et de vérification.
+processing_status
+État du traitement côté ONIP/FGP.
+correlation_id
+Référence de suivi entre systèmes.
+6.1 Gestion des références d’actes
+Conserver le type d’acte, la référence transmise, l’autorité/bureau, la date et la provenance.
+Ne pas inventer un format unique si les sources autorisées utilisent des références différentes.
+Stocker les documents numérisés dans un espace privé ; utiliser une référence sécurisée plutôt qu’un chemin public.
+Distinguer référence reçue, référence vérifiée et référence contestée.
+Journaliser l’accès aux documents justificatifs lorsque cela est requis.
+7. Cycle de traitement et synchronisation avec le FGP
+7.1 Étapes de traitement
+Réception du message via un connecteur ou une API autorisée.
+Authentification de la source et vérification de son habilitation.
+Validation structurelle des champs, tailles et version de schéma.
+Contrôle d’idempotence à partir d’une référence source stable.
+Vérification métier de l’acte, de l’autorité et des éléments de preuve attendus.
+Rapprochement avec la personne concernée dans le FGP.
+Décision : appliquer, mettre en attente, rejeter avec motif ou placer en quarantaine.
+Application des changements au FGP dans une transaction cohérente.
+Inscription du résultat et des métadonnées d’audit.
+Retour à la source d’un accusé technique et d’un résultat métier distinct.
+7.2 États de traitement indicatifs
+État
+Signification
+Traitement
+RECEIVED
+Message arrivé.
+Créer référence de corrélation.
+AUTHENTICATED
+Source et habilitation vérifiées.
+Valider le schéma.
+INVALID
+Message non conforme ou non autorisé.
+Rejeter avec code contrôlé.
+DUPLICATE_MESSAGE
+Événement déjà reçu.
+Renvoyer l’état connu sans rejouer l’effet.
+PENDING_VERIFICATION
+Acte ou référence à vérifier.
+Attendre le contrôle prévu.
+MATCH_REVIEW
+Personne non identifiée sans ambiguïté.
+Créer tâche de rapprochement.
+READY_TO_APPLY
+Conditions satisfaites.
+Lancer la transaction.
+APPLIED
+Événement appliqué au FGP.
+Conserver version et audit.
+REJECTED
+Événement rejeté par une règle métier.
+Motif et correction possible si autorisée.
+QUARANTINED
+Conflit ou anomalie à examiner.
+Aucune mise à jour automatique.
+RETRYABLE_ERROR
+Erreur technique transitoire.
+Reprise contrôlée et idempotente.
+REVERSED
+Effet compensé selon décision autorisée.
+Préserver événement initial et compensation.
+7.3 Synchronisation fiable
+Utiliser une file durable si le volume, le réseau ou les dépendances nécessitent un traitement différé.
+Enregistrer l’état après chaque étape importante pour permettre une reprise après redémarrage.
+Construire l’idempotence sur un identifiant source stable, pas sur un horodatage seul.
+Distinguer erreur technique temporaire et erreur métier nécessitant une décision.
+Limiter les tentatives et alerter lorsqu’un événement reste en échec.
+Ne jamais marquer un événement « appliqué » avant la confirmation de la transaction FGP.
+8. Rapprochement de l’événement avec une personne
+Situation
+Comportement attendu
+Référence FGP explicite
+Vérifier son existence et sa cohérence avec l’événement.
+Aucune référence de personne
+Rechercher selon les critères autorisés ; ouvrir une tâche si ambigu.
+Un candidat plausible
+Appliquer les contrôles métier requis avant mise à jour.
+Plusieurs candidats
+Mettre en revue ; bloquer toute application non sûre.
+Personne non trouvée
+Suivre le workflow approuvé ; ne pas créer arbitrairement un dossier définitif.
+Événement déjà appliqué
+Vérifier l’idempotence et retourner l’état connu.
+8.1 Règles anti-erreur
+Ne pas rapprocher deux personnes uniquement sur le nom ou la date de naissance.
+Utiliser les références d’actes et les critères supplémentaires autorisés.
+Conserver la méthode ou la règle de rapprochement lorsqu’elle est utile à l’audit.
+Traiter un résultat algorithmique comme un candidat et non comme une décision juridique.
+Bloquer l’application si le dossier cible change pendant la vérification.
+9. Gestion des conflits, corrections et annulations
+Type de conflit
+Exemple
+Traitement recommandé
+Événement répété
+Même acte transmis deux fois.
+Idempotence et retour du résultat existant.
+Même référence, contenu différent
+Identifiant source identique mais données divergentes.
+Bloquer et créer une anomalie de cohérence.
+Événement tardif
+Un événement ancien arrive après une mise à jour plus récente.
+Appliquer les règles de date d’effet ou ouvrir une revue.
+Référence contradictoire
+Deux références d’acte incompatibles.
+Quarantaine et vérification.
+Mauvais rapprochement
+Événement associé à la mauvaise personne.
+Correction autorisée avec historique et validation renforcée.
+Annulation
+Décision d’annulation reçue.
+Lier l’annulation à l’événement initial et appliquer la procédure confirmée.
+Conflit entre sources
+Deux sources envoient des valeurs différentes.
+Ne pas choisir automatiquement la dernière ; escalade habilitée.
+9.1 Traitement des corrections
+Conserver l’événement initial et sa référence.
+Enregistrer la correction ou l’annulation comme un nouvel événement lié au précédent.
+Vérifier l’autorité de la source et la procédure justifiant la correction.
+Maintenir les valeurs antérieure et corrigée, la date d’effet et l’approbation selon les règles applicables.
+Notifier les modules dépendants et suivre les résultats de propagation.
+9.2 Pas de règle « dernier message gagne »
+Les messages peuvent arriver tard, être retransmis ou corriger un événement précédent. Le système ne doit donc pas se baser uniquement sur l’ordre de réception pour choisir la donnée correcte. Il doit appliquer une politique approuvée tenant compte des dates d’effet, des références source, de la hiérarchie des sources et des validations nécessaires.
+10. Gestion des erreurs et files d’exception
+Erreur
+Réponse système
+Suivi nécessaire
+Source non authentifiée
+Refuser le message.
+Journal de sécurité minimisé.
+Type inconnu
+Rejeter ou mettre en quarantaine.
+Version de schéma et explication.
+Acte introuvable
+Attendre ou rejeter selon procédure.
+Référence de recherche et source.
+Plusieurs candidats FGP
+Bloquer l’application automatique.
+Responsable de rapprochement.
+Contradiction FGP
+Créer une exception ; conserver les provenances.
+Motif, priorité, historique.
+FGP indisponible
+Mettre en attente et réessayer.
+Tentatives et état observable.
+Notification échouée
+Conserver la décision et relancer la notification séparément.
+File de messages sortants.
+Correction mal formée
+Ne pas écraser la valeur courante.
+Quarantaine et demande de correction.
+10.1 Données d’une exception
+Chaque exception doit contenir la référence d’événement, le type d’anomalie, une gravité indicative, le responsable, la date de création, le statut, le motif, les actions réalisées et la date de clôture. Les délais et responsabilités d’escalade doivent être configurés par les responsables métier.
+10.2 Reprise contrôlée
+Réessayer automatiquement seulement les erreurs transitoires prévues.
+Exiger une correction ou décision autorisée avant de rejouer une erreur métier.
+Journaliser toute relance manuelle avec l’auteur, le motif et la date.
+Garantir qu’une reprise ne crée pas un doublon et ne réapplique pas deux fois les mêmes effets.
+11. Modèle de données indicatif
+Les noms d’entités ci-dessous sont conceptuels. Il faut d’abord inventorier les modèles, migrations et contrats existants pour réutiliser les structures déjà fonctionnelles.
+Entité/table indicative
+Responsabilité
+Contrôles clés
+civil_sources
+Sources autorisées et habilitations.
+Périmètre, types d’événements, contrat et dates.
+civil_inbound_events
+Messages entrants et métadonnées de traitement.
+Idempotence, source, version, intégrité.
+civil_event_references
+Références d’actes et liens aux événements.
+Conserver la référence reçue sans normalisation destructive.
+civil_event_parties
+Liens entre événements et personnes.
+Rapprochement vérifié et rôle de la partie.
+civil_event_links
+Liens entre correction, annulation et événement initial.
+Historique des liens.
+fgp_person_events
+Événements effectivement appliqués au FGP.
+Transaction, date d’effet et version du dossier.
+civil_verification_tasks
+Tâches de vérification.
+Responsable, statut, décision et preuve.
+civil_matching_cases
+Cas de rapprochement.
+Candidats distincts des décisions.
+civil_exceptions
+Conflits et erreurs.
+Motif, responsable, état et historique.
+outbound_notifications
+Accusés et résultats à retourner aux sources.
+Idempotence et tentatives.
+audit_events
+Opérations, acteurs, décisions et dates.
+Protection contre altération et minimisation.
+11.1 Invariants
+La référence source d’un événement est unique dans le périmètre prévu par le contrat.
+Une correction référence l’événement ou l’acte qu’elle rectifie lorsque la procédure le prévoit.
+Un événement reçu n’est pas identique à un événement appliqué au FGP : les deux états sont distincts.
+Toute mise à jour doit être reliée à la source, la décision et la version appliquée.
+Les données personnelles et documents ne sont pas dupliqués dans les journaux sans besoin.
+12. API et contrats d’interopérabilité
+Les routes ci-dessous sont des exemples conceptuels et ne représentent pas les routes confirmées du dépôt. Il faut inspecter les routes et les contrats existants avant de définir ou modifier une API.
+Capacité
+Exemple conceptuel
+Garde-fous
+Réception
+POST /api/v1/civil-events
+Source authentifiée, schéma et idempotence.
+Statut de traitement
+GET /api/v1/civil-events/{eventId}/status
+Source autorisée à consulter seulement ses événements.
+Vérification d’acte
+Connecteur ou endpoint de validation prévu par contrat.
+Interroger uniquement les sources habilitées.
+File de rapprochement
+GET /api/v1/civil-matching-cases
+Rôle habilité et données minimales.
+Décision de revue
+POST /api/v1/civil-matching-cases/{id}/decision
+Motif et audit.
+Correction/annulation
+POST /api/v1/civil-events/{id}/corrections
+Référence initiale et procédure de validation.
+Accusé / notification
+Canal de réponse configuré par source.
+Reprise idempotente.
+Historique FGP
+Endpoint interne existant.
+Ne pas exposer le dossier complet aux sources.
+12.1 Structure indicative du message
+Selon le contrat approuvé, un message peut contenir : identifiant de source, identifiant d’événement, type, référence d’acte, autorité émettrice, date de l’événement, date d’effet si disponible, date d’émission, version de schéma et référence de corrélation, ainsi que les données strictement nécessaires. Une signature ou preuve d’authentification doit être prévue si le contrat l’exige.
+12.2 Réponse et erreurs
+La réponse doit distinguer l’accusé technique — message reçu et identifié — du résultat métier : appliqué, en attente, en rapprochement, rejeté, en quarantaine ou en erreur. Un succès HTTP ne doit pas être présenté comme preuve d’une mise à jour du FGP.
+Authentification forte et permissions par source, type d’événement et périmètre.
+TLS, validation des tailles, types et structure du message.
+Clé d’idempotence fondée sur la référence source stable.
+Quotas, limitation de débit et révocation des sources.
+Versionnement du contrat et compatibilité des clients.
+Messages d’erreur stables, sans fuite d’informations personnelles.
+Journalisation des appels et résultats sans conserver inutilement les payloads complets.
+13. Sécurité, confidentialité et audit
+13.1 Protection des données
+Traiter les événements d’état civil et les données FGP comme des informations sensibles.
+Limiter l’accès selon le rôle, la source, la zone et la finalité prévue.
+Chiffrer les communications et protéger le stockage selon la politique approuvée.
+Masquer les attributs personnels dans les logs techniques et les erreurs.
+Restreindre l’accès aux documents et utiliser des liens temporaires et autorisés si nécessaire.
+Désactiver par défaut les exports nominatifs pour les rôles qui n’en ont pas besoin.
+Définir conservation, archivage et rectification selon les textes applicables.
+13.2 Audit minimal
+Événement audité
+Métadonnées indicatives
+Message reçu
+Source, référence, type, date/heure, résultat d’authentification.
+Vérification
+Méthode, rôle, version de règle et résultat.
+Rapprochement
+Références concernées, état, responsable et décision.
+Mise à jour FGP
+Dossier, événement source, version et date d’effet.
+Rejet/quarantaine
+Code, motif, responsable éventuel et horodatage.
+Correction/annulation
+Événement initial, décision, source et résultat.
+Notification
+Source destinataire, corrélation, statut et tentatives.
+13.3 Responsabilité de la source
+Le décret relatif au FGP indique que les organismes qui communiquent des données sont responsables de leur conformité avec les actes et documents qu’ils détiennent. Le logiciel doit donc conserver la source et la référence, sans prétendre certifier la validité juridique si le processus de vérification n’a pas été exécuté.
+14. Interfaces et tableaux de suivi
+Écran
+Contenu
+Actions possibles
+Vue d’ensemble
+Événements reçus, appliqués, en attente, rejetés et en exception.
+Filtrer et ouvrir les files autorisées.
+Sources connectées
+État, périmètre, événements autorisés, dernière activité.
+Administrer selon les permissions.
+Événements entrants
+Type, référence, source, date, état et corrélation.
+Examiner, vérifier et suivre.
+Détail d’événement
+Référence d’acte, source, dates, vérification et résultat.
+Rapprocher, appliquer ou mettre en quarantaine.
+Rapprochement
+Personnes candidates, motifs et état de revue.
+Décider ou escalader.
+Conflits / exceptions
+Type, ancienneté, responsable et motif.
+Assigner, résoudre et clôturer.
+Historique FGP
+Événements appliqués et versions résultantes.
+Consulter selon rôle.
+Notifications
+Accusés et résultats en attente d’envoi.
+Relancer les notifications autorisées.
+Audit
+Actions et décisions sensibles.
+Consulter sous permission dédiée.
+14.1 Indicateurs opérationnels
+Messages reçus par source et type d’événement.
+Événements appliqués avec confirmation.
+Événements en attente de vérification ou de rapprochement.
+Répétitions de messages absorbées par idempotence.
+Rejets par cause et version de schéma.
+Ancienneté des événements non résolus.
+Temps entre réception, décision et application.
+Échecs de notification vers les sources.
+Les chiffres « reçus », « vérifiés » et « appliqués » doivent rester distincts et leurs formules doivent être documentées.
+15. Scénarios métier détaillés
+Scénario A — Réception d’un événement de naissance
+La source autorisée transmet l’événement avec référence d’acte et identifiant de source.
+L’API authentifie la source, valide le schéma et vérifie l’idempotence.
+Le module vérifie la référence selon le contrat et cherche un dossier FGP correspondant.
+Si l’identité est ambiguë, l’événement est mis en rapprochement ; aucune création définitive non contrôlée n’est effectuée.
+Après validation, la mise à jour est appliquée et historisée.
+La source reçoit le statut de traitement et la référence de corrélation.
+Scénario B — Réception d’un décès
+La source transmet la référence d’acte et les données autorisées.
+Le système vérifie la source et l’acte, puis identifie la personne concernée.
+Si plusieurs personnes correspondent, le traitement est suspendu pour revue.
+Après validation, le FGP enregistre l’événement et met à jour le statut prévu.
+Le dossier historique et le NIN ne sont pas supprimés ou réutilisés.
+La source reçoit le résultat et l’opération reste auditable.
+Scénario C — Événement retransmis
+Une même référence source est envoyée une deuxième fois après un timeout.
+Le système retrouve la référence déjà traitée et renvoie l’état connu.
+Aucune seconde mise à jour métier n’est appliquée.
+La tentative répétée peut être auditée sans créer un nouvel événement.
+Scénario D — Rectification d’un acte
+La source transmet une rectification liée à un acte ou événement antérieur.
+Le système vérifie l’autorité et le lien vers l’événement initial.
+La correction passe par le workflow prévu si une validation humaine est requise.
+Après approbation, les valeurs autorisées sont mises à jour et historisées.
+Les modules dépendants sont informés et les erreurs de propagation sont suivies.
+Scénario E — Sources contradictoires
+Deux sources transmettent des informations incompatibles sur un même dossier.
+Le système conserve les références, dates et provenances de chaque source.
+Il crée une exception et bloque l’écrasement automatique.
+Un responsable habilité applique la procédure de résolution validée.
+La décision et ses effets sont enregistrés.
+Scénario F — Source non autorisée
+Un message est reçu d’une source révoquée ou non autorisée pour cet événement.
+Le serveur refuse le traitement et ne modifie pas le FGP.
+Une trace de sécurité est conservée sans stocker inutilement tout le message.
+Les responsables habilités examinent l’incident si nécessaire.
+16. Tests et critères d’acceptation
+Catégorie
+Test
+Résultat attendu
+Authentification
+Événement depuis une source inconnue ou révoquée.
+Refus ; aucune mise à jour FGP.
+Schéma
+Message mal formé ou version inconnue.
+Rejet/quarantaine avec code explicite.
+Idempotence
+Réenvoyer la même référence d’événement.
+Aucun second effet métier.
+Conflit de payload
+Même référence source avec contenu différent.
+Blocage et incident de cohérence.
+Rapprochement
+Aucun ou plusieurs candidats.
+Workflow adapté ; pas de création arbitraire.
+Événement tardif
+Événement ancien reçu après un plus récent.
+Règle de date d’effet ou revue ; pas de « dernier arrivé gagne ».
+Rectification
+Corriger un événement existant.
+Événement initial et correction liés ; historique préservé.
+Annulation
+Annuler un événement via source autorisée.
+Événement initial conservé et effet traité selon procédure.
+Disponibilité
+Panne FGP pendant le traitement.
+Événement en attente et reprise idempotente.
+Notification
+Panne du canal de retour.
+Décision conservée ; notification réessayable.
+Permissions
+Agent consulte hors périmètre.
+Accès refusé et trace appropriée.
+Audit
+Examiner réception, application et rejet.
+Traçabilité complète sans divulgation excessive.
+Non-régression
+Tester les connecteurs existants.
+Contrats préservés ou migration documentée.
+16.1 Checklist d’acceptation
+☐ Les sources ont des identifiants, types d’événements et périmètres documentés.
+☐ Message reçu, acte vérifié et événement appliqué sont des états distincts.
+☐ Les dates d’événement, d’effet, de réception et d’application sont séparées.
+☐ La répétition d’un événement est idempotente.
+☐ Conflits, événements tardifs, corrections et annulations conservent l’historique.
+☐ Aucune fiche de recensement n’est convertie automatiquement en acte d’état civil.
+☐ Un rapprochement ambigu n’entraîne pas de mise à jour irréversible sans revue.
+☐ Accusé technique et résultat métier sont distincts.
+☐ Les données et documents sont protégés par des permissions appropriées.
+☐ Les tests de sécurité, intégration et non-régression passent avant déploiement.
+17. Plan de développement progressif
+Phase 1 — Audit des intégrations
+Inventorier les systèmes sources, connecteurs, endpoints, tables, tâches planifiées et formats réellement utilisés.
+Livrable : diagramme du flux réel et rapport d’audit.
+Phase 2 — Référentiel des sources
+Documenter les sources autorisées, les types d’événements, les périmètres et les versions de contrat.
+Livrable : matrice des sources et habilitations.
+Phase 3 — Réception idempotente
+Stabiliser les références d’événement, la détection de répétitions et les accusés techniques.
+Livrable : tests de répétition, timeout et source inconnue.
+Phase 4 — Vérification et rapprochement
+Mettre en place la vérification d’acte, le rapprochement avec le FGP et la revue des cas ambigus.
+Livrable : scénarios testés avec zéro, un ou plusieurs candidats.
+Phase 5 — Application et historique
+Rendre les mises à jour transactionnelles, historisées et liées aux sources et dates d’effet.
+Livrable : tests d’historique et de conflit.
+Phase 6 — Rectification et annulation
+Implémenter les liens entre événements et la propagation autorisée des corrections.
+Livrable : scénarios de rectification, annulation et événement tardif.
+Phase 7 — Sécurité et exploitation
+Renforcer permissions, audit, notifications, files d’erreurs et surveillance.
+Livrable : rapport de sécurité et d’exploitation.
+Phase 8 — Recette et pilote
+Tester avec données fictives ou autorisées et valider les parcours avec les responsables métier.
+Livrable : rapport de recette avant production.
+18. Prompt complet pour l’agent développeur
+Tu travailles sur le projet existant SIGPOP-RDC / ONIP, Module 8 — Interconnexion avec l’état civil. Audite puis complète progressivement l’intégration entre les sources d’état civil autorisées et le Fichier Général de la Population (FGP).OBJECTIFRecevoir et traiter de manière sécurisée et traçable les événements autorisés de naissance, mariage, divorce, décès, rectification, transcription ou annulation, puis appliquer au FGP uniquement les effets permis par les règles approuvées.RÈGLES ABSOLUES1. Lis d’abord le dépôt, les README, routes frontend/API, modèles, migrations, connecteurs, tâches planifiées et tests.2. Documente le flux actuellement utilisé avant d’ajouter un nouveau connecteur. Réutilise les contrats opérationnels existants s’ils sont corrects.3. Ne supprime ni ne remplace une route, table, champ, événement ou connecteur sans justification, sauvegarde, plan de migration et retour arrière.4. Distingue faits observés, hypothèses et propositions.5. Vérifie l’identité technique et l’habilitation de toute source. Un format valide ne prouve pas que l’émetteur est autorisé.6. Distingue message reçu, acte vérifié, décision métier et événement appliqué au FGP.7. Ne transforme jamais une fiche de recensement en acte d’état civil. Les workflows restent distincts.8. N’applique pas un événement si la personne ou l’acte ne peut pas être identifié de façon sûre ; crée une exception ou une tâche de rapprochement.9. Toute référence source stable doit être idempotente. Une réémission ou un timeout ne doit pas appliquer deux fois un événement.10. N’utilise pas la règle « dernier message reçu gagne ». Traite dates d’effet, événements tardifs et conflits selon une politique approuvée.11. Toute rectification ou annulation doit référencer l’événement antérieur et préserver l’historique.12. Ne supprime pas un dossier FGP au décès et ne réattribue pas le NIN ; applique les règles officielles validées.13. Protège les données personnelles, les pièces et les journaux ; ne logue pas les payloads complets inutilement.14. Utilise des données fictives ou anonymisées pour les tests.PHASE A — AUDIT- Cartographie les sources, connecteurs, endpoints, modèles, migrations et tâches de synchronisation.- Identifie les flux réellement supportés : naissance, mariage, divorce, décès, rectification, transcription et annulation.- Vérifie authentification, version de schéma, références d’actes, idempotence, dates d’effet et retours source.- Vérifie comment les événements mettent à jour le FGP et comment l’historique est conservé.- Exécute les tests existants et consigne les résultats exacts.- Fournis d’abord un tableau d’audit : fonction, statut réel, preuve, fichiers/endpoints/tables, écart, risque, correction, priorité et tests.PHASE B — CONTRAT ET SOURCES- Documente chaque source, les événements autorisés, le périmètre, les versions et l’authentification.- Ne déduis pas la validité juridique du seul format du message.- Préserve la compatibilité des clients existants.PHASE C — RÉCEPTION ET TRAITEMENT- Renforce l’idempotence et la gestion durable des états.- Distingue accusé technique et résultat métier.- Mets en quarantaine les messages inconnus, conflits et références non vérifiées.- Rapproche les événements avec le FGP ; les ambiguïtés restent soumises à revue habilitée.- Applique les mises à jour sous transaction et conserve source, date, effet, décision et version.PHASE D — CORRECTIONS ET EXCEPTIONS- Lie chaque rectification/annulation à l’événement concerné.- Préserve l’événement initial et toutes les décisions.- Crée une file d’exception avec responsable, motif, statut et historique.- Rends les reprises idempotentes et évite de réappliquer deux fois les mêmes effets.PHASE E — SÉCURITÉ ET TESTS- Applique les permissions par source, rôle et périmètre.- Protège documents, données personnelles, journaux et notifications.- Ajoute tests pour source inconnue, message répété, conflit de payload, événement tardif, plusieurs candidats, décès, correction, annulation, service indisponible et notification échouée.- Exécute les tests, le lint et le build disponibles ; donne les commandes et résultats exacts.- Liste les fichiers modifiés, migrations, risques résiduels et procédure de retour arrière.- Aucun déploiement ni changement destructif sans autorisation explicite.LIVRABLE INITIALUn rapport d’audit fondé sur des preuves et un diagramme du flux réel avant tout changement structurel. Ne déclare pas le module terminé sans tests et validation métier.
+19. Sources, limites et décisions à valider
+19.1 Références documentaires consultées
+Décret n° 22/07 du 2 mars 2022 portant création d’un Fichier Général de la Population, publié sur le site de l’ONIP : https://www.onip.gouv.cd/docs/FGP.pdf
+Copie du décret n° 22/07 disponible sur LegaNet : https://mail.leganet.cd/Legislation/Droit%20Public/Identification/decret%2022.04.02.03.2022.html
+Loi n° 16/008 du 15 juillet 2016 modifiant et complétant la loi n° 87-010 portant Code de la famille, disponible sur LegaNet : https://mail.leganet.cd/Legislation/Code%20de%20la%20famille/Loi.15.07.2016.html
+19.2 Points à valider avant production
+Textes et procédures en vigueur, y compris les éventuelles modifications postérieures aux documents consultés.
+Liste des sources habilitées et des types d’actes qu’elles peuvent communiquer.
+Format officiel des références, mécanismes de vérification et authentification des messages.
+Règles de rapprochement avec le FGP et conditions d’application automatique ou de revue humaine.
+Règles de date d’effet, rectification, transcription, annulation et événements tardifs.
+Habilitations des utilisateurs, délais de traitement et niveaux d’escalade.
+Durées de conservation, localisation des données et exigences de protection.
+Contrats API, hébergement et reprise après incident.
+Conclusion
+Le Module 8 doit assurer une chaîne vérifiable entre l’autorité d’état civil source, l’événement transmis, la vérification de l’acte, le rapprochement avec le dossier FGP, la mise à jour autorisée et le retour du résultat à la source. Son objectif est de fiabiliser la mise à jour du FGP sans brouiller les responsabilités des autorités d’état civil.
+La première étape est l’audit des intégrations existantes. Il faut ensuite renforcer l’authentification des sources, l’idempotence, la gestion des dates d’effet et des conflits, l’historique et les tests. Aucun événement ne doit être appliqué au FGP sur la seule base d’un format de message valide, et aucune fiche de recensement ne doit être confondue avec un acte d’état civil.
