@@ -94,7 +94,7 @@ def test_generated_nics_are_unique_across_batch():
 
 
 def test_algorithm_version_constant():
-    assert ALGORITHM_VERSION == "v3-rdc-14"
+    assert ALGORITHM_VERSION == "PROVISIONAL-v3-rdc-14-NOT-OFFICIAL"
 
 
 def test_invalid_nic_rejected():
@@ -109,4 +109,5 @@ def test_all_provinces_have_numeric_codes():
     from apps.api.domains.core_registry.nic_service import PROVINCE_NUMERIC
 
     assert len(PROVINCE_NUMERIC) == len(PROVINCES) == 26
-    assert encode_province("KIN") == "01"
+    # Kinshasa = code métier SIGPOP 15 (pas 01)
+    assert encode_province("KIN") == "15"

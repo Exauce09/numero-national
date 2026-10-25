@@ -6,6 +6,18 @@ from enum import StrEnum
 
 
 class CitizenStatus(StrEnum):
+    """Statuts citoyen FGP (convention projet).
+
+    Mapping métier demandé (cahier ONIP) → existant :
+    - DRAFT → DRAFT
+    - SUBMITTED / UNDER_REVIEW → PENDING_VALIDATION (ou statut fiche recensement)
+    - DUPLICATE_REVIEW → DuplicateCandidate OPEN + verification FLAGGED_DUPLICATE
+    - APPROVED → validation métier recensement (distinct du NIC)
+    - IDENTIFIED → ACTIVE avec nic non nul (NIN attribué)
+    - REJECTED / CORRECTION_PENDING → flux sectoriels (ne pas dupliquer ici)
+    - DECEASED → DECEASED
+    """
+
     DRAFT = "DRAFT"
     PENDING_VALIDATION = "PENDING_VALIDATION"
     ACTIVE = "ACTIVE"

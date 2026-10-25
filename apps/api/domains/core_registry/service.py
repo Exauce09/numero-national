@@ -23,7 +23,9 @@ from apps.api.domains.core_registry.models import (
     CitizenAddress,
     CitizenHistory,
 )
-from apps.api.domains.core_registry.nic_service import assign_nic
+from apps.api.domains.core_registry.national_identity_number_service import (
+    assign_provisional_nic,
+)
 from apps.api.domains.core_registry.schemas import (
     CitizenCreate,
     CitizenMergeRequest,
@@ -323,7 +325,10 @@ async def validate_and_assign_nic(
                 detail="override_justification required (min 10 chars) when forcing NIC",
             )
 
-    await assign_nic(session, citizen=citizen, actor_id=actor_id)
+    result = await assign_provisional_nic(session, citizen=citizen, actor_id=actor_id)
+    if result.already_assigned:
+        # Ne jamais réattribuer — idempotence
+        pass
 
     history_payload: dict = {"status": CitizenStatus.ACTIVE.value}
     if open_count > 0 and force_despite_duplicates:

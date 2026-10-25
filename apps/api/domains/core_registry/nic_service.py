@@ -1,6 +1,17 @@
-"""NIC génération — format RDC structuré 14 chiffres (v3-rdc-14).
+"""NIC génération — format PROVISOIRE SIGPOP 14 chiffres (v3-rdc-14).
 
-Format (14 chiffres) ::
+⚠️ CE FORMAT N'EST PAS LE NIN OFFICIEL FGP.
+
+Le Décret n° 22/07 du 2 mars 2022 (art. 8) renvoie la composition du numéro
+national d'identification à un arrêté du Ministre de l'Intérieur sur proposition
+de l'ONIP. Cet arrêté / annexe n'a pas été confirmé dans le dépôt
+(voir docs/legal/onip/AUDIT_CONFORMITE_FGP_NIN.md).
+
+Tant que OFFICIAL_NIN_FORMAT_CONFIRMED est False
+(apps.api.domains.core_registry.national_identity_number_service),
+ce module ne doit servir qu'au développement / tests / transition.
+
+Format provisoire (14 chiffres) ::
   PP TTT S YYYY NNNN
   │  │   │ │    └─ séquence anti-collision (0000–9999)
   │  │   │ └────── année de naissance (4 chiffres)
@@ -8,10 +19,7 @@ Format (14 chiffres) ::
   │  └──────────── territoire / ville (001–999, 000 si inconnu)
   └─────────────── province (01–26)
 
-Pas de code pays dans le NIC : comme dans la plupart des pays, le numéro
-national est déjà scopé à un État (la RDC) — le pays n’est pas répété dedans.
-
-Le NIC n'est jamais accepté en entrée API publique ; seul ce service l'attribue.
+Le NIC n'est jamais accepté en entrée API publique ; seul le service d'attribution l'émet.
 """
 
 from __future__ import annotations
@@ -28,7 +36,7 @@ from apps.api.domains.core_registry.enums import CitizenEventType, CitizenStatus
 from apps.api.domains.core_registry.models import Citizen, CitizenHistory, NicIssuanceLog
 from apps.api.domains.geography.seed_data import PROVINCES
 
-ALGORITHM_VERSION = "v3-rdc-14"
+ALGORITHM_VERSION = "PROVISIONAL-v3-rdc-14-NOT-OFFICIAL"
 ACTOR_SYSTEM = "CORE_REGISTRY"
 NIC_PAYLOAD_LENGTH = 14
 NIC_TOTAL_LENGTH = 14
