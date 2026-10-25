@@ -38,8 +38,11 @@ def test_normalize_empty_codes_become_none():
 async def test_build_dashboard_structure_without_db_tables():
     """Sans tables : compteurs à 0, structure Module 1 complète, empty=True."""
     db = AsyncMock()
-    with patch("apps.api.domains.onip.service._safe_count", new_callable=AsyncMock) as mock_count:
+    with patch("apps.api.domains.onip.service._safe_count", new_callable=AsyncMock) as mock_count, patch(
+        "apps.api.domains.onip.service._safe_metric", new_callable=AsyncMock
+    ) as mock_metric:
         mock_count.return_value = 0
+        mock_metric.return_value = {"source": "t", "status": "ok", "value": 0}
         out = await build_dashboard(db, DashboardFilters())
     assert out["module"] == 1
     assert out["title"] == "Tableau de bord national"
@@ -51,6 +54,8 @@ async def test_build_dashboard_structure_without_db_tables():
     assert "sync_rate_percent" in out["campaigns"]
     assert "produced" in out["cards"]
     assert "delivered" in out["cards"]
+    assert "expired" in out["cards"]
+    assert "kpis" in out
     assert "services" in out
     assert out["export"]["pii"] is False
     assert out["filters_applied"]["province_code"] is None
@@ -68,8 +73,11 @@ async def test_build_dashboard_echoes_filters():
         citizen_status="ACTIVE",
         card_status="PENDING",
     )
-    with patch("apps.api.domains.onip.service._safe_count", new_callable=AsyncMock) as mock_count:
+    with patch("apps.api.domains.onip.service._safe_count", new_callable=AsyncMock) as mock_count, patch(
+        "apps.api.domains.onip.service._safe_metric", new_callable=AsyncMock
+    ) as mock_metric:
         mock_count.return_value = 3
+        mock_metric.return_value = {"source": "t", "status": "ok", "value": 3}
         out = await build_dashboard(db, filters)
     assert out["filters_applied"]["province_code"] == "KIN"
     assert out["filters_applied"]["campaign_id"] == str(cid)
@@ -77,3 +85,4 @@ async def test_build_dashboard_echoes_filters():
     assert out["filters_applied"]["card_status"] == "PENDING"
     assert out["empty"] is False  # counts > 0
     assert out["population"]["total"] == 3
+    assert out["kpis"]["registered_records"] == 3

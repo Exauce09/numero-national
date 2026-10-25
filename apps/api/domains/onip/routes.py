@@ -64,6 +64,94 @@ async def onip_dashboard(
     return await service.build_dashboard(db, filters)
 
 
+def _dashboard_filters_from_query(
+    period_from: date | None = None,
+    period_to: date | None = None,
+    province_code: str | None = None,
+    commune_code: str | None = None,
+    campaign_id: UUID | None = None,
+    citizen_status: str | None = None,
+    card_status: str | None = None,
+) -> service.DashboardFilters:
+    return service.normalize_dashboard_filters(
+        period_from=period_from,
+        period_to=period_to,
+        province_code=province_code,
+        commune_code=commune_code,
+        campaign_id=campaign_id,
+        citizen_status=citizen_status,
+        card_status=card_status,
+    )
+
+
+@router.get(
+    "/dashboard/trends",
+    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
+)
+async def onip_dashboard_trends(
+    db: AsyncSession = Depends(get_db),
+    period_from: date | None = Query(default=None),
+    period_to: date | None = Query(default=None),
+    province_code: str | None = Query(default=None),
+    commune_code: str | None = Query(default=None),
+    campaign_id: UUID | None = Query(default=None),
+    days: int = Query(default=30, ge=1, le=180),
+) -> dict[str, Any]:
+    """Module 1 — tendances temporelles agrégées."""
+    filters = _dashboard_filters_from_query(
+        period_from, period_to, province_code, commune_code, campaign_id
+    )
+    return await service.build_dashboard_trends(db, filters, days=days)
+
+
+@router.get(
+    "/dashboard/territories",
+    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
+)
+async def onip_dashboard_territories(
+    db: AsyncSession = Depends(get_db),
+    period_from: date | None = Query(default=None),
+    period_to: date | None = Query(default=None),
+    province_code: str | None = Query(default=None),
+    commune_code: str | None = Query(default=None),
+    campaign_id: UUID | None = Query(default=None),
+    limit: int = Query(default=30, ge=1, le=100),
+) -> dict[str, Any]:
+    """Module 1 — répartition territoriale agrégée."""
+    filters = _dashboard_filters_from_query(
+        period_from, period_to, province_code, commune_code, campaign_id
+    )
+    return await service.build_dashboard_territories(db, filters, limit=limit)
+
+
+@router.get(
+    "/dashboard/alerts",
+    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
+)
+async def onip_dashboard_alerts(
+    db: AsyncSession = Depends(get_db),
+    period_from: date | None = Query(default=None),
+    period_to: date | None = Query(default=None),
+    province_code: str | None = Query(default=None),
+    commune_code: str | None = Query(default=None),
+    campaign_id: UUID | None = Query(default=None),
+) -> dict[str, Any]:
+    """Module 1 — centre d'alertes synthétique."""
+    filters = _dashboard_filters_from_query(
+        period_from, period_to, province_code, commune_code, campaign_id
+    )
+    return await service.build_dashboard_alerts(db, filters)
+
+
+@router.get(
+    "/dashboard/health",
+    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
+)
+async def onip_dashboard_health(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+    """Module 1 — santé des services surveillés."""
+    return await service.build_dashboard_health(db)
+
+
 @router.get(
     "/map-points",
     dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],

@@ -3,6 +3,9 @@ import { Link } from "react-router-dom";
 import {
   censusApi,
   fetchOnipDashboard,
+  fetchOnipDashboardHealth,
+  fetchOnipDashboardTerritories,
+  fetchOnipDashboardTrends,
   type Campaign,
   type OnipDashboard,
   type OnipDashboardFilters,
@@ -10,15 +13,40 @@ import {
 import { getSession, hasPermission } from "../auth";
 
 const CITIZEN_STATUSES = ["", "DRAFT", "PENDING_VALIDATION", "ACTIVE", "DECEASED", "SUSPENDED"];
-const CARD_STATUSES = ["", "PENDING", "SENT_TO_COMMUNE", "ACTIVE", "DELIVERED"];
+const CARD_STATUSES = ["", "PENDING", "SENT_TO_COMMUNE", "ACTIVE", "DELIVERED", "EXPIRED"];
+
+function fmt(n: number | null | undefined): string {
+  if (n == null || Number.isNaN(n)) return "—";
+  return n.toLocaleString("fr-FR");
+}
+
+function periodPreset(days: number): OnipDashboardFilters {
+  const to = new Date();
+  const from = new Date();
+  from.setDate(to.getDate() - (days - 1));
+  return {
+    period_from: from.toISOString().slice(0, 10),
+    period_to: to.toISOString().slice(0, 10),
+  };
+}
 
 export default function DashboardPage() {
   const session = getSession();
   const [data, setData] = useState<OnipDashboard | null>(null);
+  const [trends, setTrends] = useState<Array<{ day: string; registered: number; validated: number }>>(
+    [],
+  );
+  const [zones, setZones] = useState<
+    Array<{ zone: string; registered: number; validated: number; nin_assigned: number }>
+  >([]);
+  const [health, setHealth] = useState<
+    Array<{ service: string; state: string; checked_at: string; detail?: string | null }>
+  >([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [filters, setFilters] = useState<OnipDashboardFilters>({});
+  const [filtersOpen, setFiltersOpen] = useState(true);
 
   const load = useCallback(
     async (f: OnipDashboardFilters = filters) => {
@@ -29,8 +57,16 @@ export default function DashboardPage() {
       setLoading(true);
       setError(null);
       try {
-        const dash = await fetchOnipDashboard(f);
+        const [dash, tr, ter, h] = await Promise.all([
+          fetchOnipDashboard(f),
+          fetchOnipDashboardTrends(f, 30).catch(() => ({ series: [] })),
+          fetchOnipDashboardTerritories(f).catch(() => ({ zones: [] })),
+          fetchOnipDashboardHealth().catch(() => ({ services: [] })),
+        ]);
         setData(dash);
+        setTrends(tr.series || []);
+        setZones(ter.zones || []);
+        setHealth(h.services || []);
       } catch (e) {
         setData(null);
         setError(e instanceof Error ? e.message : String(e));
@@ -49,7 +85,7 @@ export default function DashboardPage() {
         .then(setCampaigns)
         .catch(() => setCampaigns([]));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- charge initiale
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.accessToken]);
 
   function onFilterSubmit(e: FormEvent) {
@@ -63,24 +99,30 @@ export default function DashboardPage() {
     void load(empty);
   }
 
+  function applyPreset(days: number) {
+    const next = { ...filters, ...periodPreset(days) };
+    setFilters(next);
+    void load(next);
+  }
+
   function exportAggregatesCsv() {
     if (!data) return;
+    const k = data.kpis;
     const rows: string[][] = [
       ["indicateur", "valeur"],
       ["generated_at", data.generated_at],
-      ["population_total", String(data.population.total)],
-      ["population_active", String(data.population.active)],
-      ["population_pending", String(data.population.pending ?? 0)],
-      ["nin_assigned", String(data.population.nin_assigned ?? 0)],
-      ["coverage_percent", String(data.population.coverage_percent)],
-      ["campaigns_active", String(data.campaigns.active)],
-      ["sync_rate_percent", String(data.campaigns.sync_rate_percent ?? 0)],
-      ["duplicates_open", String(data.duplicates_open)],
-      ["biometric_reviews", String(data.biometric_reviews_pending ?? 0)],
-      ["cards_produced", String(data.cards.produced ?? 0)],
-      ["cards_active", String(data.cards.active)],
-      ["cards_pending", String(data.cards.pending)],
-      ["cards_delivered", String(data.cards.delivered ?? 0)],
+      ["freshness", data.meta?.freshness || ""],
+      ["registered_records", String(k?.registered_records ?? data.population.total)],
+      ["validated_records", String(k?.validated_records ?? data.population.active)],
+      ["pending_records", String(k?.pending_records ?? data.population.pending ?? 0)],
+      ["assigned_nins", String(k?.assigned_nins ?? data.population.nin_assigned ?? 0)],
+      ["duplicate_reviews_open", String(k?.duplicate_reviews_open ?? data.duplicates_open)],
+      ["cards_produced", String(k?.cards_produced ?? data.cards.produced ?? 0)],
+      ["cards_delivered", String(k?.cards_delivered ?? data.cards.delivered ?? 0)],
+      ["cards_expired", String(k?.cards_expired ?? data.cards.expired ?? 0)],
+      ["cards_pending", String(k?.cards_pending ?? data.cards.pending)],
+      ["sync_rate_percent", String(k?.sync_rate_percent ?? "N/A")],
+      ["validation_rate_percent", String(k?.validation_rate_percent ?? "N/A")],
     ];
     const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -96,307 +138,449 @@ export default function DashboardPage() {
       <div>
         <div className="hero-banner">
           <h1>Tableau de bord national</h1>
-          <p>Module 1 — pilotage identité · recensement · cartes</p>
+          <p>Module 1 — supervision ONIP</p>
         </div>
-        <p className="error">Impossible de charger le tableau de bord ({error}).</p>
+        <p className="error">Accès refusé ou erreur ({error}).</p>
       </div>
     );
   }
 
-  if (!data && loading) return <p className="muted">Chargement…</p>;
   if (!data) return <p className="muted">Chargement…</p>;
 
-  const popMax = Math.max(data.population.total, 1);
-  const cardTotal = Math.max(
-    (data.cards.active || 0) + (data.cards.pending || 0) + (data.cards.delivered || 0),
-    1,
-  );
-  const bars = [
-    { label: "Dossiers", value: data.population.total, color: "#007fff" },
-    { label: "Validés", value: data.population.active, color: "#0f6b45" },
-    { label: "NIC/NIN", value: data.population.nin_assigned ?? 0, color: "#005bb5" },
-    { label: "En attente", value: data.population.pending ?? 0, color: "#b8860b" },
-    { label: "Doublons", value: data.duplicates_open, color: "#ce1126" },
-    { label: "Cartes produites", value: data.cards.produced ?? 0, color: "#4a6fa5" },
-    { label: "Cartes remises", value: data.cards.delivered ?? 0, color: "#2e8b57" },
+  const k = data.kpis;
+  const drill = data.drilldown || {};
+  const freshness = data.meta?.freshness || "current";
+  const trendMax = Math.max(1, ...trends.flatMap((t) => [t.registered, t.validated]));
+  const zoneMax = Math.max(1, ...zones.map((z) => z.registered));
+
+  const kpiCards: Array<{
+    label: string;
+    value: number | null | undefined;
+    href?: string;
+    hint?: string;
+  }> = [
+    {
+      label: "Dossiers enregistrés",
+      value: k?.registered_records ?? data.population.total,
+      href: drill.population,
+    },
+    {
+      label: "Dossiers validés",
+      value: k?.validated_records ?? data.population.active,
+      href: drill.population,
+    },
+    {
+      label: "NIN / NIC attribués",
+      value: k?.assigned_nins ?? data.population.nin_assigned,
+      href: drill.nin,
+      hint: "Provisoire tant que format officiel non confirmé",
+    },
+    {
+      label: "Doublons à examiner",
+      value: k?.duplicate_reviews_open ?? data.duplicates_open,
+      href: drill.duplicates,
+    },
+    {
+      label: "Cartes produites",
+      value: k?.cards_produced ?? data.cards.produced,
+      href: drill.cards,
+    },
+    {
+      label: "Cartes remises",
+      value: k?.cards_delivered ?? data.cards.delivered,
+      href: drill.cards,
+    },
+    {
+      label: "Cartes en attente",
+      value: k?.cards_pending ?? data.cards.pending,
+      href: drill.cards,
+    },
+    {
+      label: "Cartes expirées",
+      value: k?.cards_expired ?? data.cards.expired,
+      href: drill.cards,
+    },
   ];
-  const barMax = Math.max(...bars.map((b) => b.value), 1);
 
   return (
     <div>
+      {/* A. En-tête */}
       <div className="hero-banner">
         <h1>Tableau de bord national</h1>
         <p>
-          Module 1 — vue consolidée · données au{" "}
-          {new Date(data.generated_at).toLocaleString("fr-FR")}
+          Module 1 ONIP · mis à jour à {new Date(data.generated_at).toLocaleString("fr-FR")} (UTC) ·
+          fraîcheur : <strong>{freshness === "current" ? "à jour" : freshness}</strong>
           {loading ? " · actualisation…" : ""}
         </p>
       </div>
 
-      <form className="panel dash-filters" onSubmit={onFilterSubmit}>
-        <h2 className="panel-title" style={{ marginTop: 0 }}>
-          Filtres
-        </h2>
-        <div className="dash-filters-grid">
-          <label>
-            Du
-            <input
-              type="date"
-              className="form-control"
-              value={filters.period_from || ""}
-              onChange={(e) => setFilters((f) => ({ ...f, period_from: e.target.value || undefined }))}
-            />
-          </label>
-          <label>
-            Au
-            <input
-              type="date"
-              className="form-control"
-              value={filters.period_to || ""}
-              onChange={(e) => setFilters((f) => ({ ...f, period_to: e.target.value || undefined }))}
-            />
-          </label>
-          <label>
-            Province
-            <input
-              className="form-control"
-              placeholder="ex. KIN"
-              value={filters.province_code || ""}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, province_code: e.target.value || undefined }))
-              }
-            />
-          </label>
-          <label>
-            Commune
-            <input
-              className="form-control"
-              placeholder="code commune"
-              value={filters.commune_code || ""}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, commune_code: e.target.value || undefined }))
-              }
-            />
-          </label>
-          <label>
-            Campagne
-            <select
-              className="form-control"
-              value={filters.campaign_id || ""}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, campaign_id: e.target.value || undefined }))
-              }
-            >
-              <option value="">Toutes</option>
-              {campaigns.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.code} — {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Statut dossier
-            <select
-              className="form-control"
-              value={filters.citizen_status || ""}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, citizen_status: e.target.value || undefined }))
-              }
-            >
-              {CITIZEN_STATUSES.map((s) => (
-                <option key={s || "all"} value={s}>
-                  {s || "Tous"}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Statut carte
-            <select
-              className="form-control"
-              value={filters.card_status || ""}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, card_status: e.target.value || undefined }))
-              }
-            >
-              {CARD_STATUSES.map((s) => (
-                <option key={s || "all"} value={s}>
-                  {s || "Tous"}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-          <button type="submit" className="btn-primary" disabled={loading}>
-            Appliquer
-          </button>
-          <button type="button" className="btn-secondary" onClick={resetFilters} disabled={loading}>
-            Réinitialiser
-          </button>
-          <button type="button" className="btn-secondary" onClick={exportAggregatesCsv}>
-            Export CSV (agrégats)
-          </button>
-        </div>
-        <p className="muted small" style={{ marginBottom: 0, marginTop: 8 }}>
-          Export contrôlé : indicateurs agrégés uniquement — aucune donnée personnelle.
-        </p>
-      </form>
-
-      {data.empty ? (
-        <div className="panel">
-          <p className="muted">
-            Aucune donnée pour ces filtres. Vérifiez les migrations / campagnes ou élargissez la
-            période.
+      {freshness !== "current" ? (
+        <div className="panel" style={{ borderLeft: "4px solid #b8860b" }}>
+          <strong>Données potentiellement dégradées</strong>
+          <p className="muted" style={{ marginBottom: 0 }}>
+            Au moins une source est indisponible. Les widgets concernés peuvent afficher « — »
+            plutôt qu&apos;un faux zéro.
           </p>
         </div>
       ) : null}
 
+      {/* B. Filtres */}
+      <form className="panel dash-filters" onSubmit={onFilterSubmit}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+          <h2 className="panel-title" style={{ margin: 0 }}>
+            Filtres
+          </h2>
+          <button type="button" className="btn-secondary" onClick={() => setFiltersOpen((o) => !o)}>
+            {filtersOpen ? "Replier" : "Déplier"}
+          </button>
+        </div>
+        {filtersOpen ? (
+          <>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "10px 0" }}>
+              <button type="button" className="btn-secondary" onClick={() => applyPreset(1)}>
+                Aujourd&apos;hui
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => applyPreset(7)}>
+                7 jours
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => applyPreset(30)}>
+                30 jours
+              </button>
+            </div>
+            <div className="dash-filters-grid">
+              <label>
+                Du
+                <input
+                  type="date"
+                  className="form-control"
+                  value={filters.period_from || ""}
+                  onChange={(e) =>
+                    setFilters((f) => ({ ...f, period_from: e.target.value || undefined }))
+                  }
+                />
+              </label>
+              <label>
+                Au
+                <input
+                  type="date"
+                  className="form-control"
+                  value={filters.period_to || ""}
+                  onChange={(e) =>
+                    setFilters((f) => ({ ...f, period_to: e.target.value || undefined }))
+                  }
+                />
+              </label>
+              <label>
+                Province
+                <input
+                  className="form-control"
+                  placeholder="ex. KIN"
+                  value={filters.province_code || ""}
+                  onChange={(e) =>
+                    setFilters((f) => ({ ...f, province_code: e.target.value || undefined }))
+                  }
+                />
+              </label>
+              <label>
+                Commune
+                <input
+                  className="form-control"
+                  value={filters.commune_code || ""}
+                  onChange={(e) =>
+                    setFilters((f) => ({ ...f, commune_code: e.target.value || undefined }))
+                  }
+                />
+              </label>
+              <label>
+                Campagne
+                <select
+                  className="form-control"
+                  value={filters.campaign_id || ""}
+                  onChange={(e) =>
+                    setFilters((f) => ({ ...f, campaign_id: e.target.value || undefined }))
+                  }
+                >
+                  <option value="">Toutes</option>
+                  {campaigns.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.code} — {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Statut dossier
+                <select
+                  className="form-control"
+                  value={filters.citizen_status || ""}
+                  onChange={(e) =>
+                    setFilters((f) => ({ ...f, citizen_status: e.target.value || undefined }))
+                  }
+                >
+                  {CITIZEN_STATUSES.map((s) => (
+                    <option key={s || "all"} value={s}>
+                      {s || "Tous"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Statut carte
+                <select
+                  className="form-control"
+                  value={filters.card_status || ""}
+                  onChange={(e) =>
+                    setFilters((f) => ({ ...f, card_status: e.target.value || undefined }))
+                  }
+                >
+                  {CARD_STATUSES.map((s) => (
+                    <option key={s || "all"} value={s}>
+                      {s || "Tous"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+              <button type="submit" className="btn-primary" disabled={loading}>
+                Appliquer
+              </button>
+              <button type="button" className="btn-secondary" onClick={resetFilters}>
+                Réinitialiser
+              </button>
+              <button type="button" className="btn-secondary" onClick={exportAggregatesCsv}>
+                Export CSV agrégats
+              </button>
+            </div>
+          </>
+        ) : null}
+      </form>
+
+      {data.empty ? (
+        <div className="panel">
+          <p className="muted">Aucune donnée pour les filtres choisis. Modifiez ou réinitialisez.</p>
+        </div>
+      ) : null}
+
+      {/* C. Ligne KPI + drill-down */}
       <div className="grid">
-        <Metric label="Dossiers enregistrés" value={data.population.total} />
-        <Metric label="Dossiers validés" value={data.population.active} />
-        <Metric label="Dossiers en attente" value={data.population.pending ?? 0} />
-        <Metric label="NIC / NIN attribués" value={data.population.nin_assigned ?? 0} />
-        <Metric label="Couverture validés %" value={data.population.coverage_percent} />
-        <Metric label="Couverture NIC %" value={data.population.nin_coverage_percent ?? 0} />
-        <Metric label="Campagnes actives" value={data.campaigns.active} />
-        <Metric label="Taux sync %" value={data.campaigns.sync_rate_percent ?? 0} />
-        <Metric label="Doublons ouverts" value={data.duplicates_open} />
-        <Metric label="Revues biométrie" value={data.biometric_reviews_pending ?? 0} />
-        <Metric label="Cartes produites" value={data.cards.produced ?? 0} />
-        <Metric label="Cartes remises" value={data.cards.delivered ?? 0} />
+        {kpiCards.map((c) => (
+          <KpiCard key={c.label} {...c} />
+        ))}
       </div>
+
+      <div className="grid">
+        <Metric
+          label="Taux validation %"
+          value={k?.validation_rate_percent ?? data.population.validation_rate_percent}
+        />
+        <Metric label="Taux sync %" value={k?.sync_rate_percent ?? data.campaigns.sync_rate_percent} />
+        <Metric label="Échecs sync" value={k?.sync_failures ?? data.campaigns.sync_failures ?? 0} />
+        <Metric label="Campagnes actives" value={k?.campaigns_active ?? data.campaigns.active} />
+        <Metric label="Dossiers en attente" value={k?.pending_records ?? data.population.pending ?? 0} />
+        <Metric label="Revues biométrie" value={data.biometric_reviews_pending ?? 0} />
+      </div>
+
+      {(data.population.pending_by_status || k?.pending_by_status) && (
+        <div className="panel">
+          <h2 className="panel-title">Ventilation dossiers en attente</h2>
+          <ul>
+            {Object.entries(data.population.pending_by_status || k?.pending_by_status || {}).map(
+              ([st, n]) => (
+                <li key={st}>
+                  <strong>{st}</strong> : {fmt(n)}
+                </li>
+              ),
+            )}
+          </ul>
+        </div>
+      )}
 
       <div className="stats-charts">
+        {/* D. Tendance */}
         <div className="panel chart-panel">
-          <h2>Indicateurs</h2>
-          <div className="bar-chart" role="img" aria-label="Graphique en barres des indicateurs">
-            {bars.map((b) => (
-              <div className="bar-row" key={b.label}>
-                <span className="bar-label">{b.label}</span>
-                <div className="bar-track">
-                  <div
-                    className="bar-fill"
-                    style={{
-                      width: `${Math.max(4, (b.value / barMax) * 100)}%`,
-                      background: b.color,
-                    }}
-                  />
+          <h2>Activité dans le temps (30 j.)</h2>
+          {trends.length === 0 ? (
+            <p className="muted">Aucune série temporelle.</p>
+          ) : (
+            <div className="bar-chart" role="img" aria-label="Tendance dossiers reçus et validés">
+              {trends.filter((_, i) => i % Math.ceil(trends.length / 14) === 0 || i === trends.length - 1).map((t) => (
+                <div className="bar-row" key={t.day}>
+                  <span className="bar-label">{t.day.slice(5)}</span>
+                  <div className="bar-track">
+                    <div
+                      className="bar-fill"
+                      style={{
+                        width: `${Math.max(2, (t.registered / trendMax) * 100)}%`,
+                        background: "#007fff",
+                      }}
+                      title={`Reçus ${t.registered}`}
+                    />
+                  </div>
+                  <span className="bar-value">
+                    {t.registered}/{t.validated}
+                  </span>
                 </div>
-                <span className="bar-value">{b.value.toLocaleString("fr-FR")}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
+          <p className="muted small">Reçus / validés — même périmètre que les filtres.</p>
         </div>
 
+        {/* E. Territoires */}
         <div className="panel chart-panel">
-          <h2>Répartition &amp; services</h2>
-          <div className="donut-wrap">
-            <svg viewBox="0 0 120 120" className="donut" aria-label="Couverture dossiers validés">
-              <circle cx="60" cy="60" r="42" fill="none" stroke="#e6ebf2" strokeWidth="16" />
-              <circle
-                cx="60"
-                cy="60"
-                r="42"
-                fill="none"
-                stroke="#007fff"
-                strokeWidth="16"
-                strokeDasharray={`${(data.population.active / popMax) * 264} 264`}
-                strokeLinecap="round"
-                transform="rotate(-90 60 60)"
-              />
-              <circle
-                cx="60"
-                cy="60"
-                r="26"
-                fill="none"
-                stroke="#ce1126"
-                strokeWidth="10"
-                strokeDasharray={`${((data.cards.active || 0) / cardTotal) * 163} 163`}
-                strokeLinecap="round"
-                transform="rotate(-90 60 60)"
-              />
-              <text x="60" y="58" textAnchor="middle" className="donut-center">
-                {data.population.coverage_percent}%
-              </text>
-              <text x="60" y="72" textAnchor="middle" className="donut-sub">
-                validés
-              </text>
-            </svg>
-            <ul className="chart-legend">
-              <li>
-                <span className="swatch" style={{ background: "#007fff" }} /> Validés / enregistrés
-              </li>
-              <li>
-                <span className="swatch" style={{ background: "#ce1126" }} /> Cartes actives / file
-              </li>
-              <li>
-                Sync campagne : {data.campaigns.sync_rate_percent ?? 0}% (
-                {data.campaigns.records_synced ?? 0}/{data.campaigns.records_total ?? 0})
-              </li>
-              <li>
-                API : {data.services?.api ?? "—"} · sync pending :{" "}
-                {data.services?.sync_batches_pending ?? 0}
-              </li>
-            </ul>
-          </div>
+          <h2>Répartition territoriale</h2>
+          {zones.length === 0 ? (
+            <p className="muted">Aucune zone agrégée.</p>
+          ) : (
+            <div className="bar-chart">
+              {zones.slice(0, 12).map((z) => (
+                <div className="bar-row" key={z.zone}>
+                  <span className="bar-label">{z.zone}</span>
+                  <div className="bar-track">
+                    <div
+                      className="bar-fill"
+                      style={{
+                        width: `${Math.max(2, (z.registered / zoneMax) * 100)}%`,
+                        background: "#0f6b45",
+                      }}
+                    />
+                  </div>
+                  <span className="bar-value">{fmt(z.registered)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="panel" style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <strong>Parcours</strong>
-        {hasPermission("users:manage", session) ? (
-          <Link className="btn-secondary" to="/accounts">
-            Comptes agents
+      {/* F + G CIN / campagnes */}
+      <div className="stats-charts">
+        <div className="panel chart-panel">
+          <h2>État CIN (stock)</h2>
+          <ul className="chart-legend">
+            <li>Produites : {fmt(data.cards.produced)}</li>
+            <li>Actives : {fmt(data.cards.active)}</li>
+            <li>En attente : {fmt(data.cards.pending)}</li>
+            <li>Remises : {fmt(data.cards.delivered)}</li>
+            <li>Expirées : {fmt(data.cards.expired)}</li>
+          </ul>
+          <p className="muted small">
+            Produite ≠ remise. Expirée distincte de révoquée/remplacée.
+          </p>
+          <Link className="btn-secondary" to={drill.cards || "/cards"}>
+            Suivi CIN
           </Link>
-        ) : null}
-        <Link className="btn-primary" to="/campaigns">
-          Campagnes &amp; contrôle
-        </Link>
-        <Link className="btn-secondary" to="/population">
-          Population / FGP
-        </Link>
-        <Link className="btn-secondary" to="/nic">
-          NIC / NIN
-        </Link>
-        <Link className="btn-secondary" to="/biometrie">
-          Biométrie
-        </Link>
-        <Link className="btn-secondary" to="/cards">
-          Cartes
-        </Link>
-        <Link className="btn-secondary" to="/anomalies">
-          Anomalies
-        </Link>
-        <Link className="btn-secondary" to="/admin">
-          Services
-        </Link>
+        </div>
+        <div className="panel chart-panel">
+          <h2>Campagnes &amp; synchronisation</h2>
+          <ul className="chart-legend">
+            <li>
+              Actives : {fmt(data.campaigns.active)} / {fmt(data.campaigns.total)}
+            </li>
+            <li>
+              Fiches : {fmt(data.campaigns.records_synced)} sync / {fmt(data.campaigns.records_total)}
+            </li>
+            <li>Taux sync : {fmtRate(data.campaigns.sync_rate_percent)}</li>
+            <li>Échecs / partiels : {fmt(data.campaigns.sync_failures)}</li>
+            <li>Promues FGP : {fmt(data.campaigns.records_promoted)}</li>
+          </ul>
+          <Link className="btn-secondary" to={drill.campaigns || "/campaigns"}>
+            Campagnes
+          </Link>
+        </div>
       </div>
 
+      {/* H. Alertes */}
       <div className="panel">
-        <h2>Anomalies</h2>
+        <h2>Centre d&apos;alertes</h2>
+        {data.alerts ? (
+          <p className="muted small">
+            Critique {data.alerts.critical ?? 0} · Élevé {data.alerts.high ?? 0} · Moyen{" "}
+            {data.alerts.medium ?? 0} · Faible {data.alerts.low ?? 0}
+          </p>
+        ) : null}
         {data.anomalies.length === 0 ? (
-          <p className="muted">Aucune anomalie signalée.</p>
+          <p className="muted">Aucune alerte ouverte.</p>
         ) : (
           <ul>
             {data.anomalies.map((a) => (
-              <li key={a.code}>
-                <strong>{a.code}</strong> [{a.severity}] — {a.message} ({a.count})
+              <li key={a.id || a.code}>
+                <strong>{a.code}</strong> [{a.severity}] — {a.message} ({a.count}){" "}
+                {a.link ? (
+                  <Link to={a.link}>ouvrir</Link>
+                ) : null}
               </li>
             ))}
           </ul>
         )}
+        <p className="muted small">Pas de fusion automatique depuis une alerte doublon.</p>
+      </div>
+
+      {/* I. Santé technique */}
+      <div className="panel">
+        <h2>Santé technique</h2>
+        {health.length === 0 ? (
+          <p className="muted">Sondes non disponibles.</p>
+        ) : (
+          <ul>
+            {health.map((s) => (
+              <li key={s.service}>
+                <strong>{s.service}</strong> :{" "}
+                {s.state === "operational" ? "opérationnel" : "inconnu / non surveillé"}
+                <span className="muted small"> · {new Date(s.checked_at).toLocaleString("fr-FR")}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {hasPermission("onip:dashboard", session) ? (
+          <Link className="btn-secondary" to="/admin">
+            Administration technique
+          </Link>
+        ) : null}
       </div>
     </div>
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function fmtRate(n: number | null | undefined): string {
+  if (n == null) return "N/A";
+  return `${n.toLocaleString("fr-FR")} %`;
+}
+
+function Metric({ label, value }: { label: string; value: number | null | undefined }) {
   return (
     <div className="metric">
       <div className="label">{label}</div>
-      <div className="value">{value.toLocaleString("fr-FR")}</div>
+      <div className="value">{fmt(value)}</div>
     </div>
   );
+}
+
+function KpiCard({
+  label,
+  value,
+  href,
+  hint,
+}: {
+  label: string;
+  value: number | null | undefined;
+  href?: string;
+  hint?: string;
+}) {
+  const inner = (
+    <>
+      <div className="label">{label}</div>
+      <div className="value">{fmt(value)}</div>
+      {hint ? <p className="muted small" style={{ margin: "6px 0 0" }}>{hint}</p> : null}
+    </>
+  );
+  if (href) {
+    return (
+      <Link to={href} className="metric" style={{ textDecoration: "none", color: "inherit" }}>
+        {inner}
+      </Link>
+    );
+  }
+  return <div className="metric">{inner}</div>;
 }

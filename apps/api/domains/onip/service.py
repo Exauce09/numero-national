@@ -55,13 +55,42 @@ def normalize_dashboard_filters(
 
 
 async def _safe_count(db: AsyncSession, sql: str, params: dict[str, Any] | None = None) -> int:
+    metric = await _safe_metric(db, sql, params)
+    return int(metric["value"] or 0) if metric["status"] == "ok" else 0
+
+
+async def _safe_metric(
+    db: AsyncSession, sql: str, params: dict[str, Any] | None = None, *, source: str = "sql"
+) -> dict[str, Any]:
+    """Compte avec distinction zéro réel vs source indisponible (cahier §10)."""
     try:
         result = await db.execute(text(sql), params or {})
-        return int(result.scalar_one() or 0)
+        return {
+            "source": source,
+            "status": "ok",
+            "value": int(result.scalar_one() or 0),
+        }
     except Exception as exc:
-        logger.debug("onip aggregate fallback: %s — %s", sql[:60], exc)
+        logger.debug("onip metric unavailable: %s — %s", sql[:60], exc)
         await db.rollback()
-        return 0
+        return {
+            "source": source,
+            "status": "unavailable",
+            "value": None,
+            "reason": "source_or_schema_unavailable",
+        }
+
+
+async def _safe_rows(
+    db: AsyncSession, sql: str, params: dict[str, Any] | None = None
+) -> list[dict[str, Any]]:
+    try:
+        result = await db.execute(text(sql), params or {})
+        return [dict(r) for r in result.mappings().all()]
+    except Exception as exc:
+        logger.debug("onip rows unavailable: %s — %s", sql[:60], exc)
+        await db.rollback()
+        return []
 
 
 def _citizen_where(filters: DashboardFilters, *, status: str | None = None) -> tuple[str, dict[str, Any]]:
@@ -278,84 +307,216 @@ async def build_dashboard(
         db,
         "SELECT COUNT(*) FROM recensement.sync_batches WHERE status IN ('PENDING', 'PROCESSING')",
     )
+    sync_failures = await _safe_count(
+        db,
+        "SELECT COUNT(*) FROM recensement.sync_batches WHERE status IN ('REJECTED', 'PARTIAL')",
+    )
+    pending_draft = await _safe_count(
+        db,
+        f"SELECT COUNT(*) FROM core_registry.citizens c WHERE {where_all} AND c.status = 'DRAFT'",
+        p_all,
+    )
+    pending_validation = await _safe_count(
+        db,
+        f"""
+        SELECT COUNT(*) FROM core_registry.citizens c
+        WHERE {where_all} AND c.status = 'PENDING_VALIDATION'
+        """,
+        p_all,
+    )
+    cards_expired = await _safe_count(
+        db,
+        """
+        SELECT COUNT(*) FROM cards.national_cards nc
+        WHERE nc.status = 'EXPIRED'
+           OR (
+             nc.expires_at IS NOT NULL
+             AND nc.expires_at < NOW()
+             AND nc.status NOT IN ('REVOKED', 'REPLACED', 'EXPIRED')
+           )
+        """,
+    )
+    citizens_probe = await _safe_metric(
+        db, "SELECT COUNT(*) FROM core_registry.citizens", source="core_registry.citizens"
+    )
+    cards_probe = await _safe_metric(
+        db, "SELECT COUNT(*) FROM cards.national_cards", source="cards.national_cards"
+    )
+    census_probe = await _safe_metric(
+        db, "SELECT COUNT(*) FROM recensement.campaigns", source="recensement.campaigns"
+    )
 
+    denom_validation = population_active + pending_count
+    validation_rate: float | None = (
+        round(100.0 * population_active / denom_validation, 1) if denom_validation else None
+    )
     coverage_pct = (
         round(100.0 * population_active / population_total, 2) if population_total else 0.0
     )
     nin_coverage = (
         round(100.0 * nin_assigned / population_total, 2) if population_total else 0.0
     )
+    sources = [citizens_probe, cards_probe, census_probe]
+    unavailable = sum(1 for s in sources if s["status"] != "ok")
+    freshness = "degraded" if unavailable else "current"
+    pending_by_status = {
+        "DRAFT": pending_draft,
+        "PENDING_VALIDATION": pending_validation,
+    }
 
     anomalies: list[dict[str, Any]] = []
     if duplicates_open:
         anomalies.append(
             {
+                "id": "dup-open",
                 "code": "DUPLICATES_OPEN",
                 "severity": "high",
+                "status": "open",
                 "count": duplicates_open,
                 "message": "Doublons démographiques ouverts à examiner",
+                "module": "fgp",
+                "link": "/anomalies",
             }
         )
     if biometric_dedup_review or biometric_match_pending:
         anomalies.append(
             {
+                "id": "bio-review",
                 "code": "BIOMETRIC_MANUAL_REVIEW",
                 "severity": "high",
+                "status": "open",
                 "count": biometric_dedup_review + biometric_match_pending,
                 "message": "Correspondances biométriques en revue humaine",
+                "module": "biometric",
+                "link": "/biometrie",
             }
         )
     if civil_pending:
         anomalies.append(
             {
+                "id": "civil-pending",
                 "code": "CIVIL_PENDING",
                 "severity": "medium",
+                "status": "open",
                 "count": civil_pending,
                 "message": "Déclarations d'état civil en attente",
+                "module": "civil",
+                "link": "/etat-civil",
             }
         )
     if sync_batches_pending:
         anomalies.append(
             {
+                "id": "sync-backlog",
                 "code": "SYNC_BACKLOG",
                 "severity": "medium",
+                "status": "open",
                 "count": sync_batches_pending,
                 "message": "Lots de synchronisation terrain en attente",
+                "module": "census",
+                "link": "/campaigns",
+            }
+        )
+    if sync_failures:
+        anomalies.append(
+            {
+                "id": "sync-fail",
+                "code": "SYNC_FAILURES",
+                "severity": "high",
+                "status": "open",
+                "count": sync_failures,
+                "message": "Lots de synchronisation rejetés ou partiels",
+                "module": "census",
+                "link": "/campaigns",
             }
         )
     if pending_count:
         anomalies.append(
             {
+                "id": "dossiers-pending",
                 "code": "DOSSIERS_PENDING",
                 "severity": "low",
+                "status": "open",
                 "count": pending_count,
                 "message": "Dossiers FGP en brouillon / validation",
+                "module": "fgp",
+                "link": "/population",
             }
         )
 
     empty = population_total == 0 and records_total == 0 and cards_produced == 0
+    generated_at = datetime.now(timezone.utc).isoformat()
+    filters_applied = {
+        "period_from": f.period_from.isoformat() if f.period_from else None,
+        "period_to": f.period_to.isoformat() if f.period_to else None,
+        "province_code": f.province_code,
+        "commune_code": f.commune_code,
+        "campaign_id": str(f.campaign_id) if f.campaign_id else None,
+        "citizen_status": f.citizen_status,
+        "card_status": f.card_status,
+    }
+
+    kpis = {
+        "registered_records": population_total,
+        "validated_records": population_active,
+        "pending_records": pending_count,
+        "pending_by_status": pending_by_status,
+        "assigned_nins": nin_assigned,
+        "duplicate_reviews_open": duplicates_open,
+        "cards_produced": cards_produced,
+        "cards_delivered": cards_delivered,
+        "cards_expired": cards_expired,
+        "cards_pending": cards_pending,
+        "validation_rate_percent": validation_rate,
+        "sync_rate_percent": sync_rate if records_total else None,
+        "sync_failures": sync_failures,
+        "campaigns_active": campaigns_active,
+    }
+
+    alerts_summary = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+    for a in anomalies:
+        sev = (a.get("severity") or "info").lower()
+        if sev in alerts_summary:
+            alerts_summary[sev] += 1
+
+    from apps.api.domains.core_registry.national_identity_number_service import (
+        OFFICIAL_NIN_FORMAT_CONFIRMED,
+    )
 
     return {
         "module": 1,
         "title": "Tableau de bord national",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "filters_applied": {
-            "period_from": f.period_from.isoformat() if f.period_from else None,
-            "period_to": f.period_to.isoformat() if f.period_to else None,
-            "province_code": f.province_code,
-            "commune_code": f.commune_code,
-            "campaign_id": str(f.campaign_id) if f.campaign_id else None,
-            "citizen_status": f.citizen_status,
-            "card_status": f.card_status,
+        "generated_at": generated_at,
+        "meta": {
+            "generated_at": generated_at,
+            "period": {
+                "from": filters_applied["period_from"],
+                "to": filters_applied["period_to"],
+            },
+            "scope": {
+                "province_code": f.province_code,
+                "commune_code": f.commune_code,
+                "campaign_id": filters_applied["campaign_id"],
+            },
+            "freshness": freshness,
+            "timezone": "UTC",
+            "official_nin_format_confirmed": OFFICIAL_NIN_FORMAT_CONFIRMED,
+            "kpi_dictionary": "docs/legal/onip/MODULE_1_DICTIONNAIRE_KPI.md",
         },
+        "filters_applied": filters_applied,
         "empty": empty,
+        "kpis": kpis,
+        "alerts": alerts_summary,
+        "sources": sources,
         "population": {
             "total": population_total,
             "active": population_active,
             "pending": pending_count,
+            "pending_by_status": pending_by_status,
             "nin_assigned": nin_assigned,
             "coverage_percent": coverage_pct,
             "nin_coverage_percent": nin_coverage,
+            "validation_rate_percent": validation_rate,
         },
         "campaigns": {
             "total": campaigns_total,
@@ -363,7 +524,8 @@ async def build_dashboard(
             "records_total": records_total,
             "records_synced": records_synced,
             "records_promoted": records_promoted,
-            "sync_rate_percent": sync_rate,
+            "sync_rate_percent": sync_rate if records_total else None,
+            "sync_failures": sync_failures,
         },
         "duplicates_open": duplicates_open,
         "biometric_reviews_pending": biometric_match_pending + biometric_dedup_review,
@@ -372,18 +534,30 @@ async def build_dashboard(
             "active": cards_active,
             "pending": cards_pending,
             "delivered": cards_delivered,
+            "expired": cards_expired,
         },
         "services": {
             "api": "up",
             "onip_dashboard": "ok",
             "sync_batches_pending": sync_batches_pending,
             "civil_pending": civil_pending,
+            "sync_failures": sync_failures,
         },
         "anomalies": anomalies,
         "export": {
             "format": "aggregate_csv",
             "pii": False,
             "note": "Export contrôlé : indicateurs agrégés uniquement",
+        },
+        "drilldown": {
+            "duplicates": "/anomalies",
+            "biometric": "/biometrie",
+            "cards": "/cards",
+            "campaigns": "/campaigns",
+            "population": "/population",
+            "nin": "/nic",
+            "civil": "/etat-civil",
+            "admin": "/admin",
         },
     }
 
@@ -562,6 +736,170 @@ async def list_map_by_milieu(
         "persons": raw["count"],
         "mode": "milieu",
         "milieux": milieux,
+    }
+
+
+async def build_dashboard_trends(
+    db: AsyncSession, filters: DashboardFilters | None = None, *, days: int = 30
+) -> dict[str, Any]:
+    """Séries temporelles dossiers créés / validés (agrégats, cahier §7.2)."""
+    f = filters or DashboardFilters()
+    days = max(1, min(days, 180))
+    end = f.period_to or date.today()
+    start = f.period_from or (end - timedelta(days=days - 1))
+    where, params = _citizen_where(
+        DashboardFilters(
+            period_from=start,
+            period_to=end,
+            province_code=f.province_code,
+            commune_code=f.commune_code,
+            campaign_id=f.campaign_id,
+        )
+    )
+    created_rows = await _safe_rows(
+        db,
+        f"""
+        SELECT DATE(c.created_at) AS day, COUNT(*)::int AS count
+        FROM core_registry.citizens c
+        WHERE {where}
+        GROUP BY DATE(c.created_at)
+        ORDER BY day
+        """,
+        params,
+    )
+    validated_rows = await _safe_rows(
+        db,
+        f"""
+        SELECT DATE(COALESCE(c.validated_at, c.created_at)) AS day, COUNT(*)::int AS count
+        FROM core_registry.citizens c
+        WHERE {where} AND c.status = 'ACTIVE'
+        GROUP BY DATE(COALESCE(c.validated_at, c.created_at))
+        ORDER BY day
+        """,
+        params,
+    )
+    created_map = {str(r["day"]): int(r["count"]) for r in created_rows if r.get("day") is not None}
+    validated_map = {
+        str(r["day"]): int(r["count"]) for r in validated_rows if r.get("day") is not None
+    }
+    series: list[dict[str, Any]] = []
+    cur = start
+    while cur <= end:
+        key = cur.isoformat()
+        series.append(
+            {
+                "day": key,
+                "registered": created_map.get(key, 0),
+                "validated": validated_map.get(key, 0),
+            }
+        )
+        cur += timedelta(days=1)
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "period": {"from": start.isoformat(), "to": end.isoformat()},
+        "unit": "day",
+        "series": series,
+        "definitions": {
+            "registered": "citizens.created_at",
+            "validated": "citizens ACTIVE by validated_at/created_at",
+        },
+    }
+
+
+async def build_dashboard_territories(
+    db: AsyncSession, filters: DashboardFilters | None = None, *, limit: int = 30
+) -> dict[str, Any]:
+    """Répartition territoriale agrégée (cahier §7.3) — province_code."""
+    f = filters or DashboardFilters()
+    where, params = _citizen_where(f)
+    params = {**params, "lim": max(1, min(limit, 100))}
+    rows = await _safe_rows(
+        db,
+        f"""
+        SELECT UPPER(COALESCE(NULLIF(a.province_code, ''), 'INCONNU')) AS zone,
+               COUNT(DISTINCT c.id)::int AS registered,
+               COUNT(DISTINCT c.id) FILTER (WHERE c.status = 'ACTIVE')::int AS validated,
+               COUNT(DISTINCT c.id) FILTER (WHERE c.nic IS NOT NULL)::int AS nin_assigned
+        FROM core_registry.citizens c
+        LEFT JOIN core_registry.citizen_addresses a ON a.citizen_id = c.id
+        WHERE {where}
+        GROUP BY UPPER(COALESCE(NULLIF(a.province_code, ''), 'INCONNU'))
+        ORDER BY registered DESC
+        LIMIT :lim
+        """,
+        params,
+    )
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "level": "province",
+        "count": len(rows),
+        "zones": [
+            {
+                "zone": r.get("zone") or "INCONNU",
+                "registered": int(r.get("registered") or 0),
+                "validated": int(r.get("validated") or 0),
+                "nin_assigned": int(r.get("nin_assigned") or 0),
+            }
+            for r in rows
+        ],
+        "note": "Agrégats uniquement — pas de liste nominative",
+    }
+
+
+async def build_dashboard_alerts(
+    db: AsyncSession, filters: DashboardFilters | None = None
+) -> dict[str, Any]:
+    """Centre d'alertes synthétique (cahier §8) — sans PII."""
+    dash = await build_dashboard(db, filters)
+    items = list(dash.get("anomalies") or [])
+    items.sort(
+        key=lambda a: {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}.get(
+            str(a.get("severity", "info")).lower(), 9
+        )
+    )
+    return {
+        "generated_at": dash.get("generated_at"),
+        "summary": dash.get("alerts") or {},
+        "items": items,
+        "freshness": (dash.get("meta") or {}).get("freshness"),
+    }
+
+
+async def build_dashboard_health(db: AsyncSession) -> dict[str, Any]:
+    """Santé services surveillés (cahier §7.6) — inconnu ≠ opérationnel."""
+    now = datetime.now(timezone.utc).isoformat()
+    probes = [
+        await _safe_metric(db, "SELECT 1", source="api_db"),
+        await _safe_metric(
+            db, "SELECT COUNT(*) FROM core_registry.citizens", source="core_registry"
+        ),
+        await _safe_metric(
+            db, "SELECT COUNT(*) FROM recensement.sync_batches", source="sync"
+        ),
+        await _safe_metric(
+            db,
+            "SELECT COUNT(*) FROM biometric.biometric_matches",
+            source="biometric",
+        ),
+    ]
+    services = []
+    for p in probes:
+        if p["status"] == "ok":
+            state = "operational"
+        else:
+            state = "unknown"
+        services.append(
+            {
+                "service": p["source"],
+                "state": state,
+                "checked_at": now,
+                "detail": None if state == "operational" else p.get("reason"),
+            }
+        )
+    return {
+        "generated_at": now,
+        "services": services,
+        "note": "Seules les sondes réellement exécutées sont listées ; unknown ≠ operational",
     }
 
 

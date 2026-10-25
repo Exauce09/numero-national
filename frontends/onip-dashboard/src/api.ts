@@ -306,14 +306,41 @@ export type OnipDashboard = {
   title?: string;
   generated_at: string;
   empty?: boolean;
+  meta?: {
+    generated_at?: string;
+    freshness?: string;
+    timezone?: string;
+    period?: { from?: string | null; to?: string | null };
+    scope?: Record<string, string | null | undefined>;
+  };
   filters_applied?: OnipDashboardFilters;
+  kpis?: {
+    registered_records?: number;
+    validated_records?: number;
+    pending_records?: number;
+    assigned_nins?: number;
+    duplicate_reviews_open?: number;
+    cards_produced?: number;
+    cards_delivered?: number;
+    cards_expired?: number;
+    cards_pending?: number;
+    validation_rate_percent?: number | null;
+    sync_rate_percent?: number | null;
+    sync_failures?: number;
+    campaigns_active?: number;
+    pending_by_status?: Record<string, number>;
+  };
+  alerts?: Record<string, number>;
+  sources?: Array<{ source: string; status: string; value: number | null }>;
   population: {
     total: number;
     active: number;
     pending?: number;
+    pending_by_status?: Record<string, number>;
     nin_assigned?: number;
     coverage_percent: number;
     nin_coverage_percent?: number;
+    validation_rate_percent?: number | null;
   };
   campaigns: {
     total: number;
@@ -321,7 +348,8 @@ export type OnipDashboard = {
     records_total?: number;
     records_synced?: number;
     records_promoted?: number;
-    sync_rate_percent?: number;
+    sync_rate_percent?: number | null;
+    sync_failures?: number;
   };
   duplicates_open: number;
   biometric_reviews_pending?: number;
@@ -330,28 +358,71 @@ export type OnipDashboard = {
     active: number;
     pending: number;
     delivered?: number;
+    expired?: number;
   };
   services?: {
     api?: string;
     onip_dashboard?: string;
     sync_batches_pending?: number;
     civil_pending?: number;
+    sync_failures?: number;
   };
-  anomalies: Array<{ code: string; severity: string; count: number; message: string }>;
+  anomalies: Array<{
+    id?: string;
+    code: string;
+    severity: string;
+    count: number;
+    message: string;
+    link?: string;
+    module?: string;
+  }>;
+  drilldown?: Record<string, string>;
   export?: { format?: string; pii?: boolean; note?: string };
 };
 
-export async function fetchOnipDashboard(
-  filters?: OnipDashboardFilters,
-): Promise<OnipDashboard> {
+function dashboardQuery(filters?: OnipDashboardFilters, extra?: Record<string, string | number>) {
   const q = new URLSearchParams();
   if (filters) {
     for (const [k, v] of Object.entries(filters)) {
       if (v != null && String(v).trim() !== "") q.set(k, String(v).trim());
     }
   }
+  if (extra) {
+    for (const [k, v] of Object.entries(extra)) q.set(k, String(v));
+  }
   const qs = q.toString();
-  return request(`/onip/dashboard${qs ? `?${qs}` : ""}`);
+  return qs ? `?${qs}` : "";
+}
+
+export async function fetchOnipDashboard(
+  filters?: OnipDashboardFilters,
+): Promise<OnipDashboard> {
+  return request(`/onip/dashboard${dashboardQuery(filters)}`);
+}
+
+export async function fetchOnipDashboardTrends(
+  filters?: OnipDashboardFilters,
+  days = 30,
+): Promise<{
+  series: Array<{ day: string; registered: number; validated: number }>;
+  period: { from: string; to: string };
+}> {
+  return request(`/onip/dashboard/trends${dashboardQuery(filters, { days })}`);
+}
+
+export async function fetchOnipDashboardTerritories(
+  filters?: OnipDashboardFilters,
+): Promise<{
+  zones: Array<{ zone: string; registered: number; validated: number; nin_assigned: number }>;
+  level: string;
+}> {
+  return request(`/onip/dashboard/territories${dashboardQuery(filters)}`);
+}
+
+export async function fetchOnipDashboardHealth(): Promise<{
+  services: Array<{ service: string; state: string; checked_at: string; detail?: string | null }>;
+}> {
+  return request("/onip/dashboard/health");
 }
 
 export type NationalCard = {

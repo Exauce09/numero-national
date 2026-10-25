@@ -1,0 +1,564 @@
+SIGPOP-RDC
+MODULE 1 — TABLEAU DE BORD NATIONAL ONIP
+Cahier des charges fonctionnel et technique détaillé
+Indicateurs • Graphiques • Filtres • Alertes • API • Sécurité • Tests
+Version de travail — octobre 2026Basé sur les éléments fonctionnels transmis pour SIGPOP-RDC / ONIP
+Statut et précautions
+Ce document développe le Module 1 « Tableau de bord national » à partir des éléments fournis : population enregistrée et dossiers validés, NIN attribués, dossiers en attente, doublons à examiner, cartes produites/délivrées/expirées/en attente, statistiques territoriales, campagnes, synchronisation, alertes et disponibilité des services.
+Il s’agit d’un cahier des charges proposé pour l’application existante, pas d’une preuve que toutes les données ou API sont déjà disponibles. Chaque chiffre doit être relié à une source réelle du système et validé lors de l’audit technique. Aucun chiffre de démonstration ne doit être présenté comme une statistique officielle.
+Les noms des endpoints, tables, statuts et formules indiqués ci-dessous sont des propositions de conception. Ils doivent être adaptés au dépôt existant et aux règles métier confirmées. Les règles du NIN et les détails sensibles de l’identité restent soumis aux textes et consignes officiels applicables.
+Sommaire
+1. Identification et finalité du module
+2. Objectifs et périmètre
+3. Utilisateurs, rôles et droits
+4. Structure de la page du tableau de bord
+5. Catalogue complet des indicateurs (KPI)
+6. Filtres, recherche et interactions
+7. Widgets et visualisations détaillés
+8. Centre d’alertes et suivi des anomalies
+9. Données, API et dépendances techniques
+10. Règles métier et qualité des données
+11. Sécurité, confidentialité et audit
+12. Performance, disponibilité et accessibilité
+13. États d’interface et gestion des erreurs
+14. Tests et critères d’acceptation
+15. Plan d’implémentation
+16. Prompt complet pour agent de développement
+17. Glossaire et limites
+1. Identification et finalité du module
+Élément
+Description
+Nom
+Module 1 — Tableau de bord national ONIP
+Système
+SIGPOP-RDC — module ONIP
+Nature
+Interface de supervision et de consultation de données consolidées
+Utilisateurs principaux
+Direction nationale, responsables provinciaux, responsables de centre, auditeurs, administrateurs habilités
+Finalité
+Présenter une lecture fiable de l’activité nationale : dossiers, NIN, CIN, campagnes, synchronisation, anomalies et disponibilité technique.
+État de départ
+Déjà commencé selon les notes du projet ; état réel à confirmer par audit du frontend, de l’API et des données.
+Principe
+Le tableau de bord synthétise les données ; il n’est pas la source de vérité et ne remplace pas les workflows métier.
+1.1 Rôle opérationnel
+Le tableau de bord doit permettre à un responsable autorisé de répondre rapidement à cinq questions : combien de dossiers sont enregistrés et validés ; où se situent les dossiers en attente ou les doublons ; quel est l’état de la production et de la délivrance des cartes ; comment avancent les campagnes et les synchronisations ; quels incidents nécessitent une action immédiate.
+1.2 Ce que le module doit permettre
+Comprendre l’activité à une date donnée et sur une période sélectionnée.
+Comparer les volumes par zone, centre, campagne et statut, dans la limite des permissions.
+Identifier les files de travail en attente et accéder à leur liste détaillée si l’utilisateur est habilité.
+Afficher les alertes métier et techniques avec leur gravité, leur ancienneté et leur responsable.
+Indiquer la fraîcheur des données afin de ne pas faire passer un chiffre ancien pour une donnée en temps réel.
+Exporter uniquement des statistiques autorisées et, par défaut, agrégées.
+2. Objectifs et périmètre
+2.1 Objectifs fonctionnels
+Consolider les indicateurs issus des modules Personnes/FGP, NIN, CIN, Campagnes, Synchronisation, Anomalies et Administration technique.
+Fournir des filtres communs afin que cartes, graphiques, compteurs et tableaux répondent au même périmètre.
+Permettre un drill-down : clic sur un indicateur pour ouvrir une liste filtrée autorisée, sans exposer automatiquement les données personnelles.
+Distinguer les données opérationnelles, les alertes, les données de référence et les mesures techniques.
+Garantir traçabilité, cohérence des calculs, contrôle d’accès et performance.
+2.2 Inclus
+Compteurs synthétiques : dossiers enregistrés/validés/en attente, NIN attribués, doublons à examiner et états des cartes.
+Graphiques de tendance, répartition territoriale, activité de campagne, synchronisation et anomalies.
+Centre d’alertes, état de santé des services et date de dernière mise à jour.
+Filtres, accès aux vues détaillées, export restreint, journalisation des actions et gestion des états d’interface.
+2.3 Hors périmètre du tableau de bord
+Saisir ou modifier directement les données biographiques d’un citoyen.
+Fusionner deux identités ou trancher automatiquement une alerte de doublon.
+Attribuer directement un NIN depuis une carte KPI.
+Produire ou annuler une CIN depuis les graphiques sans suivre le workflow du module CIN.
+Remplacer les mécanismes d’autorisation de l’API par un simple masquage visuel du frontend.
+3. Utilisateurs, rôles et droits
+Le tableau de bord applique les permissions fournies par le backend. Le frontend peut masquer des commandes, mais chaque endpoint doit aussi vérifier les droits côté serveur.
+Profil indicatif
+Affichage autorisé
+Actions et limites
+Administrateur national
+Vue nationale agrégée, toutes les zones autorisées, état des services et alertes globales.
+Peut accéder aux détails selon habilitation ; pas de droit automatique d’accès aux templates biométriques.
+Responsable provincial
+Indicateurs de sa province et comparaison de ses centres si autorisée.
+Ne doit pas consulter les autres provinces en modifiant simplement un paramètre URL.
+Responsable de centre
+Indicateurs et files de travail de son centre.
+Pas d’export national ni d’accès aux dossiers hors périmètre.
+Agent opérationnel
+Compteurs et tâches nécessaires à son travail.
+Affichage restreint selon fonction et affectation.
+Auditeur
+Indicateurs, historiques et journaux autorisés.
+Lecture seule ; exports documentés et contrôlés.
+Administrateur technique
+Disponibilité des API, tâches, files et services.
+Pas d’accès métier systématique aux dossiers individuels.
+Partenaire externe
+Aucun accès au dashboard interne par défaut.
+Utilise uniquement les API contractuelles explicitement autorisées.
+3.1 Vérifications obligatoires
+Vérifier le rôle et les permissions avant de renvoyer les chiffres.
+Appliquer un périmètre territorial côté serveur : province, territoire, commune, secteur ou centre selon le rôle.
+Ne pas compter un dossier dans un périmètre différent de celui autorisé, même si le filtre est modifié manuellement.
+Enregistrer les exports et les consultations sensibles dans l’audit, avec identité de l’acteur, horodatage et filtre utilisé.
+4. Structure de la page du tableau de bord
+4.1 Disposition générale recommandée
+Zone d’écran
+Contenu
+Comportement attendu
+A. En-tête
+Nom du module, périmètre courant, date/heure de dernière mise à jour, état de fraîcheur.
+Toujours visible en haut ; signale si les données sont anciennes ou si un service est indisponible.
+B. Barre de filtres
+Période, province, territoire, commune/secteur, centre, campagne, statut.
+Filtres persistants pendant la session selon politique ; bouton Réinitialiser.
+C. Ligne KPI
+Dossiers enregistrés, dossiers validés, NIN attribués, doublons à examiner, cartes produites/remises/en attente.
+Chaque carte montre valeur, libellé, date de référence et éventuellement évolution comparable.
+D. Activité dans le temps
+Graphique des dossiers reçus et validés par jour/semaine/mois.
+Même période et même zone que les autres widgets.
+E. Répartition territoriale
+Classement ou carte agrégée par province/territoire/centre.
+Clic pour approfondir le périmètre si l’utilisateur dispose du droit.
+F. Cartes d’identité
+États de production, délivrance, expiration et attente.
+Distinguer les statuts exclusifs et éviter de totaliser deux fois une même carte.
+G. Campagnes et synchronisation
+Avancement de campagne, dossiers transmis/reçus, erreurs et retard de synchronisation.
+Afficher les derniers événements et la date de synchronisation réussie.
+H. Centre d’alertes
+Alertes critiques/élevées/moyennes, doublons et anomalies en attente.
+Tri par gravité, ancienneté, zone et responsable ; accès à la file autorisée.
+I. Santé technique
+API, base de données, synchronisation, service biométrique et tâches programmées, selon disponibilité des métriques.
+Afficher l’état et le dernier succès ; limiter l’accès aux détails techniques sensibles.
+4.2 Ordre de priorité visuel
+En premier : KPI synthétiques et alertes critiques.
+Ensuite : tendances de volume et état des cartes.
+Puis : comparaison territoriale, campagnes et synchronisation.
+En bas : anomalies détaillées et santé technique selon le profil.
+4.3 Comportement responsive
+Sur grand écran, les KPI sont affichés en ligne ou en grille ; les graphiques sont placés en deux colonnes si l’espace le permet.
+Sur tablette, les graphiques passent en une ou deux colonnes selon largeur.
+Sur mobile, les KPI s’empilent ; les tableaux deviennent des listes lisibles ; les filtres sont repliables.
+Les couleurs doivent toujours être accompagnées d’un libellé, d’une icône ou d’un statut textuel.
+5. Catalogue complet des indicateurs (KPI)
+Les définitions ci-dessous sont des règles proposées pour éviter les compteurs ambigus. Le calcul définitif doit être raccordé aux statuts réellement présents dans le dépôt et validé avec les responsables métier.
+KPI
+Définition fonctionnelle proposée
+Règles de calcul / précautions
+Population enregistrée
+Nombre de dossiers personnes enregistrés dans le référentiel ou reçus dans le périmètre métier défini.
+Préciser si le chiffre compte tous les dossiers ou seulement les dossiers intégrés au FGP. Ne pas assimiler cette valeur à une estimation démographique de la population réelle.
+Dossiers validés
+Nombre de dossiers dont le statut de validation finale est confirmé.
+Compter une seule fois chaque dossier de référence ; exclure les dossiers rejetés, brouillons et doublons non résolus selon la règle retenue.
+Dossiers en attente
+Nombre de dossiers nécessitant encore une action avant clôture du workflow.
+Définir précisément les statuts inclus : à compléter, en contrôle, en validation, ou autres états réels. Afficher la ventilation par statut.
+NIN attribués
+Nombre de personnes ayant un NIN confirmé dans le référentiel.
+Ne pas compter les demandes de NIN en attente ou les numéros de test. La règle finale doit suivre la spécification officielle validée.
+Doublons à examiner
+Nombre de cas de correspondance potentielle en attente de décision autorisée.
+Un cas est distinct d’un simple résultat biométrique brut ; éviter de compter plusieurs correspondances du même dossier comme plusieurs cas sans règle explicite.
+Cartes produites
+Nombre de cartes dont la production est achevée.
+Distinguer produite, imprimée, contrôlée et prête à remise si les statuts existent.
+Cartes délivrées
+Nombre de cartes dont la remise au titulaire a été confirmée.
+Se baser sur l’événement de remise enregistré ; une carte imprimée n’est pas nécessairement délivrée.
+Cartes expirées
+Nombre de cartes dont la date de validité est passée et dont le statut confirme l’expiration.
+Vérifier la règle officielle de validité et les éventuels statuts d’annulation/remplacement.
+Cartes en attente
+Nombre de demandes/cartes dont une étape de production ou de remise reste à accomplir.
+Définir les statuts inclus et distinguer attente de production et attente de retrait.
+Taux de validation
+Dossiers validés / dossiers soumis à validation sur la période, si les états sont fiables.
+Afficher la formule et le dénominateur ; ne pas mélanger les dossiers créés à des dates différentes sans préciser la cohorte.
+Taux de synchronisation
+Événements acceptés et synchronisés / événements admissibles envoyés pour synchronisation.
+Exclure ou isoler les événements en quarantaine ; afficher période et date de dernière synchronisation.
+Échecs de synchronisation
+Nombre d’événements en échec ou en reprise selon les états réels.
+Distinguer échec temporaire et échec définitif ; afficher l’ancienneté et le motif autorisé.
+Campagnes actives
+Nombre de campagnes déclarées actives sur la période de référence.
+Utiliser l’état et les dates de campagne validés ; ne pas se baser uniquement sur la présence d’un nom.
+Dossiers reçus des campagnes
+Nombre de dossiers ou événements acceptés en entrée depuis les campagnes.
+Utiliser une clé d’idempotence pour éviter les doublons lors des réenvois.
+Anomalies ouvertes
+Nombre d’anomalies non clôturées.
+Ventiler par gravité, module, ancienneté et responsable.
+Services disponibles
+État agrégé des services techniques surveillés.
+N’afficher que les sondes réellement implémentées ; « inconnu » ne doit pas être affiché comme « opérationnel ».
+Dernière mise à jour
+Horodatage de la dernière actualisation réussie des données affichées.
+Distinguer l’heure de calcul du KPI de l’heure du dernier événement reçu.
+5.1 Règles de comparaison et de tendance
+Toute évolution (+/− %) doit préciser la période de comparaison : par exemple, période précédente de même durée.
+Si le dénominateur de pourcentage est nul, afficher « N/A » ou « — », pas une valeur artificielle.
+Les tendances sont calculées à partir de données de même périmètre, même fuseau horaire et même définition de statut.
+Une hausse des doublons ou anomalies n’est pas nécessairement positive ; le libellé doit rester neutre et la gravité dépend de la règle métier.
+Les valeurs affichées doivent pouvoir être expliquées par une requête, une agrégation versionnée ou un endpoint documenté.
+5.2 Unités et formats
+Volumes : entiers avec séparateurs de milliers selon la convention d’affichage retenue.
+Pourcentages : nombre de décimales limité, par exemple une décimale si cela apporte une information utile.
+Temps : date et heure clairement accompagnées du fuseau utilisé ; préciser « mis à jour à ».
+Valeurs indisponibles : afficher « Donnée indisponible » ou « Non calculé » avec motif ; ne jamais remplacer silencieusement par zéro.
+6. Filtres, recherche et interactions
+Filtre
+Description
+Règles
+Période
+Aujourd’hui, 7 derniers jours, 30 derniers jours, mois, période personnalisée.
+Préciser quelle date est filtrée : création, validation, attribution ou événement de carte selon le KPI.
+Province
+Filtre territorial de premier niveau.
+Options permises par le rôle ; valeur appliquée côté serveur.
+Territoire / ville
+Sous-division administrative compatible avec le référentiel.
+Options dépendantes de la province choisie.
+Commune / secteur / centre
+Granularité opérationnelle.
+Ne pas proposer une zone qui n’appartient pas au périmètre autorisé.
+Campagne
+Filtre sur une campagne identifiée.
+Ne s’applique qu’aux widgets ayant cette dimension.
+Statut
+Statut du dossier, de la CIN, de la synchronisation ou de l’anomalie selon le widget.
+Le filtre est contextualisé ; les statuts ne sont pas mélangés entre entités.
+Recherche ciblée
+Recherche limitée dans une liste détaillée si autorisée.
+Ne pas offrir une recherche globale de NIN/citoyens dans le dashboard par défaut.
+6.1 Comportement des filtres
+Le bouton « Appliquer » déclenche le chargement avec les paramètres sélectionnés.
+Le bouton « Réinitialiser » remet les filtres aux valeurs par défaut autorisées.
+Les graphiques, KPI et listes doivent afficher le même périmètre, sauf indication claire d’un widget non concerné.
+Lorsqu’un filtre change, afficher un indicateur de chargement et empêcher l’empilement involontaire de requêtes identiques.
+Conserver les filtres en navigation interne si cela facilite l’analyse, mais ne pas stocker de données personnelles sensibles dans l’URL.
+Si une zone sélectionnée devient invalide après un changement de province, réinitialiser la zone enfant et l’expliquer visuellement.
+6.2 Drill-down / clic sur un KPI
+Un clic sur une carte KPI ouvre une vue de détail avec les mêmes filtres préappliqués et le statut correspondant. Avant navigation, le backend doit vérifier que le profil a le droit de consulter les enregistrements sous-jacents. Si le rôle n’a droit qu’aux agrégats, la carte reste informative et ne donne pas accès à une liste nominative.
+7. Widgets et visualisations détaillés
+7.1 Cartes KPI
+Afficher : libellé court, valeur principale, unité, période ou date de référence et état de chargement.
+Une tendance facultative affiche la valeur actuelle versus période comparable, avec libellé explicite.
+La couleur doit exprimer une gravité définie ou un état ; elle ne sert pas uniquement à décorer.
+La carte ne présente pas de valeur inventée pendant le chargement. Un squelette peut être utilisé, puis la valeur réelle s’affiche.
+7.2 Graphique d’évolution des dossiers
+Visualisation conseillée : ligne ou barres par jour/semaine/mois, avec séries séparées pour dossiers reçus et dossiers validés. L’axe temporel, le périmètre et la date métier filtrée sont indiqués. Le graphique doit gérer les périodes sans activité sans inventer de données ; un zéro ne doit être ajouté que si l’absence d’événement signifie bien zéro pour la source utilisée.
+7.3 Répartition territoriale
+Afficher par défaut un classement des zones ou une carte thématique à partir de données agrégées. Pour chaque zone, afficher le compteur, le périmètre et la date de référence. Le clic sur une zone approfondit la navigation uniquement si le rôle permet la granularité enfant. La couleur ne doit pas être le seul moyen de distinguer les valeurs.
+7.4 État de la CIN
+Utiliser une barre empilée ou un ensemble de compteurs par statut : produite, délivrée, expirée, en attente. Les statuts doivent être exclusifs ou accompagnés de règles d’agrégation explicites pour éviter une somme trompeuse. Si une carte peut être délivrée puis expirée, les métriques de stock et de flux doivent être distinguées : « état actuel » versus « nombre d’événements pendant la période ».
+7.5 Activité des campagnes
+Nombre de campagnes actives et clôturées dans le périmètre filtré.
+Dossiers attendus, reçus et traités uniquement si ces mesures existent et ont des définitions approuvées.
+Taux de couverture ou de progression seulement si un dénominateur fiable est disponible.
+Signalement des campagnes dont la synchronisation accuse un retard mesuré par une règle explicite.
+7.6 Santé technique
+Afficher les services réellement surveillés : API, base de données, file de synchronisation, tâches planifiées et service biométrique si un contrôle de santé existe. Chaque service indique état (opérationnel, dégradé, indisponible, inconnu), dernière vérification, durée ou motif synthétique si disponible. Les messages techniques détaillés et secrets restent accessibles uniquement aux administrateurs habilités.
+8. Centre d’alertes et suivi des anomalies
+8.1 Types d’alertes à prévoir
+Type
+Exemples
+Action recommandée
+Données métier
+Dossiers incomplets trop anciens, incohérences, lots en attente.
+Ouvrir la file du module source et assigner un responsable.
+Doublons
+Correspondances potentiellement dupliquées nécessitant une revue.
+Ouvrir la file de revue autorisée ; ne pas fusionner depuis l’alerte.
+Cartes
+Retards de production ou de remise, lots en erreur.
+Ouvrir le suivi CIN et examiner les états concernés.
+Synchronisation
+Échecs répétés, backlog ou dernière synchronisation trop ancienne.
+Consulter la file de synchronisation et les motifs autorisés.
+Sécurité
+Échec d’accès répété, anomalie de permission, activité suspecte.
+Ouvrir l’incident selon le profil et suivre le plan de réponse.
+Technique
+API indisponible, tâche échouée ou service dégradé.
+Consulter le statut technique ; limiter la diffusion des détails.
+8.2 Gravité et cycle de vie
+Niveau
+Signification proposée
+Comportement
+Critique
+Service essentiel indisponible ou risque sérieux confirmé.
+Priorité maximale, date d’apparition, responsable/escalade selon procédure.
+Élevé
+Fonction importante dégradée ou backlog significatif selon seuil validé.
+Alerte visible et affectation rapide.
+Moyen
+Problème opérationnel qui exige un suivi.
+File de traitement et échéance.
+Faible / information
+Événement informatif ou dégradation mineure.
+Consultation sans interruption du workflow.
+Inconnu
+État non déterminable faute de données de surveillance.
+Ne pas l’interpréter comme opérationnel.
+Cycle recommandé : détectée → ouverte → assignée → en cours → résolue → clôturée. Les statuts exacts doivent correspondre au module Anomalies existant. Une alerte récurrente peut être regroupée pour éviter le spam, mais ses occurrences doivent rester consultables.
+8.3 Informations minimales d’une alerte
+Identifiant unique et type.
+Gravité et statut courant.
+Date de détection et dernière occurrence.
+Module et périmètre concernés.
+Résumé non sensible et motif de déclenchement.
+Responsable ou équipe en charge, lorsque désigné.
+Lien vers la vue détaillée autorisée.
+Historique des changements de statut et des décisions.
+8.4 Seuils
+Les seuils d’alerte ne doivent pas être codés arbitrairement. Ils doivent être configurables ou documentés, testés en environnement de recette et approuvés par le responsable métier/technique. Si le seuil est inconnu, afficher la métrique sans déclencher une alerte présentée comme officielle.
+9. Données, API et dépendances techniques
+9.1 Sources métier nécessaires
+Source
+Données attendues
+À vérifier dans l’existant
+Personnes / FGP
+Identifiant dossier, statut, date de création, date de validation, zone.
+Table(s), statut(s), règles d’inclusion et pagination.
+NIN
+État d’attribution confirmé, date, référence personne.
+Service d’attribution existant ; séparer réel, test et en attente.
+CIN
+État courant, demande, production, remise, expiration, annulation.
+Définition des statuts et relation au dossier/personne.
+Campagnes
+Campagne, zone, équipe, objectifs et dossiers reçus/traités.
+Statut réel, dates, clés d’idempotence et source des totaux.
+Synchronisation
+Événements en file, succès, échecs, tentatives et horodatages.
+Jobs, logs structurés et règles de regroupement.
+Anomalies
+Type, gravité, statut, ancienneté, responsable.
+Module existant, déduplication des alertes et résolution.
+Santé des services
+Résultat de sondes, horodatage, durée et message synthétique.
+Endpoints de health-check et métriques réellement disponibles.
+9.2 Endpoints indicatifs
+Ces chemins sont des exemples de conception, non des endpoints confirmés. Le projet dispose déjà, selon les notes, d’un endpoint GET /api/v1/onip/dashboard ; il faut l’auditer et l’étendre prudemment plutôt que créer un endpoint concurrent sans nécessité.
+Endpoint conceptuel
+Usage
+Réponse attendue
+GET /api/v1/onip/dashboard
+Agrégats du dashboard avec filtres autorisés.
+KPI, période, périmètre, timestamps de calcul et indicateurs de fraîcheur.
+GET /api/v1/onip/dashboard/trends
+Tendances temporelles.
+Séries agrégées, unités, définition de date et période.
+GET /api/v1/onip/dashboard/territories
+Répartition territoriale.
+Zones autorisées, compteurs agrégés et niveau géographique.
+GET /api/v1/onip/dashboard/alerts
+Alertes synthétiques autorisées.
+Identifiants, gravité, statut, résumé et date.
+GET /api/v1/onip/dashboard/health
+État des services surveillés, selon rôle.
+État, timestamp, service et résumé limité.
+GET /api/v1/onip/dashboard/export
+Export d’indicateurs autorisés, si activé.
+Fichier/flux agrégé avec trace de l’export et filtres.
+9.3 Paramètres et réponse
+Les filtres sont passés sous forme de paramètres documentés : start_date, end_date, province_id, territory_id, center_id, campaign_id, status. Utiliser uniquement les paramètres qui existent réellement et autoriser côté serveur chaque combinaison.
+Le serveur doit retourner les filtres effectivement appliqués, l’horodatage du calcul et, si nécessaire, la fraîcheur de chaque source.
+Les erreurs utilisent des codes cohérents et ne révèlent ni stack trace ni informations personnelles.
+Les endpoints doivent appliquer pagination aux listes ; le dashboard ne doit pas charger tous les dossiers pour calculer un compteur dans le navigateur.
+9.4 Exemple de structure JSON — illustratif
+Exemple indicatif, à adapter au contrat réellement implémenté :
+{  "meta": {    "generated_at": "2026-10-25T12:00:00Z",    "period": {"from": "2026-10-01", "to": "2026-10-25"},    "scope": {"province_id": null, "center_id": null},    "freshness": "current"  },  "kpis": {    "registered_records": 0,    "validated_records": 0,    "pending_records": 0,    "assigned_nins": 0,    "duplicate_reviews_open": 0,    "cards_produced": 0,    "cards_delivered": 0,    "cards_expired": 0,    "cards_pending": 0  },  "alerts": {"critical": 0, "high": 0, "medium": 0},  "sources": []}
+Les zéros de cet exemple sont des valeurs fictives servant à illustrer la forme JSON ; ils ne représentent pas les données de SIGPOP-RDC. En production, chaque valeur doit venir d’une agrégation réelle ou être explicitement indisponible.
+10. Règles métier et qualité des données
+Une valeur affichée doit pouvoir être reliée à une définition, une source, une période et un périmètre.
+Le tableau de bord doit distinguer le volume courant (stock) du nombre d’événements sur une période (flux).
+Une personne ne doit pas être comptée plusieurs fois parce qu’elle apparaît dans plusieurs campagnes ou enregistrements importés ; appliquer les règles de rapprochement officielles du module source.
+Ne pas considérer les doublons potentiels comme des doublons confirmés.
+Ne pas considérer une carte produite comme nécessairement remise, ni une demande comme une carte délivrée.
+Les valeurs manquantes, les erreurs de calcul et les services non surveillés doivent rester distingués d’une valeur égale à zéro.
+Les fuseaux horaires, bornes inclusives/exclusives et dates métier doivent être documentés.
+Les agrégats doivent être recalculables afin de vérifier une différence signalée par un utilisateur.
+Lorsque les sources sont en retard, afficher une information de fraîcheur plutôt que mélanger silencieusement des périodes différentes.
+En cas de divergences entre modules, signaler un état de qualité des données et orienter vers la procédure de réconciliation ; ne pas corriger les dossiers directement depuis le dashboard.
+11. Sécurité, confidentialité et audit
+11.1 Données affichées
+Privilégier les chiffres agrégés et les tendances.
+Ne pas afficher nom, adresse, photo, NIN complet, empreintes ou templates dans les KPI.
+Si une vue détaillée est accessible après clic, appliquer un contrôle d’accès dédié et minimiser les champs affichés.
+Masquer les données sensibles dans les logs frontend, traces, erreurs et outils de télémétrie.
+11.2 Journalisation
+Journaliser l’accès au dashboard et les exports sensibles.
+Inclure l’acteur, l’action, le timestamp, le périmètre filtré et le résultat.
+Ne pas enregistrer de jetons, mots de passe, données biométriques ou dossiers complets dans les événements d’audit.
+Protéger le journal contre l’altération par les utilisateurs ordinaires.
+11.3 Protection des API
+Vérification serveur de la session/du jeton, des rôles, du périmètre territorial et des permissions.
+Limitation de débit et protection contre les requêtes de filtre abusives.
+Pagination ou agrégation côté serveur ; éviter les extractions volumineuses inutiles.
+Messages d’erreur génériques pour les utilisateurs non autorisés.
+Aucune clé secrète ou identifiant technique sensible dans le code du frontend.
+12. Performance, disponibilité et accessibilité
+12.1 Performance
+Le dashboard doit charger les agrégats sans télécharger les dossiers individuels.
+Les requêtes lourdes doivent être agrégées côté base/service ; envisager une mise en cache seulement si les règles de fraîcheur et les droits restent respectés.
+Éviter de recalculer plusieurs fois les mêmes KPI dans le navigateur.
+Limiter le nombre de graphiques actifs sur petits écrans et charger les détails à la demande.
+Mesurer temps de réponse, erreurs et fraîcheur ; ne pas annoncer de SLA sans validation des responsables.
+12.2 Disponibilité et dégradation contrôlée
+Si une source est indisponible, conserver les widgets qui peuvent encore être calculés et signaler les autres comme indisponibles.
+Ne pas remplacer un échec d’API par des données de démonstration en production.
+Prévoir un bouton de nouvelle tentative et un message clair.
+Les données en cache, si utilisées, doivent porter leur timestamp et un marqueur « données potentiellement anciennes ».
+12.3 Accessibilité et lisibilité
+Contraste suffisant, textes lisibles et navigation clavier.
+Utiliser libellés textuels en plus de la couleur.
+Fournir des titres et unités aux graphiques, ainsi qu’un tableau ou résumé textuel accessible.
+Les filtres et commandes ont des libellés compréhensibles ; les erreurs expliquent comment réessayer.
+13. États d’interface et gestion des erreurs
+État
+Présentation souhaitée
+Comportement attendu
+Chargement initial
+Squelettes ou indicateur de chargement.
+Pas de faux chiffres ; éviter de bloquer toute la page si un seul widget est lent.
+Succès
+KPI et graphiques accompagnés de leur période/fraîcheur.
+Permettre filtres, drill-down et rafraîchissement selon droits.
+Aucun résultat
+Message « Aucune donnée pour les filtres choisis ».
+Proposer de modifier ou réinitialiser les filtres ; ne pas présenter cela comme une panne.
+Données anciennes
+Bandeau avec date/heure de dernière actualisation.
+Indiquer les widgets touchés et les limites d’interprétation.
+Erreur partielle
+Widget concerné en état d’erreur, reste de la page utilisable.
+Afficher un message synthétique et une action de nouvelle tentative.
+Accès interdit
+Message générique indiquant que l’accès n’est pas autorisé.
+Aucune donnée sensible ne doit être révélée.
+Service inconnu
+État « inconnu / non surveillé ».
+Ne pas utiliser le vert ni le terme « opérationnel » sans résultat de sonde.
+14. Tests et critères d’acceptation
+14.1 Tests fonctionnels
+ID
+Scénario
+Résultat attendu
+DASH-001
+Ouverture du dashboard avec un rôle autorisé.
+Les KPI chargent et affichent leur périmètre/date de calcul.
+DASH-002
+Ouverture avec un rôle sans droit au module.
+Accès refusé côté serveur ; aucune donnée n’est renvoyée.
+DASH-003
+Modification du filtre province dans l’interface.
+Tous les widgets concernés utilisent le même périmètre.
+DASH-004
+Tentative de forcer une province non autorisée via URL/API.
+Le serveur rejette ou limite le résultat au périmètre permis.
+DASH-005
+Choix d’une période sans donnée.
+État vide clair ; aucune valeur de démonstration.
+DASH-006
+Dénominateur nul pour un taux.
+Affichage non applicable, sans division par zéro.
+DASH-007
+Clic sur « doublons à examiner ».
+Ouverture de la file autorisée ; aucune fusion automatique.
+DASH-008
+État CIN : carte produite mais non remise.
+La carte est comptée dans l’état adapté et pas comme délivrée.
+DASH-009
+La sonde d’un service ne répond pas.
+État indisponible/inconnu selon résultat et heure de vérification.
+DASH-010
+Échec d’une source de données.
+Le widget montre une erreur et timestamp ; les autres widgets restent utilisables.
+DASH-011
+Export par un utilisateur non habilité.
+Export refusé ; tentative journalisée selon politique.
+DASH-012
+Rafraîchissement après synchronisation.
+Les compteurs évoluent selon les données réelles et sont cohérents avec l’API/source.
+DASH-013
+Comparaison entre période courante et précédente.
+Même longueur de période et formule explicitée.
+DASH-014
+Affichage sur mobile.
+KPI, filtres, alertes et graphiques restent lisibles et utilisables.
+DASH-015
+Vérification des journaux.
+Aucun NIN complet, template biométrique, jeton ou secret n’est enregistré.
+14.2 Critères de recette
+☐ Les définitions des KPI sont validées par les responsables métier.
+☐ Chaque KPI est alimenté par une source identifiée et un endpoint ou calcul documenté.
+☐ Les compteurs sont rapprochés des requêtes de référence sur un jeu de test.
+☐ Les filtres sont appliqués uniformément et protégés côté serveur.
+☐ Les rôles et permissions ont des tests positifs et négatifs.
+☐ Les données de démonstration sont clairement séparées et ne sont jamais activées en production.
+☐ Les états de chargement, d’erreur, d’absence et de fraîcheur sont testés.
+☐ Les exportations sont limitées aux utilisateurs habilités et auditables.
+☐ Les tests de non-régression confirment que les routes et fonctionnalités préexistantes restent opérationnelles.
+☐ Le déploiement possède un plan de retour arrière et une sauvegarde vérifiée.
+15. Plan d’implémentation
+Étape 1 — Audit sans modification
+Inspecter la page dashboard existante, l’endpoint GET /api/v1/onip/dashboard mentionné dans les notes, les modèles, les requêtes, les statuts, les permissions et les tests. Produire une cartographie des sources de chaque compteur.
+Étape 2 — Dictionnaire des KPI
+Faire valider pour chaque KPI sa définition, son dénominateur, la date métier filtrée, les statuts inclus, le périmètre et la source.
+Étape 3 — Contrat de réponse API
+Documenter la réponse réelle et les métadonnées de fraîcheur ; ajouter seulement les champs manquants, sans casser les consommateurs existants.
+Étape 4 — Filtres communs
+Harmoniser les filtres et vérifier le contrôle d’accès sur chaque requête côté serveur.
+Étape 5 — Widgets et tendances
+Développer ou corriger les cartes, graphiques, répartition territoriale, état des cartes et campagnes.
+Étape 6 — Alertes et santé technique
+Brancher les sources réelles d’anomalies et les sondes existantes ; laisser « inconnu » si une sonde n’existe pas.
+Étape 7 — Tests et recette
+Écrire et exécuter les tests de cohérence, permissions, erreurs, fraîcheur, responsivité et non-régression.
+Étape 8 — Déploiement progressif
+Activer d’abord sur environnement de test, comparer les chiffres avec les sources, corriger les écarts, puis déployer sous contrôle après validation.
+15.1 Livrables attendus
+Cartographie des sources et calculs de chaque KPI.
+Dictionnaire des indicateurs approuvé.
+Contrat de l’endpoint dashboard avec exemple de réponse non sensible.
+Matrice de permissions et preuve des tests.
+Tests automatisés et rapports de résultats.
+Captures de la page finale à plusieurs largeurs d’écran.
+Notes de déploiement, sauvegarde et retour arrière.
+16. Prompt complet pour agent de développement
+Tu travailles sur le projet existant SIGPOP-RDC, module ONIP. Ta tâche immédiate est de finaliser le Module 1 — Tableau de bord national en préservant toutes les fonctions existantes.RÈGLES1. Commence par auditer le code et l’endpoint GET /api/v1/onip/dashboard mentionné dans la documentation projet. Ne présume pas que l’API, les tables ou les statuts existent comme dans le présent cahier des charges : vérifie-les.2. Ne réécris pas l’application et ne supprime ni route, ni table, ni migration, ni composant sans preuve et plan de retour arrière.3. N’invente aucun chiffre. Toute valeur doit venir d’une source réelle ou être explicitement marquée comme indisponible. Les données de démonstration ne doivent jamais être exposées en production.4. Pour chaque KPI, documente la définition, les statuts inclus, le dénominateur, la date métier, le périmètre, la source et le test de cohérence.5. Applique les autorisations et le périmètre territorial côté serveur. Le masquage dans le frontend n’est pas une mesure de sécurité suffisante.6. Ne révèle pas de NIN complet, de données biométriques, de secrets ou de détails techniques sensibles dans les logs ou les réponses.7. Ne traite jamais un doublon potentiel comme un doublon confirmé et ne déclenche aucune fusion depuis le dashboard.8. Distingue valeur nulle, zéro réel, donnée indisponible et donnée ancienne.9. Maintiens un contrat API rétrocompatible, sauf si un changement incompatible est justifié et explicitement documenté.10. Exécute les tests, build et lint réellement disponibles ; rapporte les résultats exacts.TRAVAIL ATTENDUA. Audit du frontend, endpoint, modèles, requêtes, permissions et tests.B. Rapport indiquant pour chaque widget : état actuel, source, formule, problèmes et modification proposée.C. Dictionnaire KPI et contrat de réponse API.D. Corrections progressives des cartes KPI, filtres, graphiques, données territoriales, état CIN, campagnes, synchronisation, alertes et santé technique.E. États d’interface : chargement, vide, erreur, accès interdit, données anciennes et service inconnu.F. Tests fonctionnels, de permissions, cohérence des agrégats, responsivité et non-régression.G. Rapport final avec fichiers modifiés, commandes lancées, résultats, limites, risques restants et instructions de retour arrière.ORDRE DE PRIORITÉ1. Exactitude des données et droits d’accès.2. Définition des KPI et cohérence des filtres.3. Alertes et fraîcheur des données.4. Lisibilité et responsive.5. Optimisation de performance après mesure.Ne déclare pas le module terminé tant que chaque KPI important n’a pas une source réelle, une définition validée et un test. Commence par le rapport d’audit avant les changements structurants.
+17. Glossaire et limites
+Terme
+Définition dans ce document
+KPI
+Indicateur clé servant à suivre un volume, un taux ou une situation.
+FGP
+Fichier Général de la Population ; référentiel de population évoqué dans les documents du projet.
+NIN
+Numéro d’Identification Nationale ; sa génération doit suivre les règles officielles vérifiées.
+CIN
+Carte d’identité nationale.
+Drill-down
+Navigation d’un indicateur agrégé vers une liste de détail autorisée.
+Stock
+Nombre d’éléments dans un état à un instant ou à une date de référence.
+Flux
+Nombre d’événements enregistrés pendant une période.
+Fraîcheur
+Âge ou date de dernière mise à jour des données affichées.
+Idempotence
+Propriété d’une opération répétée qui ne crée pas plusieurs effets identiques.
+RBAC/ABAC
+Contrôle d’accès par rôle / contrôle d’accès selon attributs de contexte.
+Limites à respecter
+Ce cahier des charges constitue une proposition de travail, à confronter au code existant et aux personnes responsables.
+Les formules KPI, statuts, seuils et endpoints ne sont pas certifiés comme spécifications officielles ; leur validation métier est nécessaire.
+Le dashboard ne doit jamais se substituer aux systèmes sources ni aux procédures d’identification, de rectification ou de délivrance.
+Les éléments non disponibles doivent être marqués comme tels plutôt que simulés.
+Conclusion
+Le Module 1 doit fournir une vue nationale fiable, compréhensible et sécurisée des opérations ONIP. La priorité de réalisation est de vérifier les sources de données existantes, formaliser les définitions KPI, renforcer les contrôles d’accès et afficher clairement la fraîcheur des données. La qualité du dashboard se mesure à l’exactitude et à la traçabilité des chiffres, et non au nombre de cartes ou de graphiques affichés.
