@@ -5,23 +5,29 @@ from __future__ import annotations
 from typing import Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.core.permissions import (
     PERM_CITIZEN_VALIDATE,
+    PERM_CIVIL_READ,
     PERM_ONIP_DASHBOARD,
     Principal,
+    mfa_status_for,
+    require_mfa_if_enforced,
     require_permissions,
 )
 from apps.api.db.session import get_db
-from apps.api.domains.core_registry.models import Citizen
+from apps.api.domains.core_registry.enums import CitizenStatus
+from apps.api.domains.core_registry.models import Citizen, NicIssuanceLog
 from apps.api.domains.core_registry.national_identity_number_service import (
     OFFICIAL_BLOCK_REASON,
     OFFICIAL_NIN_FORMAT_CONFIRMED,
     OfficialNinFormatUnresolvedError,
     NationalIdentityNumberService,
+    ProvisionalNinPrerequisitesError,
     assign_official_nin,
     assign_provisional_nic,
 )
@@ -30,13 +36,19 @@ from apps.api.domains.onip import service
 router = APIRouter(prefix="/onip", tags=["onip"])
 
 
-@router.get("/dashboard")
+@router.get(
+    "/dashboard",
+    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
+)
 async def onip_dashboard(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
     """National operations aggregates for ONIP operators."""
     return await service.build_dashboard(db)
 
 
-@router.get("/map-points")
+@router.get(
+    "/map-points",
+    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
+)
 async def onip_map_points(
     address_source: str | None = None,
     db: AsyncSession = Depends(get_db),
@@ -45,7 +57,10 @@ async def onip_map_points(
     return await service.list_map_points(db, address_source=address_source)
 
 
-@router.get("/map-by-milieu")
+@router.get(
+    "/map-by-milieu",
+    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
+)
 async def onip_map_by_milieu(
     address_source: str | None = None,
     db: AsyncSession = Depends(get_db),
@@ -60,15 +75,7 @@ async def onip_map_by_milieu(
 )
 async def onip_ops_health(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
     """Santé agrégée pour l'administration technique ONIP (sans secrets)."""
-    dash = await service.build_dashboard(db)
-    return {
-        "api": "up",
-        "onip_dashboard": "ok",
-        "official_nin_format_confirmed": OFFICIAL_NIN_FORMAT_CONFIRMED,
-        "population_cards": dash.get("cards") if isinstance(dash, dict) else None,
-        "anomaly_count": len(dash.get("anomalies") or []) if isinstance(dash, dict) else 0,
-        "hint": "Biométrie / civil : consulter les pages dédiées (permissions séparées).",
-    }
+    return await service.build_ops_health(db)
 
 
 @router.get("/nin/compliance",
@@ -83,8 +90,32 @@ async def nin_compliance_status() -> dict[str, Any]:
         "provisional_algorithm": "PROVISIONAL-v3-rdc-14-NOT-OFFICIAL",
         "audit_doc": "docs/legal/onip/AUDIT_CONFORMITE_FGP_NIN.md",
         "plan_matrix": "docs/legal/onip/MATRICE_PLAN_VS_EXISTANT.md",
+        "detail_audit": "docs/legal/onip/RAPPORT_AUDIT_ONIP_DETAIL.md",
         "decree_ref": "Décret n° 22/07 du 2 mars 2022, art. 8",
     }
+
+
+@router.get(
+    "/security/mfa-policy",
+    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
+)
+async def onip_mfa_policy(
+    principal: Principal = Depends(require_permissions(PERM_ONIP_DASHBOARD)),
+) -> dict[str, Any]:
+    """Politique MFA pour opérations sensibles (signalement + enforcement optionnel)."""
+    return mfa_status_for(principal)
+
+
+@router.get(
+    "/civil/conflicts",
+    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD, PERM_CIVIL_READ))],
+)
+async def onip_civil_conflicts(
+    limit: int = Query(default=50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """File conflits / corrections EC — pas d'écrasement silencieux."""
+    return await service.list_civil_conflicts(db, limit=limit)
 
 
 class NinAssignRequest(BaseModel):
@@ -95,11 +126,91 @@ class NinAssignRequest(BaseModel):
     )
 
 
+@router.get(
+    "/nin/eligible",
+    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
+)
+async def nin_eligible(
+    limit: int = Query(default=50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Citoyens sans NIC, non décédés — candidats à attribution provisoire (pas officielle)."""
+    stmt = (
+        select(Citizen)
+        .where(
+            Citizen.nic.is_(None),
+            Citizen.status.notin_(
+                [
+                    CitizenStatus.DECEASED.value,
+                    CitizenStatus.MERGED.value,
+                ]
+            ),
+        )
+        .order_by(Citizen.updated_at.desc())
+        .limit(limit)
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+    items: list[dict[str, Any]] = []
+    for c in rows:
+        open_dupes = await NationalIdentityNumberService.count_open_duplicates(db, c.id)
+        items.append(
+            {
+                "id": str(c.id),
+                "family_name": c.family_name,
+                "given_names": c.given_names,
+                "date_of_birth": c.date_of_birth.isoformat() if c.date_of_birth else None,
+                "status": c.status,
+                "open_duplicates": open_dupes,
+                "eligible_provisional": open_dupes == 0
+                and bool(c.family_name and c.given_names and c.date_of_birth),
+                "nin_status": None,
+            }
+        )
+    return {
+        "count": len(items),
+        "items": items,
+        "official_assign_available": False,
+        "note": "Aucun bouton NIN officiel — générateur bloqué jusqu'à annexe signée.",
+    }
+
+
+@router.get(
+    "/nin/issuance-log",
+    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
+)
+async def nin_issuance_log(
+    limit: int = Query(default=50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Historique d'émission NIC provisoire (pas de PII biométrique)."""
+    stmt = (
+        select(NicIssuanceLog)
+        .order_by(NicIssuanceLog.issued_at.desc())
+        .limit(limit)
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+    return {
+        "count": len(rows),
+        "items": [
+            {
+                "citizen_id": str(r.citizen_id),
+                "nic": r.nic,
+                "issued_at": r.issued_at.isoformat() if r.issued_at else None,
+                "algorithm_version": r.algorithm_version,
+                "nin_status": "PROVISIONAL",
+                "official": False,
+            }
+            for r in rows
+        ],
+    }
+
+
 @router.post("/nin/assign")
 async def nin_assign(
     body: NinAssignRequest,
     db: AsyncSession = Depends(get_db),
     principal: Principal = Depends(require_permissions(PERM_CITIZEN_VALIDATE, PERM_ONIP_DASHBOARD)),
+    _: Principal = Depends(require_mfa_if_enforced()),
 ) -> dict[str, Any]:
     """Attribution via le service central — pas de génération libre publique."""
     citizen = await db.get(Citizen, body.citizen_id)
@@ -121,16 +232,29 @@ async def nin_assign(
                 },
             ) from exc
     else:
-        result = await assign_provisional_nic(
-            db, citizen=citizen, actor_id=principal.actor_id
-        )
+        try:
+            result = await assign_provisional_nic(
+                db, citizen=citizen, actor_id=principal.actor_id
+            )
+        except ProvisionalNinPrerequisitesError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "message": str(exc),
+                    "code": exc.code,
+                    **exc.details,
+                },
+            ) from exc
 
     await db.commit()
+    mfa = mfa_status_for(principal)
     return {
         "nin": result.nin,
         "citizen_id": str(result.citizen_id),
         "algorithm_version": result.algorithm_version,
         "official": result.official,
         "already_assigned": result.already_assigned,
+        "nin_status": getattr(result, "nin_status", "PROVISIONAL"),
         "service": NationalIdentityNumberService.__name__,
+        "mfa_warning": mfa["mfa_recommended"] or None,
     }

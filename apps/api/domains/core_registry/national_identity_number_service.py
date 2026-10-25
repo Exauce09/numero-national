@@ -20,9 +20,11 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.api.domains.core_registry.models import Citizen
+from apps.api.domains.core_registry.enums import CitizenStatus, DuplicateStatus
+from apps.api.domains.core_registry.models import Citizen, DuplicateCandidate
 from apps.api.domains.core_registry.nic_service import (
     ALGORITHM_VERSION as PROVISIONAL_ALGORITHM_VERSION,
     NicGenerationError,
@@ -49,6 +51,15 @@ class OfficialNinFormatUnresolvedError(RuntimeError):
     """Levée tant que la composition officielle du NIN n'est pas confirmée."""
 
 
+class ProvisionalNinPrerequisitesError(ValueError):
+    """Dossier incomplet ou doublon OPEN — attribution provisoire refusée."""
+
+    def __init__(self, message: str, *, code: str, details: dict | None = None):
+        super().__init__(message)
+        self.code = code
+        self.details = details or {}
+
+
 @dataclass(frozen=True)
 class NinAssignmentResult:
     nin: str
@@ -56,6 +67,7 @@ class NinAssignmentResult:
     algorithm_version: str
     official: bool
     already_assigned: bool = False
+    nin_status: str = "PROVISIONAL"
 
 
 class NationalIdentityNumberService:
@@ -70,8 +82,71 @@ class NationalIdentityNumberService:
         return is_valid_nic_format(value)
 
     @staticmethod
+    def nin_status_for(citizen: Citizen) -> str | None:
+        """Statut logique additif (pas de colonne obligatoire) : PROVISIONAL | None."""
+        if citizen.nic is None:
+            return None
+        # Officiel impossible tant que le flag légal est faux.
+        return "PROVISIONAL"
+
+    @staticmethod
     async def already_issued(session: AsyncSession, nin: str) -> bool:
         return await nic_exists(session, nin)
+
+    @classmethod
+    async def count_open_duplicates(
+        cls, session: AsyncSession, citizen_id: uuid.UUID
+    ) -> int:
+        open_dupes = await session.scalar(
+            select(func.count())
+            .select_from(DuplicateCandidate)
+            .where(
+                and_(
+                    DuplicateCandidate.status == DuplicateStatus.OPEN.value,
+                    or_(
+                        DuplicateCandidate.citizen_a_id == citizen_id,
+                        DuplicateCandidate.citizen_b_id == citizen_id,
+                    ),
+                )
+            )
+        )
+        return int(open_dupes or 0)
+
+    @classmethod
+    async def assert_provisional_prerequisites(
+        cls, session: AsyncSession, citizen: Citizen
+    ) -> None:
+        """Refuse si dossier incomplet, statut incompatible ou doublon OPEN."""
+        if citizen.status in {
+            CitizenStatus.DECEASED.value,
+            CitizenStatus.MERGED.value,
+            CitizenStatus.SUSPENDED.value,
+        }:
+            raise ProvisionalNinPrerequisitesError(
+                f"Cannot assign provisional NIC in status {citizen.status}",
+                code="invalid_status",
+                details={"status": citizen.status},
+            )
+        missing: list[str] = []
+        if not (citizen.given_names and str(citizen.given_names).strip()):
+            missing.append("given_names")
+        if not (citizen.family_name and str(citizen.family_name).strip()):
+            missing.append("family_name")
+        if citizen.date_of_birth is None:
+            missing.append("date_of_birth")
+        if missing:
+            raise ProvisionalNinPrerequisitesError(
+                "Dossier incomplet — champs obligatoires manquants",
+                code="incomplete_dossier",
+                details={"missing": missing},
+            )
+        open_count = await cls.count_open_duplicates(session, citizen.id)
+        if open_count > 0:
+            raise ProvisionalNinPrerequisitesError(
+                "Attribution bloquée : doublons démographiques OPEN",
+                code="open_duplicates",
+                details={"open_duplicates": open_count},
+            )
 
     @classmethod
     async def assign_official_nin(
@@ -97,10 +172,13 @@ class NationalIdentityNumberService:
         *,
         citizen: Citizen,
         actor_id: uuid.UUID | None = None,
+        skip_prerequisites: bool = False,
     ) -> NinAssignmentResult:
         """Chemin DEV / transition : format v3-rdc-14 provisoire (non officiel).
 
         Idempotent : si un NIC est déjà présent, le retourne sans en générer un autre.
+        Prérequis (sauf skip_prerequisites=True pour chemins override déjà validés) :
+        dossier complet + aucun doublon OPEN.
         """
         if citizen.nic is not None:
             return NinAssignmentResult(
@@ -109,7 +187,10 @@ class NationalIdentityNumberService:
                 algorithm_version=PROVISIONAL_ALGORITHM_VERSION,
                 official=False,
                 already_assigned=True,
+                nin_status="PROVISIONAL",
             )
+        if not skip_prerequisites:
+            await cls.assert_provisional_prerequisites(session, citizen)
         try:
             nin = await _assign_provisional_nic_impl(
                 session, citizen=citizen, actor_id=actor_id
@@ -122,6 +203,7 @@ class NationalIdentityNumberService:
             algorithm_version=PROVISIONAL_ALGORITHM_VERSION,
             official=False,
             already_assigned=False,
+            nin_status="PROVISIONAL",
         )
 
 

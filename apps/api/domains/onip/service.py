@@ -294,3 +294,92 @@ async def list_map_by_milieu(
         "mode": "milieu",
         "milieux": milieux,
     }
+
+
+async def list_civil_conflicts(db: AsyncSession, *, limit: int = 50) -> dict[str, Any]:
+    """Corrections / déclarations en tension — exposition ONIP sans écrasement."""
+    items: list[dict[str, Any]] = []
+    try:
+        result = await db.execute(
+            text(
+                """
+                SELECT id::text, status, reason, created_at
+                FROM etat_civil.correction_requests
+                WHERE status IN ('PENDING', 'PENDING_OFFICER', 'CONFLICT', 'REJECTED', 'OPEN')
+                ORDER BY created_at DESC
+                LIMIT :lim
+                """
+            ),
+            {"lim": limit},
+        )
+        for row in result.mappings():
+            items.append(
+                {
+                    "kind": "correction",
+                    "id": row["id"],
+                    "status": row["status"],
+                    "reason": row.get("reason"),
+                    "created_at": row["created_at"].isoformat()
+                    if row.get("created_at")
+                    else None,
+                    "resolution": "manual_review_required",
+                }
+            )
+    except Exception as exc:
+        logger.debug("civil conflicts fallback: %s", exc)
+        await db.rollback()
+
+    return {
+        "count": len(items),
+        "items": items,
+        "policy": "no_silent_overwrite",
+        "note": "Les événements EC dupliqués sont refusés côté API (find_duplicate_act) ; "
+        "les conflits ouverts restent en file jusqu'à décision humaine.",
+    }
+
+
+async def build_ops_health(db: AsyncSession) -> dict[str, Any]:
+    """Santé technique ONIP — agrégats files / versions, sans secrets ni PII."""
+    from apps.api.domains.core_registry.national_identity_number_service import (
+        OFFICIAL_NIN_FORMAT_CONFIRMED,
+    )
+
+    dash = await build_dashboard(db)
+    sync_pending = await _safe_count(
+        db,
+        "SELECT COUNT(*) FROM recensement.sync_batches WHERE status IN ('PENDING', 'PROCESSING')",
+    )
+    bio_pending = await _safe_count(
+        db,
+        "SELECT COUNT(*) FROM biometric.biometric_matches WHERE review_status = 'PENDING'",
+    )
+    civil_conflicts = await _safe_count(
+        db,
+        """
+        SELECT COUNT(*) FROM etat_civil.correction_requests
+        WHERE status IN ('PENDING', 'CONFLICT', 'REJECTED')
+        """,
+    )
+    nic_provisional = await _safe_count(
+        db,
+        "SELECT COUNT(*) FROM core_registry.citizens WHERE nic IS NOT NULL",
+    )
+    return {
+        "api": "up",
+        "onip_dashboard": "ok",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "official_nin_format_confirmed": OFFICIAL_NIN_FORMAT_CONFIRMED,
+        "population_cards": dash.get("cards") if isinstance(dash, dict) else None,
+        "anomaly_count": len(dash.get("anomalies") or []) if isinstance(dash, dict) else 0,
+        "queues": {
+            "sync_batches_pending": sync_pending,
+            "biometric_reviews_pending": bio_pending,
+            "civil_corrections_open": civil_conflicts,
+            "nic_issued_provisional": nic_provisional,
+        },
+        "versions": {
+            "provisional_nic_algorithm": "PROVISIONAL-v3-rdc-14-NOT-OFFICIAL",
+            "audit_report": "docs/legal/onip/RAPPORT_AUDIT_ONIP_DETAIL.md",
+        },
+        "hint": "Biométrie / civil : pages dédiées (permissions séparées). Pas d'accès métier auto.",
+    }

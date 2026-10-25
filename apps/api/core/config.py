@@ -56,6 +56,11 @@ class Settings(BaseSettings):
     allow_open_registration: bool = Field(default=False, alias="ALLOW_OPEN_REGISTRATION")
     password_min_length: int = Field(default=8, alias="PASSWORD_MIN_LENGTH")
     bcrypt_rounds: int = Field(default=12, alias="BCRYPT_ROUNDS")
+    force_mfa_sensitive: bool = Field(
+        default=False,
+        alias="FORCE_MFA_SENSITIVE",
+        description="Si true, refuse validation/bio/NIN sans MFA activé",
+    )
 
     # HTTP / edge
     cors_origins: str = Field(default="http://localhost:5173,http://localhost:3000", alias="CORS_ORIGINS")

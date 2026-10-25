@@ -54,6 +54,14 @@ from apps.api.domains.recensement.schemas import (
 router = APIRouter(prefix="/census", tags=["census"])
 
 
+@router.get("/enrollment-status-catalog")
+async def enrollment_status_catalog() -> dict:
+    """Statuts d'enrôlement alignés plan ONIP ↔ CensusRecordStatus (pas de tables dupliquées)."""
+    from apps.api.domains.recensement.enrollment_status import enrollment_status_catalog as catalog
+
+    return catalog()
+
+
 @router.post(
     "/campaigns",
     response_model=CampaignOut,

@@ -152,6 +152,31 @@ async def load_citizen_with_addresses(db: AsyncSession, citizen_id: uuid.UUID) -
     return (await db.execute(stmt)).scalar_one_or_none()
 
 
+class CardEligibilityError(ValueError):
+    """CIN refusée — dossier non validé ou NIC absent."""
+
+    def __init__(self, message: str, *, code: str):
+        super().__init__(message)
+        self.code = code
+
+
+async def assert_cin_eligibility(citizen: Citizen | None) -> Citizen:
+    """Gate Lot 3 : dossier ACTIVE + NIC présent (provisoire ou futur officiel)."""
+    if citizen is None:
+        raise CardEligibilityError("Citizen not found", code="citizen_not_found")
+    if not citizen.nic:
+        raise CardEligibilityError(
+            "CIN refusée : NIC/NIN absent — attribuer un numéro avant production",
+            code="nic_required",
+        )
+    if citizen.status not in {"ACTIVE"}:
+        raise CardEligibilityError(
+            f"CIN refusée : dossier statut {citizen.status} (ACTIVE requis)",
+            code="dossier_not_validated",
+        )
+    return citizen
+
+
 async def issue_card(
     db: AsyncSession,
     data: CardIssueRequest,
@@ -162,6 +187,7 @@ async def issue_card(
     now = datetime.now(UTC)
     expires = data.expires_at or (now + timedelta(days=365 * 10))
     citizen = await load_citizen_with_addresses(db, data.citizen_id)
+    await assert_cin_eligibility(citizen)
     routing = (
         resolve_commune_routing(citizen)
         if citizen

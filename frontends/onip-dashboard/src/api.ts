@@ -418,10 +418,53 @@ export async function fetchOnipOpsHealth(): Promise<{
   official_nin_format_confirmed: boolean;
   anomaly_count: number;
   population_cards?: Record<string, unknown> | null;
+  queues?: Record<string, number>;
+  versions?: Record<string, string>;
   hint?: string;
 }> {
   return request("/onip/ops-health");
 }
+
+export type NinEligibleItem = {
+  id: string;
+  family_name: string;
+  given_names: string;
+  date_of_birth?: string | null;
+  status: string;
+  open_duplicates: number;
+  eligible_provisional: boolean;
+  nin_status: string | null;
+};
+
+export const ninOnipApi = {
+  eligible: (limit = 50) =>
+    request<{ count: number; items: NinEligibleItem[]; official_assign_available: boolean; note: string }>(
+      `/onip/nin/eligible?limit=${limit}`,
+    ),
+  issuanceLog: (limit = 50) =>
+    request<{
+      count: number;
+      items: Array<{
+        citizen_id: string;
+        nic: string;
+        issued_at?: string | null;
+        algorithm_version: string;
+        nin_status: string;
+        official: boolean;
+      }>;
+    }>(`/onip/nin/issuance-log?limit=${limit}`),
+  assignProvisional: (citizenId: string) =>
+    request<{
+      nin: string;
+      already_assigned: boolean;
+      nin_status: string;
+      official: boolean;
+      mfa_warning?: boolean | null;
+    }>("/onip/nin/assign", {
+      method: "POST",
+      body: JSON.stringify({ citizen_id: citizenId, mode: "provisional" }),
+    }),
+};
 
 export const biometricApi = {
   stats: () =>
@@ -429,9 +472,28 @@ export const biometricApi = {
       enrollments?: number;
       fingerprints?: number;
       open_matches?: number;
+      pending_reviews?: number;
       [k: string]: unknown;
     }>("/biometric/stats"),
   thresholds: () => request<Array<{ code?: string; value?: number; active?: boolean }>>("/biometric/thresholds"),
+  pendingMatches: (limit = 50) =>
+    request<
+      Array<{
+        id: string;
+        matched_citizen_id: string;
+        match_score: number;
+        threshold_used: number;
+        decision: string;
+        finger_position?: string | null;
+        review_status: string;
+        created_at: string;
+      }>
+    >(`/biometric/matches/pending?limit=${limit}`),
+  reviewMatch: (matchId: string, approveException: boolean, reason?: string) =>
+    request(`/biometric/matches/${matchId}/review`, {
+      method: "POST",
+      body: JSON.stringify({ approve_exception: approveException, reason: reason || null }),
+    }),
 };
 
 export const civilOnipApi = {
@@ -470,6 +532,20 @@ export const civilOnipApi = {
         reason?: string;
       }>
     >("/civil/corrections"),
+  conflicts: () =>
+    request<{
+      count: number;
+      items: Array<{
+        kind: string;
+        id: string;
+        status: string;
+        reason?: string | null;
+        created_at?: string | null;
+        resolution: string;
+      }>;
+      policy: string;
+      note: string;
+    }>("/onip/civil/conflicts"),
 };
 
 export { updateAccessToken, BASE as API_BASE };

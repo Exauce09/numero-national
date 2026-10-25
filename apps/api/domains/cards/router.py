@@ -52,7 +52,13 @@ async def issue_card(
     db: AsyncSession = Depends(get_db),
     principal: Principal = Depends(require_permissions(PERM_CARD_ISSUE)),
 ) -> CardRead:
-    card, qr = await services.issue_card(db, body, actor_id=principal.actor_id)
+    try:
+        card, qr = await services.issue_card(db, body, actor_id=principal.actor_id)
+    except services.CardEligibilityError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"message": str(exc), "code": exc.code},
+        ) from exc
     return await _to_read(db, card, qr)
 
 
@@ -218,9 +224,15 @@ async def issue_and_dispatch_card(
     existing = await services.get_active_card_for_citizen(db, body.citizen_id)
     if existing is not None:
         return await _to_read(db, existing)
-    card, qr = await services.issue_card(
-        db, body, actor_id=principal.actor_id, dispatch_to_commune=True
-    )
+    try:
+        card, qr = await services.issue_card(
+            db, body, actor_id=principal.actor_id, dispatch_to_commune=True
+        )
+    except services.CardEligibilityError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"message": str(exc), "code": exc.code},
+        ) from exc
     return await _to_read(db, card, qr)
 
 

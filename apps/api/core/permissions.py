@@ -47,6 +47,18 @@ PERM_HEALTH_READ = "health:read"
 PERM_ONIP_DASHBOARD = "onip:dashboard"
 PERM_ANALYTICS_READ = "analytics:read"
 PERM_IDENTITY_VERIFY = "identity:verify"
+PERM_AUDIT_READ = "audit:read"
+
+# Permissions sensibles ONIP — MFA recommandé / forçable
+SENSITIVE_ONIP_PERMISSIONS: frozenset[str] = frozenset(
+    {
+        PERM_CITIZEN_VALIDATE,
+        PERM_CITIZEN_MERGE,
+        PERM_BIOMETRIC_ENROLL,
+        PERM_BIOMETRIC_MATCH,
+        PERM_BIOMETRIC_REVIEW,
+    }
+)
 
 # Institutional IAM (personnel / bureaux / scopes)
 PERM_PERSONNEL_READ = "personnel:read"
@@ -87,6 +99,7 @@ ALL_DOMAIN_PERMISSIONS: tuple[str, ...] = (
     PERM_ONIP_DASHBOARD,
     PERM_ANALYTICS_READ,
     PERM_IDENTITY_VERIFY,
+    PERM_AUDIT_READ,
     PERM_PERSONNEL_READ,
     PERM_PERSONNEL_MANAGE,
     PERM_ASSIGNMENT_READ,
@@ -103,6 +116,7 @@ class Principal:
     actor_id: UUID | None = None
     permissions: frozenset[str] = field(default_factory=frozenset)
     institution_id: UUID | None = None
+    mfa_enabled: bool = False
 
 
 async def get_current_principal(
@@ -137,6 +151,7 @@ async def get_current_principal(
             actor_id=me.id,
             permissions=frozenset(me.permissions),
             institution_id=me.institution_id,
+            mfa_enabled=bool(getattr(user, "mfa_enabled", False)),
         )
 
     if settings.dev_header_auth_enabled:
@@ -174,6 +189,41 @@ def require_permissions(*required: str):
                 detail={
                     "message": "Missing required permissions",
                     "missing": missing,
+                },
+            )
+        return principal
+
+    return _checker
+
+
+def mfa_status_for(principal: Principal) -> dict[str, object]:
+    """Signale si MFA est requis pour les permissions sensibles du principal."""
+    held_sensitive = sorted(SENSITIVE_ONIP_PERMISSIONS & principal.permissions)
+    settings = get_settings()
+    force = bool(getattr(settings, "force_mfa_sensitive", False))
+    needs = bool(held_sensitive) and not principal.mfa_enabled
+    return {
+        "mfa_enabled": principal.mfa_enabled,
+        "sensitive_permissions_held": held_sensitive,
+        "mfa_recommended": needs,
+        "mfa_enforced": force and needs,
+        "hint": "Activer MFA (/auth/mfa/setup) pour validation, biométrie et fusion.",
+    }
+
+
+def require_mfa_if_enforced():
+    """403 si FORCE_MFA_SENSITIVE et compte sensible sans MFA."""
+
+    async def _checker(
+        principal: Principal = Depends(get_current_principal),
+    ) -> Principal:
+        status_info = mfa_status_for(principal)
+        if status_info["mfa_enforced"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "message": "MFA required for sensitive ONIP operations",
+                    **status_info,
                 },
             )
         return principal

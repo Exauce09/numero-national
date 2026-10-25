@@ -38,6 +38,9 @@ class IdentityVerifyRequest(BaseModel):
 
 
 class IdentityVerifyResponse(BaseModel):
+    """Réponse minimale partenaire — pas de dossier, pas de biométrie."""
+
     verified: bool
-    status: str
-    claims: dict[str, Any]
+    identity_status: str | None = None
+    status: str  # alias historique (= identity_status)
+    claims: dict[str, Any] = Field(default_factory=dict)

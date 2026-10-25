@@ -163,6 +163,29 @@ async def citizen_fingerprints(
     return await enroll.list_citizen_fingerprints(db, citizen_id)
 
 
+@router.get("/matches/pending", response_model=list[MatchOut])
+async def list_pending_matches(
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+    _: Principal = Depends(require_permissions(PERM_BIOMETRIC_MATCH)),
+) -> list[MatchOut]:
+    """File ONIP de revue humaine — scores uniquement, jamais de templates."""
+    rows = await enroll.list_pending_reviews(db, limit=min(max(limit, 1), 200))
+    return [
+        MatchOut(
+            id=row.id,
+            matched_citizen_id=row.matched_citizen_id,
+            match_score=row.match_score,
+            threshold_used=row.threshold_used,
+            decision=row.decision,
+            finger_position=row.finger_position,
+            review_status=row.review_status,
+            created_at=row.created_at,
+        )
+        for row in rows
+    ]
+
+
 @router.post("/matches/{match_id}/review", response_model=MatchOut)
 async def review_match(
     match_id: uuid.UUID,

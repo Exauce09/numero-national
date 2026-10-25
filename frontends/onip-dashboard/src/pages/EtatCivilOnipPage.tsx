@@ -15,6 +15,10 @@ export default function EtatCivilOnipPage() {
   const [corrections, setCorrections] = useState<
     Array<{ id: string; status?: string; created_at?: string; reason?: string }>
   >([]);
+  const [conflicts, setConflicts] = useState<
+    Array<{ id: string; status: string; reason?: string | null; created_at?: string | null; kind: string }>
+  >([]);
+  const [policy, setPolicy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -23,14 +27,17 @@ export default function EtatCivilOnipPage() {
     setLoading(true);
     setError(null);
     try {
-      const [a, d, c] = await Promise.all([
+      const [a, d, c, conf] = await Promise.all([
         civilOnipApi.searchActs(query, 40),
         civilOnipApi.listDeclarations("PENDING_OFFICER").catch(() => civilOnipApi.listDeclarations()),
         civilOnipApi.listCorrections().catch(() => []),
+        civilOnipApi.conflicts().catch(() => ({ items: [], policy: null, note: "" })),
       ]);
       setActs(a);
       setDeclarations(d);
       setCorrections(c);
+      setConflicts(conf.items || []);
+      setPolicy(conf.policy || null);
     } catch (e) {
       setActs([]);
       setDeclarations([]);
@@ -82,6 +89,25 @@ export default function EtatCivilOnipPage() {
             </button>
           </form>
           {error ? <div className="login-error">{error}</div> : null}
+
+          <div className="panel" style={{ borderLeft: "4px solid #b35c00" }}>
+            <h2 className="panel-title">Conflits / file résolution</h2>
+            <p className="muted small">
+              Politique : {policy || "no_silent_overwrite"} — pas d&apos;écrasement silencieux ; les
+              événements répétés sont refusés côté API.
+            </p>
+            {conflicts.length === 0 ? (
+              <p className="muted">Aucun conflit ouvert listé.</p>
+            ) : (
+              <ul>
+                {conflicts.map((x) => (
+                  <li key={x.id}>
+                    [{x.kind}] {x.status} — {x.reason || x.id}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
           <div className="panel">
             <h2 className="panel-title">Déclarations (file)</h2>

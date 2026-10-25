@@ -646,6 +646,19 @@ async def revoke_fingerprint(
     return row
 
 
+async def list_pending_reviews(
+    db: AsyncSession, *, limit: int = 50
+) -> list[BiometricMatch]:
+    """File revue humaine — matchs ouverts (PENDING), sans templates."""
+    stmt = (
+        select(BiometricMatch)
+        .where(BiometricMatch.review_status == "PENDING")
+        .order_by(BiometricMatch.created_at.desc())
+        .limit(limit)
+    )
+    return list((await db.execute(stmt)).scalars().all())
+
+
 async def biometric_stats(db: AsyncSession) -> StatsOut:
     enrollments = await db.scalar(select(func.count()).select_from(BiometricEnrollment)) or 0
     fingerprints = (

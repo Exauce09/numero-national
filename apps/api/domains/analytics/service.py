@@ -234,4 +234,10 @@ async def relying_party_verify(
         claims["alive"] = citizen_status not in {"DECEASED", "NOT_FOUND", "INVALID"}
     # sex / age_band intentionally omitted unless a non-PII aggregate service supplies them
 
-    return IdentityVerifyResponse(verified=verified, status=citizen_status, claims=claims)
+    # Réponse minimale : verified + statut — claims déjà filtrés (allowed set).
+    return IdentityVerifyResponse(
+        verified=verified,
+        identity_status=citizen_status,
+        status=citizen_status,
+        claims=claims,
+    )

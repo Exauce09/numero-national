@@ -325,7 +325,10 @@ async def validate_and_assign_nic(
                 detail="override_justification required (min 10 chars) when forcing NIC",
             )
 
-    result = await assign_provisional_nic(session, citizen=citizen, actor_id=actor_id)
+    # Prérequis déjà appliqués ici (doublons / override) — ne pas re-bloquer.
+    result = await assign_provisional_nic(
+        session, citizen=citizen, actor_id=actor_id, skip_prerequisites=True
+    )
     if result.already_assigned:
         # Ne jamais réattribuer — idempotence
         pass
