@@ -66,6 +66,11 @@ class CitizenUpdate(BaseModel):
     nationality: str | None = Field(default=None, min_length=2, max_length=3)
     given_names: str | None = Field(default=None, min_length=1, max_length=255)
     family_name: str | None = Field(default=None, min_length=1, max_length=255)
+    reason: str | None = Field(
+        default=None,
+        max_length=2000,
+        description="Motif de modification (historisé)",
+    )
 
 
 class CitizenDetail(BaseModel):
@@ -114,6 +119,12 @@ class CitizenSearchParams(BaseModel):
     given_names: str | None = None
     nic: str | None = None
     date_of_birth: date | None = None
+    status: CitizenStatus | None = None
+    sex: Sex | None = None
+    place_of_birth: str | None = None
+    province_code: str | None = None
+    commune_code: str | None = None
+    include_closed: bool = False
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
 
@@ -144,3 +155,69 @@ class CitizenMergeResponse(BaseModel):
     target_citizen_id: UUID
     source_status: CitizenStatus
     message: str
+
+
+class CitizenHistoryItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    citizen_id: UUID
+    event_type: str
+    payload: dict
+    actor_id: UUID | None
+    created_at: datetime
+
+
+class PaginatedCitizenHistory(BaseModel):
+    items: list[CitizenHistoryItem]
+    total: int
+    page: int
+    page_size: int
+
+
+class CitizenSubmitRequest(BaseModel):
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class CitizenStatusChangeRequest(BaseModel):
+    status: CitizenStatus
+    reason: str = Field(min_length=5, max_length=4000)
+
+
+class DuplicateCandidateOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    citizen_a_id: UUID
+    citizen_b_id: UUID
+    other_citizen_id: UUID | None = None
+    score: float
+    status: str
+    match_method: str
+    created_at: datetime
+    other_family_name: str | None = None
+    other_given_names: str | None = None
+    other_date_of_birth: date | None = None
+    other_status: str | None = None
+    other_nic: str | None = None
+
+
+class DuplicateResolveRequest(BaseModel):
+    """Résolution manuelle — jamais une fusion automatique."""
+
+    decision: str = Field(
+        description="FALSE_POSITIVE | CONFIRMED_DUPLICATE (fusion via POST /citizens/merge)"
+    )
+    justification: str = Field(min_length=10, max_length=4000)
+
+
+class DuplicateResolveResponse(BaseModel):
+    id: UUID
+    status: str
+    message: str
+
+
+class SimilarSearchResponse(BaseModel):
+    items: list[CitizenListItem]
+    total: int
+    message: str = "Candidats potentiels — revue humaine requise, pas de fusion automatique"

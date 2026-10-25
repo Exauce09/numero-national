@@ -1,0 +1,626 @@
+SIGPOP-RDC
+MODULE 2GESTION DES PERSONNES ET DES DOSSIERS
+Cahier des charges fonctionnel et technique détailléPortail ONIP — Fichier Général de la Population (FGP)
+Version de travail — octobre 2026
+Document destiné à l’audit, à la conception et au développement progressif du module existant.
+Avertissement et usage du document
+Ce cahier des charges développe le Module 2 — Gestion des personnes et des dossiers — à partir des éléments fournis pour SIGPOP-RDC / ONIP : création et consultation des dossiers, identité biographique, naissance, sexe, caractéristiques physiques prévues, profession, nationalité, adresse, filiation, documents, provenance, statuts, historique et rectification.
+Il s’agit d’une spécification proposée pour guider le développement. Elle ne confirme pas que chaque champ ou règle est déjà implémenté dans le dépôt. Les champs obligatoires, les catégories exactes de personnes, les documents recevables, les délais de conservation et les procédures de rectification doivent être validés à partir des textes complets et des instructions officielles applicables.
+Règle majeure : ce module ne doit pas générer lui-même un NIN, décider seul d’une fusion d’identités ni remplacer les procédures officielles du FGP. Il doit appeler les services métier autorisés et conserver les traces nécessaires.
+Sommaire
+1. Finalité, objectifs et périmètre
+2. Utilisateurs, rôles et droits
+3. Organisation du module et écrans
+4. Fiche individuelle : données et champs
+5. Recherche, rapprochement et détection des doublons
+6. Cycle de vie et statuts du dossier
+7. Création et mise à jour d’un dossier
+8. Rectification, fusion et conservation de l’historique
+9. Documents justificatifs et provenance
+10. Modèle de données indicatif
+11. API et intégrations
+12. Sécurité, confidentialité et audit
+13. Règles métier et validations
+14. Cas d’utilisation et scénarios
+15. Tests et critères d’acceptation
+16. Plan de développement progressif
+17. Prompt destiné à l’agent développeur
+18. Limites et décisions à faire valider
+1. Finalité, objectifs et périmètre
+1.1 Finalité
+Le module Gestion des personnes et des dossiers constitue l’espace opérationnel utilisé pour retrouver, ouvrir, consulter et mettre à jour un dossier individuel. Il doit présenter une vue cohérente de l’identité biographique, de l’adresse, des relations familiales autorisées, des justificatifs, des références d’état civil, des vérifications réalisées et de l’historique administratif.
+1.2 Objectifs fonctionnels
+Créer un dossier provisoire sans le confondre avec une identité validée au FGP.
+Rechercher une personne de manière contrôlée, avec plusieurs critères et sans exposer des dossiers aux utilisateurs non habilités.
+Consulter une fiche individuelle et distinguer clairement les données déclarées, vérifiées, rejetées ou en attente.
+Modifier les champs autorisés selon un workflow de validation et conserver l’ancienne valeur ainsi que le motif du changement.
+Rattacher les documents justificatifs, références d’actes et sources de données au dossier concerné.
+Tracer les vérifications, demandes de complément, rejets, rectifications et décisions.
+Réduire la création de dossiers en double grâce à une recherche préalable et à une file de rapprochement.
+Faire communiquer les dossiers avec les modules d’enrôlement, biométrie, campagnes, état civil, NIN et CIN par des interfaces contrôlées.
+1.3 Périmètre inclus
+Fonction
+Dans le périmètre
+Hors périmètre ou dépendance
+Création dossier
+Créer une fiche avec identifiant interne, source et statut.
+Attribution définitive du NIN par ce formulaire.
+Consultation
+Afficher les champs autorisés, les justificatifs référencés et l’historique.
+Accès universel à toutes les données.
+Modification
+Proposer les changements permis et envoyer en validation si nécessaire.
+Écrasement silencieux des valeurs vérifiées.
+Recherche
+Recherche biographique et liens avec les modules de rapprochement.
+Fusion automatique des dossiers.
+Documents
+Associer et vérifier les pièces selon une procédure définie.
+Décider seul de l’authenticité juridique d’un acte.
+Rectification
+Créer et suivre une demande avec preuves et décision.
+Remplacer une procédure officielle de rectification.
+1.4 Principes non négociables
+Identifiant interne séparé du NIN
+Chaque dossier doit disposer d’une clé technique immuable. Cette clé ne doit pas être présentée comme un numéro d’identification nationale.
+Historique immuable au niveau métier
+Une valeur vérifiée ne doit pas être remplacée sans trace : ancienne valeur, nouvelle valeur, auteur, horodatage, motif et décision.
+Données sourcées
+Pour les champs importants, enregistrer la source, la date de collecte et l’état de vérification.
+Droits minimaux
+L’accès et la modification dépendent du rôle, du périmètre et de la finalité.
+Validation séparée
+L’agent qui collecte ne doit pas nécessairement être autorisé à valider sa propre saisie.
+Aucun NIN improvisé
+Le module consomme le résultat du service NIN autorisé ; il n’invente ni format ni algorithme.
+2. Utilisateurs, rôles et droits
+La matrice suivante est indicative. Elle doit être alignée sur les habilitations réellement approuvées par l’organisation. Les droits de lecture et les droits de modification doivent être séparés.
+Rôle indicatif
+Droits possibles
+Restrictions à appliquer
+Administrateur national
+Supervision et gestion des paramètres autorisés.
+Pas d’accès biométrique automatique ; actions sensibles journalisées.
+Administrateur provincial
+Consultation et supervision du périmètre provincial.
+Aucun accès hors périmètre sans autorisation expresse.
+Responsable de centre
+Dossiers relevant du centre, affectations et suivi.
+Pas de privilèges nationaux automatiques.
+Agent d’enrôlement
+Création de dossier et saisie initiale.
+Modification limitée ; pas d’approbation finale de ses propres dossiers si séparation requise.
+Agent de vérification
+Contrôle documentaire et cohérence.
+Ne peut pas changer les règles officielles ni attribuer librement un NIN.
+Validateur
+Décision sur dossiers et rectifications selon son habilitation.
+Décisions motivées et journalisées.
+Opérateur biométrique
+Consultation des informations nécessaires à la capture et au contrôle.
+Pas d’accès complet à tous les champs ni d’export libre de données biométriques.
+Auditeur
+Consultation des traces et des rapports autorisés.
+Lecture seule ; exports contrôlés.
+Agent support
+Assistance technique avec visibilité limitée.
+Ne doit pas modifier l’identité métier pour résoudre un problème technique.
+Citoyen / usager
+Consultation de ses propres informations si le service est autorisé.
+Aucun accès au dossier d’un tiers.
+Système partenaire
+Accès API limité à des attributs prévus.
+Pas de lecture directe de la base ni d’accès au FGP complet.
+2.1 Exemples de permissions granulaires
+person.search — rechercher les dossiers dans le périmètre autorisé.
+person.view.biographic — consulter les données biographiques autorisées.
+person.view.documents — ouvrir les pièces justificatives lorsque nécessaire.
+person.create — créer une fiche provisoire.
+person.update.unverified — corriger une donnée non encore vérifiée.
+person.propose_correction — créer une demande de rectification.
+person.approve_correction — approuver une rectification.
+person.merge.propose — proposer un rapprochement ou une fusion.
+person.merge.approve — approuver une fusion selon une procédure renforcée.
+person.export — exporter des données autorisées, avec motif et audit.
+3. Organisation du module et écrans
+Écran
+Contenu attendu
+Actions principales
+Liste des personnes
+Liste paginée de résultats autorisés, nom affiché, identifiant interne masqué selon rôle, statut et date de mise à jour.
+Ouvrir une fiche, filtrer, lancer une recherche avancée.
+Recherche avancée
+Critères biographiques, date/lieu de naissance, source, statut et références de documents.
+Rechercher, réinitialiser, examiner les résultats.
+Créer un dossier
+Formulaire par étapes avec contrôles et sauvegarde en brouillon.
+Enregistrer, enregistrer et continuer, soumettre.
+Fiche individuelle
+Résumé, identité, adresse, documents, relations, vérifications, événements et historique.
+Consulter, proposer une correction, voir le statut.
+Modifier les données
+Champs modifiables selon permissions et état de validation.
+Enregistrer brouillon, soumettre pour validation.
+Documents
+Liste des pièces, type, référence, source, date, état de vérification et accès contrôlé.
+Ajouter, examiner, accepter, rejeter ou demander un complément.
+Historique
+Événements chronologiques avec acteur, date, action, motif et résultat.
+Consulter ; export uniquement si autorisé.
+Demandes de rectification
+Demandes ouvertes, documents fournis, responsable et échéance.
+Prendre en charge, demander complément, approuver ou rejeter.
+Doublons potentiels
+Dossiers candidats, motifs et décision de revue.
+Confirmer une différence, demander vérification, proposer une fusion.
+3.1 Structure conseillée de la fiche
+Bandeau : identité principale affichable, statut du dossier, indicateur de vérification et date de dernière mise à jour.
+Onglet Identité : noms, autres noms, date et lieu de naissance, sexe et attributs autorisés.
+Onglet Adresse : adresse actuelle et historique daté.
+Onglet Filiation et relations : liens familiaux/tutorat si la collecte est autorisée.
+Onglet Documents : pièces, références d’actes et décisions associées.
+Onglet Contrôles : cohérence biographique, état des pièces et doublons potentiels.
+Onglet Événements : changements issus de l’état civil ou d’autres sources autorisées.
+Onglet Historique : lecture chronologique des opérations sensibles.
+4. Fiche individuelle : données et champs
+Le tableau ci-dessous propose une organisation des champs cités dans les notes du projet. Il ne définit pas leur caractère légalement obligatoire : chaque champ doit être configuré en fonction des exigences officielles applicables et de la situation de la personne.
+Groupe
+Champs proposés
+Règles de conception
+Références techniques
+Identifiant interne immuable, numéro de dossier provisoire, source de création, date de création, dernière mise à jour.
+L’identifiant interne doit être distinct du NIN. Les références sont uniques.
+Identité
+Nom, post-nom, prénom, autres noms ou variantes autorisées.
+Respecter la saisie officielle et conserver les variantes utiles sans écrasement.
+Naissance
+Date de naissance, lieu de naissance, référence de l’acte de naissance lorsqu’elle est disponible.
+Contrôler les formats et signaler les incohérences ; ne pas inventer une date manquante.
+Données personnelles
+Sexe et autres attributs prévus par la procédure officielle.
+Ne demander que les champs nécessaires et autorisés.
+Caractéristiques physiques
+Taille, couleur des yeux et autres caractéristiques prévues par la procédure applicable.
+Champs facultatifs ou conditionnels tant que leur caractère obligatoire n’est pas confirmé.
+Situation
+Profession, nationalité, état civil si ces champs relèvent du module et de la procédure applicable.
+Historiser les modifications et permettre les valeurs non renseignées lorsque la règle le permet.
+Adresse
+Province, ville/territoire, commune/secteur, quartier/village, adresse libre et coordonnées si autorisées.
+Utiliser un référentiel administratif versionné ; conserver l’historique des adresses.
+Filiation / ménage
+Liens vers parents, tuteurs ou membres du ménage lorsque la collecte est autorisée.
+Éviter les doublons de personnes et distinguer relation déclarée de relation vérifiée.
+Documents
+Type, référence, organisme émetteur, date, pièce stockée ou référence sécurisée, état de vérification.
+Ne jamais stocker des pièces dans un répertoire public non protégé.
+Provenance
+Source, campagne, centre, agent, appareil ou système source si nécessaire, horodatage.
+Tracer la provenance sans exposer des secrets techniques.
+Statut
+Statut du dossier, raison d’attente ou de rejet, date de décision et auteur.
+Les transitions sont contrôlées par le workflow.
+4.1 Données déclarées et données vérifiées
+Pour les champs critiques, il est préférable de conserver l’état de vérification plutôt que de présenter toutes les valeurs comme certaines. Exemples d’états : déclaré, document reçu, contrôlé, confirmé par une source autorisée, contesté ou à rectifier. Les libellés finaux sont à harmoniser avec le vocabulaire métier officiel.
+4.2 Validation des champs
+Vérifier le format des dates et l’existence logique de la date saisie, sans corriger automatiquement une donnée déclarée.
+Contrôler les références administratives contre le référentiel territorial courant.
+Préserver les caractères du nom et les variantes orthographiques ; éviter les normalisations destructives.
+Permettre la distinction entre absence de donnée, donnée inconnue, donnée non applicable et donnée en attente si les règles métier le permettent.
+Ne pas exposer les coordonnées précises ni les attributs sensibles à tous les profils.
+Conserver le motif de toute modification d’un champ vérifié.
+5. Recherche, rapprochement et détection des doublons
+5.1 Recherche simple
+La recherche simple doit aider l’agent à retrouver un dossier sans nécessiter un identifiant officiel lorsque celui-ci n’est pas encore attribué. Les critères exacts accessibles dépendent du rôle et du besoin opérationnel.
+5.2 Recherche avancée
+Critère
+Comportement attendu
+Précaution
+Nom / post-nom / prénom
+Recherche exacte ou tolérante selon les capacités de la base.
+Ne pas conclure qu’il s’agit de la même personne sur la seule base d’un nom semblable.
+Date de naissance
+Filtre de date exacte ou plage autorisée.
+Signaler les résultats proches sans les fusionner.
+Lieu de naissance
+Filtre selon le référentiel ou une valeur documentée.
+Gérer les changements de découpage et variantes documentées.
+Référence de document
+Recherche par numéro de pièce lorsque autorisé.
+Limiter le nombre de résultats et journaliser les recherches sensibles.
+Référence de dossier
+Recherche directe par identifiant interne ou référence de demande.
+Vérifier l’autorisation avant de confirmer l’existence du dossier.
+Source/campagne/centre
+Filtre pour les agents habilités.
+Appliquer le périmètre territorial et organisationnel.
+5.3 Prévention du doublon lors de la création
+Avant la création finale, lancer une recherche de correspondances biographiques.
+Si une intégration biométrique autorisée existe, transmettre la demande au service spécialisé plutôt que de comparer des fichiers bruts dans l’interface.
+Afficher les candidats à l’agent habilité avec les éléments minimaux nécessaires à la comparaison.
+Classer le dossier : aucun candidat identifié, candidat potentiel, revue nécessaire ou doublon confirmé selon la procédure approuvée.
+Conserver la décision, le motif, le responsable et la date.
+5.4 Aucun rapprochement automatique irréversible
+Une similitude de nom, de date ou un score biométrique ne doit pas déclencher à lui seul la fusion ou la déclaration de fraude. Les cas ambigus doivent passer par une procédure de vérification humaine. Les seuils, méthodes de comparaison et procédures de recours doivent être définis et validés par les responsables compétents.
+6. Cycle de vie et statuts du dossier
+Les statuts ci-dessous sont des propositions de conception pour rendre le parcours visible. Ils doivent être adaptés aux statuts déjà présents dans le code et au vocabulaire institutionnel.
+Statut proposé
+Signification
+Transition autorisée indicative
+BROUILLON
+Saisie commencée mais non soumise.
+Enregistrer, compléter, soumettre ou abandonner selon droits.
+SOUMIS
+Dossier transmis pour contrôle.
+Prendre en charge, demander complément ou mettre en revue.
+A_COMPLETER
+Une ou plusieurs informations/pièces manquent.
+Compléter puis soumettre à nouveau.
+EN_VERIFICATION
+Contrôle documentaire ou biographique en cours.
+Valider, rejeter avec motif ou ouvrir une revue de doublon.
+DOUBLON_POTENTIEL
+Un ou plusieurs dossiers correspondent possiblement.
+Examiner et décider selon procédure autorisée.
+EN_VALIDATION
+Les vérifications préalables ont été effectuées.
+Approuver, rejeter avec motif ou demander un complément.
+VALIDE
+Le dossier a été validé selon les habilitations applicables.
+Mise à jour via demande autorisée ou événement officiel.
+REJETE
+Dossier rejeté avec motif enregistré.
+Réouverture uniquement si la procédure le permet.
+RECTIFICATION_EN_COURS
+Une demande de correction est en instruction.
+Complément, approbation ou rejet.
+FUSION_EN_EXAMEN
+Rapprochement à étudier par un agent habilité.
+Confirmer différence ou soumettre une fusion pour approbation.
+ARCHIVE_ADMINISTRATIVE
+Dossier archivé selon une règle applicable.
+Consultation historique limitée ; réactivation uniquement selon procédure.
+6.1 Règles de transition
+Chaque transition doit vérifier le statut actuel, le rôle et les prérequis.
+Les actions interdites doivent être rejetées côté serveur, même si l’interface masque le bouton.
+Un rejet doit comporter un motif exploitable et une date.
+Une approbation doit indiquer l’agent ou service responsable.
+Une modification sensible doit déclencher une entrée d’historique.
+Le système doit empêcher les transitions impossibles ou non autorisées.
+7. Création et mise à jour d’un dossier
+7.1 Création initiale
+L’agent ouvre « Nouveau dossier » et le système contrôle sa permission.
+Le système crée un brouillon avec un identifiant interne unique et une référence de suivi provisoire si nécessaire.
+L’agent remplit les champs autorisés et renseigne l’origine des informations.
+Le système vérifie les formats, les champs requis pour ce parcours et les références territoriales.
+Le système lance la recherche de dossiers similaires avant la soumission.
+L’agent joint ou référence les justificatifs nécessaires.
+Le dossier est sauvegardé comme brouillon ou transmis au contrôle.
+Le système enregistre l’action, la date, l’agent, le centre et le résultat.
+7.2 Mise à jour ordinaire
+Les changements non sensibles peuvent être traités directement uniquement si la procédure autorise ce niveau d’autonomie. Un changement d’adresse, d’état civil ou de donnée considérée comme vérifiée peut nécessiter une demande de modification, des justificatifs ou une approbation.
+7.3 Sauvegarde du formulaire
+Permettre une sauvegarde partielle si le statut l’autorise.
+Indiquer clairement les champs incomplets et les erreurs bloquantes.
+Éviter de perdre le contenu en cas de rafraîchissement ou de coupure réseau.
+Ne pas accepter deux mises à jour concurrentes sans détecter le conflit de version.
+Afficher la date de dernière sauvegarde et la personne ayant modifié le dossier.
+8. Rectification, fusion et conservation de l’historique
+8.1 Demande de rectification
+Étape
+Action
+Trace obligatoire indicative
+1. Demande
+L’utilisateur habilité sélectionne le champ et motive la correction.
+Auteur, date, champ concerné et valeur proposée.
+2. Justificatifs
+Ajout ou référence de pièces probantes.
+Type de document, provenance, intégrité et date.
+3. Instruction
+Un agent examine la demande.
+Agent responsable, commentaires et demande de complément éventuelle.
+4. Décision
+La demande est approuvée ou rejetée selon la procédure.
+Décision, motif, date et autorité habilitée.
+5. Application
+La nouvelle valeur est appliquée si approuvée.
+Ancienne valeur, nouvelle valeur, date d’effet et référence à la décision.
+6. Notification
+Informer le demandeur ou l’équipe concernée si ce service existe.
+Canal, statut d’envoi et résultat.
+8.2 Fusion contrôlée de dossiers
+La fusion n’est pas une opération ordinaire d’édition. Elle doit être limitée à des utilisateurs spécialement habilités et faire l’objet d’une approbation renforcée. La procédure doit définir quelle fiche est conservée comme référence, comment les références antérieures restent consultables, et comment les NIN éventuels sont traités selon les règles officielles.
+Enregistrer les deux identifiants internes concernés et la justification du rapprochement.
+Présenter les éléments concordants et divergents sans exposer de données non nécessaires.
+Exiger la décision d’un validateur autorisé selon les règles internes.
+Ne jamais réattribuer le NIN d’une personne à une autre.
+Conserver la trace de la fusion, les références des dossiers antérieurs et les événements associés.
+Prévoir une procédure de correction si une fusion erronée est détectée.
+8.3 Historique minimum
+Pour chaque événement important, enregistrer au minimum : identifiant de l’événement, dossier concerné, type d’action, acteur, rôle, date/heure, motif, source, ancienne et nouvelle valeur lorsque nécessaire, statut de la demande, référence de la décision et résultat. Les données sensibles ne doivent pas être copiées inutilement dans le journal.
+9. Documents justificatifs et provenance
+9.1 Informations documentaires
+Type de document et catégorie.
+Référence ou numéro du document lorsque la procédure le prévoit.
+Organisme émetteur ou source déclarée.
+Date d’émission, date de réception et date d’expiration si applicable.
+Référence sécurisée du fichier, sans chemin public exposé au navigateur.
+État de vérification : reçu, à examiner, vérifié, rejeté, expiré ou à remplacer — à adapter au processus réel.
+Agent responsable du contrôle, date et motif de décision.
+9.2 Contrôles de sécurité
+Autoriser uniquement les formats et tailles de fichiers définis.
+Contrôler les fichiers téléversés et les conserver dans un stockage privé.
+Vérifier les accès lors de chaque consultation ou téléchargement.
+Éviter les URL permanentes et publiques ; employer un accès contrôlé et temporaire si nécessaire.
+Journaliser les consultations et téléchargements sensibles.
+Définir la conservation et l’archivage à partir des règles applicables.
+9.3 Provenance des informations
+Une valeur peut provenir d’une déclaration, d’un document, d’un recensement, d’un événement d’état civil ou d’une intégration autorisée. Le système doit conserver cette provenance pour faciliter les contrôles et résoudre les contradictions. Une donnée provenant d’une source ne doit pas être présentée comme confirmée par une autre source si aucune vérification ne l’établit.
+10. Modèle de données indicatif
+Les noms des tables sont proposés à titre conceptuel. Avant de créer ou modifier un modèle, il faut inspecter les schémas, migrations et relations existants afin d’éviter les duplications.
+Entité/table
+Contenu indicatif
+Relations / contraintes
+persons
+Identifiant interne, données biographiques courantes, statut et version.
+Clé technique immuable ; pas de NIN inventé dans cette table.
+person_name_history
+Variantes ou versions historisées des noms si nécessaire.
+Lien vers persons ; motif et période de validité.
+person_addresses
+Adresses actuelles et antérieures.
+Historique daté ; référence au découpage territorial.
+person_relationships
+Filiation et relations autorisées.
+Lien entre dossiers et type de relation ; provenance.
+person_documents
+Métadonnées de documents et référence au stockage sécurisé.
+Accès restreint et contrôle d’intégrité.
+person_field_sources
+Source et vérification par champ ou groupe de champs.
+Traçabilité des données critiques.
+person_status_history
+Transitions de statut et décisions.
+Acteur, date, motif et état de départ/arrivée.
+identity_reviews
+Contrôles, anomalies et doublons potentiels.
+Référence aux dossiers candidats ; décision autorisée.
+correction_requests
+Demandes de rectification et pièces.
+Workflow, approbateur et journal.
+person_merge_cases
+Propositions et décisions de rapprochement/fusion.
+Accès renforcé ; historisation complète.
+audit_events
+Trace des opérations de consultation/modification.
+Journal protégé contre l’altération.
+administrative_areas
+Référentiel territorial versionné.
+Codes et dates d’effet selon le référentiel retenu.
+10.1 Contraintes de conception
+Utiliser des clés étrangères cohérentes et des contraintes d’intégrité lorsque cela convient au modèle existant.
+Prévoir une gestion de version ou de concurrence optimiste pour éviter les écrasements simultanés.
+Ne pas stocker inutilement les mêmes pièces ou attributs dans plusieurs tables.
+Séparer la donnée courante de la trace historique lorsque cette séparation simplifie l’audit.
+Mettre en place des index sur les critères réellement utilisés par la recherche, après analyse de performance.
+Éviter les index ou journaux qui exposent des attributs sensibles à des rôles non autorisés.
+11. API et intégrations
+Les chemins ci-dessous sont des exemples conceptuels, non la liste confirmée des routes du dépôt. Il faut d’abord inventorier les endpoints existants et conserver leur compatibilité.
+Opération
+Exemple conceptuel
+Contrôles attendus
+Lister/rechercher
+GET /api/v1/persons?query=...
+Authentification, permissions, pagination, limite de résultats et masquage.
+Créer un brouillon
+POST /api/v1/persons
+Identifiant interne, validation, source, idempotence si import.
+Consulter une fiche
+GET /api/v1/persons/{id}
+Vérifier l’accès au dossier et masquer les champs interdits.
+Proposer une mise à jour
+PATCH /api/v1/persons/{id}
+Contrôler les champs éditables, version et motif lorsque nécessaire.
+Soumettre une rectification
+POST /api/v1/persons/{id}/correction-requests
+Justificatif, permission et workflow.
+Consulter l’historique
+GET /api/v1/persons/{id}/history
+Permission dédiée, pagination et audit.
+Référence documentaire
+POST /api/v1/persons/{id}/documents
+Fichier sécurisé, contrôle de type/format et accès.
+Revue de doublon
+POST /api/v1/person-reviews
+Rôle habilité, candidats et décision traçable.
+11.1 Formats de réponse et erreurs
+Réponse structurée et versionnée ; erreurs avec code stable et message non sensible.
+Ne pas révéler l’existence d’un dossier à un appelant qui n’a pas le droit de le consulter.
+Utiliser une pagination pour les recherches qui peuvent retourner plusieurs résultats.
+Valider les paramètres et limiter la taille des requêtes.
+Prévoir une gestion explicite des conflits de version, par exemple une réponse de conflit plutôt que d’écraser silencieusement.
+Ne pas exposer directement les chemins de fichiers, les secrets ou les données biométriques.
+11.2 Intégrations
+Le module doit échanger avec les services autorisés d’enrôlement, de campagnes, de biométrie, d’état civil, de NIN et de CIN. L’intégration doit respecter les contrats existants. Les événements importés doivent être idempotents et conserver leur identifiant source afin qu’une retransmission ne crée pas de nouvelle personne ou n’écrase pas une donnée sans contrôle.
+12. Sécurité, confidentialité et audit
+12.1 Sécurité applicative
+Authentifier les utilisateurs et vérifier l’autorisation côté serveur sur chaque action.
+Appliquer des permissions distinctes pour la lecture, la modification, l’approbation, l’export et la fusion.
+Contrôler les accès par centre, province ou autre périmètre lorsqu’il s’applique.
+Protéger les sessions, les jetons, les formulaires et les endpoints contre les usages non autorisés.
+Limiter les exports et demander un motif si la politique le prévoit.
+Masquer les données personnelles dans les logs techniques et les messages d’erreur.
+12.2 Audit
+Événement
+Données de trace recommandées
+Consultation sensible
+Acteur, dossier, date/heure, finalité si applicable, résultat et contexte d’accès.
+Création
+Identifiant interne, source, agent, centre, date et résultat.
+Modification
+Champ ou ensemble de champs concerné, ancienne/nouvelle valeur si approprié, motif et auteur.
+Document
+Ajout, consultation, téléchargement, changement de statut et décision.
+Rectification
+Demande, approbateur, décision, motif et application effective.
+Rapprochement/fusion
+Dossiers candidats, décision, validation et référence des historiques conservés.
+Export
+Demandeur, filtre, finalité ou motif, quantité, résultat et autorisation.
+12.3 Minimisation
+Le module ne doit afficher que les données nécessaires au travail de l’utilisateur. Les empreintes, templates biométriques et autres éléments très sensibles doivent rester dans un service spécialisé et ne pas être incorporés dans la fiche standard. Les statistiques doivent privilégier les données agrégées lorsque l’identification d’une personne n’est pas nécessaire.
+13. Règles métier et validations
+Code
+Règle
+RB-01 — Identifiant interne
+Tout dossier doit avoir un identifiant technique stable et unique.
+RB-02 — NIN distinct
+Le numéro officiel, lorsqu’il existe, provient du service d’attribution autorisé ; ce module ne le fabrique pas.
+RB-03 — Provenance
+Les sources des données importantes doivent être conservées.
+RB-04 — Recherche avant création
+Le parcours de création doit proposer une recherche de dossiers similaires avant la soumission définitive.
+RB-05 — Pas de fusion automatique
+Une similarité biographique ou biométrique déclenche une revue, pas une fusion irréversible.
+RB-06 — Historique
+Les changements importants doivent être traçables et ne pas écraser silencieusement les données antérieures.
+RB-07 — Permissions
+La lecture et la modification sont contrôlées côté serveur.
+RB-08 — Rectification
+Une demande portant sur une donnée vérifiée suit un workflow adapté à la politique officielle.
+RB-09 — Pièces
+Les pièces sont stockées dans un espace privé et leurs accès sont contrôlés.
+RB-10 — Statuts
+Les transitions sont validées côté serveur et accompagnées d’un motif lorsque nécessaire.
+RB-11 — Concurrence
+Les modifications simultanées doivent détecter un conflit de version.
+RB-12 — Import répétable
+La réception répétée du même événement source ne doit pas créer un dossier en double.
+RB-13 — Suppression
+La suppression physique d’un dossier doit être exceptionnelle et n’être effectuée qu’avec une base légale, une autorisation et une politique approuvée.
+RB-14 — Export
+L’export de dossiers est désactivé par défaut pour les rôles qui n’en ont pas besoin.
+14. Cas d’utilisation et scénarios
+Cas 1 — Création d’un nouveau dossier
+L’agent autorisé crée un brouillon.
+Le système attribue un identifiant interne et enregistre la provenance.
+L’agent remplit les champs et ajoute les justificatifs disponibles.
+Le système valide les formats et recherche les dossiers similaires.
+En l’absence de blocage, le dossier est soumis à la vérification.
+Le système enregistre l’événement dans l’historique.
+Cas 2 — Dossier incomplet
+Le vérificateur ouvre le dossier et choisit « demander un complément ».
+Il indique les informations ou documents manquants.
+Le dossier passe à un statut d’attente clairement visible.
+L’agent complète le dossier sans créer une nouvelle personne.
+Le dossier est soumis à nouveau et le système conserve les deux étapes dans l’historique.
+Cas 3 — Deux dossiers potentiellement identiques
+La recherche renvoie plusieurs candidats présentant des similitudes.
+Le système marque le résultat comme « doublon potentiel » selon le workflow approuvé.
+Un agent habilité compare les pièces et les données autorisées.
+La décision est enregistrée : personnes distinctes, rapprochement à poursuivre ou proposition de fusion.
+Toute fusion nécessitant une approbation reste bloquée jusqu’à la validation correspondante.
+Cas 4 — Rectification d’une date de naissance
+Un utilisateur habilité ouvre une demande de rectification et fournit le motif.
+La pièce justificative est associée au dossier dans le stockage sécurisé.
+Le dossier est examiné par un validateur qui n’est pas nécessairement le demandeur.
+La décision est approuvée ou rejetée avec motif.
+En cas d’approbation, la nouvelle valeur est appliquée avec date d’effet et l’ancienne valeur reste traçable.
+Cas 5 — Import de données d’une campagne
+Le système reçoit un lot portant un identifiant source stable.
+Il vérifie les permissions, la structure, la provenance et la clé d’idempotence.
+Il rapproche les entrées avec les dossiers existants.
+Il crée des brouillons ou des tâches de revue selon le résultat.
+Une retransmission du même lot ne crée pas de nouvelles personnes.
+Cas 6 — Accès interdit
+Si un agent tente d’ouvrir un dossier hors de son périmètre ou une pièce non autorisée, le serveur refuse l’accès, ne révèle pas plus d’information que nécessaire et journalise l’événement selon la politique de sécurité.
+15. Tests et critères d’acceptation
+Catégorie
+Test à réaliser
+Résultat attendu
+Création
+Créer une fiche valide puis une fiche incomplète.
+Identifiant interne unique ; statut cohérent et erreurs expliquées.
+Validation
+Soumettre un champ invalide ou une référence territoriale inconnue.
+Refus ou signalement selon la règle définie, sans écrasement des données.
+Recherche
+Chercher un dossier par plusieurs critères.
+Résultats paginés, filtrés et accessibles uniquement au rôle autorisé.
+Doublons
+Créer une saisie similaire à une personne existante.
+Alerte/revue ; pas de fusion automatique.
+Historique
+Modifier une donnée vérifiée avec autorisation.
+Ancienne et nouvelle valeurs traçables avec motif et auteur.
+Rectification
+Soumettre, approuver et rejeter une demande.
+Workflow complet et décision conservée.
+Permissions
+Tenter de lire ou modifier un dossier hors périmètre.
+Accès refusé côté serveur.
+Documents
+Téléverser un type non autorisé ou un fichier trop volumineux.
+Rejet sûr et message explicite.
+Concurrence
+Deux agents modifient la même fiche.
+Conflit détecté ; aucune mise à jour silencieuse perdue.
+Import
+Importer deux fois le même événement source.
+Idempotence ; aucun dossier dupliqué.
+Sécurité
+Chercher des pièces ou données dans les logs.
+Aucun secret ni contenu biométrique brut dans les traces.
+Non-régression
+Exécuter les tests et parcours existants.
+Les fonctions précédentes restent opérationnelles.
+15.1 Critères d’acceptation
+☐ La liste et la recherche fonctionnent avec pagination et contrôle des permissions.
+☐ La fiche individuelle distingue les champs, leurs sources et les états de vérification prévus.
+☐ La création ne déclenche pas l’attribution automatique du NIN.
+☐ Les modifications sensibles sont historisées et, si nécessaire, soumises à validation.
+☐ La détection des doublons n’effectue aucune fusion irréversible automatique.
+☐ Les demandes de rectification sont traçables de bout en bout.
+☐ Les pièces justificatives sont privées, contrôlées et journalisées.
+☐ Les rôles ne peuvent lire ou modifier que les champs et dossiers autorisés.
+☐ Les importations répétées sont idempotentes.
+☐ Les tests de non-régression et de sécurité passent et leurs résultats sont documentés.
+16. Plan de développement progressif
+Phase 1 — Audit
+Inventorier les pages, composants, endpoints, modèles, migrations, statuts et permissions existants. Produire un tableau des fonctions existantes, partielles, absentes et à vérifier.
+Livrable : rapport d’audit avec preuves.
+Phase 2 — Modèle et cohérence
+Confirmer l’identifiant interne, les champs réels, les relations, les sources et l’historique. Ne pas ajouter une nouvelle table si une table existante satisfait déjà le besoin.
+Livrable : schéma cible comparé au schéma existant.
+Phase 3 — Recherche et fiche
+Stabiliser la liste, la recherche avancée, la fiche individuelle et l’affichage par rôle.
+Livrable : parcours de consultation/recherche testé.
+Phase 4 — Création et mise à jour
+Finaliser formulaires, validations, brouillons, transitions de statut et gestion des conflits.
+Livrable : parcours de création et de mise à jour testé.
+Phase 5 — Documents et provenance
+Sécuriser le stockage des pièces, les métadonnées, les contrôles et les traces.
+Livrable : stockage privé et tests d’accès.
+Phase 6 — Rectification et doublons
+Mettre en place la demande de correction, la file de revue et la procédure de fusion contrôlée.
+Livrable : scénarios de validation et de rapprochement.
+Phase 7 — Intégration
+Connecter campagnes, état civil, biométrie, NIN et CIN en réutilisant les contrats existants.
+Livrable : tests d’intégration et d’idempotence.
+Phase 8 — Recette
+Exécuter les tests fonctionnels, permissions, sécurité, non-régression et restauration.
+Livrable : rapport de recette avant déploiement.
+17. Prompt destiné à l’agent développeur
+Tu interviens sur le projet existant SIGPOP-RDC, module ONIP, et tu dois auditer puis compléter le Module 2 — Gestion des personnes et des dossiers.OBJECTIFFournir une gestion fiable, historisée et sécurisée des dossiers individuels. Travaille sur l’application existante. Ne reconstruis pas tout le système et ne casse aucune fonction opérationnelle.RÈGLES ABSOLUES1. Inspecte d’abord le dépôt, le README, les composants, routes, endpoints, modèles, migrations, tests et règles d’autorisation.2. Avant de coder, produis l’inventaire des fonctionnalités existantes, partielles, absentes et à vérifier, avec les fichiers et endpoints exacts.3. Ne supprime ni ne remplace une route, une table, une donnée ou une fonction sans justification écrite, sauvegarde et plan de retour arrière.4. Distingue les faits observés, les hypothèses et les propositions.5. Garde un identifiant technique interne immuable distinct du NIN.6. N’invente pas le format du NIN et ne l’attribue jamais depuis le formulaire de gestion de personne. Appelle uniquement le service autorisé une fois les prérequis confirmés.7. Avant la création ou la soumission, exécute une recherche de doublons selon les mécanismes existants. Les correspondances sont des candidats à examiner, pas des preuves automatiques.8. Ne fusionne jamais automatiquement deux dossiers. Toute fusion doit passer par les rôles et validations prévus.9. Pour les changements importants, conserve l’ancienne valeur, la nouvelle valeur lorsque nécessaire, l’auteur, la date, le motif, la source et la décision.10. Les champs obligatoires et les documents recevables doivent provenir des règles approuvées ; ne déduis pas un caractère obligatoire non confirmé.11. Protége les documents, les informations personnelles et les traces. Ne journalise aucun secret ni donnée biométrique brute.12. Utilise des données de test fictives ou dûment autorisées.TRAVAUXA. Cartographier l’interface de liste, la recherche, la fiche individuelle, la création, la modification, les documents, l’historique, les rectifications et les doublons.B. Vérifier le modèle de données, les relations, les contraintes, les index et les migrations existants. Réutiliser ce qui fonctionne.C. Vérifier toutes les permissions côté serveur : lecture, modification, validation, export, rectification et fusion.D. Garantir pagination, filtres, validation des entrées, gestion des conflits de version et erreurs non sensibles.E. Ajouter ou finaliser le workflow de dossier et empêcher les transitions interdites.F. Sécuriser les documents : formats autorisés, limite de taille, stockage privé, contrôle d’accès et audit.G. Intégrer les sources de données avec des identifiants source et un traitement idempotent.H. Ajouter les tests unitaires, d’intégration, de permissions, de concurrence, de sécurité et de non-régression.I. Exécuter réellement les tests, le lint et le build disponibles puis communiquer les commandes et résultats.LIVRABLE INITIAL OBLIGATOIREFournis d’abord un tableau avec : fonction, statut réel, preuve, fichiers/endpoints/tables concernés, risque, écart, correction proposée, priorité et tests. Attends la validation de cet audit avant les changements structurels.LIVRABLE FINALListe les fichiers modifiés, migrations ajoutées, contrats API, tests exécutés, résultats exacts, risques résiduels et instructions de retour arrière. Ne déclare aucune fonction terminée sans preuve de test. Aucun déploiement en production ni opération destructive sans autorisation explicite.
+18. Limites et décisions à faire valider
+La liste définitive des données obligatoires et facultatives.
+Les catégories de personnes concernées et les procédures applicables à chacune.
+Les documents recevables et l’autorité habilitée à les vérifier.
+Les statuts officiels des dossiers et les règles de transition.
+Les règles de rectification, d’archivage, de conservation et de suppression.
+Le degré de visibilité des données selon les rôles.
+Les méthodes autorisées de recherche biométrique et les procédures de gestion des faux positifs.
+Les interfaces exactes avec le FGP, l’état civil, les campagnes, le NIN et la CIN.
+Conclusion
+Le Module 2 doit devenir le point de référence opérationnel pour consulter et administrer les dossiers individuels, sans se substituer aux services spécialisés d’attribution du NIN ou de déduplication biométrique. La priorité est d’abord de confirmer ce qui existe dans le dépôt, puis d’améliorer progressivement la recherche, la fiche individuelle, la traçabilité, les rectifications et les contrôles d’accès.
+Le critère de réussite n’est pas seulement qu’un agent puisse créer une fiche : le système doit permettre de retrouver le bon dossier, distinguer les informations déclarées des informations vérifiées, protéger les pièces, éviter les doublons, justifier les changements et préserver un historique fiable.

@@ -125,6 +125,75 @@ export type CitizenHit = {
   given_names: string;
   date_of_birth: string;
   sex?: string;
+  place_of_birth?: string | null;
+  province_code?: string | null;
+  ville?: string | null;
+  commune_code?: string | null;
+};
+
+export type CitizenAddress = {
+  id?: string;
+  address_type: string;
+  line1: string;
+  line2?: string | null;
+  city: string;
+  commune_code?: string | null;
+  province_code?: string | null;
+  country_code?: string;
+  is_primary?: boolean;
+  valid_from?: string | null;
+  valid_to?: string | null;
+};
+
+export type CitizenDetail = CitizenHit & {
+  nationality?: string;
+  created_at?: string;
+  updated_at?: string;
+  validated_at?: string | null;
+  deceased_at?: string | null;
+  merged_into_id?: string | null;
+  addresses?: CitizenAddress[];
+};
+
+export type CitizenHistoryItem = {
+  id: string;
+  citizen_id: string;
+  event_type: string;
+  payload: Record<string, unknown>;
+  actor_id?: string | null;
+  created_at: string;
+};
+
+export type DuplicateCandidate = {
+  id: string;
+  citizen_a_id: string;
+  citizen_b_id: string;
+  other_citizen_id?: string | null;
+  score: number;
+  status: string;
+  match_method: string;
+  created_at: string;
+  other_family_name?: string | null;
+  other_given_names?: string | null;
+  other_date_of_birth?: string | null;
+  other_status?: string | null;
+  other_nic?: string | null;
+};
+
+export type CitizenSearchParams = {
+  q?: string;
+  family_name?: string;
+  given_names?: string;
+  nic?: string;
+  date_of_birth?: string;
+  status?: string;
+  sex?: string;
+  place_of_birth?: string;
+  province_code?: string;
+  commune_code?: string;
+  include_closed?: boolean;
+  page?: number;
+  page_size?: number;
 };
 
 export type PaginatedCitizens = {
@@ -134,13 +203,102 @@ export type PaginatedCitizens = {
   page_size: number;
 };
 
+export type CitizenCreateBody = {
+  sex: string;
+  date_of_birth: string;
+  place_of_birth?: string;
+  nationality?: string;
+  given_names: string;
+  family_name: string;
+  addresses?: Omit<CitizenAddress, "id">[];
+};
+
 export const registryApi = {
-  searchCitizens: (q?: string, page = 1, pageSize = 50) => {
-    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
-    if (q?.trim()) params.set("q", q.trim());
+  searchCitizens: (qOrParams?: string | CitizenSearchParams, page = 1, pageSize = 50) => {
+    const params = new URLSearchParams();
+    if (typeof qOrParams === "string" || qOrParams === undefined) {
+      params.set("page", String(page));
+      params.set("page_size", String(pageSize));
+      if (typeof qOrParams === "string" && qOrParams.trim()) params.set("q", qOrParams.trim());
+    } else {
+      const p = qOrParams;
+      params.set("page", String(p.page ?? page));
+      params.set("page_size", String(p.page_size ?? pageSize));
+      if (p.q?.trim()) params.set("q", p.q.trim());
+      if (p.family_name?.trim()) params.set("family_name", p.family_name.trim());
+      if (p.given_names?.trim()) params.set("given_names", p.given_names.trim());
+      if (p.nic?.trim()) params.set("nic", p.nic.trim());
+      if (p.date_of_birth) params.set("date_of_birth", p.date_of_birth);
+      if (p.status) params.set("status", p.status);
+      if (p.sex) params.set("sex", p.sex);
+      if (p.place_of_birth?.trim()) params.set("place_of_birth", p.place_of_birth.trim());
+      if (p.province_code?.trim()) params.set("province_code", p.province_code.trim());
+      if (p.commune_code?.trim()) params.set("commune_code", p.commune_code.trim());
+      if (p.include_closed) params.set("include_closed", "true");
+    }
     return request<PaginatedCitizens>(`/registry/citizens?${params}`);
   },
-  getCitizen: (id: string) => request<CitizenHit & { nic: string | null }>(`/registry/citizens/${id}`),
+  getCitizen: (id: string) => request<CitizenDetail>(`/registry/citizens/${id}`),
+  createCitizen: (body: CitizenCreateBody) =>
+    request<CitizenDetail>(`/registry/citizens`, { method: "POST", body: JSON.stringify(body) }),
+  updateCitizen: (id: string, body: Record<string, unknown>) =>
+    request<CitizenDetail>(`/registry/citizens/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  submitCitizen: (id: string, note?: string) =>
+    request<CitizenDetail>(`/registry/citizens/${id}/submit`, {
+      method: "POST",
+      body: JSON.stringify({ note: note || null }),
+    }),
+  changeStatus: (id: string, status: string, reason: string) =>
+    request<CitizenDetail>(`/registry/citizens/${id}/status`, {
+      method: "POST",
+      body: JSON.stringify({ status, reason }),
+    }),
+  getHistory: (id: string, page = 1, pageSize = 50) =>
+    request<{ items: CitizenHistoryItem[]; total: number; page: number; page_size: number }>(
+      `/registry/citizens/${id}/history?page=${page}&page_size=${pageSize}`,
+    ),
+  getDuplicates: (id: string, openOnly = true) =>
+    request<DuplicateCandidate[]>(
+      `/registry/citizens/${id}/duplicates?open_only=${openOnly ? "true" : "false"}`,
+    ),
+  resolveDuplicate: (candidateId: string, decision: string, justification: string) =>
+    request<{ id: string; status: string; message: string }>(`/registry/duplicates/${candidateId}/resolve`, {
+      method: "POST",
+      body: JSON.stringify({ decision, justification }),
+    }),
+  findSimilar: (params: {
+    family_name: string;
+    given_names: string;
+    date_of_birth: string;
+    sex?: string;
+    province_code?: string;
+    commune_code?: string;
+  }) => {
+    const q = new URLSearchParams({
+      family_name: params.family_name,
+      given_names: params.given_names,
+      date_of_birth: params.date_of_birth,
+      sex: params.sex || "UNKNOWN",
+    });
+    if (params.province_code) q.set("province_code", params.province_code);
+    if (params.commune_code) q.set("commune_code", params.commune_code);
+    return request<{ items: CitizenHit[]; total: number; message: string }>(
+      `/registry/citizens/similar?${q}`,
+    );
+  },
+  addAddress: (id: string, body: Omit<CitizenAddress, "id">) =>
+    request<CitizenDetail>(`/registry/citizens/${id}/addresses`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  mergeCitizens: (source_citizen_id: string, target_citizen_id: string, justification: string) =>
+    request<{ source_citizen_id: string; target_citizen_id: string; message: string }>(
+      `/registry/citizens/merge`,
+      {
+        method: "POST",
+        body: JSON.stringify({ source_citizen_id, target_citizen_id, justification }),
+      },
+    ),
 };
 
 export type PromoteResult = {

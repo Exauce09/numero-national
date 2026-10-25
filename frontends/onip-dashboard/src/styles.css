@@ -441,6 +441,24 @@ body {
   padding: 0.5rem 1rem;
 }
 
+.btn-sm {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+}
+
+.status-pill {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #eef3f9;
+  color: var(--egouv-ink);
+  border: 1px solid var(--egouv-line);
+}
+
 .stat-chip {
   background: #fff;
   border-radius: 14px;

@@ -6,27 +6,32 @@ import uuid
 from datetime import date, datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from apps.api.domains.core_registry.duplicate_service import (
     check_and_record_duplicates,
+    find_demographic_matches,
     mark_pair_merged,
+    _primary_geo,
 )
 from apps.api.domains.core_registry.enums import (
     CitizenEventType,
     CitizenStatus,
+    DuplicateStatus,
 )
 from apps.api.domains.core_registry.models import (
     Citizen,
     CitizenAddress,
     CitizenHistory,
+    DuplicateCandidate,
 )
 from apps.api.domains.core_registry.national_identity_number_service import (
     assign_provisional_nic,
 )
 from apps.api.domains.core_registry.schemas import (
+    CitizenAddressIn,
     CitizenCreate,
     CitizenMergeRequest,
     CitizenUpdate,
@@ -35,6 +40,26 @@ from apps.api.domains.core_registry.schemas import (
 EDITABLE_STATUSES = {
     CitizenStatus.DRAFT.value,
     CitizenStatus.PENDING_VALIDATION.value,
+}
+
+# Transitions manuelles Module 2 (hors validate/merge spécialisés)
+ALLOWED_STATUS_TRANSITIONS: dict[str, set[str]] = {
+    CitizenStatus.DRAFT.value: {
+        CitizenStatus.PENDING_VALIDATION.value,
+        CitizenStatus.SUSPENDED.value,
+    },
+    CitizenStatus.PENDING_VALIDATION.value: {
+        CitizenStatus.DRAFT.value,  # à compléter
+        CitizenStatus.SUSPENDED.value,  # rejet
+    },
+    CitizenStatus.ACTIVE.value: {
+        CitizenStatus.SUSPENDED.value,
+        CitizenStatus.DECEASED.value,
+    },
+    CitizenStatus.SUSPENDED.value: {
+        CitizenStatus.DRAFT.value,
+        CitizenStatus.PENDING_VALIDATION.value,
+    },
 }
 
 
@@ -148,10 +173,16 @@ async def search_citizens(
     given_names: str | None = None,
     nic: str | None = None,
     date_of_birth: date | None = None,
+    status_filter: str | None = None,
+    sex: str | None = None,
+    place_of_birth: str | None = None,
+    province_code: str | None = None,
+    commune_code: str | None = None,
+    include_closed: bool = False,
     page: int = 1,
     page_size: int = 20,
 ) -> tuple[list[Citizen], int]:
-    """National search: free-text `q` (tokens AND) and/or structured filters."""
+    """Recherche Module 2 : texte libre + filtres structurés + périmètre territorial."""
     filters = []
     if nic:
         filters.append(Citizen.nic == nic.strip())
@@ -161,6 +192,14 @@ async def search_citizens(
         filters.append(func.lower(Citizen.given_names).like(f"%{given_names.strip().lower()}%"))
     if date_of_birth is not None:
         filters.append(Citizen.date_of_birth == date_of_birth)
+    if status_filter:
+        filters.append(Citizen.status == status_filter.strip().upper())
+    if sex:
+        filters.append(func.upper(Citizen.sex) == sex.strip().upper())
+    if place_of_birth and place_of_birth.strip():
+        filters.append(
+            func.coalesce(Citizen.place_of_birth, "").ilike(f"%{place_of_birth.strip()}%")
+        )
     if q and q.strip():
         tokens = [t for t in q.strip().lower().split() if t]
         for token in tokens:
@@ -174,9 +213,31 @@ async def search_citizens(
                 )
             )
 
-    # Population courante : exclure décédés et fusionnés (les décès réduisent le total).
-    filters.append(Citizen.status.notin_([CitizenStatus.DECEASED.value, CitizenStatus.MERGED.value]))
+    if not include_closed and not status_filter:
+        filters.append(
+            Citizen.status.notin_([CitizenStatus.DECEASED.value, CitizenStatus.MERGED.value])
+        )
+
+    need_addr = bool(province_code or commune_code)
     where_clause = and_(*filters) if filters else True
+
+    if need_addr:
+        addr_filters = [CitizenAddress.citizen_id == Citizen.id]
+        if province_code:
+            addr_filters.append(
+                func.upper(func.coalesce(CitizenAddress.province_code, ""))
+                == province_code.strip().upper()
+            )
+        if commune_code:
+            addr_filters.append(
+                func.upper(func.coalesce(CitizenAddress.commune_code, ""))
+                == commune_code.strip().upper()
+            )
+        addr_exists = (
+            select(CitizenAddress.id).where(and_(*addr_filters)).exists()
+        )
+        where_clause = and_(where_clause, addr_exists)
+
     total = await session.scalar(select(func.count()).select_from(Citizen).where(where_clause))
     stmt = (
         select(Citizen)
@@ -188,6 +249,29 @@ async def search_citizens(
     )
     rows = list((await session.scalars(stmt)).all())
     return rows, int(total or 0)
+
+
+def assert_citizen_in_scope(
+    citizen: Citizen,
+    *,
+    province_code: str | None,
+    commune_code: str | None,
+    forced: bool,
+) -> None:
+    """Refuse l'accès hors périmètre (404 pour ne pas révéler l'existence)."""
+    if not forced or not province_code:
+        return
+    prov, terr = _primary_geo(citizen)
+    if (prov or "").upper() != province_code.strip().upper():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Citizen not found")
+    if commune_code and (terr or "").upper() != commune_code.strip().upper():
+        # terr peut être commune_code ou city — accepter si commune_code match adresse
+        primary = next((a for a in (citizen.addresses or []) if a.is_primary), None)
+        if primary is None and citizen.addresses:
+            primary = citizen.addresses[0]
+        code = (primary.commune_code if primary else None) or ""
+        if code.strip().upper() != commune_code.strip().upper():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Citizen not found")
 
 
 def citizen_to_list_item(citizen: Citizen) -> dict:
@@ -226,6 +310,7 @@ async def update_draft_citizen(
 
     changes: dict[str, object] = {}
     payload = data.model_dump(exclude_unset=True)
+    reason = payload.pop("reason", None)
     for field, value in payload.items():
         if value is None:
             continue
@@ -243,11 +328,14 @@ async def update_draft_citizen(
 
     now = datetime.now(timezone.utc)
     citizen.updated_at = now
+    hist_payload: dict[str, object] = {"changes": changes}
+    if reason and str(reason).strip():
+        hist_payload["reason"] = str(reason).strip()
     session.add(
         CitizenHistory(
             citizen_id=citizen.id,
             event_type=CitizenEventType.UPDATED.value,
-            payload={"changes": changes},
+            payload=hist_payload,
             actor_id=actor_id,
             created_at=now,
         )
@@ -425,3 +513,302 @@ async def merge_citizens(
     await session.commit()
     await session.refresh(source)
     return source
+
+
+async def list_citizen_history(
+    session: AsyncSession,
+    citizen_id: uuid.UUID,
+    *,
+    page: int = 1,
+    page_size: int = 50,
+) -> tuple[list[CitizenHistory], int]:
+    await get_citizen(session, citizen_id)
+    where = CitizenHistory.citizen_id == citizen_id
+    total = await session.scalar(
+        select(func.count()).select_from(CitizenHistory).where(where)
+    )
+    stmt = (
+        select(CitizenHistory)
+        .where(where)
+        .order_by(CitizenHistory.created_at.desc(), CitizenHistory.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    rows = list((await session.scalars(stmt)).all())
+    return rows, int(total or 0)
+
+
+async def submit_citizen(
+    session: AsyncSession,
+    citizen_id: uuid.UUID,
+    *,
+    actor_id: uuid.UUID | None = None,
+    note: str | None = None,
+) -> Citizen:
+    """DRAFT → PENDING_VALIDATION (soumission contrôle) — aucun NIN."""
+    citizen = await get_citizen(session, citizen_id)
+    if citizen.status != CitizenStatus.DRAFT.value:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Submit only from DRAFT (current={citizen.status})",
+        )
+    now = datetime.now(timezone.utc)
+    previous = citizen.status
+    citizen.status = CitizenStatus.PENDING_VALIDATION.value
+    citizen.updated_at = now
+    payload: dict[str, object] = {
+        "from": previous,
+        "to": CitizenStatus.PENDING_VALIDATION.value,
+    }
+    if note and note.strip():
+        payload["note"] = note.strip()
+    session.add(
+        CitizenHistory(
+            citizen_id=citizen.id,
+            event_type=CitizenEventType.STATUS_CHANGED.value,
+            payload=payload,
+            actor_id=actor_id,
+            created_at=now,
+        )
+    )
+    await check_and_record_duplicates(session, citizen)
+    await session.commit()
+    await session.refresh(citizen, attribute_names=["addresses"])
+    return citizen
+
+
+async def change_citizen_status(
+    session: AsyncSession,
+    citizen_id: uuid.UUID,
+    *,
+    new_status: CitizenStatus,
+    reason: str,
+    actor_id: uuid.UUID | None = None,
+) -> Citizen:
+    """Transition manuelle contrôlée — refuse ACTIVE/MERGED/NIC via ce chemin."""
+    if new_status in {CitizenStatus.ACTIVE, CitizenStatus.MERGED}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Use validate or merge endpoints for ACTIVE/MERGED; NIN not assigned here",
+        )
+    citizen = await get_citizen(session, citizen_id)
+    allowed = ALLOWED_STATUS_TRANSITIONS.get(citizen.status, set())
+    if new_status.value not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "Transition de statut interdite",
+                "from": citizen.status,
+                "to": new_status.value,
+                "allowed": sorted(allowed),
+            },
+        )
+    now = datetime.now(timezone.utc)
+    previous = citizen.status
+    citizen.status = new_status.value
+    citizen.updated_at = now
+    if new_status == CitizenStatus.DECEASED:
+        citizen.deceased_at = now
+    session.add(
+        CitizenHistory(
+            citizen_id=citizen.id,
+            event_type=CitizenEventType.STATUS_CHANGED.value,
+            payload={
+                "from": previous,
+                "to": new_status.value,
+                "reason": reason.strip(),
+            },
+            actor_id=actor_id,
+            created_at=now,
+        )
+    )
+    await session.commit()
+    await session.refresh(citizen, attribute_names=["addresses"])
+    return citizen
+
+
+async def list_duplicates_for_citizen(
+    session: AsyncSession,
+    citizen_id: uuid.UUID,
+    *,
+    open_only: bool = True,
+) -> list[tuple[DuplicateCandidate, Citizen | None]]:
+    await get_citizen(session, citizen_id)
+    filters = [
+        (DuplicateCandidate.citizen_a_id == citizen_id)
+        | (DuplicateCandidate.citizen_b_id == citizen_id)
+    ]
+    if open_only:
+        filters.append(DuplicateCandidate.status == DuplicateStatus.OPEN.value)
+    stmt = (
+        select(DuplicateCandidate)
+        .where(and_(*filters))
+        .order_by(DuplicateCandidate.created_at.desc())
+    )
+    rows = list((await session.scalars(stmt)).all())
+    result: list[tuple[DuplicateCandidate, Citizen | None]] = []
+    for row in rows:
+        other_id = row.citizen_b_id if row.citizen_a_id == citizen_id else row.citizen_a_id
+        other = await session.scalar(
+            select(Citizen)
+            .where(Citizen.id == other_id)
+            .options(selectinload(Citizen.addresses))
+        )
+        result.append((row, other))
+    return result
+
+
+async def resolve_duplicate_candidate(
+    session: AsyncSession,
+    candidate_id: uuid.UUID,
+    *,
+    decision: str,
+    justification: str,
+    actor_id: uuid.UUID | None = None,
+) -> DuplicateCandidate:
+    """FALSE_POSITIVE ou CONFIRMED_DUPLICATE — jamais de fusion ici."""
+    decision_key = decision.strip().upper()
+    if decision_key not in {
+        DuplicateStatus.FALSE_POSITIVE.value,
+        DuplicateStatus.CONFIRMED_DUPLICATE.value,
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="decision must be FALSE_POSITIVE or CONFIRMED_DUPLICATE (merge separately)",
+        )
+    row = await session.scalar(
+        select(DuplicateCandidate).where(DuplicateCandidate.id == candidate_id)
+    )
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Duplicate not found")
+    if row.status != DuplicateStatus.OPEN.value:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Duplicate already resolved ({row.status})",
+        )
+    row.status = decision_key
+    now = datetime.now(timezone.utc)
+    for cid in (row.citizen_a_id, row.citizen_b_id):
+        session.add(
+            CitizenHistory(
+                citizen_id=cid,
+                event_type=CitizenEventType.STATUS_CHANGED.value,
+                payload={
+                    "duplicate_resolve": decision_key,
+                    "duplicate_id": str(row.id),
+                    "other_citizen_id": str(
+                        row.citizen_b_id if cid == row.citizen_a_id else row.citizen_a_id
+                    ),
+                    "justification": justification.strip(),
+                },
+                actor_id=actor_id,
+                created_at=now,
+            )
+        )
+    await session.commit()
+    await session.refresh(row)
+    return row
+
+
+async def find_similar_citizens(
+    session: AsyncSession,
+    *,
+    family_name: str,
+    given_names: str,
+    sex: str,
+    date_of_birth: date,
+    province_code: str | None = None,
+    territory_key: str | None = None,
+    limit: int = 20,
+) -> list[Citizen]:
+    """Recherche pré-création (RB-04) — candidats, pas fusion."""
+    matches = await find_demographic_matches(
+        session,
+        family_name=family_name,
+        given_names=given_names,
+        sex=sex,
+        date_of_birth=date_of_birth,
+        province_code=province_code,
+        territory_key=territory_key,
+        exclude_citizen_id=None,
+    )
+    if matches:
+        return matches[:limit]
+    # Fallback souple : même nom + année de naissance (revue humaine)
+    birth_year = date_of_birth.year
+    stmt = (
+        select(Citizen)
+        .options(selectinload(Citizen.addresses))
+        .where(
+            and_(
+                func.lower(Citizen.family_name) == family_name.strip().lower(),
+                extract("year", Citizen.date_of_birth) == birth_year,
+                Citizen.status.notin_(
+                    [CitizenStatus.MERGED.value, CitizenStatus.DECEASED.value]
+                ),
+            )
+        )
+        .limit(limit)
+    )
+    soft = list((await session.scalars(stmt)).all())
+    # Prioriser also given_names overlap
+    soft.sort(
+        key=lambda c: (
+            0 if c.given_names.strip().lower() == given_names.strip().lower() else 1,
+            c.family_name,
+        )
+    )
+    return soft
+
+
+async def add_citizen_address(
+    session: AsyncSession,
+    citizen_id: uuid.UUID,
+    data: CitizenAddressIn,
+    *,
+    actor_id: uuid.UUID | None = None,
+) -> Citizen:
+    citizen = await get_citizen(session, citizen_id)
+    if citizen.status == CitizenStatus.MERGED.value:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot update merged citizen",
+        )
+    now = datetime.now(timezone.utc)
+    if data.is_primary:
+        for existing in citizen.addresses or []:
+            existing.is_primary = False
+    addr = CitizenAddress(
+        address_type=data.address_type.value,
+        line1=data.line1,
+        line2=data.line2,
+        city=data.city,
+        commune_code=data.commune_code,
+        province_code=data.province_code,
+        country_code=data.country_code.upper(),
+        is_primary=data.is_primary,
+        valid_from=data.valid_from,
+        valid_to=data.valid_to,
+    )
+    citizen.addresses.append(addr)
+    citizen.updated_at = now
+    session.add(
+        CitizenHistory(
+            citizen_id=citizen.id,
+            event_type=CitizenEventType.UPDATED.value,
+            payload={
+                "address_added": {
+                    "line1": data.line1,
+                    "city": data.city,
+                    "province_code": data.province_code,
+                    "commune_code": data.commune_code,
+                    "is_primary": data.is_primary,
+                }
+            },
+            actor_id=actor_id,
+            created_at=now,
+        )
+    )
+    await session.commit()
+    await session.refresh(citizen, attribute_names=["addresses"])
+    return citizen
