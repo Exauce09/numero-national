@@ -2,6 +2,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   censusApi,
+  downloadOnipDashboardExport,
   fetchOnipDashboard,
   fetchOnipDashboardHealth,
   fetchOnipDashboardTerritories,
@@ -47,6 +48,7 @@ export default function DashboardPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [filters, setFilters] = useState<OnipDashboardFilters>({});
   const [filtersOpen, setFiltersOpen] = useState(true);
+  const [widgetErrors, setWidgetErrors] = useState<Record<string, string>>({});
 
   const load = useCallback(
     async (f: OnipDashboardFilters = filters) => {
@@ -56,14 +58,43 @@ export default function DashboardPage() {
       }
       setLoading(true);
       setError(null);
+      setWidgetErrors({});
       try {
-        const [dash, tr, ter, h] = await Promise.all([
-          fetchOnipDashboard(f),
-          fetchOnipDashboardTrends(f, 30).catch(() => ({ series: [] })),
-          fetchOnipDashboardTerritories(f).catch(() => ({ zones: [] })),
-          fetchOnipDashboardHealth().catch(() => ({ services: [] })),
-        ]);
+        const dash = await fetchOnipDashboard(f);
         setData(dash);
+        // Si périmètre forcé, synchroniser le filtre province affiché
+        if (dash.meta?.territory?.forced && dash.meta.territory.allowed_province) {
+          setFilters((prev) => ({
+            ...prev,
+            ...f,
+            province_code: dash.meta?.territory?.allowed_province || f.province_code,
+            commune_code:
+              dash.meta?.territory?.allowed_commune || f.commune_code || prev.commune_code,
+          }));
+        }
+        const [tr, ter, h] = await Promise.all([
+          fetchOnipDashboardTrends(f, 30).catch((e) => {
+            setWidgetErrors((w) => ({
+              ...w,
+              trends: e instanceof Error ? e.message : "Tendances indisponibles",
+            }));
+            return { series: [] };
+          }),
+          fetchOnipDashboardTerritories(f).catch((e) => {
+            setWidgetErrors((w) => ({
+              ...w,
+              territories: e instanceof Error ? e.message : "Territoires indisponibles",
+            }));
+            return { zones: [] };
+          }),
+          fetchOnipDashboardHealth().catch((e) => {
+            setWidgetErrors((w) => ({
+              ...w,
+              health: e instanceof Error ? e.message : "Santé indisponible",
+            }));
+            return { services: [] };
+          }),
+        ]);
         setTrends(tr.series || []);
         setZones(ter.zones || []);
         setHealth(h.services || []);
@@ -105,32 +136,12 @@ export default function DashboardPage() {
     void load(next);
   }
 
-  function exportAggregatesCsv() {
-    if (!data) return;
-    const k = data.kpis;
-    const rows: string[][] = [
-      ["indicateur", "valeur"],
-      ["generated_at", data.generated_at],
-      ["freshness", data.meta?.freshness || ""],
-      ["registered_records", String(k?.registered_records ?? data.population.total)],
-      ["validated_records", String(k?.validated_records ?? data.population.active)],
-      ["pending_records", String(k?.pending_records ?? data.population.pending ?? 0)],
-      ["assigned_nins", String(k?.assigned_nins ?? data.population.nin_assigned ?? 0)],
-      ["duplicate_reviews_open", String(k?.duplicate_reviews_open ?? data.duplicates_open)],
-      ["cards_produced", String(k?.cards_produced ?? data.cards.produced ?? 0)],
-      ["cards_delivered", String(k?.cards_delivered ?? data.cards.delivered ?? 0)],
-      ["cards_expired", String(k?.cards_expired ?? data.cards.expired ?? 0)],
-      ["cards_pending", String(k?.cards_pending ?? data.cards.pending)],
-      ["sync_rate_percent", String(k?.sync_rate_percent ?? "N/A")],
-      ["validation_rate_percent", String(k?.validation_rate_percent ?? "N/A")],
-    ];
-    const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `onip-dashboard-aggregates-${data.generated_at.slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+  async function exportAggregatesCsv() {
+    try {
+      await downloadOnipDashboardExport(filters);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Export refusé");
+    }
   }
 
   if (error && !data) {
@@ -150,6 +161,8 @@ export default function DashboardPage() {
   const k = data.kpis;
   const drill = data.drilldown || {};
   const freshness = data.meta?.freshness || "current";
+  const territory = data.meta?.territory;
+  const provinceLocked = Boolean(territory?.forced && territory.allowed_province);
   const trendMax = Math.max(1, ...trends.flatMap((t) => [t.registered, t.validated]));
   const zoneMax = Math.max(1, ...zones.map((z) => z.registered));
 
@@ -210,6 +223,11 @@ export default function DashboardPage() {
         <p>
           Module 1 ONIP · mis à jour à {new Date(data.generated_at).toLocaleString("fr-FR")} (UTC) ·
           fraîcheur : <strong>{freshness === "current" ? "à jour" : freshness}</strong>
+          {territory?.forced
+            ? ` · périmètre forcé : ${territory.allowed_province || "—"}${
+                territory.allowed_commune ? ` / ${territory.allowed_commune}` : ""
+              }`
+            : " · vue nationale"}
           {loading ? " · actualisation…" : ""}
         </p>
       </div>
@@ -275,7 +293,8 @@ export default function DashboardPage() {
                 <input
                   className="form-control"
                   placeholder="ex. KIN"
-                  value={filters.province_code || ""}
+                  value={filters.province_code || territory?.allowed_province || ""}
+                  disabled={provinceLocked}
                   onChange={(e) =>
                     setFilters((f) => ({ ...f, province_code: e.target.value || undefined }))
                   }
@@ -285,7 +304,8 @@ export default function DashboardPage() {
                 Commune
                 <input
                   className="form-control"
-                  value={filters.commune_code || ""}
+                  value={filters.commune_code || territory?.allowed_commune || ""}
+                  disabled={Boolean(territory?.forced && territory.allowed_commune)}
                   onChange={(e) =>
                     setFilters((f) => ({ ...f, commune_code: e.target.value || undefined }))
                   }
@@ -400,7 +420,9 @@ export default function DashboardPage() {
         {/* D. Tendance */}
         <div className="panel chart-panel">
           <h2>Activité dans le temps (30 j.)</h2>
-          {trends.length === 0 ? (
+          {widgetErrors.trends ? (
+            <p className="error">{widgetErrors.trends}</p>
+          ) : trends.length === 0 ? (
             <p className="muted">Aucune série temporelle.</p>
           ) : (
             <div className="bar-chart" role="img" aria-label="Tendance dossiers reçus et validés">
@@ -430,7 +452,9 @@ export default function DashboardPage() {
         {/* E. Territoires */}
         <div className="panel chart-panel">
           <h2>Répartition territoriale</h2>
-          {zones.length === 0 ? (
+          {widgetErrors.territories ? (
+            <p className="error">{widgetErrors.territories}</p>
+          ) : zones.length === 0 ? (
             <p className="muted">Aucune zone agrégée.</p>
           ) : (
             <div className="bar-chart">
@@ -520,6 +544,7 @@ export default function DashboardPage() {
       {/* I. Santé technique */}
       <div className="panel">
         <h2>Santé technique</h2>
+        {widgetErrors.health ? <p className="error">{widgetErrors.health}</p> : null}
         {health.length === 0 ? (
           <p className="muted">Sondes non disponibles.</p>
         ) : (

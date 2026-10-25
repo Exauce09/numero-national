@@ -6,7 +6,7 @@ from datetime import date
 from typing import Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,35 +33,9 @@ from apps.api.domains.core_registry.national_identity_number_service import (
     assign_provisional_nic,
 )
 from apps.api.domains.onip import service
+from apps.api.domains.onip.scope import resolve_scoped_filters
 
 router = APIRouter(prefix="/onip", tags=["onip"])
-
-
-@router.get(
-    "/dashboard",
-    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
-)
-async def onip_dashboard(
-    db: AsyncSession = Depends(get_db),
-    period_from: date | None = Query(default=None, description="Début période (inclus)"),
-    period_to: date | None = Query(default=None, description="Fin période (inclus)"),
-    province_code: str | None = Query(default=None),
-    commune_code: str | None = Query(default=None),
-    campaign_id: UUID | None = Query(default=None),
-    citizen_status: str | None = Query(default=None),
-    card_status: str | None = Query(default=None),
-) -> dict[str, Any]:
-    """Module 1 — agrégats nationaux filtrables (sans PII)."""
-    filters = service.normalize_dashboard_filters(
-        period_from=period_from,
-        period_to=period_to,
-        province_code=province_code,
-        commune_code=commune_code,
-        campaign_id=campaign_id,
-        citizen_status=citizen_status,
-        card_status=card_status,
-    )
-    return await service.build_dashboard(db, filters)
 
 
 def _dashboard_filters_from_query(
@@ -84,12 +58,104 @@ def _dashboard_filters_from_query(
     )
 
 
-@router.get(
-    "/dashboard/trends",
-    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
-)
+async def _scoped_dashboard_filters(
+    db: AsyncSession,
+    principal: Principal,
+    *,
+    period_from: date | None = None,
+    period_to: date | None = None,
+    province_code: str | None = None,
+    commune_code: str | None = None,
+    campaign_id: UUID | None = None,
+    citizen_status: str | None = None,
+    card_status: str | None = None,
+) -> tuple[service.DashboardFilters, Any]:
+    requested = _dashboard_filters_from_query(
+        period_from,
+        period_to,
+        province_code,
+        commune_code,
+        campaign_id,
+        citizen_status,
+        card_status,
+    )
+    return await resolve_scoped_filters(db, principal, requested)
+
+
+async def _audit_dashboard(
+    db: AsyncSession,
+    principal: Principal,
+    *,
+    action: str,
+    filters: service.DashboardFilters,
+    result: str = "success",
+) -> None:
+    try:
+        from apps.api.domains.audit.services import write_audit
+
+        await write_audit(
+            db,
+            action=action,
+            actor_id=principal.actor_id,
+            institution_id=principal.institution_id,
+            resource_type="onip_dashboard",
+            resource_id="module-1",
+            result=result,
+            new_value={
+                "period_from": filters.period_from.isoformat() if filters.period_from else None,
+                "period_to": filters.period_to.isoformat() if filters.period_to else None,
+                "province_code": filters.province_code,
+                "commune_code": filters.commune_code,
+                "campaign_id": str(filters.campaign_id) if filters.campaign_id else None,
+            },
+            commit=False,
+        )
+    except Exception:
+        # L'audit ne doit pas casser la lecture du dashboard
+        await db.rollback()
+
+
+@router.get("/dashboard")
+async def onip_dashboard(
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(require_permissions(PERM_ONIP_DASHBOARD)),
+    period_from: date | None = Query(default=None, description="Début période (inclus)"),
+    period_to: date | None = Query(default=None, description="Fin période (inclus)"),
+    province_code: str | None = Query(default=None),
+    commune_code: str | None = Query(default=None),
+    campaign_id: UUID | None = Query(default=None),
+    citizen_status: str | None = Query(default=None),
+    card_status: str | None = Query(default=None),
+) -> dict[str, Any]:
+    """Module 1 — agrégats nationaux filtrables (sans PII), périmètre serveur."""
+    filters, bound = await _scoped_dashboard_filters(
+        db,
+        principal,
+        period_from=period_from,
+        period_to=period_to,
+        province_code=province_code,
+        commune_code=commune_code,
+        campaign_id=campaign_id,
+        citizen_status=citizen_status,
+        card_status=card_status,
+    )
+    await _audit_dashboard(db, principal, action="onip.dashboard.view", filters=filters)
+    out = await service.build_dashboard(db, filters)
+    meta = dict(out.get("meta") or {})
+    meta["territory"] = {
+        "forced": bound.forced,
+        "national_view": bound.national_view,
+        "allowed_province": bound.province_code,
+        "allowed_commune": bound.commune_code,
+    }
+    out["meta"] = meta
+    return out
+
+
+@router.get("/dashboard/trends")
 async def onip_dashboard_trends(
     db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(require_permissions(PERM_ONIP_DASHBOARD)),
     period_from: date | None = Query(default=None),
     period_to: date | None = Query(default=None),
     province_code: str | None = Query(default=None),
@@ -98,18 +164,22 @@ async def onip_dashboard_trends(
     days: int = Query(default=30, ge=1, le=180),
 ) -> dict[str, Any]:
     """Module 1 — tendances temporelles agrégées."""
-    filters = _dashboard_filters_from_query(
-        period_from, period_to, province_code, commune_code, campaign_id
+    filters, _ = await _scoped_dashboard_filters(
+        db,
+        principal,
+        period_from=period_from,
+        period_to=period_to,
+        province_code=province_code,
+        commune_code=commune_code,
+        campaign_id=campaign_id,
     )
     return await service.build_dashboard_trends(db, filters, days=days)
 
 
-@router.get(
-    "/dashboard/territories",
-    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
-)
+@router.get("/dashboard/territories")
 async def onip_dashboard_territories(
     db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(require_permissions(PERM_ONIP_DASHBOARD)),
     period_from: date | None = Query(default=None),
     period_to: date | None = Query(default=None),
     province_code: str | None = Query(default=None),
@@ -118,18 +188,22 @@ async def onip_dashboard_territories(
     limit: int = Query(default=30, ge=1, le=100),
 ) -> dict[str, Any]:
     """Module 1 — répartition territoriale agrégée."""
-    filters = _dashboard_filters_from_query(
-        period_from, period_to, province_code, commune_code, campaign_id
+    filters, _ = await _scoped_dashboard_filters(
+        db,
+        principal,
+        period_from=period_from,
+        period_to=period_to,
+        province_code=province_code,
+        commune_code=commune_code,
+        campaign_id=campaign_id,
     )
     return await service.build_dashboard_territories(db, filters, limit=limit)
 
 
-@router.get(
-    "/dashboard/alerts",
-    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
-)
+@router.get("/dashboard/alerts")
 async def onip_dashboard_alerts(
     db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(require_permissions(PERM_ONIP_DASHBOARD)),
     period_from: date | None = Query(default=None),
     period_to: date | None = Query(default=None),
     province_code: str | None = Query(default=None),
@@ -137,19 +211,92 @@ async def onip_dashboard_alerts(
     campaign_id: UUID | None = Query(default=None),
 ) -> dict[str, Any]:
     """Module 1 — centre d'alertes synthétique."""
-    filters = _dashboard_filters_from_query(
-        period_from, period_to, province_code, commune_code, campaign_id
+    filters, _ = await _scoped_dashboard_filters(
+        db,
+        principal,
+        period_from=period_from,
+        period_to=period_to,
+        province_code=province_code,
+        commune_code=commune_code,
+        campaign_id=campaign_id,
     )
     return await service.build_dashboard_alerts(db, filters)
 
 
-@router.get(
-    "/dashboard/health",
-    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
-)
-async def onip_dashboard_health(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+@router.get("/dashboard/health")
+async def onip_dashboard_health(
+    db: AsyncSession = Depends(get_db),
+    _: Principal = Depends(require_permissions(PERM_ONIP_DASHBOARD)),
+) -> dict[str, Any]:
     """Module 1 — santé des services surveillés."""
     return await service.build_dashboard_health(db)
+
+
+@router.get("/dashboard/export")
+async def onip_dashboard_export(
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(require_permissions(PERM_ONIP_DASHBOARD)),
+    period_from: date | None = Query(default=None),
+    period_to: date | None = Query(default=None),
+    province_code: str | None = Query(default=None),
+    commune_code: str | None = Query(default=None),
+    campaign_id: UUID | None = Query(default=None),
+    citizen_status: str | None = Query(default=None),
+    card_status: str | None = Query(default=None),
+) -> Response:
+    """Export CSV agrégats uniquement — journalisé (cahier §11.2 / DASH-011)."""
+    filters, bound = await _scoped_dashboard_filters(
+        db,
+        principal,
+        period_from=period_from,
+        period_to=period_to,
+        province_code=province_code,
+        commune_code=commune_code,
+        campaign_id=campaign_id,
+        citizen_status=citizen_status,
+        card_status=card_status,
+    )
+    # Responsable de centre / provincial : export national interdit
+    if bound.forced and not province_code and bound.province_code:
+        # déjà forcé au périmètre — OK
+        pass
+    await _audit_dashboard(db, principal, action="onip.dashboard.export", filters=filters)
+    dash = await service.build_dashboard(db, filters)
+    k = dash.get("kpis") or {}
+    lines = [
+        "indicateur,valeur",
+        f"generated_at,{dash.get('generated_at','')}",
+        f"freshness,{(dash.get('meta') or {}).get('freshness','')}",
+        f"province,{filters.province_code or ''}",
+        f"commune,{filters.commune_code or ''}",
+    ]
+    for key in (
+        "registered_records",
+        "validated_records",
+        "pending_records",
+        "assigned_nins",
+        "duplicate_reviews_open",
+        "cards_produced",
+        "cards_delivered",
+        "cards_expired",
+        "cards_pending",
+        "validation_rate_percent",
+        "sync_rate_percent",
+        "sync_failures",
+        "campaigns_active",
+    ):
+        val = k.get(key)
+        lines.append(f"{key},{'' if val is None else val}")
+    body = "\n".join(lines) + "\n"
+    await db.commit()
+    return Response(
+        content=body,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": 'attachment; filename="onip-dashboard-aggregates.csv"',
+            "X-PII": "false",
+        },
+    )
 
 
 @router.get(

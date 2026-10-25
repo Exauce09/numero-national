@@ -312,6 +312,12 @@ export type OnipDashboard = {
     timezone?: string;
     period?: { from?: string | null; to?: string | null };
     scope?: Record<string, string | null | undefined>;
+    territory?: {
+      forced?: boolean;
+      national_view?: boolean;
+      allowed_province?: string | null;
+      allowed_commune?: string | null;
+    };
   };
   filters_applied?: OnipDashboardFilters;
   kpis?: {
@@ -423,6 +429,27 @@ export async function fetchOnipDashboardHealth(): Promise<{
   services: Array<{ service: string; state: string; checked_at: string; detail?: string | null }>;
 }> {
   return request("/onip/dashboard/health");
+}
+
+/** Export serveur CSV agrégats (audité) — pas de PII. */
+export async function downloadOnipDashboardExport(
+  filters?: OnipDashboardFilters,
+): Promise<void> {
+  const qs = dashboardQuery(filters);
+  const res = await fetch(`${BASE}/onip/dashboard/export${qs}`, {
+    headers: authHeaders(),
+  });
+  if (res.status === 401) {
+    clearSession();
+    throw new ApiError("Session expirée — reconnectez-vous.", 401);
+  }
+  if (!res.ok) throw new ApiError(await parseError(res), res.status);
+  const blob = await res.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "onip-dashboard-aggregates.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 export type NationalCard = {

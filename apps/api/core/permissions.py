@@ -117,6 +117,29 @@ class Principal:
     permissions: frozenset[str] = field(default_factory=frozenset)
     institution_id: UUID | None = None
     mfa_enabled: bool = False
+    province_code: str | None = None
+    commune_code: str | None = None
+    territory_forced: bool = False
+
+
+async def _territory_codes_for_user(db: AsyncSession, user) -> tuple[str | None, str | None, bool]:
+    """Résout codes géographiques ; forced=True si province rattachée au compte."""
+    province_code: str | None = None
+    commune_code: str | None = None
+    try:
+        from apps.api.domains.geography.models import Commune, Province
+
+        if getattr(user, "province_id", None):
+            prov = await db.get(Province, user.province_id)
+            if prov is not None:
+                province_code = (prov.code or "").strip().upper() or None
+        if getattr(user, "commune_id", None):
+            com = await db.get(Commune, user.commune_id)
+            if com is not None:
+                commune_code = (com.code or "").strip().upper() or None
+    except Exception:
+        return None, None, False
+    return province_code, commune_code, bool(province_code)
 
 
 async def get_current_principal(
@@ -124,6 +147,7 @@ async def get_current_principal(
     db: AsyncSession = Depends(get_db),
     x_actor_id: str | None = Header(default=None, alias="X-Actor-Id"),
     x_permissions: str | None = Header(default=None, alias="X-Permissions"),
+    x_province_code: str | None = Header(default=None, alias="X-Province-Code"),
 ) -> Principal:
     """Resolve principal from Bearer JWT, else optional dev headers."""
     settings = get_settings()
@@ -147,11 +171,15 @@ async def get_current_principal(
                 detail="User inactive or not found",
             )
         me = user_to_me(user)
+        prov, com, forced = await _territory_codes_for_user(db, user)
         return Principal(
             actor_id=me.id,
             permissions=frozenset(me.permissions),
             institution_id=me.institution_id,
             mfa_enabled=bool(getattr(user, "mfa_enabled", False)),
+            province_code=prov,
+            commune_code=com,
+            territory_forced=forced,
         )
 
     if settings.dev_header_auth_enabled:
@@ -167,7 +195,13 @@ async def get_current_principal(
         perms: set[str] = set()
         if x_permissions:
             perms = {p.strip() for p in x_permissions.split(",") if p.strip()}
-        return Principal(actor_id=actor_id, permissions=frozenset(perms))
+        prov = (x_province_code or "").strip().upper() or None
+        return Principal(
+            actor_id=actor_id,
+            permissions=frozenset(perms),
+            province_code=prov,
+            territory_forced=bool(prov),
+        )
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
