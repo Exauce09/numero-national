@@ -16,6 +16,7 @@ from apps.api.domains.recensement.models import (
     CensusRecord,
     CensusRecordStatus,
     Device,
+    FieldCoupon,
     FormDraft,
     Household,
     SyncBatch,
@@ -289,7 +290,15 @@ async def get_campaign(db: AsyncSession, campaign_id: uuid.UUID) -> Campaign | N
 async def update_campaign(
     db: AsyncSession, campaign: Campaign, data: CampaignUpdate
 ) -> Campaign:
-    for key, value in data.model_dump(exclude_unset=True).items():
+    from apps.api.domains.recensement.campaign_lifecycle import assert_campaign_transition
+
+    payload = data.model_dump(exclude_unset=True)
+    if "status" in payload and payload["status"] is not None:
+        new_st = payload["status"]
+        new_val = new_st.value if hasattr(new_st, "value") else str(new_st)
+        cur = campaign.status.value if hasattr(campaign.status, "value") else str(campaign.status)
+        assert_campaign_transition(cur, new_val)
+    for key, value in payload.items():
         setattr(campaign, key, value)
     await db.commit()
     await db.refresh(campaign)
@@ -325,6 +334,15 @@ async def register_device(db: AsyncSession, data: DeviceRegister) -> Device:
 
 
 async def sync_push(db: AsyncSession, req: SyncPushRequest) -> SyncPushResult:
+    from apps.api.domains.recensement.campaign_lifecycle import campaign_accepts_sync
+
+    campaign = await get_campaign(db, req.campaign_id)
+    if campaign is None:
+        raise ValueError("campaign_not_found")
+    st = campaign.status.value if hasattr(campaign.status, "value") else str(campaign.status)
+    if not campaign_accepts_sync(st):
+        raise ValueError("campaign_not_active")
+
     device = (
         await db.execute(select(Device).where(Device.device_uid == req.device_uid))
     ).scalar_one_or_none()
@@ -339,6 +357,7 @@ async def sync_push(db: AsyncSession, req: SyncPushRequest) -> SyncPushResult:
         direction="PUSH",
         status=SyncBatchStatus.PROCESSING,
         item_count=len(req.items),
+        payload_summary={"campaign_id": str(req.campaign_id)},
     )
     db.add(batch)
     await db.flush()
@@ -639,7 +658,11 @@ async def sync_push(db: AsyncSession, req: SyncPushRequest) -> SyncPushResult:
         else SyncBatchStatus.PARTIAL if accepted else SyncBatchStatus.REJECTED
     )
     batch.completed_at = datetime.now(timezone.utc)
-    batch.payload_summary = {"accepted": accepted, "conflicts": conflicts}
+    batch.payload_summary = {
+        "campaign_id": str(req.campaign_id),
+        "accepted": accepted,
+        "conflicts": conflicts,
+    }
     device.last_seen_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(batch)
@@ -988,6 +1011,56 @@ async def campaign_stats(db: AsyncSession, campaign_id: uuid.UUID) -> CampaignSt
     def _n(key: str) -> int:
         return int(by_status.get(key, 0))
 
+    zones_count = int(
+        (
+            await db.execute(
+                select(func.count()).select_from(Zone).where(Zone.campaign_id == campaign_id)
+            )
+        ).scalar_one()
+        or 0
+    )
+    teams_count = int(
+        (
+            await db.execute(
+                select(func.count()).select_from(Team).where(Team.campaign_id == campaign_id)
+            )
+        ).scalar_one()
+        or 0
+    )
+    # Zones ayant au moins un ménage / fiche
+    zones_with = int(
+        (
+            await db.execute(
+                select(func.count(func.distinct(Household.zone_id))).where(
+                    Household.campaign_id == campaign_id,
+                    Household.zone_id.is_not(None),
+                )
+            )
+        ).scalar_one()
+        or 0
+    )
+    coverage = (
+        round(100.0 * zones_with / zones_count, 1) if zones_count > 0 else None
+    )
+    coupons_count = int(
+        (
+            await db.execute(
+                select(func.count())
+                .select_from(FieldCoupon)
+                .where(FieldCoupon.campaign_id == campaign_id)
+            )
+        ).scalar_one()
+        or 0
+    )
+    # Lots sync récents (payload_summary.campaign_id) — fenêtres 7j non filtrées ici: last 200
+    recent_batches = await list_campaign_sync_batches(db, campaign_id, limit=200)
+    sync_errors = sum(
+        1
+        for b in recent_batches
+        if (b.status.value if hasattr(b.status, "value") else str(b.status))
+        in {SyncBatchStatus.REJECTED.value, SyncBatchStatus.PARTIAL.value}
+    )
+
     return CampaignStatsOut(
         campaign_id=campaign_id,
         households=int(hh or 0),
@@ -999,7 +1072,52 @@ async def campaign_stats(db: AsyncSession, campaign_id: uuid.UUID) -> CampaignSt
         promoted=_n("PROMOTED"),
         conflicts=_n("CONFLICT"),
         pending_review=_n("SYNCED"),
+        zones_count=zones_count,
+        teams_count=teams_count,
+        zones_with_records=zones_with,
+        coverage_percent=coverage,
+        coupons_count=coupons_count,
+        sync_batches_recent=len(recent_batches),
+        sync_errors_recent=sync_errors,
     )
+
+
+async def list_campaign_sync_batches(
+    db: AsyncSession,
+    campaign_id: uuid.UUID,
+    *,
+    limit: int = 50,
+) -> list[SyncBatch]:
+    """Lots sync dont payload_summary.campaign_id correspond (Module 4 supervision)."""
+    cid = str(campaign_id)
+    # Charger récents puis filtrer (portable SQLite/Postgres)
+    rows = list(
+        (
+            await db.execute(
+                select(SyncBatch).order_by(SyncBatch.created_at.desc()).limit(max(limit * 5, 100))
+            )
+        ).scalars().all()
+    )
+    matched: list[SyncBatch] = []
+    for b in rows:
+        summary = b.payload_summary if isinstance(b.payload_summary, dict) else {}
+        if summary.get("campaign_id") == cid:
+            matched.append(b)
+        if len(matched) >= limit:
+            break
+    return matched
+
+
+async def deactivate_assignment(
+    db: AsyncSession, assignment_id: uuid.UUID
+) -> AgentAssignment:
+    row = await db.get(AgentAssignment, assignment_id)
+    if row is None:
+        raise ValueError("assignment_not_found")
+    row.active = False
+    await db.commit()
+    await db.refresh(row)
+    return row
 
 
 async def export_campaign_records_csv(

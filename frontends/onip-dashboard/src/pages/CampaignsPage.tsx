@@ -7,6 +7,7 @@ import {
   CensusRecord,
   DirectoryUser,
   GeoItem,
+  SyncBatch,
   Team,
   Zone,
   censusApi,
@@ -15,7 +16,7 @@ import {
 } from "../api";
 import { getSession } from "../auth";
 
-type Tab = "campagnes" | "controle" | "affectations" | "stats";
+type Tab = "campagnes" | "controle" | "affectations" | "stats" | "sync";
 
 export default function CampaignsPage() {
   const hasToken = Boolean(getSession()?.accessToken);
@@ -53,11 +54,11 @@ export default function CampaignsPage() {
   return (
     <div>
       <div className="hero-banner">
-        <h1>Campagnes &amp; contrôle</h1>
+        <h1>Campagnes &amp; recensement</h1>
         <p>
-          Configuration opérationnelle. File Module 3 (accueil enrôlement) :{" "}
-          <Link to="/enrolement">Enrôlement</Link>. Flux : comptes → campagne / zones → contrôle →{" "}
-          <Link to="/nic">Numéros NIC</Link> après promote.
+          Module 4 — planification, zones, équipes, sync et stats. File dossiers :{" "}
+          <Link to="/enrolement">Enrôlement</Link> · NIC après promote : <Link to="/nic">Numéros NIC</Link>.
+          Sync terrain uniquement si campagne ACTIVE.
         </p>
       </div>
 
@@ -72,9 +73,10 @@ export default function CampaignsPage() {
       <div className="panel tab-row">
         {(
           [
-            ["campagnes", "2. Campagnes"],
-            ["affectations", "3. Affectations"],
-            ["controle", "4. Contrôle fiches"],
+            ["campagnes", "Campagnes"],
+            ["affectations", "Zones / équipes"],
+            ["controle", "Contrôle fiches"],
+            ["sync", "Synchronisation"],
             ["stats", "Stats / CSV"],
           ] as const
         ).map(([id, label]) => (
@@ -133,6 +135,12 @@ export default function CampaignsPage() {
       {tab === "affectations" && !selected ? (
         <div className="panel"><p className="muted">Créez ou sélectionnez une campagne pour gérer les affectations.</p></div>
       ) : null}
+      {tab === "sync" && selected ? (
+        <SyncTab campaign={selected} setError={setError} />
+      ) : null}
+      {tab === "sync" && !selected ? (
+        <div className="panel"><p className="muted">Sélectionnez une campagne pour voir les lots sync.</p></div>
+      ) : null}
       {tab === "stats" && selected ? (
         <StatsTab campaign={selected} setError={setError} setMsg={setMsg} />
       ) : null}
@@ -162,16 +170,40 @@ function CampaignsTab({
 }) {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [startsAt, setStartsAt] = useState("");
+  const [endsAt, setEndsAt] = useState("");
+  const [transitions, setTransitions] = useState<Record<string, string[]>>({});
+  const [labels, setLabels] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    void censusApi
+      .campaignCatalog()
+      .then((c) => {
+        setTransitions(c.transitions || {});
+        setLabels(c.labels || {});
+      })
+      .catch(() => undefined);
+  }, []);
 
   async function create(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      await censusApi.createCampaign({ code: code.trim(), name: name.trim() });
+      await censusApi.createCampaign({
+        code: code.trim(),
+        name: name.trim(),
+        description: description.trim() || undefined,
+        starts_at: startsAt ? new Date(startsAt).toISOString() : undefined,
+        ends_at: endsAt ? new Date(endsAt).toISOString() : undefined,
+      });
       setCode("");
       setName("");
-      setMsg("Campagne créée");
+      setDescription("");
+      setStartsAt("");
+      setEndsAt("");
+      setMsg("Campagne créée (DRAFT)");
       await onReload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Création impossible");
@@ -194,14 +226,22 @@ function CampaignsTab({
     }
   }
 
+  function canGo(from: string, to: string) {
+    return (transitions[from] || []).includes(to);
+  }
+
   return (
     <div className="panel">
       <h2>Liste</h2>
+      <p className="muted small">
+        Transitions contrôlées côté serveur. Sync APK uniquement si ACTIVE.
+      </p>
       <table className="data-table">
         <thead>
           <tr>
             <th>Code</th>
             <th>Nom</th>
+            <th>Période</th>
             <th>Statut</th>
             <th>Actions</th>
           </tr>
@@ -210,18 +250,53 @@ function CampaignsTab({
           {campaigns.map((c) => (
             <tr key={c.id}>
               <td>{c.code}</td>
-              <td>{c.name}</td>
-              <td>{c.status}</td>
+              <td>
+                {c.name}
+                {c.description ? <div className="muted small">{c.description}</div> : null}
+              </td>
+              <td className="muted small">
+                {c.starts_at ? new Date(c.starts_at).toLocaleDateString() : "—"}
+                {" → "}
+                {c.ends_at ? new Date(c.ends_at).toLocaleDateString() : "—"}
+              </td>
+              <td>
+                <span className="status-pill">{c.status}</span>
+                {labels[c.status] ? (
+                  <div className="muted small">{labels[c.status]}</div>
+                ) : null}
+              </td>
               <td style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                <button type="button" className="btn-secondary" disabled={busy} onClick={() => void setStatus(c.id, "ACTIVE")}>
-                  Activer
-                </button>
-                <button type="button" className="btn-secondary" disabled={busy} onClick={() => void setStatus(c.id, "PAUSED")}>
-                  Pause
-                </button>
-                <button type="button" className="btn-secondary" disabled={busy} onClick={() => void setStatus(c.id, "CLOSED")}>
-                  Clôturer
-                </button>
+                {canGo(c.status, "ACTIVE") ? (
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    disabled={busy}
+                    onClick={() => void setStatus(c.id, "ACTIVE")}
+                  >
+                    Activer
+                  </button>
+                ) : null}
+                {canGo(c.status, "PAUSED") ? (
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    disabled={busy}
+                    onClick={() => void setStatus(c.id, "PAUSED")}
+                  >
+                    Suspendre
+                  </button>
+                ) : null}
+                {canGo(c.status, "CLOSED") ? (
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    disabled={busy}
+                    onClick={() => void setStatus(c.id, "CLOSED")}
+                  >
+                    Clôturer
+                  </button>
+                ) : null}
+                {c.status === "CLOSED" ? <span className="muted small">Terminale</span> : null}
               </td>
             </tr>
           ))}
@@ -229,11 +304,25 @@ function CampaignsTab({
       </table>
 
       <h2 style={{ marginTop: 24 }}>Nouvelle campagne</h2>
-      <form onSubmit={create} style={{ display: "grid", gap: 8, maxWidth: 420 }}>
+      <form onSubmit={create} style={{ display: "grid", gap: 8, maxWidth: 480 }}>
         <input placeholder="Code" value={code} onChange={(e) => setCode(e.target.value)} required />
         <input placeholder="Nom" value={name} onChange={(e) => setName(e.target.value)} required />
+        <textarea
+          placeholder="Objectif / description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={2}
+        />
+        <label>
+          Début planifié
+          <input type="date" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+        </label>
+        <label>
+          Fin planifiée
+          <input type="date" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
+        </label>
         <button type="submit" className="btn-primary" disabled={busy}>
-          Créer
+          Créer (brouillon)
         </button>
       </form>
     </div>
@@ -259,8 +348,9 @@ function ReviewTab({
 
   const STATUS_MENU: Array<{ value: string; label: string; hint: string }> = [
     { value: "SYNCED", label: "1. À contrôler", hint: "Fiches sync, pas encore approuvées" },
-    { value: "APPROVED", label: "2. Approuvées", hint: "Prêtes pour Promouvoir NIC" },
-    { value: "PROMOTED", label: "3. Promues (NIC)", hint: "Déjà dans le registre" },
+    { value: "CONFLICT", label: "Conflits / doublons", hint: "Quarantaine qualité (Module 4)" },
+    { value: "APPROVED", label: "2. Approuvées", hint: "Prêtes pour Promouvoir FGP" },
+    { value: "PROMOTED", label: "3. Promues FGP", hint: "Déjà dans le registre" },
     { value: "REJECTED", label: "Rejetées", hint: "À corriger côté agent" },
   ];
 
@@ -729,12 +819,115 @@ function AssignmentsTab({
       <h3>Affectations équipe sélectionnée</h3>
       <ul>
         {assignments.map((a) => (
-          <li key={a.id}>
-            {a.agent_user_id} · {a.role_label} · {a.active ? "actif" : "inactif"}
+          <li key={a.id} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <span>
+              {a.agent_user_id} · {a.role_label} · {a.active ? "actif" : "inactif"}
+            </span>
+            {a.active ? (
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                onClick={() => {
+                  void (async () => {
+                    try {
+                      await censusApi.deactivateAssignment(a.id);
+                      setMsg("Affectation désactivée");
+                      setAssignments(await censusApi.listAssignments(teamId));
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "Retrait impossible");
+                    }
+                  })();
+                }}
+              >
+                Retirer
+              </button>
+            ) : null}
           </li>
         ))}
         {!assignments.length ? <li className="muted">Aucune</li> : null}
       </ul>
+    </div>
+  );
+}
+
+function SyncTab({
+  campaign,
+  setError,
+}: {
+  campaign: Campaign;
+  setError: (v: string | null) => void;
+}) {
+  const [rows, setRows] = useState<SyncBatch[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setRows(await censusApi.listSyncBatches(campaign.id, 50));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Lots sync introuvables");
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [campaign.id, setError]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return (
+    <div className="panel">
+      <h2>Synchronisation — {campaign.code}</h2>
+      <p className="muted small">
+        Lots PUSH/PULL liés à cette campagne (payload_summary.campaign_id). Relance = même clé
+        d&apos;idempotence côté APK.
+      </p>
+      {campaign.status !== "ACTIVE" ? (
+        <div className="login-error" style={{ marginBottom: 12 }}>
+          Campagne {campaign.status} — les nouveaux sync PUSH sont refusés tant qu&apos;elle n&apos;est
+          pas ACTIVE.
+        </div>
+      ) : null}
+      <button type="button" className="btn-secondary btn-sm" onClick={() => void load()} disabled={loading}>
+        Actualiser
+      </button>
+      {loading ? <p className="muted">Chargement…</p> : null}
+      <table className="data-table" style={{ marginTop: 12 }}>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Sens</th>
+            <th>Statut</th>
+            <th>Items</th>
+            <th>Acceptés</th>
+            <th>Conflits</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 && !loading ? (
+            <tr>
+              <td colSpan={6} className="muted">
+                Aucun lot récent pour cette campagne.
+              </td>
+            </tr>
+          ) : (
+            rows.map((b) => (
+              <tr key={b.id}>
+                <td>{new Date(b.created_at).toLocaleString()}</td>
+                <td>{b.direction}</td>
+                <td>
+                  <span className="status-pill">{b.status}</span>
+                </td>
+                <td>{b.item_count}</td>
+                <td>{b.accepted_count}</td>
+                <td>{b.conflict_count}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -796,11 +989,26 @@ function StatsTab({
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12 }}>
           <div className="stat-chip"><div className="muted">Ménages</div><strong>{stats.households}</strong></div>
           <div className="stat-chip"><div className="muted">Personnes</div><strong>{stats.records}</strong></div>
+          <div className="stat-chip"><div className="muted">Zones</div><strong>{stats.zones_count ?? "—"}</strong></div>
+          <div className="stat-chip"><div className="muted">Équipes</div><strong>{stats.teams_count ?? "—"}</strong></div>
+          <div className="stat-chip">
+            <div className="muted">Couverture zones</div>
+            <strong>
+              {stats.coverage_percent != null ? `${stats.coverage_percent}%` : "—"}
+            </strong>
+          </div>
+          <div className="stat-chip"><div className="muted">Coupons</div><strong>{stats.coupons_count ?? "—"}</strong></div>
           <div className="stat-chip"><div className="muted">À contrôler</div><strong>{stats.pending_review}</strong></div>
           <div className="stat-chip"><div className="muted">Approuvées</div><strong>{stats.approved}</strong></div>
           <div className="stat-chip"><div className="muted">Rejetées</div><strong>{stats.rejected}</strong></div>
           <div className="stat-chip"><div className="muted">Promues</div><strong>{stats.promoted}</strong></div>
           <div className="stat-chip"><div className="muted">Conflits</div><strong>{stats.conflicts}</strong></div>
+          <div className="stat-chip">
+            <div className="muted">Lots sync / erreurs</div>
+            <strong>
+              {stats.sync_batches_recent ?? 0} / {stats.sync_errors_recent ?? 0}
+            </strong>
+          </div>
         </div>
       ) : null}
       {!loading && !loadError && !stats ? (

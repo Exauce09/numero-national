@@ -1,0 +1,786 @@
+SIGPOP-RDC
+MODULE 4RECENSEMENT ET CAMPAGNES
+Cahier des charges fonctionnel et technique détailléPortail ONIP — opérations terrain, supervision et transfert des dossiers
+Version de travail — octobre 2026
+Document de conception destiné à l’audit et au développement progressif du module existant.
+
+Avertissement et statut du document
+Ce document développe le Module 4 — Recensement et campagnes — à partir des éléments du projet SIGPOP-RDC/ONIP transmis dans les échanges : création et pilotage des campagnes, affectation des agents et équipes, coupons et fiches, cartographie des zones, contrôle des dossiers reçus, transfert terrain vers ONIP, statistiques par équipe et centre et détection des doublons entre campagnes.
+Il s’agit d’une proposition de cahier des charges, pas d’une description certifiée de tous les composants actuellement présents dans le dépôt. Les fonctionnalités mentionnées comme déjà connectées en partie doivent être confirmées par l’audit du code, des API, des modèles, des applications terrain et des traitements de synchronisation.
+Principe essentiel retenu pour ce document : les données de recensement sont collectées sur le terrain puis transmises au circuit ONIP pour le traitement prévu. La validation du recensement côté ONIP ne doit pas être confondue avec une procédure d’état civil. Le transfert doit réutiliser le mécanisme existant, notamment `onipSync` s’il est bien présent dans le flux concerné, sans créer une seconde source de vérité.
+Sommaire
+1. Finalité, objectifs et périmètre
+2. Acteurs, rôles et responsabilités
+3. Organisation fonctionnelle du module
+4. Planification et cycle de vie d’une campagne
+5. Gestion des zones, centres et couverture territoriale
+6. Équipes, agents, affectations et supervision
+7. Coupons, fiches, lots et identifiants de collecte
+8. Collecte terrain et qualité des données
+9. Transmission terrain vers ONIP et synchronisation
+10. Contrôle des dossiers reçus et traitement des exceptions
+11. Détection des doublons intercampagnes
+12. Statistiques et rapports de campagne
+13. Modèle de données indicatif
+14. API et intégrations
+15. Sécurité, confidentialité et fonctionnement hors connexion
+16. Interfaces et navigation
+17. Scénarios métier détaillés
+18. Tests et critères d’acceptation
+19. Plan de développement progressif
+20. Prompt complet pour l’agent développeur
+21. Limites et validations requises
+
+1. Finalité, objectifs et périmètre
+1.1 Finalité
+Le module Recensement et campagnes permet de planifier, organiser, exécuter et superviser des opérations de collecte de données. Il relie la définition des campagnes, les territoires ciblés, les centres et équipes, les agents habilités, les coupons ou fiches, les données reçues, les contrôles qualité et le transfert sécurisé vers les services ONIP concernés.
+1.2 Objectifs
+Créer et paramétrer des campagnes avec des objectifs, une période, un territoire et des responsables.
+Affecter les équipes et agents aux zones et périodes autorisées.
+Gérer les coupons, fiches, séries et lots de collecte avec des références uniques et traçables.
+Suivre l’activité terrain et la couverture territoriale sans présenter les chiffres incomplets comme des résultats définitifs.
+Contrôler la qualité, la complétude et la provenance des dossiers collectés.
+Transmettre les dossiers à ONIP de façon sécurisée et idempotente, avec suivi des accusés de réception.
+Mettre en quarantaine les dossiers incomplets, incohérents ou à rapprocher plutôt que les intégrer silencieusement.
+Repérer les dossiers potentiellement identiques entre plusieurs campagnes et les soumettre à un circuit de revue.
+Fournir aux superviseurs des statistiques fiables par campagne, province, zone, centre, équipe et agent, en fonction de leurs permissions.
+1.3 Périmètre et dépendances
+Domaine
+Responsabilité du module
+Dépendance / limite
+Campagnes
+Définition, calendrier, objectifs, états et clôture.
+Les calendriers et objectifs sont approuvés par les responsables compétents.
+Territoires
+Association des zones, centres et équipes à une campagne.
+Référentiel administratif et cartographique validé.
+Agents
+Affectation, rôle de terrain et suivi de l’activité.
+Comptes actifs, permissions et affectations officielles.
+Coupons et lots
+Référencement, distribution, utilisation, rapprochement et annulation contrôlée.
+Règles de numérotation et format à confirmer ; ne pas inventer un format institutionnel.
+Collecte
+Suivi de la collecte, de la complétude et des erreurs.
+Formulaire terrain et règles de collecte approuvés.
+Transfert vers ONIP
+File de transmission, accusés de réception, reprises et erreurs.
+Contrat API/événement existant ; réutiliser `onipSync` s’il est confirmé.
+Validation d’identité
+Transmettre un dossier pour le workflow ONIP approprié.
+La décision d’identité relève des services métier habilités, pas de la seule campagne.
+État civil
+Ne pas traiter le recensement comme une déclaration d’état civil.
+Tout événement d’état civil passe par son propre circuit et sa source autorisée.
+
+1.4 Principes non négociables
+Séparer collecte et validation
+Une donnée recueillie par un agent n’est pas automatiquement une identité validée.
+Une seule référence de collecte
+Chaque dossier terrain doit porter une référence stable qui permette de suivre son parcours.
+Transmission idempotente
+Réexpédier le même événement ne doit pas créer un nouveau dossier ni une double opération.
+Provenance conservée
+Campagne, équipe, agent, centre, appareil ou source, date de collecte et lot doivent être traçables selon la politique approuvée.
+Pas de suppression silencieuse
+Une correction ou annulation de fiche, coupon ou lot doit conserver le motif et l’historique.
+Pas de fusion automatique
+Les correspondances entre campagnes sont des candidats à examiner, pas une décision de fraude.
+Hors connexion contrôlé
+La collecte locale peut être mise en attente, mais les décisions centrales restent soumises aux services autorisés.
+2. Acteurs, rôles et responsabilités
+Rôle indicatif
+Responsabilités
+Restrictions à prévoir
+Administrateur national de campagne
+Créer les campagnes, valider les paramètres et consulter les statistiques nationales autorisées.
+Ne pas donner automatiquement accès aux données biométriques ni à toutes les fiches nominatives.
+Coordinateur provincial
+Suivre les campagnes de sa province, affecter ou confirmer les responsables habilités.
+Accès limité à son périmètre.
+Superviseur de zone
+Suivre la progression, vérifier les lots et traiter les alertes de terrain.
+Pas de modification des données validées sans processus dédié.
+Responsable de centre
+Gérer les affectations et les lots reçus par son centre.
+Actions auditées et limitées au centre.
+Chef d’équipe
+Organiser le travail quotidien, distribuer les tâches et contrôler le retour des fiches.
+Aucun privilège d’administration central par défaut.
+Agent recenseur
+Collecter les données autorisées, associer la référence de campagne et enregistrer les fiches.
+Ne peut pas valider seul l’identité ou attribuer un NIN.
+Agent de contrôle qualité
+Vérifier la complétude, les incohérences et la provenance des dossiers.
+Ne doit pas effacer les traces de collecte.
+Agent de synchronisation
+Superviser les lots transmis et les erreurs techniques.
+Pas de droit métier global nécessaire à la synchronisation.
+Auditeur
+Consulter les journaux, résultats et rapports autorisés.
+Lecture seule et exports limités.
+Service ONIP destinataire
+Réceptionner le transfert et engager le workflow prévu.
+Doit renvoyer un accusé de réception et un résultat exploitable.
+
+2.1 Séparation des tâches
+Il faut pouvoir distinguer au minimum la création d’une campagne, son approbation, l’affectation des agents, la validation qualité des lots et le traitement d’une anomalie. Dans les petites équipes, une même personne peut cumuler certains rôles si la politique l’autorise, mais les actions critiques doivent rester traçables et, lorsque nécessaire, soumises à une validation distincte.
+3. Organisation fonctionnelle du module
+Écran / espace
+Informations principales
+Actions principales
+Tableau de bord des campagnes
+Campagnes actives, dates, objectifs, progression, alertes, synchronisation.
+Filtrer, ouvrir une campagne, accéder aux lots en erreur.
+Liste des campagnes
+Nom, code interne, territoire, période, responsable, état.
+Créer, consulter, modifier selon statut, clôturer.
+Fiche campagne
+Objectifs, zones, équipes, budget ou ressources si autorisés, indicateurs, événements.
+Gérer les affectations et examiner la progression.
+Carte / couverture
+Zones ciblées, zones couvertes, centres, équipes et retards.
+Filtrer et consulter la couverture agrégée.
+Agents et équipes
+Affectations, statut du compte, zone, période et responsable.
+Affecter, retirer, réaffecter, consulter les activités autorisées.
+Coupons et lots
+Séries, plages, distribution, retour, utilisés, annulés et non rapprochés.
+Distribuer, importer, rapprocher et expliquer les écarts.
+Réception des dossiers
+Lots transmis, nombre attendu/reçu/accepté/rejeté/en attente.
+Contrôler, valider la réception technique, mettre en quarantaine.
+Synchronisation
+File d’attente, tentatives, erreurs, dernier envoi et accusés de réception.
+Relancer une opération idempotente et ouvrir un incident.
+Doublons intercampagnes
+Candidats, sources, éléments de rapprochement et état de revue.
+Examiner et orienter vers le workflow ONIP habilité.
+Rapports
+Résultats agrégés par territoire, centre, équipe et période.
+Générer des rapports autorisés et exporter selon permissions.
+
+3.1 Navigation suggérée
+Vue d’ensemble
+Campagnes
+Zones et couverture
+Centres
+Équipes
+Agents
+Coupons et fiches
+Lots et réceptions
+Synchronisation ONIP
+Doublons potentiels
+Anomalies
+Statistiques et rapports
+Historique / audit
+4. Planification et cycle de vie d’une campagne
+4.1 Fiche de campagne
+Champ indicatif
+Description
+Contrôle recommandé
+Identifiant technique
+Clé interne de campagne.
+Unique, stable et non réutilisée.
+Nom / libellé
+Nom métier visible par les opérateurs.
+Obligatoire selon la politique ; longueur limitée.
+Code de campagne
+Référence unique de la campagne.
+Règle de format à définir par l’organisation ; aucune valeur officielle ne doit être supposée.
+Objectif
+But et résultats attendus.
+Texte explicite et traçable.
+Périmètre territorial
+Provinces, territoires, communes, secteurs, villages ou zones ciblées.
+Référentiel géographique versionné.
+Dates
+Début planifié, fin planifiée, dates réelles et jalons.
+Fin cohérente avec le début ; modifications sensibles auditées.
+Responsables
+Coordinateur et responsables habilités.
+Compte actif et permission valide.
+Objectifs quantitatifs
+Cibles de collecte, dossiers ou ménages selon le type de campagne.
+Définition de l’unité de mesure pour éviter les comparaisons trompeuses.
+Statut
+Brouillon, à approuver, planifiée, active, suspendue ou clôturée.
+Transitions contrôlées par rôle.
+Version des formulaires
+Référence du formulaire utilisé sur le terrain.
+Les dossiers conservent la version du formulaire.
+
+4.2 Cycle de vie indicatif
+État proposé
+Sens
+Règle de transition
+BROUILLON
+Paramètres en préparation.
+Modifiable par les responsables autorisés.
+A_APPROUVER
+Prête pour revue.
+Vérifier zone, dates, objectifs, ressources et responsables.
+PLANIFIEE
+Approuvée, pas encore lancée.
+Activation à la date ou sur décision autorisée.
+ACTIVE
+Collecte en cours.
+Agents et lots peuvent être affectés selon la politique.
+SUSPENDUE
+Opérations temporairement arrêtées.
+Motif, auteur et date obligatoire.
+EN_CLOTURE
+Collecte arrêtée, rapprochement final à réaliser.
+Examiner coupons, lots, transferts et incidents.
+CLOTUREE
+Bilan accepté et campagne clôturée.
+Modification uniquement via action administrative exceptionnelle.
+ANNULEE
+Campagne annulée avant ou pendant son exécution.
+Motif, impact sur les lots et information aux équipes.
+
+4.3 Contrôles avant activation
+Un responsable de campagne est désigné et son compte est actif.
+Les territoires et les centres sont renseignés et existent dans le référentiel.
+Les dates, objectifs et indicateurs de mesure sont cohérents.
+Les équipes et agents sont affectés ou le processus de planification le prévoit explicitement.
+Le formulaire et la version de l’application terrain sont approuvés.
+Le mécanisme de transfert et de gestion des erreurs est disponible ou un mode de travail dégradé est autorisé.
+Les consignes de confidentialité et les règles de collecte ont été diffusées aux agents.
+5. Gestion des zones, centres et couverture territoriale
+5.1 Référentiel de zones
+Les zones de campagne doivent être rattachées à un référentiel territorial cohérent : province, ville ou territoire, commune, secteur, chefferie, groupement, quartier, village ou autre niveau retenu officiellement. Le système doit conserver une référence stable de zone et la version du découpage administratif utilisée par la campagne.
+5.2 Couverture
+Définir les zones prévues dans la campagne et leur unité de mesure.
+Distinguer zone planifiée, zone affectée, zone visitée, zone partiellement couverte et zone terminée.
+Calculer les indicateurs de couverture à partir de règles explicites et de données datées.
+Signaler les zones en retard, non affectées ou présentant une quantité anormale de dossiers rejetés.
+Permettre une carte agrégée et des filtres de supervision sans exposer inutilement les adresses individuelles.
+Conserver l’historique des réaffectations et des changements de périmètre.
+5.3 Formule de couverture
+Formule indicative : couverture (%) = unités de terrain effectivement couvertes / unités de terrain planifiées × 100. L’unité doit être définie pour chaque campagne (zone, ménage, quartier, lot ou autre). Le système doit éviter de mélanger des unités différentes dans un même indicateur.
+5.4 Centres
+Chaque centre doit avoir un identifiant technique, un code interne, une localisation administrative, un statut, une zone de responsabilité et les agents responsables. Les affectations temporaires doivent avoir des dates de début et de fin. Un transfert de dossiers entre centres doit laisser une trace de l’expéditeur, du destinataire, du lot et de la date.
+6. Équipes, agents, affectations et supervision
+6.1 Composition d’une équipe
+Une équipe peut comprendre un chef d’équipe, plusieurs agents recenseurs et, selon l’organisation, des opérateurs ou contrôleurs. La structure exacte doit rester configurable plutôt que codée en dur.
+6.2 Affectation
+Attribut d’affectation
+Règle fonctionnelle
+Campagne
+L’agent est affecté à une campagne active ou planifiée selon les droits.
+Zone
+La zone doit être incluse dans le périmètre de la campagne.
+Dates
+L’affectation doit respecter la période et signaler les chevauchements interdits.
+Rôle opérationnel
+Les permissions sont liées au travail assigné ; elles ne remplacent pas le rôle global du compte.
+Responsable
+Toute équipe doit avoir un responsable selon la procédure retenue.
+Statut
+Prévue, active, suspendue, terminée ou révoquée, selon le vocabulaire validé.
+
+6.3 Indicateurs d’activité
+Dossiers commencés, soumis, reçus par le serveur, acceptés techniquement et mis en attente.
+Taux de complétude des fiches et taux de rejet pour erreurs de saisie.
+Nombre de lots transmis, en échec ou nécessitant une reprise.
+Progression par rapport à l’objectif et par rapport au calendrier.
+Répartition des tâches par agent et équipe selon les permissions.
+Ces indicateurs servent à la supervision opérationnelle ; ils ne doivent pas être interprétés isolément comme des mesures de qualité individuelle ou comme une preuve de fraude.
+7. Coupons, fiches, lots et identifiants de collecte
+7.1 Rôle des coupons et références
+Les coupons ou fiches servent à relier la collecte terrain à une campagne, une zone, un ménage ou un dossier selon le dispositif retenu. Leur format, leur contenu et leur numérotation doivent être définis par l’organisation compétente. Le développeur ne doit pas inventer un format présenté comme officiel.
+7.2 Données de suivi d’un coupon
+Champ
+Finalité
+Identifiant interne
+Clé technique stable.
+Référence imprimée ou scannée
+Recherche et rapprochement si un code externe est prévu.
+Campagne et zone
+Contexte de collecte.
+Lot de distribution
+Série d’origine et responsable du lot.
+Statut
+Préparé, distribué, utilisé, annulé, perdu, retourné ou à rapprocher — à valider.
+Agent / équipe
+Responsable de l’utilisation selon les règles.
+Horodatages
+Distribution, collecte, réception et clôture.
+Motif d’écart
+Explication si le coupon est inutilisé, perdu, dupliqué ou annulé.
+
+7.3 Lots de fiches
+Un lot identifie un ensemble cohérent de dossiers transmis ou remis entre deux étapes.
+Le lot doit avoir un manifeste indiquant le nombre attendu, les références des éléments et la campagne source.
+Le récepteur vérifie les totaux et signale les éléments absents, dupliqués ou non conformes.
+Un lot partiellement accepté doit permettre de traiter les éléments acceptés et de mettre les autres en quarantaine, selon le contrat de transfert.
+Le retrait ou la correction d’un lot doit garder l’historique et les raisons.
+7.4 Rapprochement de clôture
+À la clôture d’une campagne, le système compare les coupons distribués, utilisés, retournés, annulés et non rapprochés. Les différences doivent être expliquées. Les règles exactes de rapprochement dépendent du support de collecte et de la procédure approuvée.
+8. Collecte terrain et qualité des données
+8.1 Principes de collecte
+Afficher aux agents le formulaire correspondant à la bonne campagne et à sa version.
+Identifier clairement les champs obligatoires selon la règle officiellement approuvée.
+Préserver la source de chaque dossier et le contexte de collecte.
+Permettre l’enregistrement temporaire lorsque le réseau n’est pas disponible, si le mode hors connexion est autorisé.
+Afficher les erreurs de manière compréhensible sans révéler de données d’autres personnes.
+Ne pas marquer une donnée comme vérifiée si elle n’a pas été contrôlée selon la procédure définie.
+8.2 Contrôles de qualité
+Contrôle
+Exemple
+Action attendue
+Complétude
+Un champ requis dans ce parcours n’est pas renseigné.
+Bloquer la soumission ou placer le dossier en attente selon la règle.
+Format
+Date invalide ou référence mal formée.
+Afficher une erreur localisée et conserver le brouillon.
+Cohérence
+Même identifiant de collecte utilisé deux fois.
+Mettre en conflit et examiner l’origine.
+Provenance
+Campagne, agent ou zone absente.
+Placer le dossier en quarantaine ou demander un complément.
+Doublon potentiel
+Données similaires à un dossier existant.
+Orienter vers le rapprochement sans fusion automatique.
+Version du formulaire
+Dossier collecté avec une version obsolète.
+Appliquer une règle de compatibilité ou demander une mise à jour.
+Données hors périmètre
+Agent opérant dans une zone non assignée.
+Refuser ou signaler selon les permissions.
+
+8.3 Correction sur le terrain
+Lorsqu’une erreur est détectée, il faut distinguer une correction avant soumission d’une rectification d’un dossier déjà transmis ou validé. La correction terrain doit créer une version ou un événement de mise à jour identifiable ; elle ne doit pas écraser silencieusement les valeurs déjà reçues par ONIP.
+9. Transmission terrain vers ONIP et synchronisation
+9.1 Objectif du transfert
+Le transfert envoie les données de recensement vers le circuit ONIP prévu. Il doit assurer la traçabilité du dossier depuis l’appareil ou le système source jusqu’à la réception par l’API ou le service destinataire. Si `onipSync` est le mécanisme déjà utilisé dans le dépôt, il faut l’auditer et l’étendre plutôt que créer un connecteur parallèle.
+9.2 Cycle technique indicatif
+La collecte attribue une référence stable à l’événement ou au dossier terrain.
+Le système prépare le lot et valide les éléments requis avant envoi.
+L’élément passe à un état « prêt à synchroniser ».
+Le client envoie la demande sécurisée avec la référence source et une clé d’idempotence.
+Le service destinataire vérifie l’authenticité, les autorisations, la structure et les doublons de transmission.
+Le destinataire renvoie un accusé de réception avec un identifiant de traitement et un résultat.
+Le système source enregistre le résultat : accepté, accepté partiellement, en attente, rejeté ou erreur technique.
+Les erreurs temporaires sont réessayées selon une stratégie contrôlée ; les erreurs métier sont envoyées à une file de résolution.
+9.3 États de synchronisation proposés
+État
+Signification
+Traitement
+LOCAL
+Dossier créé sur l’appareil ou la source.
+Attendre l’envoi.
+READY
+Données prêtes et contrôles locaux réussis.
+Autoriser la transmission.
+SENDING
+Envoi en cours.
+Éviter plusieurs envois concurrents.
+RECEIVED
+Le serveur a accusé réception technique.
+Attendre le résultat métier si distinct.
+PROCESSING
+Réception enregistrée, traitement métier en cours.
+Afficher l’état et suivre le délai.
+ACCEPTED
+Dossier reçu selon les règles prévues.
+Enregistrer la référence côté ONIP.
+PARTIAL
+Certains éléments d’un lot ont été acceptés et d’autres non.
+Afficher les éléments par état.
+REJECTED
+Rejet métier ou structurel.
+Motif exploitable et possibilité de correction autorisée.
+RETRY
+Erreur temporaire pouvant être réessayée.
+Backoff et limites de tentatives.
+QUARANTINED
+Besoin de contrôle manuel ou incohérence.
+Bloquer le traitement automatique jusqu’à décision.
+
+9.4 Idempotence et prévention des doubles traitements
+Chaque événement transmis possède une référence stable unique côté source.
+La clé d’idempotence reste identique lors des nouvelles tentatives d’une même opération.
+Le destinataire garde la trace des événements déjà traités et renvoie un résultat cohérent en cas de répétition.
+Un timeout réseau ne doit pas provoquer la création d’un deuxième dossier si la première requête a été traitée.
+Les erreurs métier ne doivent pas être relancées automatiquement indéfiniment.
+Les relances manuelles doivent être réservées aux rôles autorisés et journalisées.
+9.5 Séparation du workflow ONIP et de l’état civil
+Le résultat du transfert d’une fiche de recensement doit alimenter le circuit d’identification prévu dans ONIP. Il ne doit pas être traité automatiquement comme un acte de naissance, de mariage, de divorce ou de décès. Si le dossier contient une référence d’état civil, celle-ci est une information à contrôler ; la validation de l’acte reste dans le workflow de l’autorité source compétente.
+10. Contrôle des dossiers reçus et traitement des exceptions
+Cas
+Réponse attendue
+Ce qu’il ne faut pas faire
+Dossier valide techniquement
+Accuser réception et lancer le workflow métier prévu.
+Considérer la réception technique comme une validation définitive d’identité.
+Champ requis manquant
+Retourner un motif précis et placer en attente si le processus le permet.
+Rejeter sans expliquer ni perdre la référence source.
+Référence source déjà connue
+Retourner le résultat du premier traitement ou un conflit explicite.
+Créer un second dossier.
+Zone ou agent non autorisé
+Refuser l’opération et journaliser la tentative.
+Accepter une collecte hors périmètre sans contrôle.
+Format ou version inconnue
+Mettre en quarantaine ou rejeter selon le contrat.
+Interpréter silencieusement les champs avec un mapping incertain.
+Doublon potentiel
+Créer une tâche de rapprochement ONIP.
+Fusionner automatiquement.
+Service indisponible
+Conserver l’élément à réessayer avec état observable.
+Supprimer la file ou perdre le dossier.
+Conflit avec données existantes
+Créer une exception avec sources et valeurs comparées.
+Écraser la valeur existante sans décision.
+
+10.1 File d’exceptions
+La file d’exceptions doit permettre de filtrer par campagne, gravité, ancienneté, type d’erreur, zone, centre et statut. Chaque exception possède un responsable, une échéance si elle est définie, un commentaire de résolution, une date de clôture et un historique. Les incidents de sécurité doivent pouvoir être séparés des simples erreurs de qualité.
+11. Détection des doublons intercampagnes
+11.1 Finalité
+Le module doit repérer les cas où des dossiers provenant de campagnes différentes peuvent représenter la même personne, la même collecte répétée ou un coupon réutilisé. Il faut distinguer le doublon de transmission, le doublon de fiche et le possible doublon d’identité.
+11.2 Types de doublons
+Type
+Exemple
+Traitement recommandé
+Doublon technique
+Même événement source transmis deux fois.
+Résoudre par idempotence ; ne pas créer un nouveau dossier.
+Doublon de coupon
+Même référence de coupon associée à plusieurs collectes.
+Bloquer ou mettre en revue selon les règles approuvées.
+Fiche répétée
+Même personne collectée dans deux campagnes.
+Rapprochement biographique et, si autorisé, biométrique.
+Doublon potentiel d’identité
+Deux dossiers semblent correspondre à la même personne.
+Transmettre au service de déduplication et à une revue humaine.
+Faux positif
+Deux personnes différentes ont des données similaires.
+Documenter la décision de séparation ; ne pas fusionner.
+
+11.3 Flux de traitement
+Comparer les références source pour identifier les répétitions strictement techniques.
+Comparer les critères biographiques autorisés pour trouver des candidats potentiels.
+Utiliser le service biométrique dédié uniquement lorsqu’il est autorisé et disponible.
+Classer les candidats selon le processus de revue prévu ; les scores ne constituent pas une décision finale.
+Faire examiner le dossier par une personne habilitée et conserver les preuves utiles.
+Transmettre la décision au système source et synchroniser le statut sans écraser l’historique.
+11.4 Indicateurs associés
+Nombre de répétitions techniques éliminées par idempotence.
+Nombre de fiches candidates à un rapprochement.
+Nombre de cas examinés, confirmés distincts ou soumis à fusion contrôlée.
+Délai moyen de résolution des cas en attente.
+Taux de faux positifs mesuré sur les cas effectivement évalués, si les données d’évaluation sont fiables.
+12. Statistiques et rapports de campagne
+Indicateur
+Définition indicative
+Précaution
+Objectif de collecte
+Cible définie au niveau campagne ou zone.
+Préciser l’unité : personnes, ménages, fiches ou zones.
+Dossiers collectés
+Fiches enregistrées à la source terrain.
+Peut inclure des brouillons selon le compteur affiché ; définir le périmètre.
+Dossiers soumis
+Fiches présentées pour transfert ou contrôle.
+Distinguer du nombre reçu par ONIP.
+Dossiers reçus par ONIP
+Éléments dont la réception est confirmée côté serveur.
+Une réception technique ne signifie pas validation métier.
+Dossiers acceptés
+Éléments acceptés selon le stade explicitement indiqué.
+Toujours afficher le niveau d’acceptation.
+Dossiers en exception
+Éléments en attente, incomplets, rejetés ou à examiner.
+Ventiler par type et ancienneté.
+Taux de synchronisation
+Dossiers envoyés avec résultat confirmé / dossiers prêts ou envoyés, selon définition retenue.
+La formule doit être visible et stable.
+Couverture territoriale
+Unités effectivement couvertes / unités planifiées.
+Comparer la même unité de mesure.
+Taux de complétude
+Fiches satisfaisant les contrôles de complétude / fiches évaluées.
+Nommer la règle de complétude utilisée.
+Taux d’erreur
+Fiches rejetées pour erreur / fiches examinées.
+Distinguer les erreurs techniques et métier.
+Lots en retard
+Lots non reçus ou non rapprochés au-delà du délai défini.
+Le seuil doit être paramétré et approuvé.
+Doublons potentiels
+Candidats encore en revue.
+Ce n’est pas le nombre de fraudes confirmées.
+
+12.1 Filtres
+Période planifiée, date de collecte, date d’envoi, date de réception ou date de traitement.
+Campagne, statut et version du formulaire.
+Province, territoire, commune, secteur, groupement ou zone de campagne.
+Centre, équipe, agent et superviseur selon les permissions.
+État de synchronisation, type d’exception, lot et statut de rapprochement.
+12.2 Export et diffusion
+Les rapports doivent afficher leur date de génération, période couverte, filtres appliqués, définition des indicateurs et source de données. Les exports nominatifs sont désactivés par défaut pour les profils qui n’en ont pas besoin ; les rapports agrégés sont préférés pour la supervision générale.
+13. Modèle de données indicatif
+Les noms ci-dessous sont proposés uniquement pour faciliter la discussion technique. Avant toute création ou modification, l’agent développeur doit inventorier les schémas et réutiliser les tables, services et événements déjà présents.
+Entité/table indicative
+Responsabilité
+Contrôles
+campaigns
+Paramètres, période, périmètre, objectif, état et responsable.
+Statuts contrôlés, versions et dates.
+campaign_areas
+Lien entre campagne et zones géographiques.
+Clés uniques et version du référentiel.
+campaign_assignments
+Affectation des agents, équipes, centres et périodes.
+Périmètre et conflits de dates.
+teams
+Composition et responsable d’équipe.
+Membres actifs et affectations datées.
+campaign_coupons
+Référence, lot, campagne, statut et usage.
+Unicité de référence selon la règle retenue.
+collection_batches
+Lots de données ou fiches transmis.
+Manifeste, totaux, provenance et statut.
+field_records
+Référence de collecte et lien vers le dossier terrain.
+Identifiant source stable et version.
+sync_jobs
+Tâches et résultats de synchronisation.
+Idempotence, tentatives, erreurs et accusés.
+sync_events
+Événements entrants/sortants et résultats techniques.
+Ne pas loguer les données sensibles en clair.
+quality_reviews
+Contrôles, exceptions et décisions de qualité.
+Historique, rôle et motif.
+duplicate_candidates
+Paires ou groupes de fiches à examiner.
+Aucun état de candidat ne vaut décision finale.
+campaign_metrics
+Indicateurs agrégés si nécessaire.
+Méthode de calcul et date de rafraîchissement.
+administrative_areas
+Référentiel territorial utilisé par les campagnes.
+Version et dates d’effet.
+audit_events
+Actions sensibles et résultats.
+Protection contre l’altération et contrôle d’accès.
+
+13.1 Relations et invariants
+Une campagne peut cibler plusieurs zones et avoir plusieurs affectations.
+Une affectation relie un agent ou une équipe à une campagne et à une période déterminée.
+Un lot référence sa campagne source et conserve les identifiants des éléments qu’il contient.
+Une tâche de synchronisation est liée à une référence source stable et à son résultat côté destinataire.
+Un dossier collecté peut être lié à un dossier ONIP sans que la collecte ne devienne l’identité de référence.
+Les candidats de doublons doivent conserver les références des dossiers concernés, leur source et l’état de la revue.
+14. API et intégrations
+Les routes suivantes sont conceptuelles et ne sont pas des routes confirmées du dépôt. Il faut inventorier les endpoints existants, notamment les mécanismes de recensement et `onipSync`, avant de définir ou modifier le contrat.
+Domaine
+Exemple conceptuel
+Garde-fous attendus
+Campagnes
+GET/POST/PATCH /api/v1/campaigns
+Rôles, transitions de statut et audit.
+Zones
+/api/v1/campaigns/{id}/areas
+Référentiel territorial et permissions de périmètre.
+Affectations
+/api/v1/campaigns/{id}/assignments
+Compte actif, dates et absence de conflit interdit.
+Coupons / lots
+/api/v1/campaigns/{id}/batches
+Références uniques, manifeste et rapprochement.
+Transfert terrain
+Endpoint ou événement existant de transfert vers ONIP
+Clé d’idempotence, source, version et accusé de réception.
+État de synchronisation
+GET /api/v1/sync-jobs/{id}
+Vérifier le périmètre et ne pas exposer les charges utiles sensibles.
+Anomalies
+/api/v1/campaign-exceptions
+Assignation, motif, statut et historique.
+Rapports
+/api/v1/campaign-reports
+Filtres autorisés, agrégation et export contrôlé.
+Doublons
+/api/v1/duplicate-candidates
+Accès au minimum d’informations et décision humaine.
+
+14.1 Contrat d’un événement de transfert
+Un événement de transfert peut contenir, selon le contrat déjà en place : une référence d’événement source, l’identifiant de la campagne, la version du formulaire, la référence de lot, les horodatages, l’acteur ou l’appareil autorisé et la charge utile autorisée. Il ne doit inclure que les données nécessaires au traitement.
+14.2 Réponse côté destinataire
+La réponse devrait distinguer l’accusé technique de réception et la décision métier. Exemple conceptuel : référence de corrélation, état de réception, statut de traitement, code de résultat et motif exploitable. Ne pas utiliser une simple réponse HTTP de succès comme preuve que l’identité est définitivement validée.
+14.3 Compatibilité
+Conserver la compatibilité des endpoints et contrats utilisés par l’application terrain.
+Versionner les formulaires et les messages échangés.
+Ne pas faire de migration API destructive sans stratégie de transition.
+Journaliser les versions du client, du formulaire et du schéma reçus.
+Prévoir des tests d’intégration automatiques pour chaque changement de contrat.
+15. Sécurité, confidentialité et fonctionnement hors connexion
+15.1 Sécurité d’accès
+Authentifier les agents et vérifier leur affectation à la campagne, la zone et la période.
+Protéger les endpoints côté serveur, pas uniquement par des contrôles visuels dans l’interface.
+Limiter les accès nominatifs aux rôles ayant besoin de traiter une fiche précise.
+Exiger une autorisation distincte pour les exports et les relances manuelles de synchronisation.
+Tracer les changements de campagne, les réaffectations, les annulations de coupon et les résolutions de doublons.
+15.2 Protection des appareils et de la collecte locale
+Stocker localement uniquement les informations nécessaires et autorisées.
+Utiliser le chiffrement local lorsqu’il est disponible et requis par la politique retenue.
+Prévoir la gestion des appareils perdus, révoqués ou compromis.
+Verrouiller la session et protéger l’accès aux données sur un appareil partagé.
+Purger les données temporaires après confirmation de synchronisation selon une règle de conservation approuvée.
+Ne jamais considérer l’effacement local comme un remplacement des sauvegardes et du traitement côté serveur.
+15.3 Synchronisation hors connexion
+En mode hors connexion, chaque dossier et événement doit recevoir une référence locale stable. La synchronisation doit gérer les transmissions interrompues, les lots partiellement acceptés, les erreurs temporaires et les conflits. L’application doit rendre visible l’état de chaque élément et ne pas présenter comme reçu par ONIP un dossier qui reste uniquement sur l’appareil.
+15.4 Journalisation
+Les journaux doivent conserver l’acteur, la campagne, la référence de l’événement, la date, l’opération et le résultat. Ils ne doivent pas enregistrer inutilement l’intégralité des fiches, des documents ou des données biométriques. L’accès aux logs est limité et les opérations administratives sont elles-mêmes auditées.
+16. Interfaces et navigation
+16.1 Tableau de bord de campagne
+La page d’ensemble doit montrer les campagnes par état, la progression, les dossiers collectés et transmis, les lots en erreur, les zones en retard et les alertes. Chaque indicateur doit préciser sa définition et sa date de mise à jour.
+16.2 Fiche de campagne
+Résumé : objectifs, période, zones, responsable et statut.
+Progression : objectifs versus dossiers collectés, soumis et reçus.
+Équipes : affectations et activité agrégée.
+Lots : volumes, états et écarts de rapprochement.
+Synchronisation : file d’attente, erreurs, tentatives et reçus.
+Qualité : fiches incomplètes, rejets, candidats de doublons et incidents.
+Journal : historique des modifications de paramètres et décisions.
+16.3 Ergonomie terrain
+Formulaires adaptés au téléphone, commandes lisibles et progression visible.
+Indication claire des champs requis, des erreurs et de l’état de sauvegarde.
+Possibilité de reprendre un brouillon sans recommencer la collecte.
+Indicateur précis de la connexion et du nombre d’éléments en attente de synchronisation.
+Confirmation avant annulation de coupon, suppression temporaire ou clôture de lot.
+Message explicite quand une opération nécessite une connexion ou une décision centrale.
+17. Scénarios métier détaillés
+Scénario A — Lancement d’une campagne
+Un coordinateur autorisé crée la campagne en brouillon.
+Il choisit la période, les zones, les objectifs, les formulaires et les responsables.
+Le validateur examine les paramètres et approuve ou renvoie la campagne pour correction.
+Les équipes sont affectées et les lots/coupons sont enregistrés ou distribués selon la procédure.
+La campagne est activée ; le journal conserve l’auteur, la date et la version des paramètres.
+Scénario B — Collecte terrain sans réseau
+L’agent connecté à son compte ouvre la campagne et la zone affectée.
+Il collecte les données et sauvegarde le dossier local avec une référence stable.
+L’application indique que le dossier est local et non encore reçu par ONIP.
+Le réseau revient ; la file de synchronisation prépare et envoie l’événement.
+Le serveur renvoie l’accusé de réception et le résultat ; l’agent voit l’état actualisé.
+Scénario C — Lot partiellement rejeté
+Le serveur réceptionne un lot et contrôle chaque élément.
+Les éléments conformes sont acceptés au stade technique prévu ; les autres reçoivent un motif.
+Le système conserve le manifeste initial et la liste des résultats par élément.
+Le responsable du centre examine les erreurs et assigne les corrections.
+Seuls les éléments concernés sont renvoyés, avec les références d’idempotence appropriées.
+Scénario D — Dossier présent dans deux campagnes
+Une nouvelle fiche correspond à un dossier déjà reçu d’une autre campagne.
+Le système distingue la répétition technique d’une possible identité commune.
+Le dossier est mis en revue et les sources des deux campagnes sont visibles aux agents autorisés.
+Un responsable habilité décide de la suite selon la procédure ONIP ; aucune fusion automatique n’est appliquée.
+La décision est retournée aux systèmes concernés et inscrite dans l’audit.
+Scénario E — Clôture
+Le responsable passe la campagne en état de clôture.
+Le système rapproche les coupons, lots, fiches, accusés, exceptions et transferts en attente.
+Les anomalies non résolues sont listées et doivent être justifiées ou transférées à un responsable.
+Le rapport final indique les unités de mesure, la période, les filtres et les chiffres consolidés.
+La campagne est clôturée par une personne habilitée ; les modifications ultérieures sont contrôlées.
+18. Tests et critères d’acceptation
+Catégorie
+Test
+Résultat attendu
+Campagne
+Créer une campagne avec des dates incohérentes.
+Refus ou erreur clairement expliquée.
+Permissions
+Un agent non affecté tente d’ouvrir une zone.
+Accès refusé côté serveur et trace selon la politique.
+Affectations
+Affecter le même agent à des tâches incompatibles.
+Alerte ou blocage selon les règles validées.
+Coupons
+Utiliser deux fois une même référence.
+Doublon détecté et traité sans écrasement.
+Lots
+Transmettre un lot avec un élément absent.
+Écart détecté et rapproché.
+Synchronisation
+Renvoyer le même événement après un timeout.
+Pas de double création ; résultat cohérent renvoyé.
+Hors connexion
+Couper le réseau pendant un envoi.
+Données conservées et état mis à jour après reprise.
+Réception
+Simuler un lot partiellement accepté.
+Résultat par élément et correction ciblée.
+État civil
+Transmettre une fiche de recensement avec une référence d’acte.
+La fiche n’est pas transformée automatiquement en acte d’état civil.
+Doublons
+Créer deux fiches similaires dans deux campagnes.
+Candidat de revue, aucune fusion automatique.
+Statistiques
+Comparer les compteurs à des requêtes de référence.
+Formules cohérentes, filtres respectés et dates affichées.
+Sécurité
+Consulter un export ou un journal sans permission.
+Refus et absence de fuite des données.
+Non-régression
+Exécuter les parcours déjà opérationnels.
+Les flux existants restent fonctionnels.
+
+18.1 Critères d’acceptation
+☐ Les campagnes possèdent un cycle de vie et des transitions contrôlées.
+☐ Les zones, centres, équipes et agents sont rattachés à la campagne et aux périodes correctes.
+☐ Les coupons et lots peuvent être suivis de la distribution jusqu’au rapprochement final.
+☐ La collecte terrain conserve un identifiant source stable et la version du formulaire.
+☐ Le transfert vers ONIP enregistre les accusés, les erreurs et les tentatives.
+☐ Les transferts répétés sont idempotents et ne créent pas de dossiers en double.
+☐ Les dossiers incomplets et les exceptions ont un motif, un responsable et un état observable.
+☐ Les doublons intercampagnes sont soumis à une revue plutôt qu’à une fusion automatique.
+☐ Les statistiques ont des formules définies et distinguent collecté, envoyé, reçu et validé.
+☐ Les tests de sécurité, d’intégration et de non-régression passent avant le déploiement.
+19. Plan de développement progressif
+Phase 1 — Audit de l’existant
+Cartographier les pages, routes, modèles, tables, applications terrain, synchronisations et statistiques. Inspecter en priorité le mécanisme `onipSync` s’il existe dans le dépôt. Ne pas modifier le contrat avant de l’avoir compris.
+Livrable : rapport d’audit et diagramme du flux réel.
+Phase 2 — Campagnes et affectations
+Vérifier la création, le cycle de vie, les zones, centres, équipes et agents. Compléter les permissions et l’historique.
+Livrable : parcours de planification et d’activation testé.
+Phase 3 — Coupons, fiches et lots
+Stabiliser les références de collecte, la distribution et le rapprochement des éléments.
+Livrable : suivi traçable des coupons et lots.
+Phase 4 — Qualité et exceptions
+Mettre en place les contrôles de complétude, provenance, version, erreurs et tâches d’exception.
+Livrable : file d’exceptions et tests.
+Phase 5 — Synchronisation ONIP
+Rendre le transfert observable, idempotent, sécurisé et résilient aux coupures.
+Livrable : tests de reprise, timeout, répétition et accusés.
+Phase 6 — Doublons intercampagnes
+Relier les candidats au service de rapprochement autorisé, sans fusion automatique.
+Livrable : workflow de revue et journal des décisions.
+Phase 7 — Statistiques et carte
+Vérifier les formules, filtres, agrégations et droits territoriaux.
+Livrable : rapports réconciliés avec les données sources.
+Phase 8 — Recette et pilote
+Tester avec des données fictives ou autorisées et documenter les risques résiduels.
+Livrable : rapport de recette avant mise en production.
+20. Prompt complet pour l’agent développeur
+Tu interviens sur le projet existant SIGPOP-RDC, module ONIP, particulièrement le Module 4 — Recensement et campagnes. Tu dois auditer puis compléter progressivement le système existant.OBJECTIFFiabiliser la planification des campagnes, les affectations, les coupons et lots, la collecte terrain, la qualité des données, le transfert vers ONIP, la synchronisation, les doublons intercampagnes et les statistiques. Ne réécris pas globalement l’application.RÈGLES ABSOLUES1. Commence par inspecter le dépôt, les README, les routes frontend et API, les modèles, les migrations, les tests, l’application terrain et les traitements de synchronisation.2. Repère et documente le flux réel de transfert terrain vers ONIP. Vérifie notamment si `onipSync` est présent et où il est appelé ; ne suppose pas sa structure sans preuve.3. Ne casse pas le contrat de transfert actuellement utilisé par les applications existantes. Toute évolution doit être rétrocompatible ou disposer d’un plan de migration.4. Ne supprime ni table, ni donnée, ni route ni fonctionnalité sans justification, sauvegarde et plan de retour arrière.5. Distingue ce que tu as observé dans le code, les hypothèses et les propositions.6. Ne transforme pas une fiche de recensement en acte d’état civil. Le recensement et l’état civil doivent conserver leurs workflows distincts.7. Ne considère pas une collecte comme une identité validée et n’attribue jamais un NIN à partir du seul fait qu’un formulaire a été transmis.8. Chaque événement de transfert doit avoir une référence stable et être idempotent. Une répétition ou un timeout ne doit pas créer deux dossiers.9. Les dossiers incomplets, incohérents ou potentiellement dupliqués doivent passer par des statuts et files de revue explicites.10. Aucune fusion automatique de dossiers ou déclaration automatique de fraude sur la seule base d’une similarité.11. Protège les données personnelles et les journaux ; n’inscris pas de fiches complètes ni de secrets en clair dans les logs.12. Utilise des données fictives ou anonymisées dans les tests.PHASE A — AUDIT- Cartographie les écrans, routes, modèles, tables, migrations et connecteurs liés aux campagnes.- Examine création/activation/clôture des campagnes, zones, centres, équipes, agents, coupons, lots, contrôle qualité, transferts, exceptions et rapports.- Inspecte le mécanisme `onipSync` s’il existe, son payload, ses états, les accusés de réception, ses erreurs et ses mécanismes de reprise.- Repère les problèmes d’idempotence, de concurrence, d’authentification, de permissions et de provenance.- Exécute les tests existants et rapporte les résultats exacts.- Fournis d’abord un tableau d’audit avec preuves, fichiers et endpoints.PHASE B — CAMPAGNES ET AFFECTATIONS- Vérifie les statuts et transitions de campagne.- Vérifie le rattachement des zones au référentiel territorial et les affectations datées.- Contrôle que les agents ne peuvent agir que dans leur périmètre.- Historise les changements de période, périmètre, responsable et statut.PHASE C — COUPONS, LOTS ET QUALITÉ- Vérifie les identifiants et l’unicité des coupons, fiches et événements source.- Assure le rapprochement des lots et la détection des éléments absents ou répétés.- Gère les dossiers incomplets, les erreurs de format, les versions de formulaire inconnues et les références de provenance manquantes.- Ne crée pas de format de coupon présenté comme officiel sans spécification approuvée.PHASE D — SYNCHRONISATION VERS ONIP- Réutilise les contrats et mécanismes existants lorsqu’ils sont corrects.- Ajoute ou complète l’idempotence, la gestion des tentatives, les timeouts, les accusés, les résultats partiels et les files d’exception.- Distingue l’accusé technique de réception de la décision métier.- N’envoie que les champs nécessaires et documente les versions de schéma.- Vérifie qu’un transfert répété ne crée aucune identité ou opération en double.PHASE E — DOUBLONS ET RAPPORTS- Distingue doublon technique, coupon réutilisé, fiche répétée et possible doublon d’identité.- Oriente les candidats vers le workflow de revue autorisé ; ne fusionne pas automatiquement.- Vérifie les formules, filtres et définitions des KPI.- Distingue collecté, soumis, reçu, accepté et validé dans tous les écrans et exports.PHASE F — TESTS ET LIVRAISON- Ajoute les tests unitaires, intégration, API, permissions, concurrence, idempotence, reprise réseau et non-régression.- Exécute les tests, le lint et le build réellement disponibles ; rapporte les commandes et résultats exacts.- Indique les fichiers modifiés, migrations, compatibilité des clients, risques résiduels et retour arrière.- Aucun déploiement en production et aucune opération destructive sans autorisation explicite.LIVRABLE INITIAL OBLIGATOIRETableau comportant : fonction, statut réel, preuve, fichiers/endpoints/tables concernés, problème, risque, correction proposée, priorité et tests nécessaires. Attends la validation de cet audit avant les changements structurels.
+21. Limites et validations requises
+Les règles officielles de campagne, les responsabilités exactes et les habilitations doivent être confirmées par l’institution.
+Les niveaux territoriaux, le référentiel géographique et les définitions de couverture doivent être approuvés.
+Le format et la numérotation des coupons ou fiches ne doivent pas être inventés.
+Le contrat API, les champs réellement envoyés et la structure de `onipSync` doivent être lus dans le dépôt.
+La politique hors connexion, la durée de conservation locale et les conditions d’effacement doivent être validées.
+Les formules de statistiques doivent définir les unités et les étapes exactes : collecté, soumis, reçu, accepté et validé.
+Les règles de rapprochement biométrique et la procédure de décision doivent rester sous la responsabilité des services habilités.
+Conclusion
+Le Module 4 doit donner une chaîne de traçabilité continue entre la planification d’une campagne, l’agent terrain, la zone, le coupon ou lot, la fiche collectée, la synchronisation et le résultat de réception côté ONIP. Il doit permettre de mesurer la progression tout en préservant la qualité des données et les responsabilités de chaque service.
+La priorité de développement est d’auditer d’abord les flux existants, en particulier le transfert terrain vers ONIP et le mécanisme `onipSync`, puis de renforcer l’idempotence, la gestion des erreurs, les affectations et le rapprochement des lots. Le succès se mesure à la fiabilité et à la traçabilité des opérations, et non uniquement au nombre de fonctionnalités visibles.

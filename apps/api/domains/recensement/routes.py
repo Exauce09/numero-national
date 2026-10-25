@@ -41,6 +41,7 @@ from apps.api.domains.recensement.schemas import (
     PromoteResult,
     RecordRejectRequest,
     RecordReviewRequest,
+    SyncBatchOut,
     SyncPullRequest,
     SyncPullResponse,
     SyncPushRequest,
@@ -58,6 +59,14 @@ router = APIRouter(prefix="/census", tags=["census"])
 async def enrollment_status_catalog() -> dict:
     """Statuts d'enrôlement alignés plan ONIP ↔ CensusRecordStatus (pas de tables dupliquées)."""
     from apps.api.domains.recensement.enrollment_status import enrollment_status_catalog as catalog
+
+    return catalog()
+
+
+@router.get("/campaign-status-catalog")
+async def campaign_status_catalog() -> dict:
+    """Module 4 — cycle de vie campagne (DRAFT/ACTIVE/PAUSED/CLOSED)."""
+    from apps.api.domains.recensement.campaign_lifecycle import campaign_status_catalog as catalog
 
     return catalog()
 
@@ -99,7 +108,15 @@ async def update_campaign(
     campaign = await service.get_campaign(db, campaign_id)
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
-    return await service.update_campaign(db, campaign, body)  # type: ignore[return-value]
+    try:
+        return await service.update_campaign(db, campaign, body)  # type: ignore[return-value]
+    except ValueError as exc:
+        if str(exc) == "invalid_campaign_transition":
+            raise HTTPException(
+                status_code=409,
+                detail=f"Transition de statut campagne interdite depuis {campaign.status}",
+            ) from exc
+        raise
 
 
 @router.delete(
@@ -188,6 +205,23 @@ async def list_assignments(
     return await service.list_team_assignments(db, team_id)  # type: ignore[return-value]
 
 
+@router.post(
+    "/assignments/{assignment_id}/deactivate",
+    response_model=AssignmentOut,
+    dependencies=[Depends(require_permissions(PERM_CENSUS_MANAGE))],
+    summary="Retirer / désactiver une affectation agent (Module 4)",
+)
+async def deactivate_assignment(
+    assignment_id: uuid.UUID, db: AsyncSession = Depends(get_db)
+) -> AssignmentOut:
+    try:
+        return await service.deactivate_assignment(db, assignment_id)  # type: ignore[return-value]
+    except ValueError as exc:
+        if str(exc) == "assignment_not_found":
+            raise HTTPException(status_code=404, detail="Assignment not found") from exc
+        raise
+
+
 @router.get(
     "/agents/me/assignments",
     response_model=list[MyAssignmentOut],
@@ -207,7 +241,18 @@ async def register_device(body: DeviceRegister, db: AsyncSession = Depends(get_d
 
 @router.post("/sync/push", response_model=SyncPushResult)
 async def sync_push(body: SyncPushRequest, db: AsyncSession = Depends(get_db)) -> SyncPushResult:
-    return await service.sync_push(db, body)
+    try:
+        return await service.sync_push(db, body)
+    except ValueError as exc:
+        code = str(exc)
+        if code == "campaign_not_found":
+            raise HTTPException(status_code=404, detail="Campaign not found") from exc
+        if code == "campaign_not_active":
+            raise HTTPException(
+                status_code=409,
+                detail="Sync refusée : campagne non ACTIVE (PAUSED/CLOSED/DRAFT)",
+            ) from exc
+        raise
 
 
 @router.post("/sync/pull", response_model=SyncPullResponse)
@@ -261,6 +306,39 @@ async def get_campaign_stats(
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
     return await service.campaign_stats(db, campaign_id)
+
+
+@router.get(
+    "/campaigns/{campaign_id}/sync-batches",
+    response_model=list[SyncBatchOut],
+    dependencies=[Depends(require_permissions(PERM_CENSUS_MANAGE))],
+    summary="Lots de synchronisation d'une campagne (Module 4)",
+)
+async def list_campaign_sync_batches(
+    campaign_id: uuid.UUID,
+    limit: int = Query(default=50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+) -> list[SyncBatchOut]:
+    campaign = await service.get_campaign(db, campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    rows = await service.list_campaign_sync_batches(db, campaign_id, limit=limit)
+    return [
+        SyncBatchOut(
+            id=b.id,
+            device_id=b.device_id,
+            agent_user_id=b.agent_user_id,
+            direction=b.direction,
+            status=b.status.value if hasattr(b.status, "value") else str(b.status),
+            item_count=b.item_count,
+            accepted_count=b.accepted_count,
+            conflict_count=b.conflict_count,
+            payload_summary=b.payload_summary,
+            created_at=b.created_at,
+            completed_at=b.completed_at,
+        )
+        for b in rows
+    ]
 
 
 @router.get(

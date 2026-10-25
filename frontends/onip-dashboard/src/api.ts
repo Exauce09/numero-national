@@ -61,6 +61,9 @@ export type Campaign = {
   name: string;
   status: string;
   description?: string | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  created_at?: string;
 };
 
 export type Zone = {
@@ -115,6 +118,27 @@ export type CampaignStats = {
   promoted: number;
   conflicts: number;
   pending_review: number;
+  zones_count?: number;
+  teams_count?: number;
+  zones_with_records?: number;
+  coverage_percent?: number | null;
+  coupons_count?: number;
+  sync_batches_recent?: number;
+  sync_errors_recent?: number;
+};
+
+export type SyncBatch = {
+  id: string;
+  device_id?: string | null;
+  agent_user_id?: string | null;
+  direction: string;
+  status: string;
+  item_count: number;
+  accepted_count: number;
+  conflict_count: number;
+  payload_summary?: Record<string, unknown> | null;
+  created_at: string;
+  completed_at?: string | null;
 };
 
 export type CitizenHit = {
@@ -379,10 +403,37 @@ export const geoApi = {
 
 export const censusApi = {
   listCampaigns: () => request<Campaign[]>("/census/campaigns"),
-  createCampaign: (body: { code: string; name: string; description?: string }) =>
-    request<Campaign>("/census/campaigns", { method: "POST", body: JSON.stringify(body) }),
-  patchCampaign: (id: string, body: { status?: string; name?: string }) =>
-    request<Campaign>(`/census/campaigns/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  createCampaign: (body: {
+    code: string;
+    name: string;
+    description?: string;
+    starts_at?: string;
+    ends_at?: string;
+  }) => request<Campaign>("/census/campaigns", { method: "POST", body: JSON.stringify(body) }),
+  patchCampaign: (
+    id: string,
+    body: {
+      status?: string;
+      name?: string;
+      description?: string;
+      starts_at?: string | null;
+      ends_at?: string | null;
+    },
+  ) => request<Campaign>(`/census/campaigns/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  campaignCatalog: () =>
+    request<{
+      module?: number;
+      title?: string;
+      labels: Record<string, string>;
+      transitions: Record<string, string[]>;
+      sync_only_when_active?: boolean;
+      offline_nin_forbidden?: boolean;
+      note?: string;
+    }>("/census/campaign-status-catalog"),
+  listSyncBatches: (campaignId: string, limit = 50) =>
+    request<SyncBatch[]>(`/census/campaigns/${campaignId}/sync-batches?limit=${limit}`),
+  deactivateAssignment: (assignmentId: string) =>
+    request<Assignment>(`/census/assignments/${assignmentId}/deactivate`, { method: "POST" }),
   listZones: (campaignId: string) => request<Zone[]>(`/census/campaigns/${campaignId}/zones`),
   createZone: (
     campaignId: string,

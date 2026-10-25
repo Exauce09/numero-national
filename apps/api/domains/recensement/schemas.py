@@ -176,6 +176,34 @@ class CampaignStatsOut(BaseModel):
     promoted: int
     conflicts: int
     pending_review: int
+    # Module 4 — couverture / structure
+    zones_count: int = 0
+    teams_count: int = 0
+    zones_with_records: int = 0
+    coverage_percent: float | None = None
+    coupons_count: int = 0
+    sync_batches_recent: int = 0
+    sync_errors_recent: int = 0
+
+
+class SyncBatchOut(BaseModel):
+    id: uuid.UUID
+    device_id: uuid.UUID | None = None
+    agent_user_id: uuid.UUID | None = None
+    direction: str
+    status: str
+    item_count: int
+    accepted_count: int
+    conflict_count: int
+    payload_summary: dict[str, Any] | None = None
+    created_at: datetime
+    completed_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class AssignmentDeactivate(BaseModel):
+    active: bool = False
 
 
 class ZoneCreate(BaseModel):
