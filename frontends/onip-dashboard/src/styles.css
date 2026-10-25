@@ -657,6 +657,24 @@ body {
   margin-bottom: 0;
 }
 
+/* ——— Module 1 dashboard filters ——— */
+.dash-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem 1rem;
+}
+
+.dash-filters-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--egouv-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 /* ——— Stats charts ——— */
 .stats-charts {
   display: grid;

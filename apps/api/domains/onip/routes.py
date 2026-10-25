@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, Literal
 from uuid import UUID
 
@@ -40,9 +41,27 @@ router = APIRouter(prefix="/onip", tags=["onip"])
     "/dashboard",
     dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
 )
-async def onip_dashboard(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
-    """National operations aggregates for ONIP operators."""
-    return await service.build_dashboard(db)
+async def onip_dashboard(
+    db: AsyncSession = Depends(get_db),
+    period_from: date | None = Query(default=None, description="Début période (inclus)"),
+    period_to: date | None = Query(default=None, description="Fin période (inclus)"),
+    province_code: str | None = Query(default=None),
+    commune_code: str | None = Query(default=None),
+    campaign_id: UUID | None = Query(default=None),
+    citizen_status: str | None = Query(default=None),
+    card_status: str | None = Query(default=None),
+) -> dict[str, Any]:
+    """Module 1 — agrégats nationaux filtrables (sans PII)."""
+    filters = service.normalize_dashboard_filters(
+        period_from=period_from,
+        period_to=period_to,
+        province_code=province_code,
+        commune_code=commune_code,
+        campaign_id=campaign_id,
+        citizen_status=citizen_status,
+        card_status=card_status,
+    )
+    return await service.build_dashboard(db, filters)
 
 
 @router.get(

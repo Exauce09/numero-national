@@ -3,13 +3,55 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class DashboardFilters:
+    """Filtres Module 1 — agrégats uniquement, pas de PII."""
+
+    period_from: date | None = None
+    period_to: date | None = None
+    province_code: str | None = None
+    commune_code: str | None = None
+    campaign_id: UUID | None = None
+    citizen_status: str | None = None
+    card_status: str | None = None
+
+
+def normalize_dashboard_filters(
+    *,
+    period_from: date | None = None,
+    period_to: date | None = None,
+    province_code: str | None = None,
+    commune_code: str | None = None,
+    campaign_id: UUID | None = None,
+    citizen_status: str | None = None,
+    card_status: str | None = None,
+) -> DashboardFilters:
+    prov = (province_code or "").strip().upper() or None
+    com = (commune_code or "").strip().upper() or None
+    cst = (citizen_status or "").strip().upper() or None
+    card = (card_status or "").strip().upper() or None
+    if period_from and period_to and period_from > period_to:
+        period_from, period_to = period_to, period_from
+    return DashboardFilters(
+        period_from=period_from,
+        period_to=period_to,
+        province_code=prov,
+        commune_code=com,
+        campaign_id=campaign_id,
+        citizen_status=cst,
+        card_status=card,
+    )
 
 
 async def _safe_count(db: AsyncSession, sql: str, params: dict[str, Any] | None = None) -> int:
@@ -22,17 +64,143 @@ async def _safe_count(db: AsyncSession, sql: str, params: dict[str, Any] | None 
         return 0
 
 
-async def build_dashboard(db: AsyncSession) -> dict[str, Any]:
-    population_active = await _safe_count(
-        db,
-        "SELECT COUNT(*) FROM core_registry.citizens WHERE status = 'ACTIVE'",
+def _citizen_where(filters: DashboardFilters, *, status: str | None = None) -> tuple[str, dict[str, Any]]:
+    """Clauses WHERE citoyens + params (agrégats)."""
+    clauses = ["1=1"]
+    params: dict[str, Any] = {}
+    st = status or filters.citizen_status
+    if st:
+        clauses.append("c.status = :citizen_status")
+        params["citizen_status"] = st
+    if filters.period_from:
+        clauses.append("c.created_at >= :period_from")
+        params["period_from"] = datetime.combine(filters.period_from, datetime.min.time(), tzinfo=timezone.utc)
+    if filters.period_to:
+        clauses.append("c.created_at < :period_to_excl")
+        params["period_to_excl"] = datetime.combine(
+            filters.period_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc
+        )
+    if filters.province_code or filters.commune_code:
+        addr = ["a.citizen_id = c.id"]
+        if filters.province_code:
+            addr.append("UPPER(COALESCE(a.province_code, '')) = :province_code")
+            params["province_code"] = filters.province_code
+        if filters.commune_code:
+            addr.append("UPPER(COALESCE(a.commune_code, '')) = :commune_code")
+            params["commune_code"] = filters.commune_code
+        clauses.append(
+            f"EXISTS (SELECT 1 FROM core_registry.citizen_addresses a WHERE {' AND '.join(addr)})"
+        )
+    return " AND ".join(clauses), params
+
+
+def _card_where(filters: DashboardFilters, *, status_in: list[str] | None = None) -> tuple[str, dict[str, Any]]:
+    clauses = ["1=1"]
+    params: dict[str, Any] = {}
+    if filters.card_status:
+        clauses.append("nc.status = :card_status")
+        params["card_status"] = filters.card_status
+    elif status_in:
+        placeholders = []
+        for i, s in enumerate(status_in):
+            key = f"card_st_{i}"
+            placeholders.append(f":{key}")
+            params[key] = s
+        clauses.append(f"nc.status IN ({', '.join(placeholders)})")
+    if filters.commune_code:
+        clauses.append("UPPER(COALESCE(nc.commune_code, '')) = :card_commune")
+        params["card_commune"] = filters.commune_code
+    if filters.period_from:
+        clauses.append("nc.created_at >= :card_from")
+        params["card_from"] = datetime.combine(filters.period_from, datetime.min.time(), tzinfo=timezone.utc)
+    if filters.period_to:
+        clauses.append("nc.created_at < :card_to")
+        params["card_to"] = datetime.combine(
+            filters.period_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc
+        )
+    return " AND ".join(clauses), params
+
+
+async def build_dashboard(
+    db: AsyncSession, filters: DashboardFilters | None = None
+) -> dict[str, Any]:
+    """Module 1 — tableau de bord national (agrégats datés, filtrables, sans PII)."""
+    f = filters or DashboardFilters()
+
+    where_all, p_all = _citizen_where(f)
+    where_active, p_active = _citizen_where(f, status="ACTIVE")
+    where_pending, p_pending = _citizen_where(f)
+    # dossiers en attente : DRAFT + PENDING_VALIDATION (sauf si statut forcé)
+    if f.citizen_status:
+        where_pending_sql = where_all
+        p_pending_use = p_all
+        pending_count = await _safe_count(
+            db,
+            f"SELECT COUNT(*) FROM core_registry.citizens c WHERE {where_pending_sql}",
+            p_pending_use,
+        ) if f.citizen_status in {"DRAFT", "PENDING_VALIDATION"} else 0
+    else:
+        pending_count = await _safe_count(
+            db,
+            f"""
+            SELECT COUNT(*) FROM core_registry.citizens c
+            WHERE {where_pending} AND c.status IN ('DRAFT', 'PENDING_VALIDATION')
+            """,
+            p_pending,
+        )
+
+    population_total = await _safe_count(
+        db, f"SELECT COUNT(*) FROM core_registry.citizens c WHERE {where_all}", p_all
     )
-    population_total = await _safe_count(db, "SELECT COUNT(*) FROM core_registry.citizens")
+    population_active = await _safe_count(
+        db, f"SELECT COUNT(*) FROM core_registry.citizens c WHERE {where_active}", p_active
+    )
+    nin_assigned = await _safe_count(
+        db,
+        f"SELECT COUNT(*) FROM core_registry.citizens c WHERE {where_all} AND c.nic IS NOT NULL",
+        p_all,
+    )
+
     campaigns_active = await _safe_count(
         db,
         "SELECT COUNT(*) FROM recensement.campaigns WHERE status = 'ACTIVE'",
     )
     campaigns_total = await _safe_count(db, "SELECT COUNT(*) FROM recensement.campaigns")
+
+    census_params: dict[str, Any] = {}
+    census_extra = "1=1"
+    if f.campaign_id:
+        census_extra = "r.campaign_id = :campaign_id"
+        census_params["campaign_id"] = str(f.campaign_id)
+    if f.period_from:
+        census_extra += " AND r.updated_at >= :c_from"
+        census_params["c_from"] = datetime.combine(f.period_from, datetime.min.time(), tzinfo=timezone.utc)
+    if f.period_to:
+        census_extra += " AND r.updated_at < :c_to"
+        census_params["c_to"] = datetime.combine(
+            f.period_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc
+        )
+
+    records_total = await _safe_count(
+        db,
+        f"SELECT COUNT(*) FROM recensement.census_records r WHERE {census_extra}",
+        census_params,
+    )
+    records_synced = await _safe_count(
+        db,
+        f"""
+        SELECT COUNT(*) FROM recensement.census_records r
+        WHERE {census_extra} AND r.status IN ('SYNCED', 'APPROVED', 'PROMOTED')
+        """,
+        census_params,
+    )
+    records_promoted = await _safe_count(
+        db,
+        f"SELECT COUNT(*) FROM recensement.census_records r WHERE {census_extra} AND r.status = 'PROMOTED'",
+        census_params,
+    )
+    sync_rate = round(100.0 * records_synced / records_total, 2) if records_total else 0.0
+
     duplicates_open = await _safe_count(
         db,
         "SELECT COUNT(*) FROM core_registry.duplicate_candidates WHERE status = 'OPEN'",
@@ -41,24 +209,81 @@ async def build_dashboard(db: AsyncSession) -> dict[str, Any]:
         db,
         "SELECT COUNT(*) FROM biometric.dedup_sessions WHERE decision = 'MANUAL_REVIEW'",
     )
-    cards_active = await _safe_count(
+    biometric_match_pending = await _safe_count(
         db,
-        "SELECT COUNT(*) FROM cards.national_cards WHERE status = 'ACTIVE'",
+        "SELECT COUNT(*) FROM biometric.biometric_matches WHERE review_status = 'PENDING'",
     )
-    cards_pending = await _safe_count(
+
+    cw_active, cp_active = _card_where(f, status_in=["ACTIVE"] if not f.card_status else None)
+    if f.card_status:
+        cards_active = await _safe_count(
+            db,
+            f"SELECT COUNT(*) FROM cards.national_cards nc WHERE {cw_active}",
+            cp_active,
+        ) if f.card_status == "ACTIVE" else 0
+    else:
+        cards_active = await _safe_count(
+            db,
+            f"SELECT COUNT(*) FROM cards.national_cards nc WHERE {cw_active}",
+            cp_active,
+        )
+
+    cw_pending, cp_pending = _card_where(
+        f, status_in=["PENDING", "SENT_TO_COMMUNE"] if not f.card_status else None
+    )
+    if f.card_status:
+        cards_pending = await _safe_count(
+            db,
+            f"SELECT COUNT(*) FROM cards.national_cards nc WHERE {cw_pending}",
+            cp_pending,
+        ) if f.card_status in {"PENDING", "SENT_TO_COMMUNE"} else 0
+    else:
+        cards_pending = await _safe_count(
+            db,
+            f"SELECT COUNT(*) FROM cards.national_cards nc WHERE {cw_pending}",
+            cp_pending,
+        )
+
+    cw_del, cp_del = _card_where(f, status_in=["DELIVERED"] if not f.card_status else None)
+    if f.card_status == "DELIVERED" or not f.card_status:
+        if f.card_status == "DELIVERED":
+            cards_delivered = await _safe_count(
+                db,
+                f"SELECT COUNT(*) FROM cards.national_cards nc WHERE {cw_del}",
+                cp_del,
+            )
+        else:
+            # DELIVERED ou delivered_at renseigné
+            cards_delivered = await _safe_count(
+                db,
+                """
+                SELECT COUNT(*) FROM cards.national_cards nc
+                WHERE nc.status = 'DELIVERED' OR nc.delivered_at IS NOT NULL
+                """,
+            )
+    else:
+        cards_delivered = 0
+
+    cards_produced = await _safe_count(
         db,
-        """
-        SELECT COUNT(*) FROM cards.national_cards
-        WHERE status IN ('PENDING', 'SENT_TO_COMMUNE')
-        """,
+        f"SELECT COUNT(*) FROM cards.national_cards nc WHERE {_card_where(f)[0]}",
+        _card_where(f)[1],
     )
+
     civil_pending = await _safe_count(
         db,
         "SELECT COUNT(*) FROM etat_civil.civil_declarations WHERE status = 'PENDING_OFFICER'",
     )
+    sync_batches_pending = await _safe_count(
+        db,
+        "SELECT COUNT(*) FROM recensement.sync_batches WHERE status IN ('PENDING', 'PROCESSING')",
+    )
 
     coverage_pct = (
         round(100.0 * population_active / population_total, 2) if population_total else 0.0
+    )
+    nin_coverage = (
+        round(100.0 * nin_assigned / population_total, 2) if population_total else 0.0
     )
 
     anomalies: list[dict[str, Any]] = []
@@ -68,16 +293,16 @@ async def build_dashboard(db: AsyncSession) -> dict[str, Any]:
                 "code": "DUPLICATES_OPEN",
                 "severity": "high",
                 "count": duplicates_open,
-                "message": "Demographic duplicate candidates awaiting review",
+                "message": "Doublons démographiques ouverts à examiner",
             }
         )
-    if biometric_dedup_review:
+    if biometric_dedup_review or biometric_match_pending:
         anomalies.append(
             {
                 "code": "BIOMETRIC_MANUAL_REVIEW",
                 "severity": "high",
-                "count": biometric_dedup_review,
-                "message": "Biometric dedup sessions require manual review",
+                "count": biometric_dedup_review + biometric_match_pending,
+                "message": "Correspondances biométriques en revue humaine",
             }
         )
     if civil_pending:
@@ -86,36 +311,80 @@ async def build_dashboard(db: AsyncSession) -> dict[str, Any]:
                 "code": "CIVIL_PENDING",
                 "severity": "medium",
                 "count": civil_pending,
-                "message": "Civil declarations pending officer validation",
+                "message": "Déclarations d'état civil en attente",
             }
         )
-    if not anomalies:
+    if sync_batches_pending:
         anomalies.append(
             {
-                "code": "NONE",
-                "severity": "info",
-                "count": 0,
-                "message": "No anomalies detected (or dependent tables not yet migrated)",
+                "code": "SYNC_BACKLOG",
+                "severity": "medium",
+                "count": sync_batches_pending,
+                "message": "Lots de synchronisation terrain en attente",
+            }
+        )
+    if pending_count:
+        anomalies.append(
+            {
+                "code": "DOSSIERS_PENDING",
+                "severity": "low",
+                "count": pending_count,
+                "message": "Dossiers FGP en brouillon / validation",
             }
         )
 
+    empty = population_total == 0 and records_total == 0 and cards_produced == 0
+
     return {
+        "module": 1,
+        "title": "Tableau de bord national",
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "filters_applied": {
+            "period_from": f.period_from.isoformat() if f.period_from else None,
+            "period_to": f.period_to.isoformat() if f.period_to else None,
+            "province_code": f.province_code,
+            "commune_code": f.commune_code,
+            "campaign_id": str(f.campaign_id) if f.campaign_id else None,
+            "citizen_status": f.citizen_status,
+            "card_status": f.card_status,
+        },
+        "empty": empty,
         "population": {
             "total": population_total,
             "active": population_active,
+            "pending": pending_count,
+            "nin_assigned": nin_assigned,
             "coverage_percent": coverage_pct,
+            "nin_coverage_percent": nin_coverage,
         },
         "campaigns": {
             "total": campaigns_total,
             "active": campaigns_active,
+            "records_total": records_total,
+            "records_synced": records_synced,
+            "records_promoted": records_promoted,
+            "sync_rate_percent": sync_rate,
         },
         "duplicates_open": duplicates_open,
+        "biometric_reviews_pending": biometric_match_pending + biometric_dedup_review,
         "cards": {
+            "produced": cards_produced,
             "active": cards_active,
             "pending": cards_pending,
+            "delivered": cards_delivered,
+        },
+        "services": {
+            "api": "up",
+            "onip_dashboard": "ok",
+            "sync_batches_pending": sync_batches_pending,
+            "civil_pending": civil_pending,
         },
         "anomalies": anomalies,
+        "export": {
+            "format": "aggregate_csv",
+            "pii": False,
+            "note": "Export contrôlé : indicateurs agrégés uniquement",
+        },
     }
 
 

@@ -291,12 +291,67 @@ export const censusApi = {
   },
 };
 
-export async function fetchOnipDashboard(): Promise<{
-  anomalies?: Array<{ code: string; message: string; count: number }>;
-  cards?: Record<string, unknown>;
-  [k: string]: unknown;
-}> {
-  return request("/onip/dashboard");
+export type OnipDashboardFilters = {
+  period_from?: string;
+  period_to?: string;
+  province_code?: string;
+  commune_code?: string;
+  campaign_id?: string;
+  citizen_status?: string;
+  card_status?: string;
+};
+
+export type OnipDashboard = {
+  module?: number;
+  title?: string;
+  generated_at: string;
+  empty?: boolean;
+  filters_applied?: OnipDashboardFilters;
+  population: {
+    total: number;
+    active: number;
+    pending?: number;
+    nin_assigned?: number;
+    coverage_percent: number;
+    nin_coverage_percent?: number;
+  };
+  campaigns: {
+    total: number;
+    active: number;
+    records_total?: number;
+    records_synced?: number;
+    records_promoted?: number;
+    sync_rate_percent?: number;
+  };
+  duplicates_open: number;
+  biometric_reviews_pending?: number;
+  cards: {
+    produced?: number;
+    active: number;
+    pending: number;
+    delivered?: number;
+  };
+  services?: {
+    api?: string;
+    onip_dashboard?: string;
+    sync_batches_pending?: number;
+    civil_pending?: number;
+  };
+  anomalies: Array<{ code: string; severity: string; count: number; message: string }>;
+  export?: { format?: string; pii?: boolean; note?: string };
+};
+
+export async function fetchOnipDashboard(
+  filters?: OnipDashboardFilters,
+): Promise<OnipDashboard> {
+  const q = new URLSearchParams();
+  if (filters) {
+    for (const [k, v] of Object.entries(filters)) {
+      if (v != null && String(v).trim() !== "") q.set(k, String(v).trim());
+    }
+  }
+  const qs = q.toString();
+  return request(`/onip/dashboard${qs ? `?${qs}` : ""}`);
 }
 
 export type NationalCard = {

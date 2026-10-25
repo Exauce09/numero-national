@@ -23,7 +23,7 @@ function RequireAuth({ children }: { children: ReactNode }) {
 }
 
 const PAGE_TITLES: Record<string, string> = {
-  "/": "Tableau de bord",
+  "/": "Tableau de bord national",
   "/accounts": "Comptes agents",
   "/campaigns": "Campagnes & contrôle",
   "/anomalies": "Anomalies",
