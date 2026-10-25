@@ -3,15 +3,19 @@ import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { clearSession, getSession, hasPermission } from "./auth";
 import AccountsPage from "./pages/AccountsPage";
+import AdminTechniquePage from "./pages/AdminTechniquePage";
 import AnomaliesPage from "./pages/AnomaliesPage";
+import BiometriePage from "./pages/BiometriePage";
 import CampaignsPage from "./pages/CampaignsPage";
 import CardsPage from "./pages/CardsPage";
 import CartographiePage from "./pages/CartographiePage";
 import ConformitePage from "./pages/ConformitePage";
 import DashboardPage from "./pages/DashboardPage";
+import EtatCivilOnipPage from "./pages/EtatCivilOnipPage";
 import FeuilleDeRoutePage from "./pages/FeuilleDeRoutePage";
 import LoginPage from "./pages/LoginPage";
 import NicNumbersPage from "./pages/NicNumbersPage";
+import PopulationFgpPage from "./pages/PopulationFgpPage";
 
 function RequireAuth({ children }: { children: ReactNode }) {
   if (!getSession()) return <Navigate to="/login" replace />;
@@ -23,9 +27,13 @@ const PAGE_TITLES: Record<string, string> = {
   "/accounts": "Comptes agents",
   "/campaigns": "Campagnes & contrôle",
   "/anomalies": "Anomalies",
+  "/population": "Population / FGP",
+  "/biometrie": "Biométrie",
+  "/etat-civil": "État civil → FGP",
   "/nic": "Numéros NIC",
   "/conformite": "Conformité FGP / NIN",
   "/feuille-de-route": "Feuille de route",
+  "/admin": "Administration technique",
   "/cards": "Cartes d'identité",
   "/cartographie": "Cartographie",
 };
@@ -62,7 +70,7 @@ function Shell() {
         <div className="sidebar-brand">
           <img src="/logo-rdc.jpg" alt="République Démocratique du Congo" />
           <strong>SIGPOP-RDC</strong>
-          <span>E-GOUV · RDC · menu v2</span>
+          <span>E-GOUV · ONIP / FGP</span>
           <button type="button" className="sidebar-close" aria-label="Fermer le menu" onClick={() => setNavOpen(false)}>
             ×
           </button>
@@ -72,6 +80,8 @@ function Shell() {
           <NavLink to="/" end>
             Tableau de bord
           </NavLink>
+          <NavLink to="/feuille-de-route">Feuille de route</NavLink>
+          <NavLink to="/conformite">Conformité FGP / NIN</NavLink>
 
           {hasPermission("users:manage", session) ? (
             <>
@@ -85,11 +95,15 @@ function Shell() {
           <NavLink to="/anomalies">Anomalies</NavLink>
           <NavLink to="/cartographie">Cartographie</NavLink>
 
-          <div className="nav-group-label">Registre</div>
+          <div className="nav-group-label">FGP</div>
+          <NavLink to="/population">Population / FGP</NavLink>
           <NavLink to="/nic">Numéros NIC</NavLink>
+          <NavLink to="/biometrie">Biométrie</NavLink>
+          <NavLink to="/etat-civil">État civil</NavLink>
           <NavLink to="/cards">Cartes d&apos;identité</NavLink>
-          <NavLink to="/conformite">Conformité FGP / NIN</NavLink>
-          <NavLink to="/feuille-de-route">Feuille de route</NavLink>
+
+          <div className="nav-group-label">Exploitation</div>
+          <NavLink to="/admin">Administration technique</NavLink>
         </nav>
         <div className="sidebar-foot">
           <button type="button" className="btn-logout" onClick={logout}>
@@ -120,14 +134,18 @@ function Shell() {
         </header>
         <main className="shell">
           <Routes>
-            <Route path="/accounts" element={<AccountsPage />} />
             <Route path="/" element={<DashboardPage />} />
+            <Route path="/accounts" element={<AccountsPage />} />
             <Route path="/campaigns" element={<CampaignsPage />} />
             <Route path="/anomalies" element={<AnomaliesPage />} />
             <Route path="/cartographie" element={<CartographiePage />} />
+            <Route path="/population" element={<PopulationFgpPage />} />
             <Route path="/nic" element={<NicNumbersPage />} />
+            <Route path="/biometrie" element={<BiometriePage />} />
+            <Route path="/etat-civil" element={<EtatCivilOnipPage />} />
             <Route path="/conformite" element={<ConformitePage />} />
             <Route path="/feuille-de-route" element={<FeuilleDeRoutePage />} />
+            <Route path="/admin" element={<AdminTechniquePage />} />
             <Route path="/cards" element={<CardsPage />} />
           </Routes>
         </main>

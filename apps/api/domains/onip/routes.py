@@ -55,7 +55,23 @@ async def onip_map_by_milieu(
 
 
 @router.get(
-    "/nin/compliance",
+    "/ops-health",
+    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
+)
+async def onip_ops_health(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+    """Santé agrégée pour l'administration technique ONIP (sans secrets)."""
+    dash = await service.build_dashboard(db)
+    return {
+        "api": "up",
+        "onip_dashboard": "ok",
+        "official_nin_format_confirmed": OFFICIAL_NIN_FORMAT_CONFIRMED,
+        "population_cards": dash.get("cards") if isinstance(dash, dict) else None,
+        "anomaly_count": len(dash.get("anomalies") or []) if isinstance(dash, dict) else 0,
+        "hint": "Biométrie / civil : consulter les pages dédiées (permissions séparées).",
+    }
+
+
+@router.get("/nin/compliance",
     dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
 )
 async def nin_compliance_status() -> dict[str, Any]:

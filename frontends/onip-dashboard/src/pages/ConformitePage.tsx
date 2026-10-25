@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ApiError } from "../api";
+import { fetchNinCompliance } from "../api";
 import { getSession } from "../auth";
 
 type Compliance = {
@@ -8,12 +8,8 @@ type Compliance = {
   official_generation_enabled: boolean;
   block_reason: string | null;
   provisional_algorithm: string;
-  audit_doc: string;
-  plan_matrix: string;
   decree_ref: string;
 };
-
-const BASE = import.meta.env.VITE_API_BASE ?? "/api/v1";
 
 export default function ConformitePage() {
   const hasToken = Boolean(getSession()?.accessToken);
@@ -22,14 +18,7 @@ export default function ConformitePage() {
 
   useEffect(() => {
     if (!hasToken) return;
-    const token = getSession()?.accessToken;
-    void fetch(`${BASE}/onip/nin/compliance`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-      .then(async (res) => {
-        if (!res.ok) throw new ApiError(await res.text(), res.status);
-        return (await res.json()) as Compliance;
-      })
+    void fetchNinCompliance()
       .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : "Erreur"));
   }, [hasToken]);
@@ -40,7 +29,8 @@ export default function ConformitePage() {
         <h1>Conformité FGP / NIN</h1>
         <p>
           Suivi du plan SIGPOP-RDC / ONIP. Le générateur NIN officiel reste bloqué tant que
-          l&apos;arrêté et l&apos;annexe technique ne sont pas confirmés (Décret 22/07 art. 8).
+          l&apos;arrêté et l&apos;annexe technique ne sont pas confirmés (Décret 22/07 art. 8) — on
+          n&apos;invente pas le format.
         </p>
       </div>
 
@@ -75,26 +65,21 @@ export default function ConformitePage() {
             </li>
             <li>Référence : {data.decree_ref}</li>
           </ul>
-          {data.block_reason ? (
-            <p className="muted small">{data.block_reason}</p>
-          ) : null}
-          <p className="muted small">
-            Docs dépôt : <code>{data.audit_doc}</code> · <code>{data.plan_matrix}</code>
-          </p>
+          {data.block_reason ? <p className="muted small">{data.block_reason}</p> : null}
         </div>
       ) : (
         <div className="panel muted">Chargement…</div>
       )}
 
       <div className="panel">
-        <h2 className="panel-title">Prochaines étapes (plan)</h2>
+        <h2 className="panel-title">Prochaines étapes</h2>
         <ol>
           <li>Obtenir l&apos;arrêté + annexe NIN signés (ONIP / Intérieur).</li>
-          <li>Basculer <code>OFFICIAL_NIN_FORMAT_CONFIRMED</code> après validation écrite.</li>
-          <li>Inventaire données : <code>python scripts/inventory_nic_nin.py</code></li>
           <li>
-            Continuer les modules manquants :{" "}
-            <Link to="/feuille-de-route">feuille de route</Link>
+            Inventaire : <code>python scripts/inventory_nic_nin.py</code>
+          </li>
+          <li>
+            Modules opérationnels : <Link to="/feuille-de-route">feuille de route</Link>
           </li>
         </ol>
       </div>

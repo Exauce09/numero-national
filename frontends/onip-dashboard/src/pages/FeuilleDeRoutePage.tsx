@@ -8,84 +8,19 @@ type Item = {
 };
 
 const ITEMS: Item[] = [
-  {
-    title: "Tableau de bord",
-    status: "EXISTANT",
-    href: "/",
-    note: "Agrégats nationaux",
-  },
-  {
-    title: "Comptes agents",
-    status: "PARTIEL",
-    href: "/accounts",
-    note: "MFA sensible à renforcer",
-  },
-  {
-    title: "Campagnes & contrôle",
-    status: "EXISTANT",
-    href: "/campaigns",
-    note: "Promote NIC provisoire",
-  },
-  {
-    title: "Anomalies / doublons",
-    status: "PARTIEL",
-    href: "/anomalies",
-    note: "Tickets SLA à ajouter",
-  },
-  {
-    title: "Cartographie",
-    status: "EXISTANT",
-    href: "/cartographie",
-    note: "Points GPS / milieu",
-  },
-  {
-    title: "Numéros NIC / NIN",
-    status: "PARTIEL",
-    href: "/nic",
-    note: "Provisoire — officiel bloqué",
-  },
-  {
-    title: "Conformité FGP / NIN",
-    status: "PARTIEL",
-    href: "/conformite",
-    note: "Statut juridique live",
-  },
-  {
-    title: "Cartes d'identité",
-    status: "PARTIEL",
-    href: "/cards",
-    note: "Gabarit prototype",
-  },
-  {
-    title: "Population / FGP (recherche dossier)",
-    status: "ABSENT",
-    note: "À brancher sur registry search",
-  },
-  {
-    title: "Biométrie (revue 1:N)",
-    status: "ABSENT",
-    note: "API biometric existe — UI ONIP manquante",
-  },
-  {
-    title: "État civil (file événements)",
-    status: "ABSENT",
-    note: "Sync EC existe — console ONIP manquante",
-  },
-  {
-    title: "Partenaires / API verify",
-    status: "PARTIEL",
-    note: "Endpoints verify partiels",
-  },
-  {
-    title: "Administration technique",
-    status: "ABSENT",
-    note: "Health / jobs / files",
-  },
-  {
-    title: "Générateur NIN officiel",
-    status: "BLOQUE",
-    note: "Attente arrêté + annexe",
-  },
+  { title: "Tableau de bord", status: "EXISTANT", href: "/", note: "Agrégats nationaux" },
+  { title: "Comptes agents", status: "PARTIEL", href: "/accounts", note: "MFA sensible à renforcer" },
+  { title: "Campagnes & contrôle", status: "EXISTANT", href: "/campaigns", note: "Promote NIC provisoire" },
+  { title: "Anomalies / doublons", status: "PARTIEL", href: "/anomalies", note: "Tickets SLA à ajouter" },
+  { title: "Cartographie", status: "EXISTANT", href: "/cartographie", note: "Points GPS / milieu" },
+  { title: "Population / FGP", status: "EXISTANT", href: "/population", note: "Recherche registry" },
+  { title: "Numéros NIC / NIN", status: "PARTIEL", href: "/nic", note: "Provisoire — officiel bloqué" },
+  { title: "Biométrie", status: "PARTIEL", href: "/biometrie", note: "Stats ; revue humaine via API" },
+  { title: "État civil → FGP", status: "PARTIEL", href: "/etat-civil", note: "File actes / déclarations" },
+  { title: "Cartes d'identité", status: "PARTIEL", href: "/cards", note: "Gabarit prototype" },
+  { title: "Conformité FGP / NIN", status: "EXISTANT", href: "/conformite", note: "Statut juridique live" },
+  { title: "Administration technique", status: "EXISTANT", href: "/admin", note: "Ops health + inventaire" },
+  { title: "Générateur NIN officiel", status: "BLOQUE", note: "Attente arrêté + annexe (non inventé)" },
 ];
 
 const COLOR: Record<Item["status"], string> = {
@@ -101,7 +36,7 @@ export default function FeuilleDeRoutePage() {
       <div className="hero-banner">
         <h1>Feuille de route ONIP</h1>
         <p>
-          Matrice issue du plan complet SIGPOP-RDC. Détail :{" "}
+          Matrice plan complet SIGPOP-RDC — modules branchés progressivement. Détail dépôt :{" "}
           <code>docs/legal/onip/MATRICE_PLAN_VS_EXISTANT.md</code>
         </p>
       </div>
@@ -117,9 +52,7 @@ export default function FeuilleDeRoutePage() {
           <tbody>
             {ITEMS.map((it) => (
               <tr key={it.title}>
-                <td>
-                  {it.href ? <Link to={it.href}>{it.title}</Link> : it.title}
-                </td>
+                <td>{it.href ? <Link to={it.href}>{it.title}</Link> : it.title}</td>
                 <td>
                   <span style={{ color: COLOR[it.status], fontWeight: 700 }}>{it.status}</span>
                 </td>

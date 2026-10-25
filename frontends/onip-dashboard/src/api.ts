@@ -402,4 +402,74 @@ export async function fetchOnipMapByMilieu(
   return request(`/onip/map-by-milieu${q}`);
 }
 
+export async function fetchNinCompliance(): Promise<{
+  official_nin_format_confirmed: boolean;
+  official_generation_enabled: boolean;
+  block_reason: string | null;
+  provisional_algorithm: string;
+  decree_ref: string;
+}> {
+  return request("/onip/nin/compliance");
+}
+
+export async function fetchOnipOpsHealth(): Promise<{
+  api: string;
+  onip_dashboard: string;
+  official_nin_format_confirmed: boolean;
+  anomaly_count: number;
+  population_cards?: Record<string, unknown> | null;
+  hint?: string;
+}> {
+  return request("/onip/ops-health");
+}
+
+export const biometricApi = {
+  stats: () =>
+    request<{
+      enrollments?: number;
+      fingerprints?: number;
+      open_matches?: number;
+      [k: string]: unknown;
+    }>("/biometric/stats"),
+  thresholds: () => request<Array<{ code?: string; value?: number; active?: boolean }>>("/biometric/thresholds"),
+};
+
+export const civilOnipApi = {
+  searchActs: (q?: string, limit = 50) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (q?.trim()) params.set("q", q.trim());
+    return request<
+      Array<{
+        id: string;
+        act_type?: string;
+        act_number?: string;
+        status?: string;
+        created_at?: string;
+        payload?: Record<string, unknown>;
+      }>
+    >(`/civil/acts/search?${params}`);
+  },
+  listDeclarations: (status?: string) => {
+    const q = status ? `?status=${encodeURIComponent(status)}` : "";
+    return request<
+      Array<{
+        id: string;
+        declaration_type?: string;
+        status?: string;
+        created_at?: string;
+        facility_name?: string;
+      }>
+    >(`/civil/declarations${q}`);
+  },
+  listCorrections: () =>
+    request<
+      Array<{
+        id: string;
+        status?: string;
+        created_at?: string;
+        reason?: string;
+      }>
+    >("/civil/corrections"),
+};
+
 export { updateAccessToken, BASE as API_BASE };

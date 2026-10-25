@@ -27,11 +27,10 @@
 | Audit append-only | PARTIEL | `domains/audit/` | Revue intégrité |
 | Hébergement RDC | À VÉRIFIER | Infra hors dépôt | Attestation institution |
 | MFA ops sensibles | PARTIEL | identity MFA models | Forcer sur validate/NIN |
-| Population / FGP UI | ABSENT | — | Page placeholder → recherche registry |
-| Biométrie UI ONIP | ABSENT | — | Page revue correspondances |
-| État civil UI ONIP | ABSENT | — | File événements |
-| Rapports / exports | PARTIEL | Dashboard + CSV campagnes | Indicateurs plan §16 |
-| Administration technique | ABSENT | — | Health jobs UI |
+| Population / FGP UI | EXISTANT | `PopulationFgpPage.tsx` | Enrichir historique art.9 |
+| Biométrie UI ONIP | PARTIEL | `BiometriePage.tsx` + `/biometric/stats` | Revue match UI |
+| État civil UI ONIP | PARTIEL | `EtatCivilOnipPage.tsx` | Validation depuis cockpit |
+| Administration technique | EXISTANT | `AdminTechniquePage.tsx`, `/onip/ops-health` | Jobs / files |
 | Frais / reçus | ABSENT (volontaire) | Plan §5.19 | Ne pas inventer de tarifs |
 | Migration NIN officielle | BLOQUE | — | Interdit sans procédure ONIP |
 
