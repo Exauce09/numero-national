@@ -1,15 +1,18 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  fgpApi,
   registryApi,
   type CitizenDetail,
   type CitizenHistoryItem,
   type CitizenHit,
   type DuplicateCandidate,
+  type FgpHealth,
+  type FgpRelation,
 } from "../api";
 import { getSession } from "../auth";
 
-type Tab = "identite" | "adresse" | "controles" | "historique";
+type Tab = "identite" | "adresse" | "filiation" | "controles" | "historique" | "rectification";
 type Mode = "liste" | "creer" | "detail";
 
 const STATUS_OPTIONS = [
@@ -22,7 +25,7 @@ const STATUS_OPTIONS = [
   "MERGED",
 ];
 
-/** Module 2 — Gestion personnes / dossiers FGP (sans attribution NIN). */
+/** Module 5 FGP (+ Module 2 dossiers) — référentiel central, sans NIN inventé. */
 export default function PopulationFgpPage() {
   const hasToken = Boolean(getSession()?.accessToken);
   const [mode, setMode] = useState<Mode>("liste");
@@ -40,10 +43,12 @@ export default function PopulationFgpPage() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [health, setHealth] = useState<FgpHealth | null>(null);
 
   const [selected, setSelected] = useState<CitizenDetail | null>(null);
   const [history, setHistory] = useState<CitizenHistoryItem[]>([]);
   const [duplicates, setDuplicates] = useState<DuplicateCandidate[]>([]);
+  const [relations, setRelations] = useState<FgpRelation[]>([]);
 
   const [familyName, setFamilyName] = useState("");
   const [givenNames, setGivenNames] = useState("");
@@ -57,13 +62,19 @@ export default function PopulationFgpPage() {
   const [similar, setSimilar] = useState<CitizenHit[]>([]);
   const [statusReason, setStatusReason] = useState("");
   const [dupJustification, setDupJustification] = useState("");
+  const [corrField, setCorrField] = useState("family_name");
+  const [corrValue, setCorrValue] = useState("");
+  const [corrReason, setCorrReason] = useState("");
+  const [relRelatedId, setRelRelatedId] = useState("");
+  const [relType, setRelType] = useState("PARENT");
+  const [mergeTargetId, setMergeTargetId] = useState("");
 
   const load = useCallback(async () => {
     if (!hasToken) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await registryApi.searchCitizens({
+      const res = await fgpApi.searchPersons({
         q: q.trim() || undefined,
         status: status || undefined,
         province_code: province.trim() || undefined,
@@ -87,19 +98,29 @@ export default function PopulationFgpPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!hasToken) return;
+    void fgpApi
+      .health()
+      .then(setHealth)
+      .catch(() => setHealth(null));
+  }, [hasToken]);
+
   async function openDetail(id: string) {
     setError(null);
     setInfo(null);
     setTab("identite");
     try {
-      const [c, hist, dups] = await Promise.all([
-        registryApi.getCitizen(id),
-        registryApi.getHistory(id),
+      const [c, hist, dups, rels] = await Promise.all([
+        fgpApi.getPerson(id),
+        fgpApi.getHistory(id),
         registryApi.getDuplicates(id, false),
+        fgpApi.listRelations(id),
       ]);
       setSelected(c);
       setHistory(hist.items);
       setDuplicates(dups);
+      setRelations(rels);
       setMode("detail");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Dossier inaccessible");
@@ -250,10 +271,43 @@ export default function PopulationFgpPage() {
       <div className="hero-banner">
         <h1>Population / FGP</h1>
         <p>
-          Module 2 — dossiers individuels (identifiant interne distinct du NIN). Attribution NIN :{" "}
+          Module 5 — référentiel central (identifiant interne ≠ NIN). Dossiers Module 2 + santé /
+          filiation / rectification / événements. Attribution NIN :{" "}
           <Link to="/conformite">conformité</Link> · <Link to="/nic">NIN</Link>.
         </p>
       </div>
+
+      {health ? (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))",
+            gap: 10,
+            marginBottom: 12,
+          }}
+        >
+          <div className="stat-chip">
+            <div className="muted">Dossiers</div>
+            <strong>{health.citizens_total}</strong>
+          </div>
+          <div className="stat-chip">
+            <div className="muted">Avec NIC</div>
+            <strong>{health.with_nic}</strong>
+          </div>
+          <div className="stat-chip">
+            <div className="muted">Sans NIC</div>
+            <strong>{health.without_nic}</strong>
+          </div>
+          <div className="stat-chip">
+            <div className="muted">Doublons OPEN</div>
+            <strong>{health.open_duplicates}</strong>
+          </div>
+          <div className="stat-chip">
+            <div className="muted">NIN officiel</div>
+            <strong>{health.official_nin_format_confirmed ? "oui" : "non confirmé"}</strong>
+          </div>
+        </div>
+      ) : null}
 
       {!hasToken ? (
         <div className="panel muted">Connexion requise.</div>
@@ -566,7 +620,9 @@ export default function PopulationFgpPage() {
                   [
                     ["identite", "Identité"],
                     ["adresse", "Adresse"],
+                    ["filiation", "Filiation"],
                     ["controles", "Contrôles / doublons"],
+                    ["rectification", "Rectification"],
                     ["historique", "Historique"],
                   ] as const
                 ).map(([k, label]) => (
@@ -632,13 +688,98 @@ export default function PopulationFgpPage() {
                 )
               ) : null}
 
+              {tab === "filiation" ? (
+                <div>
+                  <p className="muted small">Relations déclarées — distinctes d&apos;une preuve juridique d&apos;acte.</p>
+                  {relations.length === 0 ? (
+                    <p className="muted">Aucune relation.</p>
+                  ) : (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Type</th>
+                          <th>Dossier lié</th>
+                          <th>Base</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {relations.map((r) => (
+                          <tr key={r.id}>
+                            <td>{r.relation_type}</td>
+                            <td>
+                              <button
+                                type="button"
+                                className="btn-secondary btn-sm"
+                                onClick={() =>
+                                  void openDetail(
+                                    r.citizen_id === selected.id
+                                      ? r.related_citizen_id
+                                      : r.citizen_id,
+                                  )
+                                }
+                              >
+                                {(r.citizen_id === selected.id
+                                  ? r.related_citizen_id
+                                  : r.citizen_id
+                                ).slice(0, 8)}
+                                …
+                              </button>
+                            </td>
+                            <td className="muted small">{r.legal_basis || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12, maxWidth: 560 }}>
+                    <input
+                      className="form-control"
+                      placeholder="UUID dossier lié"
+                      value={relRelatedId}
+                      onChange={(e) => setRelRelatedId(e.target.value)}
+                    />
+                    <select className="form-control" value={relType} onChange={(e) => setRelType(e.target.value)}>
+                      <option value="PARENT">PARENT</option>
+                      <option value="CHILD">CHILD</option>
+                      <option value="SPOUSE">SPOUSE</option>
+                      <option value="GUARDIAN">GUARDIAN</option>
+                      <option value="OTHER">OTHER</option>
+                    </select>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={() => {
+                        void (async () => {
+                          if (!selected || !relRelatedId.trim()) return;
+                          try {
+                            await fgpApi.addRelation(selected.id, {
+                              related_citizen_id: relRelatedId.trim(),
+                              relation_type: relType,
+                            });
+                            setInfo("Relation ajoutée.");
+                            setRelRelatedId("");
+                            setRelations(await fgpApi.listRelations(selected.id));
+                            setHistory((await fgpApi.getHistory(selected.id)).items);
+                          } catch (e) {
+                            setError(e instanceof Error ? e.message : "Relation impossible");
+                          }
+                        })();
+                      }}
+                    >
+                      Ajouter
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
               {tab === "controles" ? (
                 <div>
                   <p className="muted small">
-                    Les correspondances sont des candidats à examiner. Aucune fusion automatique (RB-05).
+                    Les correspondances sont des candidats à examiner. Aucune fusion automatique.
+                    Fusion contrôlée = permission merge + justification.
                   </p>
                   <label style={{ display: "block", maxWidth: 480 }}>
-                    Justification résolution
+                    Justification résolution / fusion
                     <input
                       className="form-control"
                       value={dupJustification}
@@ -646,6 +787,44 @@ export default function PopulationFgpPage() {
                       placeholder="Min. 10 caractères"
                     />
                   </label>
+                  <label style={{ display: "block", maxWidth: 480 }}>
+                    Cible fusion (UUID survivant)
+                    <input
+                      className="form-control"
+                      value={mergeTargetId}
+                      onChange={(e) => setMergeTargetId(e.target.value)}
+                      placeholder="UUID dossier à conserver"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    style={{ marginBottom: 12 }}
+                    onClick={() => {
+                      void (async () => {
+                        if (!selected || !mergeTargetId.trim() || dupJustification.trim().length < 10) {
+                          setError("Cible UUID + justification (≥10) requis pour fusion.");
+                          return;
+                        }
+                        try {
+                          const target = mergeTargetId.trim();
+                          await registryApi.mergeCitizens(
+                            selected.id,
+                            target,
+                            dupJustification.trim(),
+                          );
+                          setInfo("Fusion contrôlée effectuée (source → MERGED).");
+                          setMergeTargetId("");
+                          await openDetail(target);
+                          void load();
+                        } catch (e) {
+                          setError(e instanceof Error ? e.message : "Fusion impossible");
+                        }
+                      })();
+                    }}
+                  >
+                    Fusionner ce dossier → cible
+                  </button>
                   {duplicates.length === 0 ? (
                     <p className="muted">Aucun doublon enregistré.</p>
                   ) : (
@@ -703,6 +882,60 @@ export default function PopulationFgpPage() {
                       </tbody>
                     </table>
                   )}
+                </div>
+              ) : null}
+
+              {tab === "rectification" ? (
+                <div style={{ maxWidth: 480 }}>
+                  <p className="muted small">
+                    Demande historisée — non appliquée automatiquement (cahier §9.2). Aucun NIN modifié ici.
+                  </p>
+                  <label>
+                    Champ
+                    <select className="form-control" value={corrField} onChange={(e) => setCorrField(e.target.value)}>
+                      <option value="family_name">family_name</option>
+                      <option value="given_names">given_names</option>
+                      <option value="place_of_birth">place_of_birth</option>
+                      <option value="date_of_birth">date_of_birth</option>
+                      <option value="sex">sex</option>
+                    </select>
+                  </label>
+                  <label>
+                    Valeur proposée
+                    <input className="form-control" value={corrValue} onChange={(e) => setCorrValue(e.target.value)} />
+                  </label>
+                  <label>
+                    Motif (≥10)
+                    <input className="form-control" value={corrReason} onChange={(e) => setCorrReason(e.target.value)} />
+                  </label>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => {
+                      void (async () => {
+                        if (!selected || corrValue.trim().length < 1 || corrReason.trim().length < 10) {
+                          setError("Valeur et motif (min. 10) requis.");
+                          return;
+                        }
+                        try {
+                          const r = await fgpApi.requestCorrection({
+                            citizen_id: selected.id,
+                            field_name: corrField,
+                            proposed_value: corrValue.trim(),
+                            reason: corrReason.trim(),
+                          });
+                          setInfo(r.message);
+                          setCorrValue("");
+                          setCorrReason("");
+                          setHistory((await fgpApi.getHistory(selected.id)).items);
+                        } catch (e) {
+                          setError(e instanceof Error ? e.message : "Demande impossible");
+                        }
+                      })();
+                    }}
+                  >
+                    Soumettre demande
+                  </button>
                 </div>
               ) : null}
 

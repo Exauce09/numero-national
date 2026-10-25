@@ -1,0 +1,724 @@
+SIGPOP-RDC
+MODULE 5FICHIER GÉNÉRAL DE LA POPULATION (FGP)
+Cahier des charges fonctionnel et technique détailléRéférentiel central des personnes, historique, provenance et événements
+Version de travail — octobre 2026
+Document de conception pour auditer, compléter et sécuriser le module existant.
+
+Avertissement et statut du document
+Ce document développe le Module 5 — Fichier Général de la Population (FGP) — à partir des éléments fournis sur SIGPOP-RDC et le module ONIP : référentiel central des personnes, dossier individuel, données biographiques, références d’actes, liens de filiation, données biométriques ou leurs références, événements d’état civil, provenance, historique, contrôles de cohérence et rectification.
+Il s’agit d’une proposition de cahier des charges et non d’une description certifiée de l’architecture interne de l’ONIP. Les champs obligatoires, catégories de personnes, règles de conservation, procédures de rectification, règles du NIN et exigences précises d’hébergement doivent être validés à partir des textes officiels complets, annexes et instructions applicables.
+Le FGP est présenté ici comme le référentiel de données de référence du système cible. Il ne doit pas être confondu avec les applications de collecte, les actes d’état civil sources, le service d’attribution du NIN ou le tableau de bord national. Le FGP reçoit des données de sources autorisées et conserve la provenance ainsi que les changements.
+Sommaire
+1. Vision, rôle et périmètre du FGP
+2. Principes de conception
+3. Architecture fonctionnelle et responsabilités
+4. Dossier de référence d’une personne
+5. Provenance, qualité et statut de vérification
+6. Cycle de vie du dossier FGP
+7. Ingestion et rapprochement des sources
+8. Gestion des événements d’état civil
+9. Historique, rectifications et fusions contrôlées
+10. Règles de gestion du NIN dans le FGP
+11. Modèle de données conceptuel
+12. Recherche, consultation et services d’identification
+13. API et interopérabilité
+14. Sécurité, confidentialité et gouvernance
+15. Hébergement, continuité et qualité opérationnelle
+16. Interfaces et navigation
+17. Scénarios métier détaillés
+18. Tests et critères d’acceptation
+19. Plan de développement progressif
+20. Prompt complet pour l’agent développeur
+21. Limites et décisions à valider
+
+1. Vision, rôle et périmètre du FGP
+1.1 Rôle central
+Le Fichier Général de la Population est conçu comme le référentiel central où sont conservées les données de référence des personnes physiques visées par le cadre applicable. Il rassemble les informations autorisées provenant de l’enrôlement, du recensement, de l’état civil et d’autres sources institutionnelles autorisées. Il permet de retrouver une personne, d’examiner l’état de son dossier, de suivre les événements qui la concernent et de fournir des réponses d’identification limitées aux services habilités.
+1.2 Objectifs
+Maintenir un dossier individuel de référence doté d’un identifiant technique interne immuable.
+Conserver les données biographiques, références d’actes, liens administratifs et données nécessaires selon les textes applicables.
+Rattacher chaque donnée importante à sa source, sa date et son état de vérification.
+Prendre en compte les mises à jour autorisées sans perdre l’historique.
+Réduire les doublons et contradictions entre les sources, tout en soumettant les cas ambigus à une revue autorisée.
+Permettre l’interopérabilité avec les services autorisés en limitant les informations communiquées.
+Assurer la traçabilité, la sécurité, la qualité, la disponibilité et la restauration du référentiel.
+1.3 Inclus et dépendances
+Domaine
+Responsabilité du FGP
+Dépendance ou limite
+Référence personne
+Maintenir le dossier de référence et ses identifiants techniques.
+La création finale suit le workflow d’identification approuvé.
+Données biographiques
+Conserver les attributs autorisés et leur provenance.
+La liste obligatoire doit provenir des textes et procédures applicables.
+Données biométriques
+Garder les références et statuts nécessaires ; isoler les données sensibles.
+La capture et la comparaison relèvent d’un service spécialisé autorisé.
+NIN
+Associer et exposer le NIN confirmé selon les droits.
+L’attribution est opérée par le service autorisé et sa règle officielle validée.
+État civil
+Recevoir et tracer les événements vérifiés qui doivent mettre le dossier à jour.
+La validité juridique d’un acte relève de l’autorité source compétente.
+CIN
+Fournir la référence de la personne et les données nécessaires à la délivrance.
+La production et la remise relèvent du module de carte.
+Interopérabilité
+Servir des vérifications et attributs autorisés.
+Pas d’accès public à la base complète.
+
+1.4 Hors périmètre
+Le FGP ne doit pas remplacer l’application qui collecte les données sur le terrain.
+Le FGP ne doit pas fabriquer un NIN selon un format inventé par le développeur.
+Le FGP ne doit pas remplacer le registre ou l’autorité compétente d’état civil.
+Le FGP ne doit pas considérer automatiquement un résultat biométrique comme une décision juridique.
+Le FGP ne doit pas fournir l’intégralité d’un dossier à un partenaire lorsque seule une vérification d’attribut est nécessaire.
+2. Principes de conception
+Référentiel de référence
+Une fois le dossier établi selon le processus autorisé, le FGP conserve sa référence et ses versions. Les autres modules s’y relient par des identifiants stables.
+Identifiant technique distinct du NIN
+L’identifiant interne sert aux relations techniques. Le NIN est un identifiant officiel soumis à des règles spécifiques.
+Donnée et source séparées
+Le système doit pouvoir distinguer une valeur déclarée, une valeur issue d’un document, une valeur confirmée par une source autorisée et une valeur contestée.
+Historique sans écrasement silencieux
+Toute rectification importante conserve la valeur antérieure, la valeur appliquée, l’auteur, la date, la source, le motif et la décision.
+Traitement par événements
+Naissance, mariage, divorce, décès et rectification sont enregistrés comme des événements sourcés et datés.
+Intégrité des relations
+Les liens entre personne, acte, NIN, dossier d’enrôlement et carte doivent rester cohérents.
+Minimisation
+Chaque rôle ou partenaire ne reçoit que les données utiles à sa mission.
+Revue humaine
+Les rapprochements ambigus, fusions et corrections sensibles requièrent un processus d’approbation autorisé.
+Idempotence
+La réimportation d’un même événement source ne doit pas créer un événement ou dossier supplémentaire.
+Résilience
+Les sauvegardes, contrôles d’intégrité et tests de restauration sont obligatoires avant une mise en production sensible.
+3. Architecture fonctionnelle et responsabilités
+Composant
+Responsabilité
+Ce qu’il ne doit pas faire
+Portail ONIP
+Présenter les dossiers et les opérations autorisées aux utilisateurs.
+Se connecter directement à la base ou contourner les permissions.
+Service FGP
+Gérer les dossiers de référence, les versions, les relations et les règles de cohérence.
+Remplacer les workflows sources ni inventer les règles juridiques.
+Service d’enrôlement
+Collecter les données et transmettre les fiches pour traitement.
+Déclarer automatiquement une fiche comme identité de référence.
+Service biométrique
+Contrôler la qualité et calculer les correspondances autorisées.
+Décider seul d’une fraude ou fusionner les dossiers.
+Service NIN
+Attribuer le NIN selon les règles officielles validées.
+Accepter une attribution ad hoc depuis un formulaire FGP.
+Connecteur état civil
+Recevoir les événements provenant de sources autorisées.
+Transformer une déclaration non vérifiée en événement confirmé.
+Service CIN
+Gérer les demandes, la personnalisation et la remise de la carte.
+Changer le dossier FGP sans événement ou autorisation.
+API d’interopérabilité
+Fournir des vérifications et attributs strictement autorisés.
+Exposer l’ensemble du registre.
+Journal d’audit
+Conserver les opérations sensibles et les résultats.
+Contenir des biométries ou secrets en clair.
+
+3.1 Flux logique
+1. Une application source produit un dossier ou événement avec une référence stable.
+2. Le connecteur authentifie la source et valide le schéma, la version et les droits.
+3. Le FGP vérifie l’idempotence, la provenance, les champs attendus et les contradictions.
+4. Si le cas est simple et autorisé, la mise à jour suit le workflow prévu ; sinon, l’événement est placé en attente ou en quarantaine.
+5. Le FGP inscrit le résultat et les références d’historique.
+6. Les modules consommateurs reçoivent un résultat limité ou un événement de mise à jour selon les contrats définis.
+3.2 Source de vérité
+Le système doit définir, pour chaque groupe de données, quelle source peut les créer ou les confirmer. Par exemple, le recensement peut fournir une donnée déclarée ou collectée ; l’état civil fournit les références d’actes et événements relevant de son autorité ; le service biométrique fournit des résultats de comparaison ; le service NIN fournit la confirmation du NIN. Le FGP conserve ces informations et applique les règles de rapprochement validées, plutôt que d’effacer les distinctions entre sources.
+4. Dossier de référence d’une personne
+4.1 Structure conceptuelle
+Groupe
+Éléments possibles
+Contrôles de conception
+Référence technique
+Identifiant interne stable, date de création, statut du dossier, version.
+Clé unique et immuable, distincte du NIN.
+Identité biographique
+Nom, post-nom, prénom, variantes ou autres noms autorisés.
+Ne pas normaliser destructivement ; conserver les variantes utiles selon la politique.
+Naissance
+Date et lieu de naissance, références d’acte et source.
+Distinguer information déclarée et information confirmée.
+Attributs personnels
+Sexe, profession, nationalité, état civil et attributs autorisés.
+La liste définitive dépend des exigences applicables.
+Adresse
+Adresse courante et historique, localisation administrative.
+Historiser les changements et les versions du référentiel territorial.
+Filiation / relations
+Parents, tuteurs, liens familiaux ou autres relations autorisées.
+Distinguer lien déclaré, documenté et vérifié.
+Actes et événements
+Naissance, mariage, divorce, décès, rectification et autres événements autorisés.
+Source, référence, date d’effet et date de réception.
+Biométrie
+Référence vers les captures/templates, état de qualité et fournisseur.
+Stockage séparé, accès restreint et aucune biométrie brute dans les logs.
+NIN
+Valeur confirmée, état et référence d’attribution.
+Origine exclusivement via le service autorisé ; règles d’unicité et de permanence.
+CIN et documents
+Références des cartes, demandes et justificatifs.
+Conserver les relations et statuts sans copier inutilement les fichiers.
+Historique
+Changements, vérifications, opérations et décisions.
+Audit protégé et accès contrôlé.
+
+4.2 Fiche synthétique
+La fiche synthétique doit montrer les informations nécessaires à l’utilisateur courant : référence de dossier, nom affichable, statut du dossier, état de vérification, référence du NIN si l’utilisateur est autorisé à le voir, dernier événement, éventuelle demande de rectification et messages d’attention. Les éléments biométriques détaillés ne doivent pas apparaître dans la fiche standard.
+4.3 Versions et dates d’effet
+Conserver l’horodatage de réception d’une donnée et, séparément, sa date d’effet si le métier la définit.
+Permettre de reconstruire l’état du dossier à une date donnée lorsque les règles de conservation le permettent.
+Ne pas confondre date de naissance déclarée, date d’inscription et date d’enregistrement dans le FGP.
+Quand une correction est appliquée, relier la nouvelle valeur à la décision ou à l’événement qui l’autorise.
+5. Provenance, qualité et statut de vérification
+5.1 Provenance minimale
+Métadonnée
+Utilité
+Source
+Identifier le système ou l’autorité qui a produit l’information.
+Référence source
+Retrouver le dossier, l’acte ou l’événement d’origine.
+Date de collecte / émission
+Comprendre quand l’information a été déclarée ou produite.
+Date de réception
+Tracer quand le FGP a reçu la donnée.
+Acteur / service
+Identifier le système ou l’utilisateur autorisé responsable.
+Méthode de vérification
+Document examiné, source interrogée ou contrôle effectué.
+État de vérification
+Distinguer déclaré, en contrôle, confirmé, contesté ou à rectifier.
+Version de schéma
+Interpréter correctement les données reçues depuis un système source.
+
+5.2 États de vérification indicatifs
+État proposé
+Sens
+Règle d’utilisation
+DECLARE
+Information déclarée ou collectée.
+Ne pas l’afficher comme confirmée.
+DOCUMENT_RECU
+Une pièce a été jointe ou référencée.
+La présence du document ne prouve pas à elle seule sa validité.
+EN_VERIFICATION
+Contrôle en cours.
+Afficher l’état d’attente et le responsable.
+CONFIRME
+Valeur confirmée par une procédure ou source autorisée.
+Conserver la preuve ou sa référence.
+CONTESTE
+Contradiction ou contestation enregistrée.
+Ne pas écraser la valeur sans résolution.
+A_RECTIFIER
+Une correction est requise ou demandée.
+Ouvrir le workflow de rectification.
+INCONNU / NON_RENSEIGNE
+Valeur non disponible selon le cas.
+Ne pas remplacer par une valeur supposée.
+
+Les valeurs finales de ces statuts doivent être harmonisées avec le vocabulaire du projet existant et les procédures officielles.
+6. Cycle de vie du dossier FGP
+État conceptuel
+Description
+Règles et contrôles
+DOSSIER_PROVISOIRE
+Données reçues mais parcours d’identification non finalisé.
+Doit rester distinct d’un dossier de référence validé.
+EN_RAPPROCHEMENT
+Comparaison avec les dossiers existants en cours.
+Aucune fusion ni attribution automatique liée au seul rapprochement.
+EN_VERIFICATION
+Données, actes ou provenance nécessitant un contrôle.
+Responsable et motif d’attente visibles aux utilisateurs autorisés.
+VALIDE
+Dossier confirmé selon le processus applicable.
+Les changements suivent les workflows autorisés.
+A_RECTIFIER
+Demande ou anomalie nécessitant une correction.
+Conserver les valeurs antérieures et la décision.
+FUSION_EN_EXAMEN
+Plusieurs dossiers potentiellement liés.
+Approbation renforcée et historique obligatoire.
+INACTIF / ARCHIVE
+État administratif selon une règle validée.
+Ne pas supprimer mécaniquement le dossier ou ses références.
+STATUT SPÉCIAL
+Par exemple statut résultant d’un événement d’état civil.
+Défini par les règles officielles ; date d’effet et source conservées.
+
+6.1 Transitions
+Toute transition est validée côté serveur en fonction du statut courant et des permissions.
+Le passage à l’état validé exige les contrôles ou décisions requis par le processus applicable.
+Les dossiers provisoires ou en rapprochement ne doivent pas être présentés comme des identités confirmées.
+Une transition refusée doit produire une erreur explicite et non sensible.
+Les opérations administratives exceptionnelles doivent être justifiées, autorisées et auditées.
+7. Ingestion et rapprochement des sources
+7.1 Sources possibles
+Selon les intégrations effectivement autorisées, le FGP peut recevoir des données d’enrôlement, des lots issus du recensement, des événements d’état civil, des mises à jour de dossiers, des résultats de services biométriques ou les références du service NIN. La liste des sources admises, leurs champs et leurs permissions doit être configurée et documentée.
+7.2 Pipeline d’ingestion
+1. Authentifier le système source et vérifier que sa clé ou son jeton est actif.
+2. Valider la version du schéma, la structure, les tailles et les champs attendus.
+3. Vérifier la référence stable de l’événement source et la clé d’idempotence.
+4. Enregistrer la provenance et l’horodatage de réception.
+5. Détecter les doublons exacts et les incohérences de données.
+6. Créer ou mettre à jour un dossier uniquement selon les règles et permissions autorisées.
+7. Placer les éléments ambigus en quarantaine ou en revue.
+8. Retourner un accusé de réception et un résultat par élément ou lot.
+7.3 Idempotence et conflits
+Situation
+Comportement attendu
+Même événement reçu plusieurs fois
+Renvoyer le résultat connu ou signaler un conflit, sans créer un second événement métier.
+Même référence avec payload différent
+Bloquer l’écrasement et créer un incident de cohérence.
+Événement plus ancien reçu tardivement
+Appliquer une règle de date d’effet et de résolution du conflit, pas une simple règle « dernier arrivé gagne ».
+Source non habilitée
+Refuser la mise à jour et journaliser la tentative.
+Schéma inconnu
+Mettre en quarantaine ou rejeter avec un motif exploitable.
+Données contradictoires entre sources
+Ouvrir une revue de rapprochement, conserver les deux provenances.
+
+8. Gestion des événements d’état civil
+8.1 Événements gérés
+Événement
+Traitement FGP proposé
+Précautions
+Naissance
+Rapprocher l’acte et les identités déjà présentes ; créer ou mettre à jour le dossier selon la procédure autorisée.
+Vérifier la référence d’acte et l’autorité source.
+Mariage
+Enregistrer l’événement et appliquer les champs ou relations prévus.
+Conserver les valeurs antérieures et la date d’effet.
+Divorce
+Enregistrer la décision ou l’acte et mettre à jour les données prévues.
+Ne pas inventer les conséquences administratives.
+Décès
+Mettre à jour le statut selon la règle applicable et conserver l’historique.
+Ne pas supprimer le dossier ; respecter le traitement officiel du NIN.
+Rectification
+Associer la décision, la valeur corrigée et la version précédente.
+Éviter l’écrasement silencieux.
+Annulation / événement rectifié
+Conserver la trace de l’événement initial et de son annulation ou correction.
+Ne pas effacer les journaux ni les références historiques.
+
+8.2 Contrôle des messages entrants
+Vérifier la provenance et la référence unique de l’acte ou de l’événement.
+Confirmer que la source est autorisée à transmettre le type d’événement.
+Vérifier la cohérence du dossier cible et les possibles identités concurrentes.
+Distinguer date de l’acte, date d’effet et date de transmission.
+En cas de contradiction, ouvrir une exception sans mettre à jour silencieusement les données confirmées.
+Retourner l’état de traitement à la source pour permettre le suivi des erreurs.
+9. Historique, rectifications et fusions contrôlées
+9.1 Journal d’évolution du dossier
+Le FGP doit permettre de comprendre comment l’information a évolué. Selon le type de changement, l’historique doit conserver l’événement, l’acteur ou le système source, le champ ou le groupe de champs concerné, l’ancienne et la nouvelle valeur lorsque nécessaire, le motif, la référence du document ou de la décision, la date de traitement et la date d’effet.
+9.2 Rectification
+Étape
+Fonction
+Trace attendue
+Demande
+Créer une demande liée à la personne et au champ concerné.
+Auteur, date, motif et valeur proposée.
+Justificatifs
+Associer les pièces ou références d’acte.
+Type, provenance, intégrité et statut de contrôle.
+Instruction
+Examiner la cohérence et les règles applicables.
+Agent responsable et commentaires.
+Décision
+Approuver, rejeter ou demander un complément.
+Décideur habilité, date et motif.
+Application
+Mettre à jour la valeur après approbation.
+Ancienne valeur, nouvelle valeur, date d’effet et référence de décision.
+Propagation
+Informer les modules dépendants selon les contrats.
+Événements de synchronisation et résultats.
+
+9.3 Fusions de dossiers
+La fusion est une opération exceptionnelle, non une simple modification de fiche.
+Conserver les identifiants techniques des dossiers avant et après l’opération.
+Documenter les éléments concordants, divergents, les preuves et la décision.
+Exiger une permission dédiée et une approbation selon la procédure prévue.
+Ne jamais réattribuer à une autre personne le NIN d’un titulaire.
+Prévoir un traitement de correction si la fusion est reconnue comme erronée.
+Conserver les références des cartes, actes et événements historiques.
+10. Règles de gestion du NIN dans le FGP
+Le FGP doit pouvoir référencer le NIN confirmé et garantir la cohérence de cette association, mais le mécanisme de génération relève du service officiel autorisé. Les notes du projet indiquent que le NIN est généré automatiquement et aléatoirement par un module de sécurité et qu’il est individuel, incessible, non répétitif et permanent. La mise en œuvre exacte doit être fondée sur le texte complet et l’annexe technique officielle.
+10.1 Règles techniques
+Séparer l’identifiant interne de la personne et le NIN officiel.
+Ne pas coder un format, une longueur, une clé de contrôle ou une séquence supposée.
+Associer le NIN à un dossier de référence par un service autorisé et une transaction protégée.
+Appliquer une contrainte d’unicité au niveau de la base de données selon le modèle retenu.
+Enregistrer la référence d’attribution, l’état, la date et le service responsable sans stocker de secrets.
+Gérer les erreurs et répétitions de requêtes de façon idempotente.
+Ne pas attribuer le NIN simplement parce qu’une collecte ou une importation a réussi.
+10.2 Cas à tester
+Tentatives simultanées sur la même personne.
+Réémission de la même demande après un timeout.
+Valeur NIN déjà présente ou conflit d’unicité.
+Dossier incomplet ou en rapprochement.
+Mise à jour d’un statut après événement d’état civil.
+Révocation ou correction selon la procédure officielle, sans réutilisation du NIN.
+11. Modèle de données conceptuel
+Les noms d’entités ci-dessous sont des exemples de conception. Il faut d’abord examiner les modèles et migrations existants du projet pour éviter de créer des doublons structurels.
+Entité indicative
+Responsabilité
+Contrôles clés
+persons
+Référence technique et données biographiques de base.
+Identifiant stable, version et statut.
+person_attribute_values
+Attributs ou versions d’attributs si le schéma choisi les sépare.
+Source, date d’effet et état de vérification.
+person_addresses
+Adresses actuelles et historiques.
+Référentiel territorial et historique daté.
+person_relationships
+Filiation et liens autorisés.
+Type de lien, source, période et statut de vérification.
+person_source_records
+Liens avec les dossiers des systèmes sources.
+Référence externe unique par source.
+fgp_events
+Événements enregistrés dans le FGP.
+Type, source, date, idempotence et résultat.
+civil_events
+Références et événements issus de l’état civil.
+Provenance, acte, date d’effet et statut.
+national_ids
+Association NIN-personne et statut.
+Unicité, origine autorisée et historique.
+biometric_references
+Références vers les éléments biométriques protégés.
+Séparation et contrôle d’accès.
+identity_documents
+Métadonnées des pièces et références de stockage privé.
+Intégrité, droits et politique de conservation.
+identity_reviews
+Rapprochements et décisions de vérification.
+Candidats séparés des décisions.
+correction_requests
+Workflow de rectification.
+Demande, justificatifs, décision et application.
+merge_cases
+Dossiers de fusion contrôlée.
+Approbation, liens historiques et audit.
+audit_events
+Traces de consultation et de modification.
+Protection contre l’altération et masquage des secrets.
+integration_events
+Événements d’import/export et résultats de traitement.
+Clé d’idempotence, statut, tentatives et erreurs.
+
+11.1 Invariants de données
+Une référence technique de personne ne doit pas être réutilisée pour une autre personne.
+Une relation entre deux dossiers doit conserver son type, sa provenance et son historique si elle change.
+Le FGP doit pouvoir identifier la source d’une valeur et la date à laquelle elle a été confirmée.
+Une référence source déjà traitée ne doit pas créer un nouvel événement à chaque retransmission.
+Les données biométriques sont isolées des tables générales ; le FGP conserve seulement les références nécessaires lorsque l’architecture le prévoit.
+Les traces d’audit sont protégées contre la modification ordinaire et ne contiennent pas de biométrie brute.
+12. Recherche, consultation et services d’identification
+12.1 Recherche interne
+Recherche par référence technique ou référence source quand le rôle le permet.
+Recherche biographique selon les champs autorisés et avec pagination.
+Affichage des résultats avec statut, provenance synthétique et niveau de vérification.
+Contrôle d’accès avant de révéler qu’un dossier existe.
+Journalisation des recherches sensibles selon la politique approuvée.
+12.2 Vérification pour un partenaire
+Un service autorisé peut avoir besoin de vérifier un NIN ou quelques attributs sans accéder au dossier complet. Le FGP devrait prendre en charge ce modèle de réponse minimale lorsqu’il est conforme aux habilitations approuvées.
+Demande
+Réponse autorisée indicative
+À éviter
+Vérifier un NIN
+Résultat de vérification et statut permis pour la finalité.
+Retourner toutes les données biographiques et biométriques.
+Confirmer un attribut
+Attribut explicitement demandé et autorisé, avec résultat.
+Retourner les champs non demandés.
+Vérifier une carte
+Validité de la référence de carte et état autorisé.
+Exposer les informations internes de production.
+
+12.3 Audit des consultations
+Les consultations de dossiers sensibles par les utilisateurs et partenaires doivent être journalisées selon la politique de sécurité : acteur, finalité ou contexte si prévu, dossier ou référence, date, résultat et système demandeur. Les journaux doivent être protégés et accessibles uniquement aux personnes habilitées.
+13. API et interopérabilité
+Les endpoints ci-dessous sont conceptuels. Ils ne doivent pas être créés ou modifiés avant l’inventaire des routes existantes et des contrats d’intégration.
+Capacité
+Exemple conceptuel
+Garde-fous
+Dossier FGP
+GET /api/v1/fgp/persons/{id}
+Permission, masquage, journalisation.
+Recherche interne
+GET /api/v1/fgp/search
+Pagination, filtres autorisés et limitation des résultats.
+Ingestion d’événement
+POST /api/v1/fgp/events
+Source authentifiée, version de schéma et idempotence.
+Référence source
+GET /api/v1/fgp/source-records/{source}/{id}
+Accès limité aux systèmes autorisés.
+Rectification
+POST /api/v1/fgp/corrections
+Workflow et validation des droits.
+Événement d’état civil
+Contrat existant ou endpoint documenté
+Vérification de provenance et gestion des conflits.
+Vérification d’identité
+POST /api/v1/identity/verify
+Réponse minimale et authentification du partenaire.
+Historique
+GET /api/v1/fgp/persons/{id}/history
+Permission d’audit ou de consultation adaptée.
+
+13.1 Exigences communes
+TLS et authentification des systèmes intégrés.
+Contrôle du rôle, de la finalité, du périmètre et des attributs demandés.
+Limitation de débit, quotas, révocation des accès et gestion des erreurs.
+Versionnement des schémas et compatibilité des clients existants.
+Clés d’idempotence pour les événements et opérations répétables.
+Réponses non sensibles, cohérentes et documentées.
+Audit des appels et suivi des résultats sans journalisation excessive des données.
+14. Sécurité, confidentialité et gouvernance
+14.1 Contrôle d’accès
+Le système doit appliquer des autorisations côté serveur. Les permissions peuvent combiner un rôle et un contexte : centre, province, finalité, catégorie de données ou type d’opération. Les droits de consultation, modification, validation, fusion, attribution NIN, export et administration technique doivent être séparés.
+Rôle indicatif
+Droits principaux
+Séparation nécessaire
+Administrateur métier
+Paramétrage métier et supervision autorisée.
+Pas de privilège biométrique automatique.
+Gestionnaire FGP
+Gestion des dossiers et traitements autorisés.
+Distinguer modification et décision finale.
+Validateur
+Décisions de validation et rectification.
+Ne pas administrer tous les comptes par défaut.
+Opérateur biométrique
+Accès spécialisé selon les besoins de vérification.
+Pas d’export libre de biométries.
+Administrateur technique
+Infrastructure, déploiement, maintenance.
+Pas d’accès métier systématique.
+Auditeur
+Journaux et rapports autorisés.
+Lecture seule et export limité.
+Partenaire
+Vérifications explicitement autorisées.
+Accès contractuel, limité, révocable et audité.
+
+14.2 Mesures techniques
+Chiffrer les communications et les stockages sensibles selon une politique approuvée.
+Gérer les clés et secrets hors du code source.
+Appliquer MFA aux comptes privilégiés et opérations à risque.
+Protéger les documents et données biométriques dans des espaces séparés.
+Masquer les attributs sensibles dans les logs, erreurs et outils de support.
+Détecter les accès anormaux et organiser une réponse aux incidents.
+Tester les restaurations et les procédures de révocation des accès.
+Définir des politiques de conservation, d’archivage et de suppression conformément aux règles applicables.
+14.3 Gouvernance des données
+Avant la production, il faut désigner les responsables des données, les autorités qui peuvent confirmer les attributs, les rôles habilités à rectifier ou fusionner les dossiers et les procédures d’accès des partenaires. Le développeur doit implémenter les règles approuvées, pas déterminer seul les obligations juridiques.
+15. Hébergement, continuité et qualité opérationnelle
+15.1 Hébergement
+Les notes fournies citent une exigence d’hébergement des données du FGP sur le territoire de la RDC. Cette exigence et ses éventuelles modalités doivent être vérifiées dans les textes officiels applicables, puis intégrées au choix de l’infrastructure, du stockage, des sauvegardes et du site de reprise.
+15.2 Continuité
+Définir les objectifs de reprise (RTO) et de perte de données admissible (RPO) avec les responsables.
+Protéger les sauvegardes, limiter les accès et séparer les sauvegardes des identifiants de production.
+Tester la restauration sur un environnement isolé.
+Prévoir une procédure de reprise des files d’intégration et de synchronisation.
+Documenter les changements de schéma et les procédures de retour arrière.
+Surveiller l’état de la base, des API, des files et des services spécialisés.
+15.3 Indicateurs d’exploitation
+Indicateur
+Description indicative
+Disponibilité du service FGP
+Pourcentage de temps où les fonctions critiques sont accessibles.
+Événements en attente
+Nombre et ancienneté des événements non traités.
+Échecs d’intégration
+Erreurs par source, version de schéma et type de problème.
+Retard de synchronisation
+Temps entre la production d’un événement et son traitement.
+Anomalies de cohérence
+Contradictions ou relations invalides détectées.
+Sauvegarde/restauration
+Dernière sauvegarde réussie et dernier test de restauration.
+
+Ces indicateurs doivent mesurer le système et la qualité du traitement. Ils ne doivent pas exposer de données personnelles inutiles au tableau de bord technique.
+16. Interfaces et navigation
+Espace
+Contenu
+Actions possibles selon permissions
+Vue FGP
+Volume des dossiers, statuts, événements en attente et anomalies agrégées.
+Filtrer et ouvrir une file de traitement.
+Recherche des personnes
+Recherche autorisée et résultats paginés.
+Ouvrir la fiche ou le dossier de rapprochement.
+Fiche de référence
+Identité, statut, provenance, sources, références d’actes et historique.
+Consulter, proposer une correction ou ouvrir un événement.
+Événements entrants
+État des événements par source, date et résultat.
+Examiner les erreurs et relancer les traitements autorisés.
+Rectifications
+Demandes, justificatifs, décideur, état et échéance.
+Traiter, demander un complément ou décider.
+Rapprochements
+Dossiers candidats, divergences et motif du rapprochement.
+Examiner et proposer la suite autorisée.
+Historique / audit
+Opérations, décisions et modifications.
+Consulter dans le périmètre permis.
+Partenaires/API
+État des intégrations, droits et échanges.
+Gérer les habilitations selon le rôle technique autorisé.
+Santé du FGP
+Disponibilité, files, intégrité et sauvegardes.
+Superviser sans exposer les dossiers nominaux.
+
+16.1 Principes d’interface
+Montrer clairement ce qui est confirmé, déclaré, en attente ou contesté.
+Afficher la source et la date de mise à jour des informations critiques.
+Distinguer statut du dossier, état du NIN, état de la carte et statut d’un événement.
+Ne pas afficher des biométries brutes dans la fiche standard.
+Demander une confirmation et un motif pour les actions sensibles.
+Éviter les liens ou boutons qui permettent de contourner les workflows autorisés.
+17. Scénarios métier détaillés
+Scénario A — Réception d’un dossier d’enrôlement
+1. Le service source envoie une fiche avec référence stable, version et provenance.
+2. Le FGP vérifie la source, le schéma et la clé d’idempotence.
+3. Le dossier est rapproché avec les références existantes.
+4. Si une validation supplémentaire est nécessaire, le dossier reste provisoire ou en revue.
+5. Le système renvoie un résultat technique et métier clairement distingué.
+Scénario B — Réception d’un événement de naissance
+1. Le connecteur d’état civil transmet une référence d’acte et un événement signé ou authentifié selon le contrat autorisé.
+2. Le FGP vérifie la source, les champs, la référence unique et les éventuelles identités existantes.
+3. Les conflits sont envoyés en revue ; une réimportation identique est idempotente.
+4. La création ou mise à jour suit le workflow approuvé.
+5. La date d’effet, la source et le résultat sont conservés.
+Scénario C — Rectification d’une donnée confirmée
+1. Une demande référencée est créée avec motif et justificatifs.
+2. Le service vérifie les droits et envoie la demande à la file de traitement.
+3. Un validateur examine les preuves et rend une décision motivée.
+4. Si approuvée, la nouvelle valeur est enregistrée et l’ancienne reste historisée.
+5. Les services dépendants sont informés selon le contrat ; les erreurs de propagation sont suivies.
+Scénario D — Deux dossiers ressemblants
+1. Le système détecte une similitude et crée un candidat de rapprochement.
+2. Les agents autorisés examinent les différences et les sources disponibles.
+3. Si les personnes sont distinctes, le résultat est enregistré comme tel.
+4. Si une fusion est proposée, elle suit une procédure renforcée et ne réattribue jamais un NIN.
+5. Toutes les décisions et références antérieures restent traçables.
+Scénario E — Service externe vérifie une identité
+1. Le partenaire s’authentifie et demande une vérification autorisée.
+2. L’API vérifie le droit du partenaire, la finalité et les attributs demandés.
+3. Le FGP renvoie uniquement le résultat prévu par le contrat.
+4. L’appel est journalisé sans stocker inutilement le dossier complet.
+18. Tests et critères d’acceptation
+Catégorie
+Test à réaliser
+Résultat attendu
+Intégrité
+Créer ou mettre à jour un dossier de référence.
+Clés, relations et contraintes cohérentes.
+Provenance
+Importer une donnée sans source ou avec une source inconnue.
+Refus ou quarantaine selon la règle.
+Idempotence
+Envoyer deux fois la même référence d’événement.
+Pas de double événement ni de double dossier.
+Conflit
+Envoyer le même ID source avec un contenu différent.
+Blocage et création d’une anomalie.
+État civil
+Transmettre un événement répété ou tardif.
+Résultat cohérent, historique conservé et règles appliquées.
+Rectification
+Approuver puis rejeter des demandes.
+Trace de la demande et décision, anciennes valeurs préservées.
+NIN
+Tenter une attribution depuis le formulaire FGP.
+Opération refusée ; attribution réservée au service autorisé.
+Permissions
+Consulter un dossier ou historique hors périmètre.
+Accès refusé côté serveur.
+Biométrie
+Tenter d’accéder à un template depuis la fiche standard.
+Accès refusé ou absence d’exposition.
+API partenaire
+Demander des champs non autorisés.
+Réponse minimale, sans fuite de données.
+Restauration
+Restaurer une sauvegarde dans l’environnement de test.
+Données et relations cohérentes après restauration.
+Non-régression
+Exécuter les tests des intégrations existantes.
+Les flux précédents restent opérationnels.
+
+18.1 Checklist d’acceptation
+☐ Le FGP possède un identifiant technique interne stable distinct du NIN.
+☐ Les données critiques ont une provenance et un état de vérification.
+☐ Les événements sont idempotents et les conflits sont visibles.
+☐ Les modifications sensibles conservent l’historique et la décision.
+☐ Les événements d’état civil ne sont appliqués que depuis des sources autorisées.
+☐ Les rapprochements ambigus suivent une revue humaine.
+☐ Le NIN est associé seulement via le service autorisé et selon la règle officielle validée.
+☐ Les API retournent uniquement les informations permises.
+☐ Les données biométriques et les documents sont protégés et séparés des écrans ordinaires.
+☐ Les sauvegardes ont fait l’objet d’un test de restauration.
+☐ Les tests de sécurité et de non-régression sont passés et documentés.
+19. Plan de développement progressif
+Phase 1 — Audit du FGP existant
+Inventorier les modèles, migrations, endpoints, relations, champs et workflows déjà présents. Rechercher les doubles sources de vérité et les règles dispersées dans le code.
+Livrable : cartographie technique et rapport d’écarts.
+Phase 2 — Modèle de référence et provenance
+Confirmer l’identifiant interne, les attributs, les références source, les états de vérification et les relations.
+Livrable : schéma actuel comparé au schéma cible.
+Phase 3 — Ingestion et idempotence
+Fiabiliser les événements entrants et les résultats, en réutilisant les contrats existants.
+Livrable : tests de retransmission, conflits et reprise.
+Phase 4 — Historique et rectification
+Stabiliser les versions, décisions, demandes de correction et procédures de rapprochement.
+Livrable : audit trail testable de bout en bout.
+Phase 5 — État civil et NIN
+Vérifier les sources autorisées et la séparation avec le service d’attribution du NIN.
+Livrable : scénarios validés pour les événements et association NIN.
+Phase 6 — Sécurité et API
+Renforcer les permissions, l’accès partenaires, la protection des données et la journalisation.
+Livrable : matrice de permission et tests de sécurité.
+Phase 7 — Qualité opérationnelle
+Mettre en place la surveillance, les sauvegardes et les tests de restauration.
+Livrable : rapport de continuité et résultats de restauration.
+Phase 8 — Recette et pilote
+Tester avec des données fictives ou autorisées et valider les parcours auprès des responsables métier.
+Livrable : procès-verbal de recette et risques résiduels.
+20. Prompt complet pour l’agent développeur
+Tu interviens sur le projet existant SIGPOP-RDC, module ONIP, Module 5 — Fichier Général de la Population (FGP). Tu dois auditer puis compléter progressivement le référentiel FGP existant, sans reconstruire le système ni casser les fonctionnalités opérationnelles.OBJECTIFMaintenir un référentiel cohérent, historisé, sourcé et sécurisé des dossiers de personnes. Fiabiliser l’ingestion des sources, les événements, les rectifications, les rapprochements, la référence NIN et les API de vérification.RÈGLES ABSOLUES1. Commence par inspecter le dépôt, README, services, routes, modèles, migrations, tests, connecteurs et variables d’environnement.2. Cartographie le schéma et les flux réellement implémentés avant de proposer une nouvelle table ou un endpoint.3. Ne supprime ni ne renomme une table, route, champ ou fonction sans justification, sauvegarde et plan de migration/retour arrière.4. Distingue les faits observés dans le code des hypothèses et recommandations.5. Conserve un identifiant technique interne immuable distinct du NIN officiel.6. N’invente jamais le format, la longueur ou l’algorithme du NIN. N’active pas de génération définitive sans texte complet et annexe officielle validés. Le FGP ne génère pas lui-même le NIN.7. Toute ingestion doit vérifier la source, le schéma, l’idempotence et la provenance. Un événement répété ne crée pas un doublon.8. En cas de conflit ou de données contradictoires, crée une exception visible ; n’applique pas une règle aveugle « dernier arrivé gagne ».9. N’effectue aucune fusion automatique de personnes. Les candidats passent par une revue habilitée.10. Les rectifications des données confirmées conservent ancienne valeur, nouvelle valeur, auteur, date, motif, source et décision.11. Les événements d’état civil doivent provenir de sources autorisées et être distincts des fiches de recensement.12. Protège les données biométriques, documents, secrets et logs. N’inscris pas des biométries brutes ou des secrets dans les journaux.13. Les APIs partenaires renvoient uniquement les attributs autorisés nécessaires à la finalité.14. Préserve les données existantes et utilise des jeux de test fictifs ou anonymisés.PHASE A — AUDIT- Cartographie les modèles, relations, tables, migrations, endpoints et services FGP.- Inventorie les sources : enrôlement, recensement, état civil, biométrie, NIN, cartes et partenaires.- Vérifie les contraintes d’unicité, les états, les historiques et la provenance.- Vérifie les conflits entre sources, l’idempotence et le traitement des événements tardifs.- Exécute les tests existants et rapporte les résultats exacts.- Produis d’abord un tableau : module/fonction, statut réel, preuve, fichiers/endpoints/tables, écarts, risques, correction, priorité et tests.PHASE B — RÉFÉRENTIEL ET QUALITÉ- Stabilise l’identifiant interne et les relations existantes.- Assure la traçabilité de la provenance et l’état de vérification des champs critiques.- Conserve les historiques de changements selon le modèle approprié.- Évite les doublons structurels et réutilise les composants existants.PHASE C — ÉVÉNEMENTS ET RECTIFICATIONS- Rends le traitement des événements idempotent.- Contrôle la source et la version du schéma.- Gère les erreurs, conflits et quarantaines avec des résultats explicites.- Mets en place le workflow de rectification et les validations nécessaires.- Assure que les événements d’état civil ne sont pas confondus avec le recensement.PHASE D — NIN, BIOMÉTRIE ET RAPPROCHEMENT- Vérifie la séparation entre FGP, service NIN et service biométrique.- N’invente aucune règle officielle du NIN.- Expose les références et statuts autorisés seulement.- Garde les candidats de doublon séparés des décisions ; aucune fusion automatique.PHASE E — API, SÉCURITÉ ET EXPLOITATION- Vérifie les rôles, permissions, périmètres, MFA si présent et journaux.- Restreins les APIs partenaires au minimum de données nécessaires.- Protège documents, clés, sauvegardes et logs.- Vérifie la continuité, les migrations et le plan de restauration.PHASE F — TESTS ET LIVRAISON- Ajoute tests unitaires, intégration, idempotence, concurrence, permissions, sécurité, restauration et non-régression.- Exécute réellement les tests, le lint et le build disponibles.- Documente les commandes, résultats, fichiers modifiés, migrations, risques et retour arrière.- Ne déclare pas terminé ce qui n’a pas de preuve de test.- N’effectue aucun déploiement ni changement destructif sans autorisation explicite.LIVRABLE INITIALUn rapport d’audit fondé sur des preuves, avant toute modification structurelle. Attends la validation de ce rapport avant d’entreprendre une refonte du modèle ou des intégrations.
+21. Limites et décisions à valider
+La version complète du décret et des arrêtés applicables, y compris les annexes techniques.
+La liste officielle des attributs du FGP et les catégories de personnes concernées.
+Les autorités et sources habilitées à créer, confirmer et rectifier chaque attribut.
+La règle exacte d’attribution, d’association et de permanence du NIN.
+Les règles applicables aux événements de naissance, mariage, divorce, décès et rectification.
+La politique de conservation, d’archivage, de consultation et de suppression.
+Les exigences d’hébergement et de reprise, notamment la localisation des données.
+Les contrats d’API, partenaires habilités et champs communicables.
+Conclusion
+Le FGP doit être la référence cohérente et historisée des dossiers, tout en maintenant la séparation entre identité technique, NIN officiel, actes d’état civil, recensement, biométrie et carte d’identité. Sa fiabilité repose sur la provenance des données, l’idempotence, la résolution contrôlée des contradictions, l’historique et la sécurité.
+La priorité est d’auditer le modèle et les intégrations existants, puis de renforcer la qualité, la traçabilité et la sécurité sans créer une seconde base concurrente ni supprimer les données déjà utilisées. Les règles officielles non confirmées doivent rester identifiées comme points à valider.

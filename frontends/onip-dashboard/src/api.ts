@@ -325,6 +325,84 @@ export const registryApi = {
     ),
 };
 
+/** Module 5 — FGP (façade audité /events /filiation /santé). */
+export type FgpHealth = {
+  generated_at: string;
+  citizens_total: number;
+  with_nic: number;
+  without_nic: number;
+  by_status: Record<string, number>;
+  open_duplicates: number;
+  provisional_nic_only: boolean;
+  official_nin_format_confirmed: boolean;
+  offline_nin_forbidden: boolean;
+};
+
+export type FgpRelation = {
+  id: string;
+  citizen_id: string;
+  related_citizen_id: string;
+  relation_type: string;
+  legal_basis?: string | null;
+};
+
+export const fgpApi = {
+  catalog: () =>
+    request<{
+      module: number;
+      title: string;
+      offline_nin_forbidden: boolean;
+      invent_nin_forbidden: boolean;
+      note: string;
+    }>("/fgp/catalog"),
+  health: () => request<FgpHealth>("/fgp/health"),
+  searchPersons: (params: CitizenSearchParams) => {
+    const q = new URLSearchParams({
+      page: String(params.page ?? 1),
+      page_size: String(params.page_size ?? 50),
+    });
+    if (params.q?.trim()) q.set("q", params.q.trim());
+    if (params.status) q.set("status", params.status);
+    if (params.province_code?.trim()) q.set("province_code", params.province_code.trim());
+    if (params.commune_code?.trim()) q.set("commune_code", params.commune_code.trim());
+    if (params.place_of_birth?.trim()) q.set("place_of_birth", params.place_of_birth.trim());
+    return request<PaginatedCitizens>(`/fgp/persons?${q}`);
+  },
+  getPerson: (id: string) => request<CitizenDetail>(`/fgp/persons/${id}`),
+  getHistory: (id: string, page = 1, pageSize = 50) =>
+    request<{ items: CitizenHistoryItem[]; total: number }>(
+      `/fgp/persons/${id}/history?page=${page}&page_size=${pageSize}`,
+    ),
+  listRelations: (id: string) => request<FgpRelation[]>(`/fgp/persons/${id}/relations`),
+  addRelation: (id: string, body: { related_citizen_id: string; relation_type: string; legal_basis?: string }) =>
+    request<FgpRelation>(`/fgp/persons/${id}/relations`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  ingestEvent: (body: {
+    source: string;
+    source_event_id: string;
+    citizen_id: string;
+    event_type: string;
+    payload?: Record<string, unknown>;
+  }) =>
+    request<{ id: string; already_processed: boolean; message: string }>("/fgp/events", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  requestCorrection: (body: {
+    citizen_id: string;
+    field_name: string;
+    proposed_value: string;
+    reason: string;
+    current_value?: string;
+  }) =>
+    request<{ history_id: string; status: string; message: string }>("/fgp/corrections", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+};
+
 export type PromoteResult = {
   citizen_id?: string | null;
   nic?: string | null;
