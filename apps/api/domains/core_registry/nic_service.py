@@ -223,13 +223,15 @@ async def nic_exists(session: AsyncSession, nic: str) -> bool:
 
 
 def _geo_from_citizen(citizen: Citizen) -> dict[str, str | None]:
+    # Évite lazy-load sync sous asyncpg (MissingGreenlet).
+    addrs = citizen.__dict__.get("addresses") or []
     primary = None
-    for addr in getattr(citizen, "addresses", None) or []:
-        if addr.is_primary:
+    for addr in addrs:
+        if getattr(addr, "is_primary", False):
             primary = addr
             break
-    if primary is None and getattr(citizen, "addresses", None):
-        primary = citizen.addresses[0] if citizen.addresses else None
+    if primary is None and addrs:
+        primary = addrs[0]
     if primary is None:
         # Défaut Kinshasa (15) — jamais province 00
         return {"province_code": "KIN", "commune_code": None, "city": "Kinshasa"}
@@ -263,11 +265,24 @@ async def assign_nic(
     *,
     citizen: Citizen,
     actor_id: uuid.UUID | None = None,
+    chosen_nic: str | None = None,
 ) -> str:
+    """Attribue un NIC provisoire — généré ou choisi (14 chiffres, DEV)."""
     if citizen.nic is not None:
         raise NicGenerationError("Citizen already has a NIC; re-attribution forbidden")
 
-    nic = await generate_unique_nic(session, citizen)
+    chosen = (chosen_nic or "").strip()
+    if chosen:
+        if not is_valid_nic_format(chosen):
+            raise NicGenerationError("chosen_nic must be exactly 14 digits")
+        if await nic_exists(session, chosen):
+            raise NicGenerationError("chosen_nic already in use")
+        nic = chosen
+        algo = f"{ALGORITHM_VERSION}-CHOSEN"
+    else:
+        nic = await generate_unique_nic(session, citizen)
+        algo = ALGORITHM_VERSION
+
     now = datetime.now(timezone.utc)
 
     citizen.nic = nic
@@ -280,7 +295,7 @@ async def assign_nic(
             citizen_id=citizen.id,
             nic=nic,
             issued_at=now,
-            algorithm_version=ALGORITHM_VERSION,
+            algorithm_version=algo,
             actor_system=ACTOR_SYSTEM,
         )
     )
@@ -290,8 +305,9 @@ async def assign_nic(
             event_type=CitizenEventType.NIC_ASSIGNED.value,
             payload={
                 "nic": nic,
-                "algorithm_version": ALGORITHM_VERSION,
+                "algorithm_version": algo,
                 "actor_system": ACTOR_SYSTEM,
+                "chosen": bool(chosen),
                 "fields": parse_nic_fields(nic),
                 "previous_status": CitizenStatus.PENDING_VALIDATION.value,
                 "new_status": CitizenStatus.ACTIVE.value,

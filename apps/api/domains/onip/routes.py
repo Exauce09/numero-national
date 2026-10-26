@@ -31,6 +31,10 @@ from apps.api.domains.core_registry.national_identity_number_service import (
     ProvisionalNinPrerequisitesError,
     nin_catalog,
 )
+from apps.api.domains.core_registry.nic_service import (
+    NicGenerationError,
+    generate_unique_nic,
+)
 from apps.api.domains.onip import service
 from apps.api.domains.onip.scope import resolve_scoped_filters
 
@@ -389,6 +393,11 @@ class NinAssignRequest(BaseModel):
         max_length=64,
         description="Module demandeur (ONIP_UI, CENSUS, CIVIL, FGP, …)",
     )
+    chosen_nin: str | None = Field(
+        default=None,
+        max_length=14,
+        description="NIN/NIC provisoire au choix (14 chiffres). Vide = génération auto.",
+    )
 
 
 class NinExceptionOpenRequest(BaseModel):
@@ -627,6 +636,7 @@ async def nin_assign(
             actor_id=principal.actor_id,
             idempotency_key=body.idempotency_key,
             request_source=body.request_source,
+            chosen_nin=body.chosen_nin,
         )
     except OfficialNinFormatUnresolvedError as exc:
         raise HTTPException(
@@ -646,6 +656,11 @@ async def nin_assign(
                 **exc.details,
             },
         ) from exc
+    except NicGenerationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"message": str(exc), "code": "nic_generation_error"},
+        ) from exc
 
     await db.commit()
     mfa = mfa_status_for(principal)
@@ -653,4 +668,45 @@ async def nin_assign(
         **result,
         "service": NationalIdentityNumberService.__name__,
         "mfa_warning": mfa["mfa_recommended"] or None,
+    }
+
+
+@router.get(
+    "/nin/suggest/{citizen_id}",
+    dependencies=[Depends(require_permissions(PERM_ONIP_DASHBOARD))],
+)
+async def nin_suggest_provisional(
+    citizen_id: UUID,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Propose un NIC provisoire 14 chiffres (non réservé) — à confirmer via /nin/assign."""
+    from sqlalchemy.orm import selectinload
+
+    citizen = await db.scalar(
+        select(Citizen)
+        .where(Citizen.id == citizen_id)
+        .options(selectinload(Citizen.addresses))
+    )
+    if citizen is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Citizen not found")
+    if citizen.nic:
+        return {
+            "citizen_id": str(citizen.id),
+            "suggested_nin": citizen.nic,
+            "already_assigned": True,
+            "note": "Dossier a déjà un NIC — suggestion = numéro existant.",
+        }
+    try:
+        suggested = await generate_unique_nic(db, citizen)
+    except NicGenerationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"message": str(exc), "code": "nic_generation_error"},
+        ) from exc
+    return {
+        "citizen_id": str(citizen.id),
+        "suggested_nin": suggested,
+        "already_assigned": False,
+        "format": "14 digits provisional (not official)",
+        "note": "Proposition non réservée — confirmez avec POST /nin/assign (chosen_nin).",
     }

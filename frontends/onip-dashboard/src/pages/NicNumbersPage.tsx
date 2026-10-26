@@ -36,6 +36,9 @@ export default function NicNumbersPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [assignMsg, setAssignMsg] = useState<string | null>(null);
+  const [chosenCitizenId, setChosenCitizenId] = useState("");
+  const [chosenNin, setChosenNin] = useState("");
+  const [suggestBusy, setSuggestBusy] = useState(false);
 
   const load = useCallback(
     async (query?: string) => {
@@ -76,11 +79,11 @@ export default function NicNumbersPage() {
     void load(q);
   }
 
-  async function assignProvisional(citizenId: string) {
+  async function assignProvisional(citizenId: string, nin?: string) {
     setAssignMsg(null);
     try {
       const key = `onip-ui-${citizenId}-${Date.now()}`;
-      const r = await ninOnipApi.assignProvisional(citizenId, key);
+      const r = await ninOnipApi.assignProvisional(citizenId, key, nin);
       setAssignMsg(
         r.already_processed
           ? `Reprise idempotente : ${r.nin}`
@@ -92,6 +95,44 @@ export default function NicNumbersPage() {
     } catch (e) {
       setAssignMsg(e instanceof Error ? e.message : "Attribution refusée");
     }
+  }
+
+  async function suggestChosen() {
+    if (!chosenCitizenId.trim()) {
+      setAssignMsg("Indiquez l’UUID du dossier citoyen.");
+      return;
+    }
+    setSuggestBusy(true);
+    setAssignMsg(null);
+    try {
+      const s = await ninOnipApi.suggest(chosenCitizenId.trim());
+      setChosenNin(s.suggested_nin);
+      setAssignMsg(
+        s.already_assigned
+          ? `Dossier a déjà le NIC ${s.suggested_nin}`
+          : `Proposition : ${s.suggested_nin} — vous pouvez la modifier puis attribuer.`,
+      );
+    } catch (e) {
+      setAssignMsg(e instanceof Error ? e.message : "Suggestion impossible");
+    } finally {
+      setSuggestBusy(false);
+    }
+  }
+
+  async function assignChosen(e: FormEvent) {
+    e.preventDefault();
+    if (!canAssign) return;
+    const id = chosenCitizenId.trim();
+    const nin = chosenNin.replace(/\D/g, "");
+    if (!id) {
+      setAssignMsg("UUID citoyen requis.");
+      return;
+    }
+    if (nin && nin.length !== 14) {
+      setAssignMsg("Le NIN choisi doit contenir exactement 14 chiffres (ou laissez vide pour auto).");
+      return;
+    }
+    await assignProvisional(id, nin || undefined);
   }
 
   async function lookupStatus(e: FormEvent) {
@@ -186,6 +227,50 @@ export default function NicNumbersPage() {
               {assignMsg}
             </div>
           ) : null}
+
+          <form className="panel" onSubmit={assignChosen}>
+            <h2 className="panel-title" style={{ marginTop: 0 }}>
+              NIN provisoire au choix (DEV)
+            </h2>
+            <p className="muted small">
+              Tant que le format officiel n&apos;est pas confirmé : générez une proposition ou
+              saisissez 14 chiffres, puis attribuez. Non officiel — usage démo / transition.
+            </p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <label style={{ flex: "1 1 260px" }}>
+                UUID dossier citoyen
+                <input
+                  className="form-control"
+                  value={chosenCitizenId}
+                  onChange={(e) => setChosenCitizenId(e.target.value)}
+                  placeholder="Identifiant interne FGP"
+                  required
+                />
+              </label>
+              <label style={{ flex: "1 1 180px" }}>
+                NIN / NIC (14 chiffres)
+                <input
+                  className="form-control"
+                  inputMode="numeric"
+                  maxLength={14}
+                  value={chosenNin}
+                  onChange={(e) => setChosenNin(e.target.value.replace(/\D/g, "").slice(0, 14))}
+                  placeholder="ex. 15001202001234"
+                />
+              </label>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={!canAssign || suggestBusy}
+                onClick={() => void suggestChosen()}
+              >
+                {suggestBusy ? "…" : "Générer une proposition"}
+              </button>
+              <button type="submit" className="btn-primary" disabled={!canAssign}>
+                Attribuer ce NIN
+              </button>
+            </div>
+          </form>
 
           <form className="panel" onSubmit={lookupStatus} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <h2 className="panel-title" style={{ flex: "1 1 100%", marginTop: 0 }}>

@@ -118,8 +118,8 @@ async def check_and_record_duplicates(
     session: AsyncSession,
     citizen: Citizen,
 ) -> list[DuplicateCandidate]:
-    # Assure addresses chargées
-    if not getattr(citizen, "addresses", None):
+    # Assure addresses chargées sans lazy-load sync (asyncpg / MissingGreenlet).
+    if "addresses" not in citizen.__dict__:
         loaded = await session.scalar(
             select(Citizen)
             .options(selectinload(Citizen.addresses))

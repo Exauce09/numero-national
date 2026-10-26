@@ -192,11 +192,12 @@ class NationalIdentityNumberService:
         citizen: Citizen,
         actor_id: uuid.UUID | None = None,
         skip_prerequisites: bool = False,
+        chosen_nin: str | None = None,
     ) -> NinAssignmentResult:
         """Chemin DEV / transition : format v3-rdc-14 provisoire (non officiel).
 
         Idempotent : si un NIC est déjà présent, le retourne sans en générer un autre.
-        Prérequis (sauf skip_prerequisites=True pour chemins override déjà validés) :
+        Prérequis (sauf skip_prerequisites=True ou NIN choisi pour démo) :
         dossier complet + aucun doublon OPEN.
         """
         if citizen.nic is not None:
@@ -208,18 +209,25 @@ class NationalIdentityNumberService:
                 already_assigned=True,
                 nin_status="PROVISIONAL",
             )
-        if not skip_prerequisites:
+        chosen = (chosen_nin or "").strip() or None
+        # NIN au choix (DEV) : on laisse passer sans bloquer sur doublons OPEN.
+        if not skip_prerequisites and not chosen:
             await cls.assert_provisional_prerequisites(session, citizen)
         try:
             nin = await _assign_provisional_nic_impl(
-                session, citizen=citizen, actor_id=actor_id
+                session, citizen=citizen, actor_id=actor_id, chosen_nic=chosen
             )
         except NicGenerationError:
             raise
+        algo = (
+            f"{PROVISIONAL_ALGORITHM_VERSION}-CHOSEN"
+            if chosen
+            else PROVISIONAL_ALGORITHM_VERSION
+        )
         return NinAssignmentResult(
             nin=nin,
             citizen_id=citizen.id,
-            algorithm_version=PROVISIONAL_ALGORITHM_VERSION,
+            algorithm_version=algo,
             official=False,
             already_assigned=False,
             nin_status="PROVISIONAL",
@@ -359,6 +367,7 @@ class NationalIdentityNumberService:
         actor_id: uuid.UUID | None = None,
         idempotency_key: str | None = None,
         request_source: str | None = None,
+        chosen_nin: str | None = None,
     ) -> dict[str, Any]:
         """Attribution via service central + journal de demande (idempotence clé)."""
         key = (idempotency_key or "").strip() or None
@@ -385,7 +394,10 @@ class NationalIdentityNumberService:
             raise OfficialNinFormatUnresolvedError(OFFICIAL_BLOCK_REASON)
 
         result = await cls.assign_provisional_nic(
-            session, citizen=citizen, actor_id=actor_id
+            session,
+            citizen=citizen,
+            actor_id=actor_id,
+            chosen_nin=chosen_nin,
         )
         now = datetime.now(timezone.utc)
         hist = CitizenHistory(

@@ -2,6 +2,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   fgpApi,
+  ninOnipApi,
   registryApi,
   type CitizenDetail,
   type CitizenHistoryItem,
@@ -904,6 +905,32 @@ export default function PopulationFgpPage() {
                   </p>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
+                  {!selected.nic ? (
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={() => {
+                        void (async () => {
+                          setError(null);
+                          try {
+                            const sug = await ninOnipApi.suggest(selected.id);
+                            const r = await ninOnipApi.assignProvisional(
+                              selected.id,
+                              `fgp-${selected.id}-${Date.now()}`,
+                              sug.suggested_nin,
+                            );
+                            setInfo(`NIN provisoire attribué : ${r.nin}`);
+                            await openDetail(selected.id);
+                            void load();
+                          } catch (e) {
+                            setError(e instanceof Error ? e.message : "Attribution NIN impossible");
+                          }
+                        })();
+                      }}
+                    >
+                      Générer NIN provisoire
+                    </button>
+                  ) : null}
                   {selected.status === "DRAFT" ? (
                     <button type="button" className="btn-primary" onClick={() => void submitSelected()}>
                       Soumettre
@@ -1004,9 +1031,12 @@ export default function PopulationFgpPage() {
                     </li>
                     <li>
                       NIN / NIC :{" "}
-                      {selected.nic || (
+                      {selected.nic ? (
+                        <code>{selected.nic}</code>
+                      ) : (
                         <>
-                          non attribué — voir <Link to="/nic">module NIN</Link>
+                          non attribué — bouton « Générer NIN provisoire » ci-dessus, ou{" "}
+                          <Link to="/nic">module NIN</Link> (NIN au choix)
                         </>
                       )}
                     </li>

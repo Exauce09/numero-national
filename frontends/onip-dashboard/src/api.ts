@@ -1070,7 +1070,14 @@ export const ninOnipApi = {
         official: boolean;
       }>;
     }>(`/onip/nin/issuance-log?limit=${limit}`),
-  assignProvisional: (citizenId: string, idempotencyKey?: string) =>
+  suggest: (citizenId: string) =>
+    request<{
+      citizen_id: string;
+      suggested_nin: string;
+      already_assigned: boolean;
+      note?: string;
+    }>(`/onip/nin/suggest/${citizenId}`),
+  assignProvisional: (citizenId: string, idempotencyKey?: string, chosenNin?: string) =>
     request<{
       nin: string;
       already_assigned: boolean;
@@ -1080,6 +1087,7 @@ export const ninOnipApi = {
       request_id?: string;
       idempotency_key?: string | null;
       mfa_warning?: boolean | null;
+      message?: string;
     }>("/onip/nin/assign", {
       method: "POST",
       body: JSON.stringify({
@@ -1087,6 +1095,7 @@ export const ninOnipApi = {
         mode: "provisional",
         request_source: "ONIP_UI",
         ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
+        ...(chosenNin ? { chosen_nin: chosenNin } : {}),
       }),
     }),
   exceptions: (limit = 50) =>
