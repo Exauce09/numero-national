@@ -511,12 +511,29 @@ export type GeoItem = { id: string; code?: string; name: string };
 
 export const geoApi = {
   provinces: () => request<GeoItem[]>("/geo/provinces"),
+  districts: (provinceId: string) =>
+    request<GeoItem[]>(`/geo/districts?province_id=${encodeURIComponent(provinceId)}`),
   villes: (provinceId: string) =>
     request<GeoItem[]>(`/geo/villes?province_id=${encodeURIComponent(provinceId)}`),
   communes: (villeId: string) =>
     request<GeoItem[]>(`/geo/communes?ville_id=${encodeURIComponent(villeId)}`),
+  communesByDistrict: (districtId: string) =>
+    request<GeoItem[]>(`/geo/communes?district_id=${encodeURIComponent(districtId)}`),
   communesByProvince: (provinceId: string) =>
     request<GeoItem[]>(`/geo/communes?province_id=${encodeURIComponent(provinceId)}`),
+  quartiers: (communeId: string) =>
+    request<GeoItem[]>(`/geo/quartiers?commune_id=${encodeURIComponent(communeId)}`),
+  localites: (params: { communeId?: string; districtId?: string }) => {
+    const q = new URLSearchParams();
+    if (params.communeId) q.set("commune_id", params.communeId);
+    if (params.districtId) q.set("district_id", params.districtId);
+    return request<GeoItem[]>(`/geo/localites?${q}`);
+  },
+  seed: (force = false) =>
+    request<{ status: string; counts?: Record<string, number> }>(
+      `/geo/seed?force=${force ? "true" : "false"}`,
+      { method: "POST" },
+    ),
 };
 
 export const censusApi = {
@@ -1115,6 +1132,52 @@ export const biometricApi = {
       [k: string]: unknown;
     }>("/biometric/stats"),
   thresholds: () => request<Array<{ code?: string; name?: string; value?: number; active?: boolean }>>("/biometric/thresholds"),
+  fingers: () =>
+    request<{ positions: Array<{ code: string; label: string }> }>("/biometric/fingers"),
+  startEnrollment: (body: { citizen_id: string; device_id?: string }) =>
+    request<{
+      id: string;
+      citizen_id: string;
+      status: string;
+      required_fingers: number;
+      fingerprints_count: number;
+    }>("/biometric/enrollments", { method: "POST", body: JSON.stringify(body) }),
+  capture: (
+    enrollmentId: string,
+    body: {
+      finger_position: string;
+      template_b64: string;
+      quality_score?: number;
+      capture_device?: string;
+    },
+  ) =>
+    request<{
+      accepted: boolean;
+      blocked: boolean;
+      message: string;
+      fingerprints_count: number;
+      required_fingers: number;
+      match?: { id: string; matched_citizen_id: string; match_score: number };
+    }>(`/biometric/enrollments/${enrollmentId}/capture`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  finalize: (enrollmentId: string) =>
+    request<{ id: string; status: string }>(`/biometric/enrollments/${enrollmentId}/finalize`, {
+      method: "POST",
+      body: "{}",
+    }),
+  citizenPrints: (citizenId: string) =>
+    request<
+      Array<{
+        id: string;
+        finger_position: string;
+        finger_label: string;
+        quality_score: number | null;
+        status: string;
+        created_at: string;
+      }>
+    >(`/biometric/citizens/${citizenId}/fingerprints`),
   pendingMatches: (limit = 50) =>
     request<
       Array<{

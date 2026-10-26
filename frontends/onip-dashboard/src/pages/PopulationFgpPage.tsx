@@ -11,6 +11,18 @@ import {
   type FgpRelation,
 } from "../api";
 import { getSession } from "../auth";
+import GeoCascade, {
+  ADDRESS_FIELD_LABELS,
+  GEO_PRESETS,
+  ORIGIN_FIELD_LABELS,
+  type GeoSelection,
+} from "../components/GeoCascade";
+import NationaliteSelect from "../components/NationaliteSelect";
+import FgpFingerprintPanel, {
+  enrollPendingFingers,
+  type PendingFinger,
+} from "../components/FgpFingerprintPanel";
+import { nationaliteLabel } from "../nationalites";
 
 type Tab = "identite" | "adresse" | "filiation" | "controles" | "historique" | "rectification";
 type Mode = "liste" | "creer" | "detail";
@@ -65,22 +77,16 @@ export default function PopulationFgpPage() {
   const [eyeColor, setEyeColor] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [originProvince, setOriginProvince] = useState("");
-  const [originTerritory, setOriginTerritory] = useState("");
-  const [originSecteur, setOriginSecteur] = useState("");
+  const [originGeo, setOriginGeo] = useState<GeoSelection>({});
   const [originGroupement, setOriginGroupement] = useState("");
-  const [originLocalite, setOriginLocalite] = useState("");
   const [fatherName, setFatherName] = useState("");
   const [fatherOcc, setFatherOcc] = useState("");
   const [fatherNat, setFatherNat] = useState("COD");
   const [motherName, setMotherName] = useState("");
   const [motherOcc, setMotherOcc] = useState("");
   const [motherNat, setMotherNat] = useState("COD");
-  const [addrLine, setAddrLine] = useState("");
-  const [addrLine2, setAddrLine2] = useState("");
-  const [addrCity, setAddrCity] = useState("");
-  const [addrProv, setAddrProv] = useState("");
-  const [addrCommune, setAddrCommune] = useState("");
+  const [residenceGeo, setResidenceGeo] = useState<GeoSelection>({});
+  const [pendingFingers, setPendingFingers] = useState<PendingFinger[]>([]);
   const [similar, setSimilar] = useState<CitizenHit[]>([]);
   const [statusReason, setStatusReason] = useState("");
   const [dupJustification, setDupJustification] = useState("");
@@ -132,6 +138,7 @@ export default function PopulationFgpPage() {
     setError(null);
     setInfo(null);
     setTab("identite");
+    setPendingFingers([]);
     try {
       const [c, hist, dups, rels] = await Promise.all([
         fgpApi.getPerson(id),
@@ -161,8 +168,8 @@ export default function PopulationFgpPage() {
         given_names: givenNames.trim(),
         date_of_birth: dob,
         sex,
-        province_code: addrProv.trim() || undefined,
-        commune_code: addrCommune.trim() || undefined,
+        province_code: residenceGeo.province_code || undefined,
+        commune_code: residenceGeo.commune_code || undefined,
       });
       setSimilar(res.items);
       setInfo(res.message);
@@ -187,22 +194,16 @@ export default function PopulationFgpPage() {
     setEyeColor("");
     setPhone("");
     setEmail("");
-    setOriginProvince("");
-    setOriginTerritory("");
-    setOriginSecteur("");
+    setOriginGeo({});
     setOriginGroupement("");
-    setOriginLocalite("");
     setFatherName("");
     setFatherOcc("");
     setFatherNat("COD");
     setMotherName("");
     setMotherOcc("");
     setMotherNat("COD");
-    setAddrLine("");
-    setAddrLine2("");
-    setAddrCity("");
-    setAddrProv("");
-    setAddrCommune("");
+    setResidenceGeo({});
+    setPendingFingers([]);
     setSimilar([]);
   }
 
@@ -216,6 +217,26 @@ export default function PopulationFgpPage() {
     }
     try {
       const height = heightCm.trim() ? Number(heightCm.replace(",", ".")) : undefined;
+      const originProvince = originGeo.province_name?.trim() || "";
+      const originTerritory =
+        originGeo.district_name?.trim() || originGeo.ville_name?.trim() || "";
+      const originSecteur = originGeo.commune_name?.trim() || "";
+      const originLocalite = originGeo.localite_name?.trim() || "";
+
+      const resAvenue = residenceGeo.avenue_name
+        ? `Av. ${residenceGeo.avenue_name}${residenceGeo.numero ? ` n° ${residenceGeo.numero}` : ""}`
+        : residenceGeo.numero
+          ? `n° ${residenceGeo.numero}`
+          : residenceGeo.label || "";
+      const resCity =
+        residenceGeo.ville_name?.trim() ||
+        residenceGeo.commune_name?.trim() ||
+        residenceGeo.district_name?.trim() ||
+        "";
+      const resLine1 =
+        resAvenue.trim() ||
+        [residenceGeo.quartier_name, residenceGeo.commune_name].filter(Boolean).join(", ");
+
       const body = {
         family_name: familyName.trim(),
         post_name: postName.trim(),
@@ -232,11 +253,11 @@ export default function PopulationFgpPage() {
         eye_color: eyeColor.trim() || undefined,
         phone: phone.trim() || undefined,
         email: email.trim() || undefined,
-        origin_province: originProvince.trim() || undefined,
-        origin_territory: originTerritory.trim() || undefined,
-        origin_secteur: originSecteur.trim() || undefined,
+        origin_province: originProvince || undefined,
+        origin_territory: originTerritory || undefined,
+        origin_secteur: originSecteur || undefined,
         origin_groupement: originGroupement.trim() || undefined,
-        origin_localite: originLocalite.trim() || undefined,
+        origin_localite: originLocalite || undefined,
         father_full_name: fatherName.trim() || undefined,
         father_occupation: fatherOcc.trim() || undefined,
         father_nationality: fatherNat.trim() || undefined,
@@ -244,15 +265,21 @@ export default function PopulationFgpPage() {
         mother_occupation: motherOcc.trim() || undefined,
         mother_nationality: motherNat.trim() || undefined,
         addresses:
-          addrLine.trim() && addrCity.trim()
+          resLine1.trim() && resCity.trim()
             ? [
                 {
                   address_type: "RESIDENTIAL",
-                  line1: addrLine.trim(),
-                  line2: addrLine2.trim() || undefined,
-                  city: addrCity.trim(),
-                  province_code: addrProv.trim() || undefined,
-                  commune_code: addrCommune.trim() || undefined,
+                  line1: resLine1.trim(),
+                  line2: residenceGeo.quartier_name?.trim() || undefined,
+                  city: resCity.trim(),
+                  province_code:
+                    residenceGeo.province_code?.trim() ||
+                    residenceGeo.province_name?.trim() ||
+                    undefined,
+                  commune_code:
+                    residenceGeo.commune_code?.trim() ||
+                    residenceGeo.commune_name?.trim() ||
+                    undefined,
                   country_code: "COD",
                   is_primary: true,
                 },
@@ -260,8 +287,20 @@ export default function PopulationFgpPage() {
             : [],
       };
       const created = await registryApi.createCitizen(body);
+      let bioNote = "";
+      if (pendingFingers.length > 0) {
+        try {
+          bioNote = await enrollPendingFingers(created.id, pendingFingers);
+        } catch (bioErr) {
+          bioNote =
+            bioErr instanceof Error
+              ? `Empreintes non liées : ${bioErr.message}`
+              : "Empreintes non liées.";
+        }
+      }
       setInfo(
-        `Brouillon créé — identifiant interne ${created.id}. Aucun NIN attribué (RB-02).`,
+        `Brouillon créé — identifiant interne ${created.id}. Aucun NIN attribué (RB-02).` +
+          (bioNote ? ` ${bioNote}` : ""),
       );
       resetCreateForm();
       await openDetail(created.id);
@@ -546,7 +585,8 @@ export default function PopulationFgpPage() {
               <p className="muted small">
                 Champs alignés sur le décret n° 22/07 du 2 mars 2022 (art. 8) et la pratique
                 d&apos;identification RDC (nom / postnom / prénom). Aucun NIN n&apos;est attribué ici.
-                Photo, empreintes et signature = modules biométrie / production CIN.
+                Les empreintes se capturent ci-dessous via le capteur branché ; photo / signature =
+                production CIN.
               </p>
 
               <h3>1. Identité</h3>
@@ -593,10 +633,12 @@ export default function PopulationFgpPage() {
                   N° acte de naissance
                   <input className="form-control" value={birthActNo} onChange={(e) => setBirthActNo(e.target.value)} />
                 </label>
-                <label>
-                  Nationalité *
-                  <input className="form-control" required maxLength={3} value={nationality} onChange={(e) => setNationality(e.target.value.toUpperCase())} />
-                </label>
+                <NationaliteSelect
+                  label="Nationalité *"
+                  value={nationality}
+                  onChange={setNationality}
+                  required
+                />
                 <label>
                   État civil
                   <select className="form-control" value={maritalStatus} onChange={(e) => setMaritalStatus(e.target.value)}>
@@ -634,26 +676,29 @@ export default function PopulationFgpPage() {
               </div>
 
               <h3>3. Province d&apos;origine (art. 8)</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12 }}>
-                <label>
-                  Province d&apos;origine
-                  <input className="form-control" value={originProvince} onChange={(e) => setOriginProvince(e.target.value)} />
-                </label>
-                <label>
-                  Territoire
-                  <input className="form-control" value={originTerritory} onChange={(e) => setOriginTerritory(e.target.value)} />
-                </label>
-                <label>
-                  Secteur / chefferie
-                  <input className="form-control" value={originSecteur} onChange={(e) => setOriginSecteur(e.target.value)} />
-                </label>
+              <p className="muted small">
+                Sélectionnez dans l&apos;ordre : province → ville / territoire → secteur / chefferie
+                (ou commune) → localité. Utilisez <strong>+ Ajouter</strong> si une entrée manque.
+              </p>
+              <GeoCascade
+                embedded
+                allowAdd
+                zoneChoice
+                levels={[...GEO_PRESETS.originRural]}
+                fieldLabels={ORIGIN_FIELD_LABELS}
+                value={originGeo}
+                onChange={setOriginGeo}
+                label="Origine"
+              />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginTop: 12 }}>
                 <label>
                   Groupement
-                  <input className="form-control" value={originGroupement} onChange={(e) => setOriginGroupement(e.target.value)} />
-                </label>
-                <label>
-                  Localité
-                  <input className="form-control" value={originLocalite} onChange={(e) => setOriginLocalite(e.target.value)} />
+                  <input
+                    className="form-control"
+                    placeholder="Groupement (saisie libre si non listé)"
+                    value={originGroupement}
+                    onChange={(e) => setOriginGroupement(e.target.value)}
+                  />
                 </label>
               </div>
 
@@ -667,10 +712,12 @@ export default function PopulationFgpPage() {
                   Profession du père
                   <input className="form-control" value={fatherOcc} onChange={(e) => setFatherOcc(e.target.value)} />
                 </label>
-                <label>
-                  Nationalité du père
-                  <input className="form-control" maxLength={3} value={fatherNat} onChange={(e) => setFatherNat(e.target.value.toUpperCase())} />
-                </label>
+                <NationaliteSelect
+                  label="Nationalité du père"
+                  value={fatherNat}
+                  onChange={setFatherNat}
+                  allowEmpty
+                />
                 <label>
                   Nom complet de la mère
                   <input className="form-control" value={motherName} onChange={(e) => setMotherName(e.target.value)} />
@@ -679,41 +726,35 @@ export default function PopulationFgpPage() {
                   Profession de la mère
                   <input className="form-control" value={motherOcc} onChange={(e) => setMotherOcc(e.target.value)} />
                 </label>
-                <label>
-                  Nationalité de la mère
-                  <input className="form-control" maxLength={3} value={motherNat} onChange={(e) => setMotherNat(e.target.value.toUpperCase())} />
-                </label>
+                <NationaliteSelect
+                  label="Nationalité de la mère"
+                  value={motherNat}
+                  onChange={setMotherNat}
+                  allowEmpty
+                />
               </div>
 
               <h3>5. Adresse de domicile / résidence</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12 }}>
-                <label>
-                  Avenue / avenue n° *
-                  <input
-                    className="form-control"
-                    placeholder="Avenue + numéro"
-                    value={addrLine}
-                    onChange={(e) => setAddrLine(e.target.value)}
-                  />
-                </label>
-                <label>
-                  Quartier / référence
-                  <input className="form-control" value={addrLine2} onChange={(e) => setAddrLine2(e.target.value)} />
-                </label>
-                <label>
-                  Ville / cité *
-                  <input className="form-control" value={addrCity} onChange={(e) => setAddrCity(e.target.value)} />
-                </label>
-                <label>
-                  Commune
-                  <input className="form-control" value={addrCommune} onChange={(e) => setAddrCommune(e.target.value)} />
-                </label>
-                <label>
-                  Province (résidence)
-                  <input className="form-control" value={addrProv} onChange={(e) => setAddrProv(e.target.value)} />
-                </label>
-              </div>
-              <p className="muted small">Adresse enregistrée si avenue et ville sont renseignées.</p>
+              <p className="muted small">
+                Sélectionnez province → ville / territoire → commune / secteur → quartier → avenue.
+                L&apos;adresse est enregistrée dès qu&apos;une ville (ou commune) et une ligne sont
+                disponibles.
+              </p>
+              <GeoCascade
+                embedded
+                allowAdd
+                zoneChoice
+                levels={[...GEO_PRESETS.address]}
+                fieldLabels={ADDRESS_FIELD_LABELS}
+                value={residenceGeo}
+                onChange={setResidenceGeo}
+                label="Résidence"
+              />
+
+              <FgpFingerprintPanel
+                pending={pendingFingers}
+                onPendingChange={setPendingFingers}
+              />
 
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
                 <button type="button" className="btn-secondary" onClick={() => void checkSimilar()}>
@@ -844,43 +885,53 @@ export default function PopulationFgpPage() {
               </div>
 
               {tab === "identite" ? (
-                <ul className="muted">
-                  <li>Nom : {selected.family_name}</li>
-                  <li>Postnom : {selected.post_name || "—"}</li>
-                  <li>Prénom(s) : {selected.given_names}</li>
-                  <li>Autres noms : {selected.other_names || "—"}</li>
-                  <li>Sexe : {selected.sex}</li>
-                  <li>Naissance : {selected.date_of_birth}</li>
-                  <li>Lieu : {selected.place_of_birth || "—"}</li>
-                  <li>N° acte de naissance : {selected.birth_certificate_number || "—"}</li>
-                  <li>Nationalité : {selected.nationality || "—"}</li>
-                  <li>État civil : {selected.marital_status || "—"}</li>
-                  <li>Profession : {selected.occupation || "—"}</li>
-                  <li>Taille : {selected.height_cm != null ? `${selected.height_cm} cm` : "—"}</li>
-                  <li>Yeux : {selected.eye_color || "—"}</li>
-                  <li>Téléphone : {selected.phone || "—"}</li>
-                  <li>E-mail : {selected.email || "—"}</li>
-                  <li>
-                    Origine :{" "}
-                    {[
-                      selected.origin_province,
-                      selected.origin_territory,
-                      selected.origin_secteur,
-                      selected.origin_groupement,
-                      selected.origin_localite,
-                    ]
-                      .filter(Boolean)
-                      .join(" / ") || "—"}
-                  </li>
-                  <li>
-                    NIN / NIC :{" "}
-                    {selected.nic || (
-                      <>
-                        non attribué — voir <Link to="/nic">module NIN</Link>
-                      </>
-                    )}
-                  </li>
-                </ul>
+                <>
+                  <ul className="muted">
+                    <li>Nom : {selected.family_name}</li>
+                    <li>Postnom : {selected.post_name || "—"}</li>
+                    <li>Prénom(s) : {selected.given_names}</li>
+                    <li>Autres noms : {selected.other_names || "—"}</li>
+                    <li>Sexe : {selected.sex}</li>
+                    <li>Naissance : {selected.date_of_birth}</li>
+                    <li>Lieu : {selected.place_of_birth || "—"}</li>
+                    <li>N° acte de naissance : {selected.birth_certificate_number || "—"}</li>
+                    <li>Nationalité : {nationaliteLabel(selected.nationality)}</li>
+                    <li>État civil : {selected.marital_status || "—"}</li>
+                    <li>Profession : {selected.occupation || "—"}</li>
+                    <li>Taille : {selected.height_cm != null ? `${selected.height_cm} cm` : "—"}</li>
+                    <li>Yeux : {selected.eye_color || "—"}</li>
+                    <li>Téléphone : {selected.phone || "—"}</li>
+                    <li>E-mail : {selected.email || "—"}</li>
+                    <li>
+                      Origine :{" "}
+                      {[
+                        selected.origin_province,
+                        selected.origin_territory,
+                        selected.origin_secteur,
+                        selected.origin_groupement,
+                        selected.origin_localite,
+                      ]
+                        .filter(Boolean)
+                        .join(" / ") || "—"}
+                    </li>
+                    <li>
+                      NIN / NIC :{" "}
+                      {selected.nic || (
+                        <>
+                          non attribué — voir <Link to="/nic">module NIN</Link>
+                        </>
+                      )}
+                    </li>
+                  </ul>
+                  <FgpFingerprintPanel
+                    pending={pendingFingers}
+                    onPendingChange={setPendingFingers}
+                    citizenId={selected.id}
+                    onEnrolled={() =>
+                      setInfo("Empreintes enrôlées sur ce dossier (capteur ZK9500).")
+                    }
+                  />
+                </>
               ) : null}
 
               {tab === "adresse" ? (
