@@ -64,11 +64,40 @@ async function fetchMe(accessToken: string): Promise<{
   }
 }
 
+function formatLoginErrorDetail(detail: unknown): string | null {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const msgs = detail.map((d) => {
+      if (typeof d === "object" && d && "msg" in d) {
+        const loc = "loc" in d && Array.isArray((d as { loc: unknown }).loc)
+          ? (d as { loc: unknown[] }).loc.join(".")
+          : "";
+        const msg = String((d as { msg: unknown }).msg);
+        if (loc.includes("email") || /email|value.?is.?not.?a.?valid.?email/i.test(msg)) {
+          return "Adresse e-mail invalide — utilisez le format nom@domaine (ex. admin.recensement@example.gov).";
+        }
+        return msg;
+      }
+      return String(d);
+    });
+    return msgs.filter(Boolean).join(" ") || null;
+  }
+  if (detail && typeof detail === "object" && "message" in detail) {
+    return String((detail as { message: unknown }).message);
+  }
+  return null;
+}
+
 /** Connexion API uniquement — JWT obligatoire. */
 export async function login(username: string, password: string): Promise<Session> {
   const user = username.trim();
   if (!user || !password) {
     throw new Error("Identifiant et mot de passe requis.");
+  }
+  if (!user.includes("@") || !/\S+@\S+\.\S+/.test(user)) {
+    throw new Error(
+      "Adresse e-mail invalide — utilisez le format nom@domaine (ex. admin.recensement@example.gov).",
+    );
   }
 
   const base = import.meta.env.VITE_API_BASE ?? "/api/v1";
@@ -110,12 +139,15 @@ export async function login(username: string, password: string): Promise<Session
   let detail = `Connexion refusée (${res.status}).`;
   try {
     const body = (await res.json()) as { detail?: unknown };
-    if (typeof body.detail === "string") detail = body.detail;
+    detail = formatLoginErrorDetail(body.detail) ?? detail;
   } catch {
     /* ignore */
   }
   if (res.status === 401) {
     throw new Error("Email ou mot de passe incorrect.");
+  }
+  if (res.status === 422) {
+    throw new Error(detail);
   }
   if (res.status === 502 || res.status === 503 || res.status === 504) {
     throw new Error("API indisponible. Vérifiez que le serveur tourne sur le port 8000.");

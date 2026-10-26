@@ -5,8 +5,8 @@ import { getSession, homePathForSession, login } from "../auth";
 export default function LoginPage() {
   const navigate = useNavigate();
   const existing = getSession();
-  const [username, setUsername] = useState("supervisor.recensement@example.gov");
-  const [password, setPassword] = useState("CensusSupervisor123!");
+  const [username, setUsername] = useState("admin.recensement@example.gov");
+  const [password, setPassword] = useState("CensusAdmin123!");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -40,14 +40,16 @@ export default function LoginPage() {
           {error ? <div className="login-error">{error}</div> : null}
 
           <label className="form-label" htmlFor="username">
-            Identifiant
+            E-mail
           </label>
           <input
             id="username"
             className="form-control"
             name="username"
-            type="text"
+            type="email"
+            inputMode="email"
             autoComplete="username"
+            placeholder="admin.recensement@example.gov"
             value={username}
             onChange={(ev) => setUsername(ev.target.value)}
           />
