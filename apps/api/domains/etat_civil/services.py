@@ -1168,6 +1168,15 @@ async def apply_registry_on_validation(
             place = _payload_str(
                 payload, "place_of_birth", "lieu_naissance", "lieu_etat_civil"
             )
+            mother_name = _payload_str(
+                payload, "mother_name", "mere_nom", "mother_full_name"
+            )
+            father_name = _payload_str(
+                payload, "father_name", "pere_nom", "father_full_name"
+            )
+            birth_act_no = _payload_str(
+                payload, "act_number", "birth_certificate_number", "numero_acte"
+            ) or act.act_number
             citizen = Citizen(
                 status=CitizenStatus.DRAFT.value,
                 nic=None,
@@ -1177,6 +1186,10 @@ async def apply_registry_on_validation(
                 nationality="COD",
                 given_names=given_names,
                 family_name=family_name,
+                birth_certificate_number=birth_act_no,
+                mother_full_name=mother_name or None,
+                father_full_name=father_name or None,
+                person_kind="NEWBORN",
                 created_at=now,
                 updated_at=now,
             )
@@ -1189,8 +1202,11 @@ async def apply_registry_on_validation(
                     payload={
                         "status": CitizenStatus.DRAFT.value,
                         "source": "etat_civil.birth",
+                        "person_kind": "NEWBORN",
                         "act_id": str(act.id),
                         "act_number": act.act_number,
+                        "mother_name": mother_name or None,
+                        "father_name": father_name or None,
                     },
                     actor_id=actor_id,
                     created_at=now,

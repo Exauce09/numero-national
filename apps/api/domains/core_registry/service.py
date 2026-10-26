@@ -129,6 +129,7 @@ async def create_draft_citizen(
         mother_full_name=data.mother_full_name,
         mother_occupation=data.mother_occupation,
         mother_nationality=_up3(data.mother_nationality),
+        person_kind=(data.person_kind or "ADULT").upper(),
         created_at=now,
         updated_at=now,
     )
@@ -312,6 +313,7 @@ def citizen_to_list_item(citizen: Citizen) -> dict:
         "date_of_birth": citizen.date_of_birth,
         "sex": citizen.sex,
         "place_of_birth": citizen.place_of_birth,
+        "person_kind": getattr(citizen, "person_kind", None) or "ADULT",
         "province_code": primary.province_code if primary else None,
         "ville": primary.city if primary else None,
         "commune_code": primary.commune_code if primary else None,

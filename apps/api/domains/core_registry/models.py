@@ -84,6 +84,14 @@ class Citizen(Base):
     mother_full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     mother_occupation: Mapped[str | None] = mapped_column(String(255), nullable=True)
     mother_nationality: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    # NEWBORN = bébé / nouveau-né ; ADULT = parent ou personne majeure
+    person_kind: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="ADULT",
+        server_default="ADULT",
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

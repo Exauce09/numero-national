@@ -69,6 +69,11 @@ class CitizenCreate(BaseModel):
     mother_full_name: str | None = Field(default=None, max_length=255)
     mother_occupation: str | None = Field(default=None, max_length=255)
     mother_nationality: str | None = Field(default=None, min_length=2, max_length=3)
+    person_kind: str = Field(
+        default="ADULT",
+        max_length=16,
+        description="NEWBORN (bébé) ou ADULT (parent / personne)",
+    )
     addresses: list[CitizenAddressIn] = Field(default_factory=list)
 
     @field_validator("given_names", "family_name")
@@ -78,6 +83,16 @@ class CitizenCreate(BaseModel):
         if not cleaned:
             raise ValueError("name must not be blank")
         return cleaned
+
+    @field_validator("person_kind")
+    @classmethod
+    def normalize_person_kind(cls, value: str) -> str:
+        kind = (value or "ADULT").strip().upper()
+        if kind in {"BEBE", "BÉBÉ", "NOUVEAU_NE", "NOUVEAU-NE", "NEW_BORN"}:
+            return "NEWBORN"
+        if kind not in {"NEWBORN", "ADULT"}:
+            raise ValueError("person_kind must be NEWBORN or ADULT")
+        return kind
 
     @field_validator(
         "post_name",
@@ -126,6 +141,7 @@ class CitizenUpdate(BaseModel):
     mother_full_name: str | None = Field(default=None, max_length=255)
     mother_occupation: str | None = Field(default=None, max_length=255)
     mother_nationality: str | None = Field(default=None, min_length=2, max_length=3)
+    person_kind: str | None = Field(default=None, max_length=16)
     reason: str | None = Field(
         default=None,
         max_length=2000,
@@ -167,6 +183,7 @@ class CitizenDetail(BaseModel):
     mother_full_name: str | None = None
     mother_occupation: str | None = None
     mother_nationality: str | None = None
+    person_kind: str = "ADULT"
     created_at: datetime
     updated_at: datetime
     validated_at: datetime | None
@@ -189,6 +206,7 @@ class CitizenListItem(BaseModel):
     date_of_birth: date
     sex: Sex = Sex.UNKNOWN
     place_of_birth: str | None = None
+    person_kind: str = "ADULT"
     province_code: str | None = None
     ville: str | None = None
     commune_code: str | None = None

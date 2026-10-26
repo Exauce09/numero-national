@@ -151,6 +151,8 @@ export type CitizenHit = {
   date_of_birth: string;
   sex?: string;
   place_of_birth?: string | null;
+  /** NEWBORN = bébé ; ADULT = parent / personne */
+  person_kind?: string | null;
   province_code?: string | null;
   ville?: string | null;
   commune_code?: string | null;
@@ -274,6 +276,7 @@ export type CitizenCreateBody = {
   mother_full_name?: string;
   mother_occupation?: string;
   mother_nationality?: string;
+  person_kind?: "NEWBORN" | "ADULT";
   addresses?: Omit<CitizenAddress, "id">[];
 };
 
