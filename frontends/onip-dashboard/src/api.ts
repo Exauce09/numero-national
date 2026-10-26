@@ -795,7 +795,59 @@ export type NationalCard = {
   routing_message?: string | null;
 };
 
+export type CardsCatalog = {
+  module: number;
+  title: string;
+  official_nin_format_confirmed: boolean;
+  invent_nin_forbidden: boolean;
+  cin_generates_nin_forbidden: boolean;
+  prototype_template_only: boolean;
+  template_approved: boolean;
+  template_version: string;
+  official_mrz_forbidden: boolean;
+  note: string;
+};
+
+export type CinEligibility = {
+  citizen_id: string;
+  admissible: boolean;
+  codes: string[];
+  has_nic: boolean;
+  nin_status: string | null;
+  official_nin_confirmed: boolean;
+  dossier_status: string | null;
+  active_card: boolean;
+  production_allowed: boolean;
+  note?: string;
+};
+
+export type CardRequestItem = {
+  id: string;
+  citizen_id: string;
+  request_type: string;
+  status: string;
+  block_reason?: string | null;
+  template_version?: string;
+  already_processed?: boolean;
+};
+
 export const cardsApi = {
+  catalog: () => request<CardsCatalog>("/cards/catalog"),
+  eligibility: (citizenId: string) =>
+    request<CinEligibility>(`/cards/eligibility/${citizenId}`),
+  listRequests: (limit = 40) =>
+    request<{ count: number; items: CardRequestItem[]; template_approved: boolean }>(
+      `/cards/card-requests?limit=${limit}`,
+    ),
+  createRequest: (citizenId: string, requestType = "FIRST_ISSUE", idempotencyKey?: string) =>
+    request<CardRequestItem>("/cards/card-requests", {
+      method: "POST",
+      body: JSON.stringify({
+        citizen_id: citizenId,
+        request_type: requestType,
+        ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
+      }),
+    }),
   getByCitizen: (citizenId: string) =>
     request<NationalCard | null>(`/cards/citizen/${citizenId}`),
   issueAndActivate: (citizenId: string) =>

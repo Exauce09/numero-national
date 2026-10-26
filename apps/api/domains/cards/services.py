@@ -177,6 +177,247 @@ async def assert_cin_eligibility(citizen: Citizen | None) -> Citizen:
     return citizen
 
 
+def cards_catalog() -> dict[str, Any]:
+    """Catalogue Module 9 — gabarit prototype ; pas de NIN inventé."""
+    from apps.api.domains.cards import request_store as rs
+    from apps.api.domains.core_registry.national_identity_number_service import (
+        OFFICIAL_NIN_FORMAT_CONFIRMED,
+    )
+
+    return {
+        "module": 9,
+        "title": "Carte d'Identité Nationale (CIN)",
+        "official_nin_format_confirmed": OFFICIAL_NIN_FORMAT_CONFIRMED,
+        "invent_nin_forbidden": True,
+        "cin_generates_nin_forbidden": True,
+        "prototype_template_only": True,
+        "template_approved": rs.TEMPLATE_APPROVED,
+        "template_version": rs.TEMPLATE_VERSION,
+        "official_mrz_forbidden": True,
+        "official_serial_format_confirmed": False,
+        "hardcoded_validity_days_note": (
+            f"Durée indicative {rs.PROTOTYPE_VALIDITY_DAYS} j — non juridique"
+        ),
+        "request_types": list(rs.REQUEST_TYPES),
+        "request_statuses": list(rs.REQUEST_STATUSES),
+        "card_statuses": [s.value for s in CardStatus],
+        "endpoints": {
+            "catalog": "GET /api/v1/cards/catalog",
+            "eligibility": "GET /api/v1/cards/eligibility/{citizen_id}",
+            "card_requests": "POST|GET /api/v1/cards/card-requests",
+            "approve_production": "POST /api/v1/cards/card-requests/{id}/approve-production",
+            "batches": "POST|GET /api/v1/cards/production-batches",
+            "issue": "POST /api/v1/cards/issue",
+            "issue_and_activate": "POST /api/v1/cards/issue-and-activate",
+            "deliver": "POST /api/v1/cards/{id}/deliver",
+            "report_lost": "POST /api/v1/cards/{id}/report-lost",
+            "report_stolen": "POST /api/v1/cards/{id}/report-stolen",
+            "replace": "POST /api/v1/cards/{id}/replace",
+            "revoke": "POST /api/v1/cards/{id}/revoke",
+            "lifecycle": "POST /api/v1/cards/{id}/lifecycle-events",
+        },
+        "note": (
+            "Module CIN : n'attribue jamais de NIN. Gabarit HTML = prototype non homologué. "
+            "Lots de production bloqués tant que template_approved=false. "
+            "QR interne sans PII ; MRZ UI non officielle."
+        ),
+        "audit_doc": "docs/legal/onip/MODULE_9_AUDIT.md",
+    }
+
+
+async def evaluate_cin_eligibility(
+    db: AsyncSession, citizen_id: uuid.UUID
+) -> dict[str, Any]:
+    """Admissibilité structurée (cahier §4) — sans générer de NIN."""
+    from apps.api.domains.core_registry.national_identity_number_service import (
+        OFFICIAL_NIN_FORMAT_CONFIRMED,
+        NationalIdentityNumberService,
+    )
+
+    citizen = await load_citizen_with_addresses(db, citizen_id)
+    codes: list[str] = []
+    if citizen is None:
+        return {
+            "citizen_id": str(citizen_id),
+            "admissible": False,
+            "codes": ["citizen_not_found"],
+            "has_nic": False,
+            "nin_status": None,
+            "official_nin_confirmed": False,
+            "dossier_status": None,
+            "active_card": False,
+            "template_approved": False,
+            "production_allowed": False,
+        }
+    if not citizen.nic:
+        codes.append("NIN_NON_CONFIRME")
+        codes.append("nic_required")
+    if citizen.status != "ACTIVE":
+        codes.append("DOSSIER_NON_VALIDE")
+        codes.append("dossier_not_validated")
+
+    active = await get_active_card_for_citizen(db, citizen_id)
+    if active is not None:
+        codes.append("CARTE_ACTIVE_EXISTANTE")
+
+    nin_status = NationalIdentityNumberService.nin_status_for(citizen)
+    admissible = not any(
+        c in codes
+        for c in ("citizen_not_found", "nic_required", "dossier_not_validated", "NIN_NON_CONFIRME", "DOSSIER_NON_VALIDE")
+    )
+    from apps.api.domains.cards import request_store as rs
+
+    return {
+        "citizen_id": str(citizen_id),
+        "admissible": admissible,
+        "codes": codes,
+        "has_nic": bool(citizen.nic),
+        "nin_status": nin_status,
+        "official_nin_confirmed": OFFICIAL_NIN_FORMAT_CONFIRMED,
+        "dossier_status": citizen.status,
+        "active_card": active is not None,
+        "active_card_id": str(active.card_id) if active else None,
+        "template_approved": rs.TEMPLATE_APPROVED,
+        "production_allowed": admissible and rs.TEMPLATE_APPROVED,
+        "note": (
+            "NIC provisoire accepté pour parcours prototype ; "
+            "production officielle bloquée (gabarit non homologué)."
+        ),
+    }
+
+
+async def create_card_request(
+    db: AsyncSession,
+    *,
+    citizen_id: uuid.UUID,
+    request_type: str = "FIRST_ISSUE",
+    idempotency_key: str | None = None,
+    source_card_id: uuid.UUID | None = None,
+    reason: str | None = None,
+    actor_id: uuid.UUID | None = None,
+) -> dict[str, Any]:
+    """Crée une demande CIN — n'émet pas la carte, n'invente pas de NIN."""
+    from apps.api.domains.cards import request_store as rs
+
+    rt = request_type.strip().upper()
+    if rt not in rs.REQUEST_TYPES:
+        raise CardEligibilityError(f"request_type invalide: {request_type}", code="invalid_request_type")
+
+    existing = rs.find_by_idempotency(idempotency_key)
+    if existing is not None:
+        return {**existing, "already_processed": True}
+
+    eligibility = await evaluate_cin_eligibility(db, citizen_id)
+    if eligibility.get("dossier_status") is None and "citizen_not_found" in eligibility["codes"]:
+        raise CardEligibilityError("Citizen not found", code="citizen_not_found")
+
+    if rt == "FIRST_ISSUE" and eligibility.get("active_card"):
+        status = "BLOCKED"
+        block = "CARTE_ACTIVE_EXISTANTE"
+    elif eligibility["admissible"]:
+        status = "ADMISSIBLE"
+        block = None
+    else:
+        status = "BLOCKED"
+        block = ",".join(eligibility["codes"]) or "INCOMPLET"
+
+    now = rs._now()
+    row = {
+        "id": rs.new_id(),
+        "citizen_id": str(citizen_id),
+        "request_type": rt,
+        "status": status,
+        "idempotency_key": (idempotency_key or "").strip() or None,
+        "source_card_id": str(source_card_id) if source_card_id else None,
+        "reason": reason,
+        "eligibility": eligibility,
+        "block_reason": block,
+        "template_version": rs.TEMPLATE_VERSION,
+        "preview_valid": False,
+        "actor_id": str(actor_id) if actor_id else None,
+        "created_at": now.isoformat(),
+        "updated_at": now.isoformat(),
+        "nin_generated_by_cin": False,
+        "already_processed": False,
+    }
+    return rs.save_request(row)
+
+
+async def approve_request_for_production(
+    request_id: str,
+    *,
+    motif: str,
+    actor_id: uuid.UUID | None = None,
+) -> dict[str, Any]:
+    """Approuve pour production — bloquée si gabarit non homologué."""
+    from apps.api.domains.cards import request_store as rs
+
+    row = rs.get_request(request_id)
+    if row is None:
+        raise CardEligibilityError("Demande introuvable", code="request_not_found")
+    if row["status"] not in {"ADMISSIBLE", "APPROVED_FOR_PERSONALIZATION"}:
+        raise CardEligibilityError(
+            f"Statut {row['status']} non approuvable pour production",
+            code="invalid_status",
+        )
+    if not rs.TEMPLATE_APPROVED:
+        raise CardEligibilityError(
+            "Gabarit prototype non homologué — production officielle refusée",
+            code="template_not_approved",
+        )
+    row["status"] = "APPROVED_FOR_PRODUCTION"
+    row["production_motif"] = motif.strip()
+    row["updated_at"] = rs._now().isoformat()
+    row["actor_id"] = str(actor_id) if actor_id else row.get("actor_id")
+    return rs.save_request(row)
+
+
+async def create_production_batch(
+    *,
+    request_ids: list[str],
+    actor_id: uuid.UUID | None = None,
+) -> dict[str, Any]:
+    """Crée un lot — refuse si gabarit non approuvé ou demandes non prêtes."""
+    from apps.api.domains.cards import request_store as rs
+
+    if not rs.TEMPLATE_APPROVED:
+        raise CardEligibilityError(
+            "Création de lot refusée : gabarit non homologué (prototype only)",
+            code="template_not_approved",
+        )
+    if not request_ids:
+        raise CardEligibilityError("request_ids requis", code="empty_batch")
+    for rid in request_ids:
+        req = rs.get_request(rid)
+        if req is None:
+            raise CardEligibilityError(f"Demande {rid} introuvable", code="request_not_found")
+        if req["status"] != "APPROVED_FOR_PRODUCTION":
+            raise CardEligibilityError(
+                f"Demande {rid} statut {req['status']} — APPROVED_FOR_PRODUCTION requis",
+                code="request_not_ready",
+            )
+    now = rs._now()
+    batch = {
+        "id": rs.new_id(),
+        "status": "CREATED",
+        "request_ids": list(request_ids),
+        "count": len(request_ids),
+        "template_version": rs.TEMPLATE_VERSION,
+        "actor_id": str(actor_id) if actor_id else None,
+        "created_at": now.isoformat(),
+        "released": False,
+        "note": "Lot MVP — impression matérielle hors lot",
+    }
+    for rid in request_ids:
+        req = rs.get_request(rid)
+        assert req is not None
+        req["status"] = "IN_BATCH"
+        req["batch_id"] = batch["id"]
+        req["updated_at"] = now.isoformat()
+        rs.save_request(req)
+    return rs.save_batch(batch)
+
+
 async def issue_card(
     db: AsyncSession,
     data: CardIssueRequest,
@@ -423,6 +664,48 @@ async def report_lost(
         actor_id=actor_id,
         payload={"reason": reason},
     )
+
+
+async def report_stolen(
+    db: AsyncSession,
+    card_id: uuid.UUID,
+    *,
+    reason: str | None = None,
+    actor_id: uuid.UUID | None = None,
+) -> NationalCard:
+    """Déclare un vol — historisé ; ne recycle pas le numéro ni le NIN."""
+    card = await get_card(db, card_id)
+    if card is None:
+        raise ValueError("Card not found")
+    return await _set_status(
+        db,
+        card,
+        CardStatus.STOLEN,
+        CardHistoryEvent.REPORTED_STOLEN,
+        actor_id=actor_id,
+        payload={"reason": reason, "nin_mutated": False},
+    )
+
+
+async def record_lifecycle_event(
+    db: AsyncSession,
+    card_id: uuid.UUID,
+    *,
+    event: str,
+    reason: str,
+    actor_id: uuid.UUID | None = None,
+) -> NationalCard:
+    """Événements de cycle de vie (cahier §12) — stubs contrôlés."""
+    ev = event.strip().upper()
+    if ev in {"LOST", "REPORTED_LOST"}:
+        return await report_lost(db, card_id, reason=reason, actor_id=actor_id)
+    if ev in {"STOLEN", "REPORTED_STOLEN"}:
+        return await report_stolen(db, card_id, reason=reason, actor_id=actor_id)
+    if ev in {"REVOKE", "REVOKED", "INVALIDATE"}:
+        return await revoke_card(db, card_id, reason=reason, actor_id=actor_id)
+    if ev in {"SUSPEND", "SUSPENDED"}:
+        return await suspend_card(db, card_id, reason=reason, actor_id=actor_id)
+    raise ValueError(f"Événement cycle de vie non supporté: {event}")
 
 
 async def revoke_card(

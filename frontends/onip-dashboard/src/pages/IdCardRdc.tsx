@@ -202,6 +202,7 @@ export default function IdCardRdc({ card, fallback }: Props) {
     ? new Date(card.expires_at).toLocaleDateString("fr-FR")
     : "—";
   const sexLabel = String(holder.sex).toUpperCase().startsWith("F") ? "F" : "M";
+  // MRZ UI = aperçu non officiel (cahier Module 9 — ne pas traiter comme norme ICAO ONIP).
   const mrz = buildMrz(card, holder);
 
   useEffect(() => {
@@ -223,8 +224,46 @@ export default function IdCardRdc({ card, fallback }: Props) {
 
   return (
     <div id="nn-id-card-print" className="id-card-print-wrap">
+      <p
+        className="no-print-actions"
+        style={{
+          margin: "0 0 8px",
+          padding: "6px 10px",
+          background: "#8a1c1c",
+          color: "#fff",
+          fontWeight: 700,
+          letterSpacing: "0.04em",
+          fontSize: 12,
+        }}
+      >
+        APERÇU / PROTOTYPE — gabarit non homologué · MRZ non officielle · aucun NIN inventé ici
+      </p>
       {/* RECTO — HTML réel (pas une image) */}
       <article className="rdc-card rdc-card-front" aria-label="Carte d'identité nationale — recto">
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: "30% 5%",
+            zIndex: 5,
+            pointerEvents: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: 0.18,
+            transform: "rotate(-18deg)",
+            fontSize: 28,
+            fontWeight: 800,
+            color: "#8a1c1c",
+            letterSpacing: "0.12em",
+            textAlign: "center",
+            lineHeight: 1.2,
+          }}
+        >
+          APERÇU
+          <br />
+          PROTOTYPE
+        </div>
         <div className="rdc-card-bg" aria-hidden>
           <img className="rdc-bg-tour" src={ASSETS.tour} alt="" />
           <img className="rdc-bg-arms" src={ASSETS.arms} alt="" />

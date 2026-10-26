@@ -1,0 +1,747 @@
+SIGPOP-RDC
+MODULE 9CARTE D’IDENTITÉ NATIONALE (CIN)
+Cahier des charges fonctionnel et technique détailléDemande, admissibilité, personnalisation, production, remise et cycle de vie de la carte
+Version de travail — octobre 2026
+Document destiné à l’audit et à l’évolution progressive du module existant.
+Avertissement et statut du document
+Ce document développe le Module 9 — Carte d’Identité Nationale (CIN) — pour le projet SIGPOP-RDC / ONIP. Il organise les besoins fonctionnels du parcours de demande, de vérification d’admissibilité, de préparation des données, de personnalisation, de production, de contrôle qualité, de remise et de suivi après délivrance.
+Ce cahier des charges est une proposition de conception, non une spécification officielle de la carte congolaise ni une certification juridique. Les éléments graphiques officiels, les données imprimées, les zones lisibles par machine (MRZ), les codes-barres ou QR, les dispositifs de sécurité, la durée de validité, les frais éventuels et les conditions exactes d’éligibilité doivent être confirmés auprès des autorités compétentes et dans les documents officiels en vigueur.
+Les notes du projet indiquent qu’un gabarit de carte, des éléments visuels nationaux et une fonction d’impression HTML existent ou ont été commencés. Ils doivent être audités avant toute refonte. Toute maquette proposée doit être clairement considérée comme un prototype jusqu’à validation formelle de la charte, du contenu et des caractéristiques de sécurité.
+Le module CIN ne doit pas attribuer ni inventer le NIN. Il doit utiliser uniquement une référence de dossier FGP validée et un NIN confirmé par le service compétent, selon les règles applicables. La génération ou la lecture des zones de sécurité ne doit pas être codée à partir d’hypothèses.
+Sommaire
+1. Finalité, objectifs et périmètre
+2. Principes directeurs et dépendances
+3. Architecture fonctionnelle du module CIN
+4. Demande et contrôle d’admissibilité
+5. Données de personnalisation de la carte
+6. Gabarit visuel, impression HTML et prévisualisation
+7. Production, lots et contrôle qualité
+8. Remise, réception et preuve de délivrance
+9. Cycle de vie : validité, renouvellement, perte et annulation
+10. États et transitions du dossier de carte
+11. Modèle de données indicatif
+12. API et intégrations avec les modules ONIP
+13. Sécurité, anti-fraude et protection des documents
+14. Interfaces et navigation
+15. Scénarios métier détaillés
+16. Tests et critères d’acceptation
+17. Plan de développement progressif
+18. Prompt complet pour l’agent développeur
+19. Sources, limites et décisions à valider
+1. Finalité, objectifs et périmètre
+1.1 Finalité
+Le module CIN organise le parcours administratif et opérationnel qui mène d’une demande admissible à la préparation, la personnalisation, la production et la remise d’une carte d’identité. Il relie chaque carte à une personne de référence dans le FGP et au NIN confirmé, conserve l’historique de toutes les opérations et suit les cartes non produites, non remises, remplacées, perdues, invalidées ou annulées selon les procédures en vigueur.
+1.2 Objectifs
+Recevoir ou créer une demande de carte en lien avec le dossier FGP correspondant.
+Vérifier que le dossier est validé et que le NIN est confirmé avant la personnalisation.
+Constituer un jeu de données de personnalisation à partir de sources autorisées.
+Générer une prévisualisation contrôlée et permettre la validation avant production.
+Gérer les lots de production, les opérateurs, les erreurs d’impression et la réconciliation des supports.
+Effectuer les contrôles qualité avant la remise au titulaire.
+Enregistrer la remise avec une preuve conforme à la procédure approuvée.
+Gérer renouvellement, remplacement, perte, vol, détérioration, invalidation et annulation selon les règles applicables.
+Protéger les gabarits, le contenu imprimé, les journaux, les données personnelles et les fonctions d’impression.
+1.3 Périmètre et dépendances
+Domaine
+Responsabilité du module CIN
+Dépendance / limite
+Demande
+Créer et suivre une demande de carte.
+Conditions d’éligibilité à valider officiellement.
+Admissibilité
+Vérifier les statuts du dossier et du NIN.
+Dépend du FGP et du service NIN ; ne génère pas de NIN.
+Personnalisation
+Composer les champs autorisés et la version du gabarit.
+Contenu, éléments de sécurité et MRZ doivent être approuvés.
+Impression
+Préparer, envoyer ou imprimer selon l’installation existante.
+Matériel, format, calibrage et contrôle de production à confirmer.
+Contrôle qualité
+Vérifier exactitude, lisibilité et conformité de la carte produite.
+Règles de contrôle et caractéristiques de sécurité officielles.
+Remise
+Suivre la carte jusqu’à sa remise ou sa non-remise.
+Vérification du titulaire et preuve requises par la procédure.
+Renouvellement/remplacement
+Ouvrir une nouvelle demande reliée à l’historique.
+Ne pas réutiliser ou effacer la trace d’une ancienne carte.
+Frais éventuels
+Tracer un paiement lorsque requis par une règle officielle.
+Aucun tarif ne doit être inventé ou activé sans base légale.
+1.4 Hors périmètre
+Définir de manière autonome le design officiel, la durée de validité ou les conditions juridiques de délivrance.
+Inventer ou générer le NIN dans le module CIN.
+Créer une MRZ, un QR code ou une clé cryptographique avec une structure supposée officielle.
+Imprimer une carte définitive quand le dossier ou le NIN n’est pas confirmé.
+Permettre à un opérateur de contourner le statut d’une carte par modification manuelle de la base.
+2. Principes directeurs et dépendances
+Une carte reliée au dossier de référence
+Chaque carte doit être reliée au dossier FGP et au NIN confirmé de la personne concernée.
+Admissibilité avant personnalisation
+Le module doit vérifier les conditions avant de composer les données ou déclencher la production.
+Séparer la maquette et le titre officiel
+Une maquette de développement ne doit jamais être confondue avec le modèle approuvé de la CIN.
+Tracer chaque exemplaire
+Toute production, impression ratée, carte détruite, remise, perte ou annulation doit être historisée.
+Pas de réutilisation d’un numéro de carte
+Les références de carte et les numéros de série suivent la règle officielle confirmée et ne sont pas recyclés par le logiciel.
+Contrôle à deux étapes
+La préparation de la personnalisation et la libération du lot de production devraient être des actions distinctes si la procédure le permet.
+Impression maîtrisée
+Les fonctions d’impression ne doivent pas laisser des fichiers PDF, images ou aperçus dans des dossiers publics ou des caches non contrôlés.
+Données minimales
+Seuls les attributs autorisés et nécessaires apparaissent sur la carte ou dans les zones lisibles par machine.
+3. Architecture fonctionnelle du module CIN
+Composant
+Responsabilité
+Contrôles attendus
+Gestion des demandes
+Créer et suivre les demandes de première délivrance ou de remplacement.
+Workflow, droits et motif de demande.
+Contrôle d’admissibilité
+Vérifier le statut FGP, le NIN, les blocages et les pièces exigées.
+Réponse du service de référence, pas de cache périmé non signalé.
+Service de personnalisation
+Assembler les champs approuvés dans un modèle versionné.
+Validation des champs, version de gabarit et accès restreint.
+Moteur de prévisualisation
+Afficher une prévisualisation fidèle au rendu prévu.
+Marquage « aperçu » si pas encore approuvé et aucune émission définitive.
+Gestion des lots
+Regrouper les demandes admissibles et assurer la traçabilité de production.
+Manifestes, volumes, état et opérateur.
+Connecteur d’impression
+Transmettre les données et/ou travaux vers l’imprimante selon l’architecture retenue.
+Séparation des droits, gestion des erreurs et des reprises.
+Contrôle qualité
+Enregistrer les vérifications après production.
+Carte non libérée avant le contrôle requis.
+Remise
+Organiser la remise au titulaire ou à l’agent autorisé.
+Vérification d’identité et preuve selon procédure.
+Cycle de vie
+Gérer renouvellement, perte, remplacement, invalidation et annulation.
+Historique conservé et statut cohérent.
+Audit et supervision
+Tracer les opérations et suivre les incidents.
+Journal protégé, pas de copie excessive du contenu imprimé.
+3.1 Flux général
+Le module reçoit une demande liée à une personne FGP identifiée.
+Le contrôle vérifie admissibilité, NIN confirmé, données requises et éventuels blocages.
+Le service de personnalisation sélectionne une version approuvée du gabarit.
+Un agent habilité vérifie la prévisualisation et approuve la demande de production lorsque la procédure le requiert.
+La demande entre dans un lot de production avec un identifiant stable et un manifeste.
+L’impression ou la personnalisation est exécutée ; chaque résultat est enregistré.
+La carte produite subit les contrôles qualité définis.
+La carte conforme est mise en attente de remise ; les exemplaires non conformes suivent un circuit de quarantaine/destruction contrôlée.
+La remise est enregistrée avec preuve, date, lieu et acteur selon les exigences applicables.
+Les événements de carte mettent à jour le statut du dossier et l’historique sans écraser les anciennes cartes.
+4. Demande et contrôle d’admissibilité
+4.1 Types de demandes
+Type de demande
+But
+Contrôle supplémentaire
+Première délivrance
+Émettre la première carte associée au dossier admissible.
+Vérifier l’absence de carte active antérieure selon le référentiel.
+Renouvellement
+Préparer une nouvelle carte à l’approche de l’échéance ou selon une règle autorisée.
+Relier l’ancienne carte et conserver son historique.
+Remplacement
+Remplacer une carte détériorée, illisible ou inutilisable.
+Enregistrer la cause et le statut de l’ancienne carte.
+Perte/vol
+Traiter une déclaration et demander le remplacement selon la procédure.
+Évaluer si un blocage ou une invalidation est requis.
+Correction de données imprimées
+Corriger une carte issue d’une donnée rectifiée.
+S’appuyer sur la rectification validée du dossier source.
+Annulation administrative
+Annuler une carte lorsque la procédure l’autorise.
+Décision motivée, approbation et traçabilité.
+4.2 Conditions préalables indicatives
+Le dossier de la personne existe dans le FGP et possède une référence stable.
+Le statut du dossier est compatible avec la délivrance.
+Le NIN est confirmé par le service autorisé et la consultation est permise.
+Les informations nécessaires à la personnalisation ont été vérifiées selon la procédure applicable.
+Les alertes bloquantes ou situations de doublon sont résolues ou traitées conformément à la règle métier.
+La demande dispose des justificatifs exigés pour ce type de démarche.
+Aucune carte active incompatible ou demande concurrente non résolue n’empêche la production.
+4.3 Résultats du contrôle
+Résultat
+Comportement attendu
+ADMISSIBLE
+Le parcours peut poursuivre vers la préparation, sous réserve des approbations requises.
+INCOMPLET
+Indiquer les champs ou pièces manquants et suspendre la demande.
+NIN_NON_CONFIRME
+Bloquer la personnalisation définitive et orienter vers le service NIN.
+DOSSIER_EN_REVUE
+Mettre en attente si une anomalie ou un doublon bloque la délivrance.
+CARTE_ACTIVE_EXISTANTE
+Orienter vers renouvellement/remplacement plutôt que première délivrance.
+NON_ADMISSIBLE
+Refuser avec motif conforme au workflow validé.
+ERREUR_TECHNIQUE
+Ne pas interpréter l’indisponibilité d’un service comme un refus métier définitif.
+Le contrôle d’admissibilité doit être fait côté serveur au moment de la demande puis revérifié avant la libération en production, afin d’éviter qu’un dossier ait changé de statut entre-temps.
+5. Données de personnalisation de la carte
+5.1 Catalogue de champs
+Les champs de la carte doivent être définis à partir du modèle officiel approuvé. La liste ci-dessous est indicative et sert à préparer le modèle de données ; elle ne confirme pas quels champs doivent légalement apparaître sur la CIN.
+Groupe
+Champs potentiels
+Règle
+Identification
+NIN confirmé, référence de carte, numéro de série officiel si applicable.
+Le NIN vient du service officiel ; le numéro de carte suit sa propre règle.
+Nom
+Nom, post-nom, prénom ou autres éléments prescrits.
+Respecter l’ordre, les accents, les longueurs et la translittération approuvés.
+Naissance
+Date et lieu de naissance si prévus par la maquette officielle.
+Source FGP validée ; format approuvé.
+Nationalité / sexe
+Attributs si le modèle officiel les prévoit.
+Ne pas exposer un champ non autorisé.
+Photo
+Portrait validé.
+Dimensions, qualité, arrière-plan et transformation selon spécification officielle.
+Signature
+Signature ou indication prévue par le modèle.
+Ne pas inventer une valeur de substitution sans procédure.
+Dates
+Date d’émission et date d’expiration si prévues.
+Calcul et format selon règle officielle.
+Autorité
+Émetteur, centre ou mentions officielles requises.
+Utiliser les libellés et marques approuvés.
+Zone machine
+MRZ, code-barres ou QR éventuel.
+Format officiel, standard applicable et contenu approuvé à confirmer.
+Éléments de sécurité
+Dispositifs physiques/visuels et éléments de vérification.
+Doivent provenir des spécifications approuvées, pas d’une maquette improvisée.
+5.2 Source des champs
+Les champs biographiques doivent provenir du dossier FGP validé, pas d’une saisie libre non contrôlée dans l’écran d’impression.
+La photo utilisée doit être celle autorisée et associée au dossier, avec statut de qualité vérifié.
+Le NIN ne peut pas être modifié à partir du module CIN.
+Les dates d’émission et d’expiration doivent être générées selon la règle officielle approuvée, et non par une durée arbitraire codée en dur.
+Toute correction après prévisualisation doit invalider l’aperçu antérieur et entraîner une nouvelle génération contrôlée.
+5.3 Normalisation et contrôle de longueur
+Le logiciel peut préparer l’affichage et la mise en page, mais ne doit pas tronquer silencieusement un nom ou modifier une date pour faire tenir les champs. En cas de dépassement, il doit appliquer une règle de présentation approuvée ou placer la demande en contrôle manuel.
+6. Gabarit visuel, impression HTML et prévisualisation
+6.1 Audit du rendu existant
+Les notes du projet indiquent qu’un modèle visuel de CIN avec symboles nationaux et une impression HTML existent ou ont été commencés. Avant toute refonte, l’agent développeur doit identifier les composants, feuilles CSS, ressources graphiques, polices, dimensions, règles d’impression et navigateurs pris en charge.
+Localiser le gabarit de carte, les composants de prévisualisation et le code d’impression HTML existants.
+Vérifier si le rendu utilise des dimensions physiques explicites et comment il se comporte avec les paramètres d’impression.
+Identifier les images, emblèmes et polices autorisés et leurs sources.
+Vérifier les marges, l’échelle, le rendu recto/verso, les sauts de page et le format du support.
+Confirmer comment le système prévient l’impression accidentelle de données de test ou d’un aperçu non approuvé.
+6.2 Exigences de prévisualisation
+Afficher les données qui seront réellement imprimées et identifier la version du gabarit.
+Signaler visuellement un aperçu de test ou un document non officiel tant que la maquette n’a pas été approuvée.
+Distinguer les actions « prévisualiser », « approuver » et « lancer la production ».
+Recalculer l’aperçu lorsque les données sources ou la version du gabarit changent.
+Interdire l’approbation si des champs requis sont absents, si le NIN n’est pas confirmé ou si le dossier est bloqué.
+Limiter l’accès à la prévisualisation et éviter l’enregistrement automatique de copies dans des espaces publics.
+6.3 Impression HTML et navigateur
+Point
+Exigence de conception
+Test
+Dimensions
+Utiliser des dimensions et marges conformes aux spécifications confirmées du support.
+Mesure du rendu imprimé.
+Échelle
+Éviter qu’un navigateur redimensionne automatiquement la carte.
+Tester les paramètres d’impression supportés.
+Recto/verso
+Séparer et aligner les faces si la procédure prévoit une impression sur les deux côtés.
+Contrôle d’alignement et de pagination.
+Couleurs et polices
+Utiliser les ressources autorisées et tester la disponibilité des polices.
+Rendu sur les postes de production.
+Images
+Contrôler la résolution et la présence des images.
+Carte imprimée et comparaison au modèle validé.
+Données variables
+Empêcher les champs trop longs de se superposer ou disparaître.
+Tests avec noms longs et caractères accentués.
+Impression répétée
+Tracer chaque job et empêcher une répétition involontaire non auditée.
+Test de double clic/rechargement.
+6.4 Validation formelle du gabarit
+Le gabarit ne doit être déclaré prêt pour production qu’après approbation par l’autorité compétente du contenu, de la disposition, des mentions, des marques nationales, des caractéristiques de sécurité, de la lisibilité machine, des dimensions et de la procédure de personnalisation. Le prototype peut servir aux tests avec des données fictives, mais il doit être clairement séparé de la production officielle.
+7. Production, lots et contrôle qualité
+7.1 Gestion des lots
+Champ de lot
+Description
+Identifiant du lot
+Référence interne stable et non réutilisée.
+Date de préparation
+Date/heure de constitution du lot.
+Centre / opérateur
+Site et personnes autorisées responsables.
+Version du gabarit
+Version utilisée pour toutes les cartes du lot, ou versions séparées explicitement.
+Liste des demandes
+Références des demandes incluses dans le lot.
+Nombre prévu / envoyé / produit
+Totaux de rapprochement.
+Statut
+Brouillon, prêt, approuvé, en production, partiel, terminé, bloqué ou annulé selon workflow approuvé.
+Incidents
+Erreurs d’impression, supports endommagés, écarts et actions.
+7.2 Workflow de production
+Le responsable sélectionne les demandes admissibles.
+Le système revalide les statuts FGP/NIN et les blocages.
+Le lot est créé avec une liste stable de demandes et la version du gabarit.
+Une personne habilitée approuve le lot selon la séparation des tâches définie.
+Le système transmet les travaux au mécanisme d’impression ou au service de personnalisation autorisé.
+Chaque travail obtient un identifiant de production et un statut.
+Le résultat est rapproché avec le nombre de cartes prévues et les incidents.
+Les cartes produites passent au contrôle qualité avant le statut prêt à remettre.
+Les exemplaires non conformes sont mis en quarantaine et traités selon la procédure de destruction ou de reprise approuvée.
+7.3 Contrôle qualité
+Contrôle
+Vérification
+Résultat en cas d’échec
+Correspondance
+Données imprimées comparées aux données autorisées au moment de la personnalisation.
+Bloquer et corriger avant toute remise.
+Lisibilité
+Texte, photo, codes et zones de lecture respectent les critères approuvés.
+Reprendre la production selon procédure.
+Intégrité visuelle
+Pas de mauvais alignement, de coupure ou de superposition.
+Quarantaine et réimpression si autorisée.
+Version
+Gabarit et règles de personnalisation approuvés.
+Bloquer le lot s’il utilise une version non autorisée.
+Rapprochement
+Cartes prévues, produites, ratées et détruites sont comptées.
+Ouvrir une exception avec justification.
+Éléments sécurisés
+Contrôle prévu par les procédures officielles.
+Accès restreint et escalade selon gravité.
+7.4 Gestion des exemplaires non conformes
+Une carte ratée, endommagée ou incorrectement personnalisée ne doit pas disparaître du suivi. Le système doit enregistrer sa référence, son état, le motif, la personne responsable, le traitement (reprise, quarantaine, destruction contrôlée) et les preuves éventuellement requises par la procédure officielle.
+8. Remise, réception et preuve de délivrance
+8.1 Préparation à la remise
+Confirmer que la carte a passé les contrôles qualité.
+Vérifier que la demande et le dossier n’ont pas été bloqués ou modifiés de façon incompatible depuis la production.
+Identifier le centre de remise et l’agent responsable.
+Définir la procédure de vérification du titulaire ou du représentant légal autorisé.
+Préparer le reçu ou la preuve de remise selon le modèle officiel approuvé.
+8.2 Enregistrement de la remise
+Donnée
+Utilité
+Référence de carte
+Associer la remise à l’exemplaire concerné.
+Date/heure
+Tracer le moment de remise.
+Centre / lieu
+Localiser la remise selon le référentiel.
+Agent responsable
+Identifier l’auteur de l’opération.
+Vérification du destinataire
+Référence ou résultat du contrôle prévu par la procédure.
+Preuve de réception
+Signature, reçu ou autre mécanisme autorisé, selon la règle applicable.
+Résultat
+Remise réussie, échec, refus, titulaire absent ou autre statut validé.
+Motif de non-remise
+Explication et prochaine étape si la carte n’a pas été remise.
+8.3 Non-remise
+Une carte produite mais non remise doit rester dans un état distinct d’une carte délivrée. Le système doit suivre l’ancienneté, la localisation sécurisée, les tentatives de contact si elles sont autorisées et la décision de clôture ou de destruction selon les règles applicables. Les données nominatives ne doivent pas être diffusées aux personnes non habilitées.
+9. Cycle de vie : validité, renouvellement, perte et annulation
+Événement
+Traitement proposé
+Garde-fous
+Première délivrance
+Créer la carte après contrôle d’admissibilité et approbation.
+Une carte active existante doit être recherchée.
+Expiration
+Marquer la carte selon la date et la règle officielle.
+Ne pas coder une durée non confirmée.
+Renouvellement
+Créer une nouvelle demande reliée à l’ancienne carte.
+Conserver l’historique et les relations.
+Perte
+Enregistrer une déclaration et appliquer le blocage éventuel prévu.
+Vérifier la procédure officielle avant toute invalidation.
+Vol
+Enregistrer le signalement et les actions autorisées.
+Accès et escalade contrôlés.
+Détérioration
+Examiner l’état et lancer un remplacement si admissible.
+Traçabilité de l’ancien exemplaire.
+Correction de données
+Repersonnaliser à partir du dossier source rectifié.
+La modification doit être validée en amont.
+Annulation / invalidation
+Mettre à jour l’état après décision autorisée.
+Motif, date, acteur et preuve.
+Carte retrouvée
+Appliquer la règle prévue après une déclaration de perte.
+Ne pas réactiver automatiquement une carte bloquée.
+Décès du titulaire
+Appliquer le traitement officiel de la carte et conserver la trace.
+Ne pas supprimer l’historique de production/remise.
+9.1 Historique des cartes
+Chaque exemplaire doit posséder un historique séparé. Une nouvelle carte ne doit pas écraser l’ancienne dans la base : l’ancienne garde son état (active, expirée, remplacée, perdue, invalidée, annulée ou autre état approuvé) et la relation vers la carte de remplacement.
+9.2 Numéro de carte et NIN
+Le numéro de carte, le numéro de série du support et le NIN sont des références qui peuvent avoir des rôles différents. Le système doit respecter la spécification officielle qui définit ces éléments, leurs formats et leur relation. Il ne faut pas assimiler automatiquement le numéro de carte au NIN ni inventer un format de série.
+10. États et transitions du dossier de carte
+Statut indicatif
+Signification
+Transitions autorisées indicatives
+DRAFT
+Demande en préparation.
+Compléter, soumettre ou annuler selon droits.
+SUBMITTED
+Demande transmise au contrôle.
+Contrôler l’admissibilité ou demander un complément.
+INCOMPLETE
+Pièce ou champ requis manquant.
+Compléter puis resoumettre.
+ELIGIBILITY_REVIEW
+Contrôle du FGP, NIN et blocages.
+Admissible, en attente ou refus motivé.
+APPROVED_FOR_PERSONALIZATION
+Demande admissible et approuvée.
+Préparer l’aperçu avec la version autorisée.
+PREVIEW_READY
+Aperçu généré.
+Valider, corriger les données en amont ou rejeter.
+APPROVED_FOR_PRODUCTION
+Bon pour production selon procédure.
+Ajouter à un lot autorisé.
+IN_PRODUCTION
+Travail d’impression/personnalisation en cours.
+Production réussie, échec ou reprise.
+QUALITY_CONTROL
+Carte produite et en attente de contrôle.
+Approuver ou mettre en quarantaine.
+READY_FOR_DELIVERY
+Carte conforme et prête à être remise.
+Remise, non-remise ou blocage.
+DELIVERED
+Remise confirmée.
+Événements de cycle de vie ultérieurs.
+NOT_DELIVERED
+Carte non remise.
+Nouvelle tentative ou procédure de clôture.
+REPLACED / EXPIRED
+Carte remplacée ou expirée.
+Conserver historique et lien vers l’exemplaire suivant.
+LOST / BLOCKED / INVALIDATED
+Carte déclarée perdue, bloquée ou invalidée selon procédure.
+Action ultérieure uniquement si autorisée.
+CANCELLED
+Demande ou carte annulée.
+Motif, approbation et trace obligatoires.
+10.1 Transitions sûres
+Toutes les transitions sont contrôlées côté serveur, et pas uniquement par l’affichage des boutons.
+Le lancement en production revalide l’admissibilité et la version du gabarit.
+La remise ne peut être enregistrée que si les contrôles de production sont satisfaits.
+L’annulation, l’invalidation, la destruction et les reprises exigent un motif et un acteur autorisé.
+Une même demande ne peut pas produire accidentellement plusieurs exemplaires actifs à cause d’une requête répétée.
+11. Modèle de données indicatif
+Les entités suivantes sont conceptuelles. L’audit du dépôt est obligatoire avant toute nouvelle table ou migration ; les noms et relations doivent être adaptés aux modèles existants.
+Entité indicative
+Responsabilité
+Contrôles clés
+identity_card_requests
+Demande de première délivrance, renouvellement ou remplacement.
+Statut, source, type de demande et idempotence.
+identity_cards
+Référence de chaque exemplaire de carte, statut et dates.
+Identifiant unique ; historique conservé.
+card_personalization_jobs
+Données préparées et version du gabarit utilisée.
+Version, admissibilité, approbation et minimisation.
+card_templates
+Version du gabarit et état d’approbation.
+Modification contrôlée et historique.
+card_production_batches
+Lots de production et manifestes.
+Comptage prévu/produit/raté/détruit.
+card_print_jobs
+Travaux d’impression et résultats.
+Idempotence, état et erreur de production.
+card_quality_checks
+Contrôles qualité et décisions.
+Responsable, résultat et date.
+card_delivery_events
+Remise, non-remise et preuve prévue.
+Acteur, lieu, date et référence de preuve.
+card_lifecycle_events
+Perte, vol, expiration, remplacement, invalidation.
+Motif, décision et lien avec l’exemplaire.
+card_documents
+Pièces de demande et reçus.
+Stockage privé, accès et intégrité.
+audit_events
+Journal des opérations sensibles.
+Protection contre altération et minimisation.
+11.1 Relations essentielles
+Une demande appartient à une personne FGP et référence le NIN confirmé nécessaire au parcours.
+Une demande peut produire un ou plusieurs travaux techniques, mais les règles doivent empêcher des émissions actives accidentelles en double.
+Chaque carte référence la version du gabarit utilisé et le lot de production.
+Une carte remplacée doit référencer la carte suivante lorsque la procédure le prévoit, sans effacer l’ancienne.
+Chaque remise, perte, invalidation ou annulation doit être conservée comme événement lié à la carte.
+Les pièces justificatives doivent être référencées dans un stockage sécurisé plutôt qu’exposées directement depuis la base ou le serveur web.
+12. API et intégrations avec les modules ONIP
+Les routes ci-dessous sont des exemples conceptuels et ne constituent pas la liste confirmée des endpoints existants. Il faut examiner le dépôt et documenter les routes réelles avant d’ajouter ou modifier les contrats.
+Capacité
+Exemple conceptuel
+Garde-fous
+Créer une demande
+POST /api/v1/identity-card-requests
+Authentification, personne FGP valide, idempotence.
+Consulter une demande
+GET /api/v1/identity-card-requests/{id}
+Permission et périmètre.
+Contrôler l’admissibilité
+Service interne FGP/NIN
+Statut à jour et réponse clairement qualifiée.
+Prévisualisation
+POST /api/v1/identity-card-requests/{id}/preview
+Gabarit de test ou version approuvée ; accès limité.
+Approuver la production
+POST /api/v1/identity-card-requests/{id}/approve-production
+Rôle dédié, motif si exigé et révalidation.
+Créer un lot
+POST /api/v1/card-production-batches
+Manifeste stable, pas de demandes bloquées.
+Enregistrer contrôle qualité
+POST /api/v1/identity-cards/{id}/quality-checks
+Acteur habilité et résultat structuré.
+Enregistrer la remise
+POST /api/v1/identity-cards/{id}/delivery-events
+Vérification du destinataire et preuve autorisée.
+Déclarer perte/remplacement
+POST /api/v1/identity-cards/{id}/lifecycle-events
+Workflow dédié, autorisation et traçabilité.
+12.1 Sources de données
+FGP : identité de référence et attributs autorisés.
+Service NIN : statut et valeur confirmée selon droits, jamais un NIN généré par le module CIN.
+Biométrie : photo ou référence biométrique autorisée, sans accès direct non nécessaire aux templates.
+Gestion des comptes : rôle, centre et autorisation de production/remise.
+Référentiel géographique : centre et lieu de remise.
+Service de notification : information de disponibilité ou de suivi si cette fonction est officiellement prévue.
+12.2 Contrôle des changements
+Si le dossier FGP ou le NIN change de statut entre la prévisualisation et la production, le système doit réévaluer la demande et, si nécessaire, invalider l’aperçu et suspendre le lot. L’API doit distinguer un état technique de l’impression d’un état administratif de délivrance.
+13. Sécurité, anti-fraude et protection des documents
+13.1 Contrôles d’accès
+Séparer les permissions de consultation, création de demande, approbation, production, contrôle qualité, remise, invalidation et administration du gabarit.
+Limiter les listes et exports de données personnelles aux rôles qui en ont besoin.
+Vérifier les permissions côté serveur à chaque action sensible.
+Appliquer une authentification forte aux utilisateurs qui approuvent ou produisent des cartes.
+Tracer les accès aux aperçus, travaux d’impression, gabarits et pièces justificatives.
+13.2 Protection du gabarit et de la fonction d’impression
+Conserver les gabarits dans un emplacement contrôlé et historiser chaque version.
+Limiter la modification des gabarits à des rôles techniques explicitement autorisés et à une validation formelle.
+Ne pas exposer les chemins internes, fichiers sources ou secrets de personnalisation dans le frontend.
+Limiter l’impression en masse et exiger un lot approuvé.
+Éviter l’export incontrôlé d’aperçus contenant des données personnelles.
+Désactiver ou marquer nettement les modèles de démonstration afin d’éviter leur usage comme cartes officielles.
+13.3 Anti-fraude et piste d’audit
+Opération
+Trace conseillée
+Modification des données de personnalisation
+Source, version du dossier, auteur, date et champs concernés.
+Changement de gabarit
+Ancienne/nouvelle version, auteur, approbateur et date d’effet.
+Création d’un lot
+Responsable, demandes incluses, volumes et version de gabarit.
+Impression
+Identifiant du job, opérateur, poste/équipement selon politique, résultat et incidents.
+Contrôle qualité
+Contrôleur, résultat, motifs de rejet ou approbation.
+Remise
+Carte, date, centre, agent et preuve selon la procédure.
+Perte/invalidation
+Déclaration, motif, décision, date et état final.
+La journalisation doit éviter la duplication excessive du contenu intégral de la carte, du NIN ou des pièces. Les traces doivent rester protégées contre la modification non autorisée.
+14. Interfaces et navigation
+Écran
+Contenu
+Actions possibles
+Vue CIN
+Demandes par statut, cartes prêtes, lots en cours, non-remises et alertes.
+Filtrer et ouvrir les files autorisées.
+Demandes
+Type, dossier, statut, centre, date et motif.
+Créer, compléter, soumettre ou consulter.
+Contrôle d’admissibilité
+Statut FGP, NIN, doublon/blocage, pièces attendues.
+Vérifier et envoyer en revue ou continuer.
+Prévisualisation
+Rendu du recto/verso et champs utilisés.
+Valider ou renvoyer à correction.
+Lots de production
+Demandes, versions de gabarit, quantités et état.
+Approuver, lancer ou suspendre selon droits.
+Contrôle qualité
+Cartes produites, résultats de vérification et défauts.
+Accepter, rejeter ou mettre en quarantaine.
+Remise
+Cartes prêtes, centre, destinataire et preuve.
+Enregistrer la remise ou la non-remise.
+Cycle de vie
+Cartes actives, expirées, remplacées, perdues ou invalidées.
+Créer des événements selon workflow.
+Gabarits
+Versions, date d’effet, état d’approbation.
+Consulter ; modification via procédure renforcée.
+Audit et rapports
+Volumes, erreurs, non-remises, remplacements et incidents.
+Consulter/exporter selon permissions.
+14.1 Principes d’ergonomie
+Afficher le statut de la demande et la prochaine action attendue.
+Afficher les raisons bloquantes avant tout lancement de production.
+Distinguer aperçu, carte produite, carte contrôlée et carte remise.
+Demander confirmation pour annulation, perte, invalidation et destruction.
+Ne pas afficher le NIN complet dans les listes générales si sa présence n’est pas nécessaire.
+Rendre visibles les incidents de lot et le rapprochement entre cartes prévues, imprimées, ratées et détruites.
+15. Scénarios métier détaillés
+Scénario A — Première délivrance
+Un agent habilité crée une demande liée à un dossier FGP.
+Le serveur vérifie le statut du dossier, la présence du NIN confirmé et les conditions applicables.
+Les champs de personnalisation sont extraits des sources autorisées.
+Un aperçu est généré avec une version de gabarit approuvée pour le contexte concerné.
+La demande et, si nécessaire, le lot sont approuvés par les rôles prévus.
+La production est réalisée et contrôlée.
+La carte conforme passe à l’état prête à remettre.
+La remise est enregistrée avec la preuve prévue ; le statut et l’historique sont mis à jour.
+Scénario B — Carte produite mais non remise
+La carte est produite et contrôlée, mais le titulaire ne se présente pas.
+Le dossier passe à un état de non-remise et conserve le lieu de stockage sécurisé.
+Le système suit l’ancienneté et les suites autorisées.
+Une remise ultérieure ou une clôture est enregistrée comme un nouvel événement.
+Scénario C — Impression incorrecte
+Le contrôle détecte une donnée coupée, une photo incorrecte ou un défaut d’impression.
+La carte est mise en quarantaine et ne peut pas être remise.
+L’opérateur documente le défaut et la décision de réimpression/destruction selon la procédure.
+Le nouveau travail de production référence la demande et l’incident précédent.
+Les quantités du lot sont rapprochées.
+Scénario D — Perte ou vol
+Un utilisateur habilité enregistre la déclaration et les justificatifs prévus.
+Le système suit la procédure officielle de blocage ou d’invalidation si elle est applicable.
+Une demande de remplacement est liée à l’ancienne carte.
+La nouvelle carte possède son propre identifiant et conserve la relation avec l’ancienne.
+L’historique de l’ancienne carte n’est ni supprimé ni réutilisé.
+Scénario E — Données FGP modifiées après prévisualisation
+Un aperçu a été généré depuis une version donnée du dossier.
+Le FGP enregistre ensuite une rectification validée.
+Le système détecte que la version source est différente.
+Il invalide l’aperçu ancien et exige une nouvelle personnalisation/vérification.
+Aucun travail ne part en production sur la base d’un aperçu périmé.
+Scénario F — Répétition d’une requête
+Le client relance une requête après un timeout ou un double clic.
+Le service utilise la référence d’opération/idempotence pour retrouver le résultat précédent.
+Il évite de créer deux demandes, deux travaux actifs ou deux remises pour le même événement.
+16. Tests et critères d’acceptation
+Catégorie
+Test
+Résultat attendu
+Admissibilité
+Dossier FGP non validé ou NIN non confirmé.
+Production bloquée et motif visible.
+Version source
+Le FGP change après l’aperçu.
+Aperçu invalidé ou nouvelle validation exigée.
+Gabarit
+Gabarit non approuvé ou version retirée.
+Production refusée.
+Rendu
+Nom long, accents, photo absente ou champs manquants.
+Pas de superposition ; blocage ou traitement selon règle approuvée.
+Impression
+Imprimante indisponible ou job échoué.
+Erreur traçable ; pas de statut produit fictif.
+Lot
+Quantités prévues différentes des cartes produites.
+Écart détecté et expliqué.
+Qualité
+Carte comportant un défaut de personnalisation.
+Carte en quarantaine, aucune remise.
+Remise
+Enregistrer une remise sans contrôles requis.
+Action refusée côté serveur.
+Répétition
+Double clic ou timeout lors de création/production.
+Pas de double demande/travail non contrôlé.
+Cycle de vie
+Déclarer perte puis remplacement.
+Historique complet et relation entre exemplaires.
+Permissions
+Agent de lecture tente de modifier un gabarit ou d’invalider une carte.
+Refus côté serveur.
+Sécurité
+Rechercher aperçus dans un répertoire public ou les logs.
+Aucune exposition des fichiers sensibles.
+Audit
+Examiner production, contrôle et remise.
+Toutes les étapes sont traçables.
+Non-régression
+Exécuter les parcours existants de CIN/HTML print.
+Comportement existant préservé ou migration documentée.
+16.1 Checklist d’acceptation
+☐ Les règles d’admissibilité sont approuvées et testées.
+☐ Le module s’appuie sur un NIN confirmé et ne génère pas de NIN lui-même.
+☐ Le gabarit officiel et ses versions sont validés et contrôlés.
+☐ L’aperçu correspond aux données sources et devient invalide si celles-ci changent.
+☐ La production est organisée par lots et chaque travail possède une référence stable.
+☐ Les contrôles qualité précèdent la remise.
+☐ Les cartes non remises, ratées, remplacées, perdues ou invalidées ont un statut et un historique.
+☐ Les opérations critiques sont sécurisées par permissions côté serveur et journalisées.
+☐ Les tests de non-régression, idempotence, impression, sécurité et remise passent.
+☐ La procédure de destruction des exemplaires non conformes est validée et documentée.
+17. Plan de développement progressif
+Phase 1 — Audit de l’existant
+Cartographier les écrans CIN, la maquette, le HTML print, les endpoints, les modèles, migrations, fonctions de production et de remise. Identifier précisément ce qui fonctionne.
+Livrable : rapport d’audit avec fichiers et captures/test reproductible.
+Phase 2 — Admissibilité et demande
+Vérifier l’intégration FGP/NIN, les statuts, les demandes et les blocages. Réutiliser les services existants.
+Livrable : parcours de demande et contrôles testés.
+Phase 3 — Personnalisation et gabarits
+Séparer les données sources, la version du gabarit et la prévisualisation. Bloquer les gabarits non approuvés.
+Livrable : aperçu fiable avec tests de rendu.
+Phase 4 — Lots et impression
+Suivre les demandes, jobs, résultats et écarts de production.
+Livrable : traçabilité de lot et reprise d’erreur.
+Phase 5 — Contrôle qualité et remise
+Mettre en place les contrôles avant remise, les preuves et le suivi des non-remises.
+Livrable : workflow de remise testé.
+Phase 6 — Cycle de vie
+Finaliser renouvellement, perte, vol, remplacement et invalidation selon règles approuvées.
+Livrable : historiques et tests de cycle de vie.
+Phase 7 — Sécurité et audit
+Renforcer rôles, protection des gabarits, journalisation et stockage documentaire.
+Livrable : matrice de permissions et rapport de tests.
+Phase 8 — Recette et pilote
+Tester avec des données fictives ou autorisées, un environnement d’impression contrôlé et une procédure de retour arrière.
+Livrable : procès-verbal de recette avant toute production réelle.
+18. Prompt complet pour l’agent développeur
+Tu interviens sur le projet existant SIGPOP-RDC / ONIP, Module 9 — Carte d’Identité Nationale (CIN). Le projet semble déjà contenir un modèle de carte et une impression HTML : audite ces éléments avant de les modifier.OBJECTIFFiabiliser le workflow de demande, l’admissibilité, la personnalisation, la production, le contrôle qualité, la remise et le suivi du cycle de vie des cartes, sans réécrire globalement le système.RÈGLES ABSOLUES1. Inspecte d’abord le dépôt, README, pages/composants CIN, CSS d’impression, endpoints, modèles, migrations, services FGP/NIN, tests et ressources graphiques.2. Cartographie le rendu réel à l’écran et à l’impression, recto/verso, dimensions, marges, polices, images, paramètres du navigateur et matériel pris en charge.3. Ne remplace pas le modèle existant avant de savoir ce qui fonctionne. Ne supprime ni route, donnée, gabarit ni fonction sans justification, sauvegarde, plan de migration et retour arrière.4. Distingue faits observés, hypothèses et propositions.5. Ne fabrique pas le design officiel, les mentions, le numéro de carte, la durée de validité, la MRZ, le QR/barcode ou les caractéristiques de sécurité. Utilise uniquement les spécifications approuvées. Les maquettes non approuvées restent des prototypes de test.6. Le module CIN ne génère pas le NIN. Il doit utiliser uniquement un NIN confirmé par le service autorisé et une référence FGP valide.7. Ne lance pas la production si le dossier est incomplet, bloqué, non validé ou si la donnée source a changé depuis l’approbation.8. Toute demande, impression, reprise, carte ratée, destruction, remise, perte, remplacement et invalidation doit être traçable.9. Protège les gabarits, prévisualisations, données imprimées, pièces et fonctions d’impression. N’expose pas de fichiers sensibles dans un répertoire public.10. Utilise des données fictives ou autorisées pour les tests, sans émettre de faux documents présentés comme officiels.PHASE A — AUDIT- Identifie les pages, CSS, gabarits, ressources, endpoints, tables, workflows et fonctions d’impression actuels.- Vérifie les intégrations avec FGP, NIN, biométrie, comptes/permissions et référentiel territorial.- Exécute les parcours et tests existants ; rapporte les résultats.- Fournis d’abord un tableau avec fonction, statut réel, preuve, fichier/endpoint/table, risque, écart, correction proposée et tests nécessaires.PHASE B — DEMANDE ET ADMISSIBILITÉ- Vérifie les prérequis côté serveur : dossier FGP, NIN confirmé, pièces, blocages et type de demande.- Distingue première délivrance, renouvellement, remplacement et autres démarches autorisées.- Garantit qu’un double clic ou une reprise après timeout ne crée pas plusieurs demandes/productions.PHASE C — PERSONNALISATION ET IMPRESSION- Construis les données d’impression à partir des sources autorisées.- Versionne les gabarits et distingue aperçu, approbation et production.- Invalide un aperçu si les données sources changent.- Teste noms longs, accents, photo manquante, dimensions, marges, échelle, recto/verso et erreurs imprimante.- Bloque la production avec un gabarit non approuvé.PHASE D — LOTS ET QUALITÉ- Trace chaque lot, job, résultat et incident.- Compare les quantités prévues, produites, ratées et mises en quarantaine.- Exige le contrôle qualité avant la remise.- Documente la procédure autorisée de destruction ou reprise des exemplaires non conformes.PHASE E — REMISE ET CYCLE DE VIE- Enregistre la remise, la non-remise et la preuve selon la procédure approuvée.- Relie renouvellement/remplacement à la carte précédente sans effacer l’historique.- Implémente perte, vol, invalidation, expiration et annulation uniquement selon les règles confirmées.- Sépare le statut de la demande, le statut de production et le statut administratif de la carte.PHASE F — SÉCURITÉ ET TESTS- Sépare permissions de demande, approbation, production, contrôle qualité, remise, invalidation et administration du gabarit.- Protège les données personnelles, les aperçus, fichiers de travail et journaux.- Ajoute tests de permissions, admissibilité, changement de version source, impression, idempotence, cycle de vie et non-régression.- Exécute réellement tests, lint et build disponibles ; rapporte commandes et résultats exacts.- Liste fichiers modifiés, migrations, risques et retour arrière.- Aucun déploiement ou changement destructif sans autorisation.LIVRABLE INITIALUn rapport d’audit fondé sur des preuves et un aperçu imprimé de test clairement marqué comme non officiel. Ne déclare pas la CIN prête pour production sans validation de l’autorité sur le gabarit, les champs, la sécurité, les règles de délivrance et le processus d’impression.
+19. Sources, limites et décisions à valider
+Le document est établi à partir des éléments de conception fournis pour SIGPOP-RDC / ONIP. Les liens ci-dessous sont des références de travail déjà citées dans les notes du projet ; ils doivent être vérifiés dans leur version complète, en vigueur et avec leurs annexes avant d’en déduire une spécification de production.
+Site officiel de l’ONIP : https://www.onip.gouv.cd/
+Décret n° 22/07 du 2 mars 2022 relatif au Fichier Général de la Population : https://www.onip.gouv.cd/docs/FGP.pdf
+Arrêté et annexe relatifs à la CIN et au NIN : https://www.onip.gouv.cd/docs/ARRETE%20CIN%20ET%20NIN.pdf
+19.1 Décisions à confirmer avant production
+Modèle visuel et mentions officiellement approuvés, y compris recto/verso.
+Champs obligatoires à imprimer et règles de translittération ou de mise en forme.
+Spécification du numéro de carte distincte du NIN, le cas échéant.
+Format officiel de la MRZ, du QR code ou d’autres zones lisibles par machine, s’ils sont requis.
+Caractéristiques de sécurité physique et logique et processus de vérification.
+Conditions de délivrance, durée de validité, renouvellement, perte, remplacement et annulation.
+Procédure de contrôle du titulaire et preuve de remise.
+Règles de frais éventuels, exemptions et reçus, si ces opérations sont prévues par une base légale.
+Spécifications du matériel d’impression, gabarits, supports, stockage et destruction des exemplaires non conformes.
+Conclusion
+Le Module 9 doit garantir qu’une carte est préparée à partir de données de référence vérifiées, produite selon une version approuvée, contrôlée avant remise et suivie pendant tout son cycle de vie. Une carte produite, une carte conforme et une carte effectivement remise sont trois états différents qui doivent rester visibles dans le système.
+La priorité est d’auditer le gabarit et l’impression HTML déjà présents, de confirmer les règles métier d’admissibilité, puis de sécuriser la traçabilité de production et de remise. Aucun élément présenté comme officiel — design, MRZ, code, numéro, validité ou sécurité — ne doit être inventé par le développeur.
