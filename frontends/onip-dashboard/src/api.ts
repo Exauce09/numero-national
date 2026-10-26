@@ -147,6 +147,7 @@ export type CitizenHit = {
   status: string;
   family_name: string;
   given_names: string;
+  post_name?: string | null;
   date_of_birth: string;
   sex?: string;
   place_of_birth?: string | null;
@@ -171,6 +172,25 @@ export type CitizenAddress = {
 
 export type CitizenDetail = CitizenHit & {
   nationality?: string;
+  other_names?: string | null;
+  birth_certificate_number?: string | null;
+  height_cm?: number | null;
+  eye_color?: string | null;
+  occupation?: string | null;
+  marital_status?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  origin_province?: string | null;
+  origin_territory?: string | null;
+  origin_secteur?: string | null;
+  origin_groupement?: string | null;
+  origin_localite?: string | null;
+  father_full_name?: string | null;
+  father_occupation?: string | null;
+  father_nationality?: string | null;
+  mother_full_name?: string | null;
+  mother_occupation?: string | null;
+  mother_nationality?: string | null;
   created_at?: string;
   updated_at?: string;
   validated_at?: string | null;
@@ -234,6 +254,26 @@ export type CitizenCreateBody = {
   nationality?: string;
   given_names: string;
   family_name: string;
+  post_name?: string;
+  other_names?: string;
+  birth_certificate_number?: string;
+  height_cm?: number;
+  eye_color?: string;
+  occupation?: string;
+  marital_status?: string;
+  phone?: string;
+  email?: string;
+  origin_province?: string;
+  origin_territory?: string;
+  origin_secteur?: string;
+  origin_groupement?: string;
+  origin_localite?: string;
+  father_full_name?: string;
+  father_occupation?: string;
+  father_nationality?: string;
+  mother_full_name?: string;
+  mother_occupation?: string;
+  mother_nationality?: string;
   addresses?: Omit<CitizenAddress, "id">[];
 };
 

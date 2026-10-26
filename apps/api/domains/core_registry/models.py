@@ -63,6 +63,27 @@ class Citizen(Base):
     nationality: Mapped[str] = mapped_column(String(3), nullable=False, default="COD")
     given_names: Mapped[str] = mapped_column(String(255), nullable=False)
     family_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Décret 22/07 art. 8 — fiche FGP / identification RDC
+    post_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    other_names: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    birth_certificate_number: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    height_cm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    eye_color: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    occupation: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    marital_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    origin_province: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    origin_territory: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    origin_secteur: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    origin_groupement: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    origin_localite: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    father_full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    father_occupation: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    father_nationality: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    mother_full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mother_occupation: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mother_nationality: Mapped[str | None] = mapped_column(String(3), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

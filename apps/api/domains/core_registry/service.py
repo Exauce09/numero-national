@@ -97,6 +97,9 @@ async def create_draft_citizen(
         )
 
     now = datetime.now(timezone.utc)
+    def _up3(v: str | None) -> str | None:
+        return v.strip().upper() if v and v.strip() else None
+
     citizen = Citizen(
         status=CitizenStatus.DRAFT.value,
         nic=None,
@@ -106,6 +109,26 @@ async def create_draft_citizen(
         nationality=data.nationality.upper(),
         given_names=data.given_names,
         family_name=data.family_name,
+        post_name=(data.post_name.strip() if data.post_name else None),
+        other_names=(data.other_names.strip() if data.other_names else None),
+        birth_certificate_number=data.birth_certificate_number,
+        height_cm=data.height_cm,
+        eye_color=data.eye_color,
+        occupation=data.occupation,
+        marital_status=(data.marital_status.strip().upper() if data.marital_status else None),
+        phone=data.phone,
+        email=data.email,
+        origin_province=data.origin_province,
+        origin_territory=data.origin_territory,
+        origin_secteur=data.origin_secteur,
+        origin_groupement=data.origin_groupement,
+        origin_localite=data.origin_localite,
+        father_full_name=data.father_full_name,
+        father_occupation=data.father_occupation,
+        father_nationality=_up3(data.father_nationality),
+        mother_full_name=data.mother_full_name,
+        mother_occupation=data.mother_occupation,
+        mother_nationality=_up3(data.mother_nationality),
         created_at=now,
         updated_at=now,
     )
@@ -285,6 +308,7 @@ def citizen_to_list_item(citizen: Citizen) -> dict:
         "status": citizen.status,
         "family_name": citizen.family_name,
         "given_names": citizen.given_names,
+        "post_name": getattr(citizen, "post_name", None),
         "date_of_birth": citizen.date_of_birth,
         "sex": citizen.sex,
         "place_of_birth": citizen.place_of_birth,
