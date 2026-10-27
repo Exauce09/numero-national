@@ -37,8 +37,15 @@ export default function ConformitePage() {
       <div className="panel" style={{ borderLeft: "4px solid #c0392b" }}>
         <strong>Prototype / développement — pas une homologation ONIP</strong>
         <p className="muted" style={{ marginBottom: 0 }}>
-          Les numéros actuellement émis sont <em>provisoires</em>. Ils ne doivent pas être présentés
-          comme NIN officiels ni utilisés pour une CIN de production.
+          Les numéros actuellement émis sont <em>provisoires</em> (14 chiffres SIGPOP). Ils ne
+          doivent pas être présentés comme NIN officiels ni utilisés pour une CIN de production.
+        </p>
+        <p className="muted small" style={{ marginBottom: 0, marginTop: 8 }}>
+          Recherche 2026-10-27 : le Décret 22/07 art. 8 impose un arrêté Intérieur + annexe ONIP
+          pour la composition ; le PDF{" "}
+          <code>ARRETE CIN ET NIN.pdf</code> n&apos;est pas récupérable. L&apos;ID.NAT économique
+          (arrêté 2020) n&apos;est <strong>pas</strong> le NIN FGP personnes. Voir{" "}
+          <code>docs/legal/onip/RECHERCHE_FORMAT_NIN_OFFICIEL.md</code>.
         </p>
       </div>
 
