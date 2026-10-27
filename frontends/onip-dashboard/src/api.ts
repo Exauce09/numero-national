@@ -1349,4 +1349,87 @@ export const civilOnipApi = {
     }>("/onip/civil/conflicts"),
 };
 
+export type MovementsCatalog = {
+  module: number;
+  title: string;
+  invent_nin_forbidden: boolean;
+  modify_nin_forbidden: boolean;
+  parallel_identity_forbidden: boolean;
+  gps_tracking_forbidden: boolean;
+  auto_pdi_inference_forbidden: boolean;
+  fgp_residence_only_after_validation: boolean;
+  note: string;
+  movement_types: Array<{ code: string; label: string }>;
+  statuses: Array<{ code: string; label: string }>;
+};
+
+export type MovementOut = {
+  id: string;
+  citizen_id: string;
+  movement_type: string;
+  status: string;
+  declared_at: string;
+  destination_city?: string | null;
+  destination_line1?: string | null;
+  destination_province_code?: string | null;
+  update_fgp_residence: boolean;
+  fgp_residence_applied: boolean;
+  notes_minimal?: string | null;
+  decision_reason?: string | null;
+};
+
+export type MovementStats = {
+  generated_at: string;
+  total: number;
+  by_status: Record<string, number>;
+  by_type: Record<string, number>;
+  pending_review: number;
+  validated: number;
+  fgp_residence_updates: number;
+  note: string;
+};
+
+export const movementsApi = {
+  catalog: () => request<MovementsCatalog>("/population-movements/catalog"),
+  stats: () => request<MovementStats>("/population-movements/stats"),
+  list: (opts?: { page?: number; page_size?: number; status?: string; citizen_id?: string }) => {
+    const params = new URLSearchParams({
+      page: String(opts?.page ?? 1),
+      page_size: String(opts?.page_size ?? 50),
+    });
+    if (opts?.status) params.set("status", opts.status);
+    if (opts?.citizen_id) params.set("citizen_id", opts.citizen_id);
+    return request<{ items: MovementOut[]; total: number; page: number; page_size: number }>(
+      `/population-movements?${params}`,
+    );
+  },
+  create: (body: {
+    citizen_id: string;
+    movement_type: string;
+    destination_city?: string | null;
+    destination_line1?: string | null;
+    destination_province_code?: string | null;
+    update_fgp_residence?: boolean;
+    notes_minimal?: string | null;
+    submit?: boolean;
+  }) =>
+    request<MovementOut>("/population-movements", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  review: (
+    id: string,
+    body: { decision: "IN_REVIEW" | "COMPLEMENT_REQUIRED" | "REJECTED"; reason: string },
+  ) =>
+    request<MovementOut>(`/population-movements/${id}/review`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  approve: (id: string, body?: { reason?: string; apply_fgp_residence?: boolean | null }) =>
+    request<MovementOut>(`/population-movements/${id}/approve`, {
+      method: "POST",
+      body: JSON.stringify(body ?? {}),
+    }),
+};
+
 export { updateAccessToken, BASE as API_BASE };

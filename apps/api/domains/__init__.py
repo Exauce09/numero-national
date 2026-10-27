@@ -12,6 +12,7 @@ from apps.api.domains.civil_interconnect.router import router as civil_interconn
 from apps.api.domains.health.routes import router as health_domain_router
 from apps.api.domains.notifications.routes import router as notifications_router
 from apps.api.domains.onip.routes import router as onip_router
+from apps.api.domains.population_movements.router import router as population_movements_router
 from apps.api.domains.recensement.routes import router as census_router
 
 PHASE_3_6_9_ROUTERS = (
@@ -23,6 +24,7 @@ PHASE_3_6_9_ROUTERS = (
     identity_verify_router,
     notifications_router,
     civil_interconnect_router,
+    population_movements_router,
 )
 
 __all__ = [
@@ -35,4 +37,5 @@ __all__ = [
     "identity_verify_router",
     "notifications_router",
     "civil_interconnect_router",
+    "population_movements_router",
 ]

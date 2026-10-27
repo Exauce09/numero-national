@@ -15,6 +15,7 @@ import EnrolementPage from "./pages/EnrolementPage";
 import EtatCivilOnipPage from "./pages/EtatCivilOnipPage";
 import FeuilleDeRoutePage from "./pages/FeuilleDeRoutePage";
 import LoginPage from "./pages/LoginPage";
+import MouvementsPopulationPage from "./pages/MouvementsPopulationPage";
 import NicNumbersPage from "./pages/NicNumbersPage";
 import PopulationFgpPage from "./pages/PopulationFgpPage";
 
@@ -30,6 +31,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/campaigns": "Campagnes & contrôle",
   "/anomalies": "Anomalies",
   "/population": "Population / FGP",
+  "/mouvements": "Mouvements population",
   "/biometrie": "Biométrie",
   "/etat-civil": "État civil → FGP",
   "/nic": "Numéros NIC",
@@ -97,6 +99,7 @@ function Shell() {
 
           <div className="nav-group-label">FGP</div>
           <NavLink to="/population">Population / FGP</NavLink>
+          <NavLink to="/mouvements">Mouvements</NavLink>
           <NavLink to="/biometrie">Biométrie</NavLink>
           <NavLink to="/etat-civil">État civil</NavLink>
           <NavLink to="/cards">Cartes d&apos;identité</NavLink>
@@ -137,6 +140,7 @@ function Shell() {
             <Route path="/anomalies" element={<AnomaliesPage />} />
             <Route path="/cartographie" element={<CartographiePage />} />
             <Route path="/population" element={<PopulationFgpPage />} />
+            <Route path="/mouvements" element={<MouvementsPopulationPage />} />
             <Route path="/nic" element={<NicNumbersPage />} />
             <Route path="/biometrie" element={<BiometriePage />} />
             <Route path="/etat-civil" element={<EtatCivilOnipPage />} />

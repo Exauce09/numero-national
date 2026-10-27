@@ -1,0 +1,750 @@
+SIGPOP-RDC
+MODULE 12GESTION DES MOUVEMENTSDE LA POPULATION
+Cahier des charges fonctionnel et technique — Prompt complet pour agent de développement
+Élément
+Description
+Système
+SIGPOP-RDC — plateforme nationale de gestion des données de population, avec module ONIP/FGP
+Module
+12 — Gestion des mouvements de la population
+Version
+1.0 — document de travail, octobre 2026
+Nature
+Spécifications proposées ; à confronter à l’architecture logicielle et aux règles officielles applicables
+Livrable attendu
+Module intégré, sécurisé, traçable, testé et documenté ; aucune réécriture destructive du projet existant
+PRINCIPE DIRECTEURLe module enregistre les événements pertinents de mobilité et leurs effets administratifs éventuels. Il ne suit pas en permanence les citoyens, ne crée pas une identité parallèle et ne modifie pas le NIN. Un déplacement physique, une déclaration de résidence et une validation administrative sont des notions distinctes.
+Document de conception — la validation juridique, institutionnelle et technique demeure obligatoire avant la production.
+Contrôle du document et mode d’emploi
+Champ
+Valeur
+Public cible
+Maîtrise d’ouvrage, ONIP/FGP, responsables métier, architecte logiciel, développeurs, sécurité, exploitation et auditeurs.
+Objet
+Décrire les exigences d’un module de gestion des changements de résidence, migrations internes, déplacements forcés, retours et mouvements internationaux uniquement dans les limites autorisées.
+Relation aux modules existants
+FGP (M5), recensement/campagnes (M4), état civil (M8), cartographie territoriale (M10), comptes/habilitations (M11), tableau de bord (M1), CIN et NIN (M7/M9).
+Statut des exigences
+Les spécifications sont proposées pour audit et validation. Elles ne prouvent pas que ces fonctions existent déjà dans le code.
+Règle de changement
+Auditer avant d’implémenter ; préserver les migrations, contrats d’API, interfaces et données existants ; déployer progressivement.
+Sommaire
+1. Résumé exécutif et objectifs
+2. Périmètre, exclusions et principes
+3. Typologie des mouvements
+4. Acteurs et responsabilités
+5. Parcours fonctionnels
+6. Exigences fonctionnelles détaillées
+7. Données à gérer et modèle logique
+8. Règles de gestion et statuts
+9. Interfaces et intégrations
+10. API proposée
+11. Sécurité, confidentialité et droits
+12. Tableaux de bord et rapports
+13. Exigences non fonctionnelles
+14. Scénarios d’acceptation et tests
+15. Plan de réalisation et critères de sortie
+16. Risques et questions à valider
+17. Prompt complet pour l’agent de développement
+18. Références et points de vérification juridique
+1. Résumé exécutif et objectifs
+Le Module 12 fournit un registre traçable des événements de mobilité pertinents pour la gestion de la population : changement de résidence, mobilité interne, déplacement forcé, retour/réinstallation et, lorsque l’accès légal aux données est établi, événements de mobilité internationale provenant d’autorités compétentes. Il est intégré au référentiel central FGP et au référentiel territorial. Il ne remplace ni les autorités d’immigration, ni les organismes chargés de la protection humanitaire, ni les actes d’état civil.
+1.1 Objectifs métier
+Permettre la déclaration et la vérification d’un événement de mobilité par une source autorisée.
+Conserver l’origine, la destination, les dates, le type, la source, les justificatifs autorisés et le statut de vérification.
+Distinguer le déplacement physique, l’intention de déménager, l’occupation d’une résidence et le changement administratif validé.
+Mettre à jour l’adresse de référence du FGP uniquement selon les règles et autorisations approuvées, tout en conservant l’historique.
+Produire des statistiques agrégées fiables afin d’aider la planification des services publics.
+Protéger particulièrement les dossiers relatifs aux déplacements forcés, aux personnes vulnérables et aux zones sensibles.
+Réduire les doubles enregistrements, les erreurs territoriales et les modifications non autorisées.
+Permettre un fonctionnement dégradé hors connexion si l’architecture existante le justifie, avec synchronisation idempotente.
+1.2 Résultats attendus
+Résultat
+Indicateur de réussite
+Registre unique des événements
+Chaque mouvement possède un identifiant technique unique et une trace d’audit.
+Historique cohérent
+Les versions antérieures d’une résidence ne sont ni effacées ni écrasées sans trace.
+Données de qualité
+Les origines et destinations se rattachent à des identifiants territoriaux actifs et datés.
+Protection des personnes
+Les vues sensibles sont cloisonnées et toute consultation sensible est journalisée.
+Interopérabilité contrôlée
+Les échanges ont une source identifiée, un contrat documenté et une autorisation explicite.
+Statistiques défendables
+Les chiffres définissent leurs périodes, statuts, dédoublonnage et limites méthodologiques.
+2. Périmètre, exclusions et principes
+2.1 Inclus dans le module
+Création d’une déclaration de mouvement et gestion de son cycle de vie.
+Recherche du dossier FGP de référence, sans créer un second registre d’identité.
+Saisie du type de mouvement, du lieu d’origine et de destination, des dates et de la source.
+Gestion des ménages ou mouvements collectifs lorsque le mandat et les données le permettent.
+Contrôle de cohérence, détection des déclarations similaires et traitement des cas contestés.
+Vérification et approbation par un agent habilité, distinct du déclarant lorsque le risque le justifie.
+Historique des résidences, des événements et de leurs effets administratifs.
+Cartographie et statistiques agrégées, avec règles de confidentialité et suppression des petits effectifs.
+Journal d’audit, export autorisé, API et synchronisation éventuelle de clients terrain.
+2.2 Hors périmètre ou sous autorité distincte
+Suivi GPS permanent ou en temps réel des citoyens.
+Contrôle des frontières, décision d’entrée/sortie, visas, séjour ou expulsion. Ces fonctions restent aux autorités compétentes.
+Détermination autonome du statut de réfugié ou de personne déplacée. Le système conserve uniquement les statuts/événements transmis ou validés par une autorité autorisée.
+Remplacement des registres d’état civil ou création automatique d’actes juridiques.
+Attribution, modification ou réutilisation d’un NIN par le module de mobilité.
+Profilage, prédiction d’itinéraires individuels ou classement des citoyens selon une prétendue dangerosité.
+Partage de localisation individualisée à des tiers sans base légale, finalité définie et autorisation.
+RÈGLE DE CONCEPTIONNe pas traiter tout voyage comme un changement de résidence. Un événement de mobilité peut être temporaire, incertain, déclaré sans preuve complète ou non validé. Le système doit représenter cette incertitude sans la convertir automatiquement en fait officiel.
+3. Typologie des mouvements
+Type
+Description métier
+Exemples
+Précautions
+Changement de résidence
+Déclaration d’une nouvelle résidence habituelle.
+Changement de commune ou d’adresse.
+Ne pas confondre avec un séjour temporaire.
+Migration interne
+Déplacement entre localités ou entités administratives à l’intérieur de la RDC.
+Matadi vers Kinshasa.
+Conserver les deux lieux et les dates d’effet.
+Mobilité temporaire
+Présence temporaire sans transfert automatique de résidence habituelle.
+Études, mission, travail saisonnier.
+Ne pas mettre à jour l’adresse de référence sans règle validée.
+Déplacement forcé / PDI
+Déplacement involontaire à l’intérieur du pays en lien avec un risque, conflit ou catastrophe, documenté dans le cadre applicable.
+Fuite vers une zone d’accueil.
+Données hautement sensibles ; accès restreint.
+Retour / réinstallation
+Retour vers le lieu d’origine ou installation durable dans un autre lieu après un déplacement.
+Retour volontaire vers le village.
+Ne pas présumer de la sécurité ni du caractère durable.
+Mouvement international
+Entrée ou sortie enregistrée par une source officielle habilitée.
+Passage d’une frontière.
+Dépend entièrement des autorisations et interfaces officielles.
+Mouvement collectif
+Événement couvrant plusieurs membres d’un ménage ou un groupe identifié selon les règles autorisées.
+Famille déplacée.
+Éviter de rendre une famille visible à des personnes non autorisées.
+3.1 Distinctions de vocabulaire
+Départ : événement déclaré ou observé selon une source autorisée ; ne signifie pas que le mouvement a été vérifié.
+Arrivée : événement d’arrivée enregistré ; ne signifie pas automatiquement résidence officielle.
+Résidence habituelle : notion à définir et valider selon la règle métier officielle applicable.
+Lieu d’accueil : lieu temporaire ou collectif qui n’est pas automatiquement la résidence principale.
+Origine/destination : entités territoriales référencées, avec l’identifiant de la version territoriale utilisée.
+Motif : facultatif si non nécessaire ; préférer des catégories minimales et éviter les récits détaillés lorsque cela augmente le risque.
+4. Acteurs et responsabilités
+Acteur / rôle
+Actions possibles (à configurer)
+Restrictions
+Citoyen ou déclarant autorisé
+Déclarer ou demander la correction d’un mouvement concernant son dossier, selon le portail et les règles validés.
+Ne consulte pas les dossiers d’autrui ni les détails sensibles de tiers.
+Agent d’accueil
+Saisir une déclaration, vérifier les pièces autorisées et orienter le dossier.
+Ne peut pas approuver automatiquement son propre dossier lorsque la séparation est requise.
+Agent de vérification
+Comparer données et justificatifs, demander complément, proposer validation ou rejet motivé.
+Accès limité au territoire et à la catégorie qui lui sont affectés.
+Superviseur territorial
+Contrôler les files, répartir les dossiers et résoudre certains conflits.
+Ne peut pas outrepasser les règles nationales ni effacer l’audit.
+Autorité compétente / partenaire habilité
+Transmettre des événements officiellement autorisés via une interface contractuelle.
+Accès limité à ses données, finalités et contrats.
+Administrateur fonctionnel
+Configurer nomenclatures, files de traitement, paramètres non sensibles et règles activées.
+Pas d’accès automatique au contenu sensible des dossiers.
+Administrateur technique
+Gérer disponibilité, déploiements, sauvegardes et accès techniques.
+Pas d’utilisation métier des données ; accès exceptionnel contrôlé.
+Responsable protection des données / audit
+Examiner accès, incidents, demandes d’exercice des droits et conformité.
+N’utilise que les accès nécessaires à sa mission.
+4.1 Séparation des responsabilités
+Le déclarant, le vérificateur et l’approbateur doivent être séparés pour les cas sensibles ou les opérations à fort impact.
+Une correction de résidence ayant un effet sur le FGP doit être journalisée et accompagnée d’un motif.
+Les accès d’urgence doivent être temporaires, motivés, limités à un périmètre et revus par la suite.
+Un administrateur technique ne doit pas pouvoir modifier discrètement des données métier.
+Les comptes partagés sont interdits ; l’authentification doit permettre d’attribuer chaque action à une identité professionnelle.
+5. Parcours fonctionnels
+5.1 Déclaration simple d’un changement de résidence
+1. L’agent recherche la personne dans le FGP par les moyens autorisés.
+2. Le système affiche uniquement les attributs nécessaires à la confirmation d’identité, selon les habilitations.
+3. L’agent crée un événement de mouvement lié à la personne, sans dupliquer son profil.
+4. Il choisit le type, l’origine, la destination, les dates et la source de déclaration.
+5. Le système vérifie la cohérence des entités territoriales, les dates et les éventuelles déclarations similaires.
+6. Le dossier reçoit le statut « soumis » ou « à vérifier » ; l’adresse du FGP n’est pas modifiée à ce stade, sauf règle de processus explicitement autorisée.
+7. Un vérificateur examine le dossier, documente sa décision et l’approuve, le rejette ou demande un complément.
+8. Lorsque l’approbation a un effet sur la résidence de référence, le système l’applique dans une transaction cohérente et conserve l’ancienne version.
+9. Le déclarant reçoit un accusé de réception ou une notification autorisée, sans révéler de données à des tiers.
+5.2 Mouvement lié à un déplacement forcé
+1. L’événement est transmis par une source autorisée ou déclaré selon une procédure appropriée.
+2. Le formulaire collecte seulement les informations nécessaires au mandat de l’ONIP/FGP et de l’organisme compétent.
+3. La localisation précise ou les détails du motif sont séparés des vues ordinaires et protégés par habilitations dédiées.
+4. Le statut de protection ou de déplacement n’est pas inventé par l’algorithme ; il provient de la source compétente ou est marqué comme non vérifié.
+5. L’agent peut enregistrer un lieu d’accueil approximatif si une adresse précise crée un risque ou n’est pas disponible.
+6. Les rapports publics utilisent des données agrégées et limitent l’affichage de petites cellules géographiques.
+5.3 Retour, transfert secondaire ou correction
+1. Un nouvel événement est créé pour chaque nouvelle étape ; l’événement précédent n’est pas écrasé.
+2. Une correction ne doit pas simuler un nouveau déplacement : elle relie l’action corrective à l’événement initial.
+3. Les conflits entre données déclarées et données transmises par une source officielle passent par une file d’exception.
+4. Une décision d’annulation ou de rectification laisse une trace avec auteur, date, motif, ancienne valeur et nouvelle valeur, dans la limite des règles de conservation.
+6. Exigences fonctionnelles détaillées
+ID
+Exigence
+Priorité
+Critère de validation
+MOV-F01
+Créer un événement de mobilité lié à un identifiant interne de personne FGP.
+Must
+Impossible de créer un profil FGP dupliqué depuis l’écran mobilité.
+MOV-F02
+Proposer des types de mouvement configurables et versionnés.
+Must
+Chaque dossier garde le code et la version de nomenclature utilisés.
+MOV-F03
+Sélectionner origine et destination dans le référentiel territorial.
+Must
+Un territoire inexistant ou hors période de validité est refusé ou soumis à exception.
+MOV-F04
+Gérer date de déclaration, date estimée du mouvement, date de vérification et date d’effet distinctement.
+Must
+Les champs ne sont pas interchangeables et possèdent des règles documentées.
+MOV-F05
+Gérer plusieurs mouvements successifs pour une même personne.
+Must
+L’historique reste ordonné sans écrasement.
+MOV-F06
+Gérer brouillon, soumis, en vérification, complément requis, validé, rejeté, annulé et contesté.
+Must
+Chaque transition non autorisée est bloquée et auditée.
+MOV-F07
+Ajouter des justificatifs si la base légale et le processus le permettent.
+Should
+Fichiers analysés, autorisations vérifiées, accès restreint, métadonnées conservées.
+MOV-F08
+Détecter les doublons probables et les mouvements contradictoires.
+Must
+Le système signale et explique ; il ne fusionne ni ne rejette automatiquement les personnes.
+MOV-F09
+Tenir une file de contrôle et de résolution des exceptions.
+Must
+Chaque exception a un responsable, une date et un statut.
+MOV-F10
+Mettre à jour la résidence FGP après validation autorisée, avec historique.
+Must
+Transaction atomique et audit avant/après.
+MOV-F11
+Restreindre les dossiers de déplacements forcés et les localisations sensibles.
+Must
+Tests d’accès négatifs démontrent les refus.
+MOV-F12
+Fournir des statistiques agrégées par période et territoire.
+Must
+Les chiffres définissent filtres, statuts inclus et règles anti-réidentification.
+MOV-F13
+Prendre en charge imports/synchronisations idempotents si des clients terrain existent.
+Should
+Rejouer le même message ne crée pas un second mouvement.
+MOV-F14
+Permettre à un citoyen autorisé de demander une rectification, sans écrasement direct.
+Should
+La demande suit un processus vérifiable.
+MOV-F15
+Exporter selon rôle, finalité et périmètre, avec journalisation.
+Must
+Les exports sensibles sont justifiés, limités et audités.
+7. Données à gérer et modèle logique
+Le modèle ci-dessous est conceptuel. Les noms et types réels doivent être adaptés au schéma, à l’ORM et aux conventions du dépôt existant. Il ne faut pas créer une deuxième table personne sans preuve d’un besoin et d’une compatibilité avec le FGP existant.
+Entité logique
+Attributs essentiels
+Notes / invariants
+population_movement
+id, person_id, movement_type, status, declared_at, effective_date, observed_date, source_type, source_reference, created_by, validated_by, reason_code, version
+person_id référence la personne existante ; id technique interne ; aucune donnée d’identité recopiée inutilement.
+movement_location
+movement_id, location_role, territorial_unit_id, address_text_minimal, precision_level, valid_from, valid_to
+Rôles : origin, destination, reception_site ; précision réglée selon le risque.
+movement_evidence
+id, movement_id, evidence_type, storage_ref, issuer, issue_date, verification_status, sensitivity_level
+Conserver seulement les pièces nécessaires ; éviter le stockage de fichiers en clair dans la base.
+movement_review
+id, movement_id, reviewer_id, decision, reason_code, decided_at, comments_minimal
+Décision, motifs et séparations de tâches ; commentaires libres limités.
+movement_event_history
+id, movement_id, event_type, old_status, new_status, actor_id, occurred_at, correlation_id
+Historique append-only autant que possible ; corrections par événements compensatoires.
+movement_source_registry
+id, source_code, source_name, authority_basis, allowed_data, interface, active_from, active_to
+Sources externes approuvées et périmètre d’échange.
+movement_sync_receipt
+source_code, external_event_id, received_at, payload_hash, processing_status, error_code
+Clé d’idempotence par source et identifiant externe.
+movement_restriction
+movement_id, sensitivity_class, access_policy, review_date, authorized_purpose
+Restrictions supplémentaires pour localisation sensible et vulnérabilité.
+7.1 Champs communs à définir
+Identifiants techniques non signifiants ; ne pas construire un NIN à partir des données territoriales ou de la date.
+created_at, updated_at, created_by, updated_by et version optimiste si cela correspond aux conventions existantes.
+Dates enregistrées avec un fuseau cohérent et affichées dans le fuseau institutionnel défini.
+Source de données et date de réception pour distinguer le fait déclaré du fait importé.
+Niveau de précision du lieu ; si le lieu est approximatif, ne pas l’afficher comme adresse exacte.
+Motif en code contrôlé ; texte libre facultatif, minimal, masqué dans les vues non autorisées.
+Historique des rectifications et motif de la correction.
+7.2 Contraintes d’intégrité
+Clé étrangère vers la personne FGP existante, vers les entités territoriales et vers les utilisateurs.
+Dates cohérentes : fin ne précède pas début ; une date estimée peut être marquée comme telle.
+Pas de chevauchement d’événements considéré automatiquement comme erreur universelle : signaler et faire vérifier selon le type de mouvement.
+Pas de modification de NIN par ce module.
+Idempotence des imports par source et identifiant d’événement.
+Transactions atomiques quand l’approbation modifie l’adresse de référence.
+Suppression physique limitée et soumise à une politique officielle de conservation ; l’interface ordinaire doit privilégier annulation/rectification.
+8. Règles de gestion et statuts
+Règle
+Comportement attendu
+RG-01 — identité
+Un événement est lié à la personne FGP existante. Si l’identité ne peut pas être confirmée, créer une exception à résoudre, pas un nouvel identifiant national.
+RG-02 — statut initial
+Une déclaration commence en brouillon ou soumise, selon le canal ; elle n’est pas réputée validée à la saisie.
+RG-03 — résidence principale
+Seule une décision ou un événement autorisé met à jour la résidence de référence.
+RG-04 — historique
+Chaque mouvement et chaque changement de statut conserve son auteur, son horodatage et son motif.
+RG-05 — correction
+Une rectification conserve l’événement d’origine et crée une relation de correction.
+RG-06 — source
+Une donnée d’origine externe reste attribuée à sa source ; une synchronisation ne signifie pas automatiquement que l’information est juridiquement vérifiée.
+RG-07 — déplacement forcé
+Les statuts sensibles et la localisation sont soumis à une politique d’accès distincte et explicitement approuvée.
+RG-08 — carte statistique
+Aucun point individuel ni nom de personne sur une carte statistique publique ; règles de seuil pour petites populations.
+RG-09 — NIN
+Le module ne génère, ne réutilise, ne change et ne réattribue jamais un NIN.
+RG-10 — conflit de données
+Le système crée un cas d’arbitrage ; il ne privilégie pas une source uniquement sur la base d’une heuristique non approuvée.
+RG-11 — ménage
+Un mouvement collectif peut être lié à des membres, mais l’enregistrement du ménage ne remplace pas les événements individuels qui seraient nécessaires.
+RG-12 — absence d’information
+Les valeurs inconnues sont représentées explicitement, sans déduire un lieu ou un statut à partir du silence.
+8.1 Machine d’état proposée
+Brouillon → Soumis → En vérification → (Complément requis → Soumis) → Validé / Rejeté. Les états Contesté et Annulé suivent des transitions contrôlées et journalisées. La liste finale doit être alignée sur les états déjà utilisés dans SIGPOP-RDC.
+Transition
+Autorisé à
+Contrôles
+Brouillon → Soumis
+Déclarant ou agent
+Champs obligatoires du type, origine/destination si applicables, consentement/avis au besoin.
+Soumis → En vérification
+Système ou agent habilité
+File de travail et contrôle d’accès.
+En vérification → Complément requis
+Vérificateur
+Motif de complément et notification autorisée.
+En vérification → Validé
+Approbateur autorisé
+Séparation de tâches pour processus sensibles, intégrité FGP et absence de conflit bloquant.
+En vérification → Rejeté
+Vérificateur/approbateur selon la procédure
+Motif codé ; possibilité de réexamen selon politique.
+Validé → Contesté / rectifié
+Rôle spécifique
+Ne pas réécrire l’histoire ; décision corrective associée.
+9. Interfaces et intégrations
+Système lié
+Échange envisagé
+Contrôle indispensable
+FGP / personnes
+Référence personne, résidence validée, historique
+API/service existant ; transaction et version ; jamais de double fichier personne.
+Cartographie territoriale M10
+Identifiants, hiérarchie, versions et validité des lieux
+Seules les entités valides à la date du mouvement sont proposées ; les anciennes limites restent consultables.
+Recensement/campagnes M4
+Signalements terrain et validations autorisées
+Un dossier de recensement n’est pas automatiquement un mouvement officiel.
+État civil M8
+Événements civils pouvant influencer le dossier
+Les actes d’état civil ne sont pas des déclarations de mouvement ; conserver le type et la source.
+Comptes/habilitations M11
+Identité d’agent, rôle, périmètre, historique d’accès
+Contrôle serveur sur chaque action et ressource.
+Partenaires humanitaires / CNR / DGM ou autres
+Échange uniquement si autorisé et contractualisé
+Base légale, minimisation, finalité, sécurité, registre d’interface, contrôle de provenance.
+Tableau de bord M1
+KPI agrégés, files et exceptions
+Définition des indicateurs versionnée, droits et seuils de confidentialité.
+9.1 Principes d’interopérabilité
+Documenter chaque flux : producteur, consommateur, finalité, données, fréquence, sécurité, conservation et responsable.
+Authentifier les systèmes partenaires par des credentials dédiés, rotation de secrets et droits minimaux.
+Valider le schéma de chaque message ; mettre en quarantaine les payloads invalides.
+Utiliser une clé d’idempotence et conserver un identifiant de corrélation pour le support.
+Aucune interface partenaire ne doit permettre de faire une recherche libre sur toute la population si le besoin autorisé ne le justifie pas.
+Les transferts hors du territoire congolais doivent être examinés selon le cadre légal applicable et les validations compétentes avant activation.
+10. API proposée
+Les chemins ci-dessous sont indicatifs et ne doivent pas être ajoutés avant l’audit des conventions d’API existantes. Si le projet possède déjà des routes équivalentes, les réutiliser et documenter les écarts.
+Méthode / route proposée
+Objet
+Règles principales
+GET /api/v1/population-movements
+Recherche paginée des mouvements autorisés
+Filtres sur statut, période, type et territoire ; champs selon rôle ; pas de recherche globale non autorisée.
+POST /api/v1/population-movements
+Créer un brouillon ou soumettre une déclaration
+Validation stricte, idempotence optionnelle, audit, rate-limit.
+GET /api/v1/population-movements/{id}
+Lire un événement
+Autorisation par dossier, territoire, sensibilité et finalité.
+PATCH /api/v1/population-movements/{id}
+Modifier les champs autorisés selon l’état
+Optimistic locking/version ; pas de correction silencieuse.
+POST /api/v1/population-movements/{id}/submit
+Soumettre
+Vérifications métier et transition de statut.
+POST /api/v1/population-movements/{id}/review
+Enregistrer l’examen
+Rôle de vérification et motif obligatoire pour les décisions.
+POST /api/v1/population-movements/{id}/approve
+Approuver
+Transaction atomique, revalidation, historique et synchronisation FGP autorisée.
+POST /api/v1/population-movements/{id}/correct
+Créer une correction
+Lien vers le dossier initial, motif, valeurs versionnées.
+GET /api/v1/population-movements/stats
+Statistiques agrégées
+Paramètres limités, protection des petits effectifs, permissions dédiées.
+POST /api/v1/integrations/movements/{source}
+Réception de flux externe
+Source autorisée, signature/authentification, idempotence, validation de schéma, quarantaine.
+10.1 Exemple de payload (illustratif)
+{
+"movementType": "RESIDENCE_CHANGE",
+"personId": "<identifiant_interne_FGP_existant>",
+"declaredAt": "2026-10-27T09:00:00+01:00",
+"effectiveDate": "2026-10-25",
+"dateConfidence": "DECLARED",
+"originTerritorialUnitId": "<ID_TERRITORIAL_ORIGINE>",
+"destinationTerritorialUnitId": "<ID_TERRITORIAL_DESTINATION>",
+"sourceType": "CITIZEN_DECLARATION",
+"reasonCode": "FAMILY",
+"sensitivityLevel": "STANDARD",
+"idempotencyKey": "<UUID_CLIENT_OPTIONNEL>"
+}
+Les codes du payload sont des valeurs d’exemple à valider. Les identifiants entre chevrons sont des placeholders et ne sont pas des identifiants réels. Les champs sensibles ne doivent pas être acceptés librement si la politique exige une source habilitée.
+10.2 Contrats d’erreur
+Code logique
+Signification
+Réponse attendue
+400 VALIDATION_ERROR
+Structure ou champs invalides
+Lister les erreurs sans divulguer de données sensibles.
+401 UNAUTHENTICATED
+Session ou jeton absent/invalide
+Refuser la requête et journaliser les signaux nécessaires.
+403 ACCESS_DENIED
+Rôle, territoire ou finalité insuffisants
+Refus systématique, sans révéler l’existence d’un dossier si cela crée un risque.
+404 NOT_FOUND
+Ressource inexistante ou masquée par la politique
+Réponse conforme à la politique anti-énumération.
+409 VERSION_CONFLICT
+Modification concurrente ou état incompatible
+Retourner l’instruction de rechargement/revue, pas un écrasement.
+422 BUSINESS_RULE_CONFLICT
+Dates, doublons probables ou territoire incohérents
+Mettre en exception ou demander correction ; pas d’auto-validation.
+429 RATE_LIMITED
+Trop de requêtes
+Limiter et surveiller sans bloquer arbitrairement les services essentiels.
+503 DEPENDENCY_UNAVAILABLE
+FGP ou service partenaire indisponible
+Échec sûr ou file de reprise idempotente selon le flux.
+11. Sécurité, confidentialité et droits
+11.1 Principes obligatoires
+Contrôle d’accès fondé sur rôles, territoire, sensibilité, dossier et finalité.
+Principe du moindre privilège et séparation des tâches.
+Authentification forte pour les comptes sensibles ; sessions courtes et révocation immédiate après suspension.
+Chiffrement en transit et au repos selon l’architecture et les standards approuvés.
+Journalisation des consultations de données sensibles, modifications, exports, rejets et tentatives d’accès.
+Protection contre l’énumération des identifiants, l’accès direct à un ID (IDOR), l’injection, le CSRF et les abus de l’API.
+Secret management : aucun mot de passe, clé API, donnée réelle ou exemple sensible dans le code ou les logs.
+Politique officielle de conservation et suppression/archivage avant mise en production.
+Procédure d’incident, restauration et tests de sauvegarde.
+Information claire des personnes concernées sur le traitement des données et les modalités d’accès/rectification selon les textes applicables.
+11.2 Mesures spécifiques aux déplacements forcés
+Marquer les dossiers sensibles par une classe de confidentialité et une raison d’accès autorisée.
+Masquer la localisation détaillée dans les vues ordinaires, notifications, exports et logs applicatifs.
+Ne jamais produire de carte publique de personnes déplacées à l’adresse ou au point individuel.
+Évaluer la ré-identification des petits effectifs et appliquer suppression, regroupement ou seuil minimal.
+Éviter de collecter les itinéraires détaillés et les motifs en texte libre lorsqu’ils ne sont pas nécessaires.
+Limiter les exports en masse et exiger une autorisation, une justification et, si nécessaire, une double validation.
+Ne pas exposer l’existence d’une personne dans une zone de protection à des rôles non autorisés, y compris par différence de messages d’erreur.
+11.3 Audit et protection des données
+Le décret n° 22/07 du 2 mars 2022 relatif au FGP prévoit notamment l’inscription des changements survenus dans la situation des personnes et de leur date de prise d’effet (article 10), des règles d’accès et de non-divulgation, ainsi que des dispositions sur l’information, la rectification, la sécurité et le secret professionnel. Le périmètre précis d’application au présent module doit être validé par la fonction juridique et la personne responsable de la protection des données avant la production. Voir les références de la section 18.
+12. Tableaux de bord et rapports
+Indicateur
+Définition proposée
+Précautions
+Mouvements déclarés
+Nombre d’événements soumis sur une période
+Ne pas les confondre avec les mouvements validés.
+Mouvements validés
+Nombre d’événements dont la validation est enregistrée
+Définition du statut et des annulations à versionner.
+Délai de traitement
+Temps entre soumission et décision ; médiane et percentiles
+Traiter les dossiers incomplets séparément.
+Mouvements par origine/destination
+Agrégats de flux entre entités territoriales
+Confidentialité des petites cellules.
+Dossiers en attente
+Nombre selon l’ancienneté et l’étape
+Pas de données sensibles dans l’affichage général.
+Taux de correction/contestation
+Nombre de mouvements corrigés ou contestés / mouvements traités
+Interpréter les biais de déclaration.
+Mouvements de retour
+Événements de type retour/réinstallation selon source autorisée
+Ne pas conclure à une réinstallation durable sans définition validée.
+Qualité des données
+Champs manquants, territoires inconnus, conflits de dates
+Mesures qualité sans exposer les personnes concernées.
+12.1 Filtres proposés
+Période : déclaration, date estimée, date d’effet, validation.
+Type et statut du mouvement.
+Province/territoire/commune ou autre unité prise en charge par M10.
+Source de déclaration et canal.
+État de traitement et ancienneté de la file.
+Niveau d’agrégation, avec restriction d’accès sur les critères sensibles.
+Le tableau de bord ne doit pas fournir par défaut une carte de localisation individualisée. Il présente des agrégats documentés et applique une politique anti-réidentification.
+13. Exigences non fonctionnelles
+Domaine
+Exigence de conception / recette
+Performance
+Pagination serveur ; filtres indexés ; temps cible à mesurer sur un jeu réaliste ; ne pas charger tous les dossiers en mémoire.
+Disponibilité
+Aligner SLO et objectifs de reprise sur l’architecture existante ; documenter les comportements en cas d’indisponibilité du FGP.
+Fiabilité
+Transactions pour l’approbation ; idempotence des imports ; reprise après échec sans doublons.
+Traçabilité
+Événements métier audités ; identifiant de corrélation ; horodatages normalisés.
+Accessibilité
+Formulaires utilisables au clavier, libellés compréhensibles, contrastes suffisants et erreurs explicites.
+Maintenabilité
+Nomenclatures configurables, tests automatiques, migrations réversibles lorsque possible, documentation API.
+Compatibilité
+Respect du framework, du style, des conventions et des contraintes déjà adoptées par le dépôt SIGPOP-RDC.
+Résilience réseau
+Si mode hors ligne existant : stockage local minimal et chiffré, synchronisation idempotente, conflit visible ; sinon, ne pas ajouter ce mode sans besoin démontré.
+Observabilité
+Métriques et journaux techniques sans données personnelles inutiles ; alertes sur erreurs d’intégration et files en retard.
+Localisation linguistique
+Français clair en première version ; traductions éventuelles pilotées par les besoins institutionnels.
+Déploiement
+Feature flag, migration documentée, préproduction, contrôle de régression et procédure de retour arrière.
+Protection des données
+Minimisation, limitation de finalité, durée de conservation et accès revus par les acteurs compétents.
+14. Scénarios d’acceptation et tests
+ID
+Scénario
+Résultat attendu
+AT-01
+Agent autorisé déclare un changement de résidence avec origine et destination valides.
+Dossier soumis ; personne FGP non dupliquée ; audit créé.
+AT-02
+Un citoyen déclare avoir déménagé mais les informations sont incomplètes.
+Le système conserve un brouillon/complément requis ; aucune mise à jour non autorisée.
+AT-03
+Un agent tente d’approuver son propre dossier alors qu’une séparation est requise.
+Refus serveur, événement de sécurité enregistré.
+AT-04
+Une destination référence une unité territoriale inactive ou inconnue.
+Validation refusée ou mise en exception avec raison explicite.
+AT-05
+La même notification externe est rejouée deux fois.
+Un seul événement métier ; réponse idempotente.
+AT-06
+Deux agents modifient simultanément le même dossier.
+Conflit de version détecté ; aucun écrasement silencieux.
+AT-07
+Un rôle standard tente de consulter la localisation sensible d’une PDI.
+Accès refusé ; aucune donnée sensible dans la réponse ou les logs.
+AT-08
+Un mouvement est approuvé et change l’adresse de référence selon les règles.
+Mise à jour atomique ; ancienne adresse conservée ; audit avant/après.
+AT-09
+Une correction est créée pour un dossier déjà validé.
+Correction liée à l’événement d’origine ; historique inchangé.
+AT-10
+Un rapport contient une cellule géographique à très faible effectif.
+Application du seuil/confidentialité approuvé (masquage/regroupement).
+AT-11
+Le service FGP est indisponible durant l’approbation.
+Pas de faux succès ; reprise sûre ou statut d’échec contrôlé.
+AT-12
+Une personne déclare un séjour temporaire.
+Aucune mise à jour automatique de la résidence habituelle.
+AT-13
+Une source partenaire envoie un champ non autorisé.
+Flux rejeté/quarantainé, erreur documentée et auditée.
+AT-14
+Un utilisateur suspendu réutilise une session existante.
+Session révoquée ou refus d’accès selon le mécanisme retenu.
+AT-15
+Une exportation de mouvements sensibles est demandée.
+Autorisation spécifique, justification, périmètre limité et journalisation.
+14.1 Niveaux de tests
+Tests unitaires : transitions de statut, règles de dates, visibilité, validation des identifiants territoriaux, idempotence.
+Tests d’intégration : base de données, FGP, cartographie, habilitations, imports et notifications.
+Tests API : authN/authZ, schémas, pagination, contrôles anti-énumération, erreurs, rate-limit.
+Tests de sécurité : IDOR, escalade de privilèges, injection, accès transversal aux territoires, fuite par export ou logs.
+Tests de charge : volumes estimés, recherche paginée, tableaux de bord et flux de synchronisation.
+Tests de restauration : backups, reprise, cohérence de l’historique et réconciliation des événements.
+Tests d’acceptation : acteurs métier, cas de mobilité simple, déplacement sensible, correction et statistiques.
+15. Plan de réalisation et critères de sortie
+Phase
+Travaux
+Livrables et porte de sortie
+P0 — Audit
+Cartographier dépôt, API, modèles, authentification, rôles, FGP, M10, journaux, conventions de tests et déploiement.
+Rapport d’audit ; fonctions réutilisables identifiées ; aucune modification destructive.
+P1 — Validation métier/juridique
+Valider types de mouvement, définitions de résidence, acteurs, statuts, données autorisées, conservation et flux partenaires.
+Décisions approuvées, registre des questions ouvertes et bases de traitement documentées.
+P2 — Modèle et contrats
+Modèle conceptuel aligné sur schéma existant ; API ; transitions ; règles d’autorisation.
+Migrations revues, contrats versionnés, plan de rollback.
+P3 — MVP
+Déclaration, revue, validation, historique, liaison FGP et référentiel territorial.
+Scénarios AT-01 à AT-09 réussis ; tests de permissions réussis.
+P4 — Sécurité et rapports
+Restrictions renforcées, audit, statistiques agrégées, export contrôlé, protection anti-réidentification.
+Revue sécurité, rapports testés et aucune fuite de données sensibles.
+P5 — Intégrations
+Connecteurs uniquement pour sources approuvées ; idempotence, quarantaine et surveillance.
+Contrats, clés sécurisées, tests d’intégration et procédure d’exploitation.
+P6 — Préproduction
+Migration test, jeu synthétique, sauvegarde/restauration, tests de charge et formation.
+Go/no-go signé ; plan de retour arrière ; pas de données réelles dans les environnements non autorisés.
+P7 — Déploiement progressif
+Feature flag, cohortes limitées, monitoring, revue des incidents.
+Critères de stabilisation atteints avant généralisation.
+15.1 Critères de sortie (Definition of Done)
+Toutes les exigences Must ont un test ou une justification d’exclusion approuvée.
+Aucune nouvelle route ne contourne le contrôle d’accès serveur.
+Les opérations d’approbation et d’import sont transactionnelles ou explicitement conçues pour une reprise sûre.
+Les migrations ont été testées sur une copie synthétique et disposent d’une procédure de retour arrière.
+Les journaux et rapports n’exposent pas de données personnelles inutiles.
+Le mode sensible a fait l’objet d’une revue par l’autorité fonctionnelle, la sécurité et la protection des données.
+Les documentations d’exploitation, API, sauvegarde, support et gestion des incidents sont à jour.
+Les tests existants ne régressent pas ; les tests nouveaux passent dans l’intégration continue.
+16. Risques et questions à valider
+Point ouvert
+Pourquoi c’est important
+Responsable de validation proposé
+Définition officielle de résidence habituelle
+Détermine si un mouvement modifie l’adresse de référence du FGP.
+ONIP/FGP + juridique
+Base légale et acteurs habilités pour chaque type de mouvement
+Évite que le système collecte des données hors mandat.
+Autorité compétente + juridique
+Traitement des déplacements forcés et rôle de la CNR/partenaires
+La donnée peut mettre des personnes en danger.
+Autorités de protection + responsable données
+Réutilisation des composants FGP et M10
+Évite les doublons de données et les référentiels divergents.
+Architecte logiciel
+Conservation et suppression des données/justificatifs
+Les durées ne doivent pas être inventées.
+Juridique + responsable protection données
+Partage/transfert entre systèmes ou à l’étranger
+Nécessite validation de la finalité, du contrat et des règles applicables.
+Juridique + sécurité
+Qualité et officialité des données partenaires
+Une source différente peut utiliser des définitions différentes.
+Responsable interopérabilité
+Publication de flux cartographiques
+Les petits effectifs peuvent réidentifier les personnes.
+Responsable données + métier
+Mode hors ligne et sécurité appareil
+Risque de perte de terminal ou de synchronisation concurrente.
+Architecture + sécurité
+Règles précises d’annulation/rectification
+Les corrections ne doivent pas falsifier l’historique.
+Métier + audit
+BLOCAGE AVANT PRODUCTIONNe pas activer les intégrations avec les autorités ou partenaires, les exports individualisés ni le traitement opérationnel des dossiers sensibles tant que les autorisations, les données partagées, les rôles, les durées de conservation et les mécanismes de sécurité ne sont pas approuvés.
+17. Prompt complet pour l’agent de développement
+Le prompt ci-dessous peut être copié dans un agent de programmation (Cursor, Copilot, Claude Code ou outil équivalent) après ouverture du dépôt SIGPOP-RDC. Il impose un audit préalable et une réalisation progressive. Remplacer les éléments spécifiques seulement après vérification dans le code ; ne jamais supposer qu’une route, une table ou un service existe parce qu’il apparaît dans ce cahier des charges.
+RÔLE ET MISSION
+Tu es un architecte logiciel senior et développeur full-stack chargé d'auditer et d'implémenter progressivement le Module 12 — Gestion des mouvements de la population dans le projet existant SIGPOP-RDC / ONIP. Tu dois livrer un module maintenable, sécurisé, testé, documenté et intégré à l'architecture existante. Tu ne dois ni réécrire l'application ni remplacer les composants existants sans preuve documentée que cela est nécessaire.
+CONTEXTE FONCTIONNEL
+Le module gère les événements pertinents de mobilité : changement de résidence, migration interne, mobilité temporaire, déplacement forcé/PDI, retour/réinstallation et, uniquement si la base légale et les interfaces autorisées sont confirmées, mouvements internationaux provenant d'une source officielle habilitée. Le module doit se connecter au Fichier Général de la Population (FGP) et au référentiel territorial déjà existants. Il ne constitue pas un nouveau registre d'identité et ne génère/modifie jamais le NIN.
+PHASE 0 — RÈGLES DE SÉCURITÉ DU TRAVAIL
+1. Commence par lire les instructions du dépôt, README, conventions de contribution, architecture, gestion des secrets et scripts de test.
+2. Inspecte l'état Git, la branche, les modifications locales et les fichiers non suivis. Ne supprime ni ne réinitialise les modifications utilisateur.
+3. N'exécute pas de git reset --hard, clean destructif, suppression de base, migration irréversible ou remplacement complet de fichiers pour aller plus vite.
+4. Avant de modifier un fichier, indique son rôle et pourquoi il faut le changer.
+5. Ne révèle, n'imprime et ne copie aucune donnée personnelle réelle, secret, token, fichier de production ou variable d'environnement sensible dans les rapports.
+6. Utilise exclusivement des données fictives dans les tests et captures.
+7. N'effectue aucun déploiement, transfert de données ni appel à un système externe réel sans autorisation explicite et documentation de l'environnement.
+PHASE 1 — AUDIT DU PROJET EXISTANT
+Inspecte, sans présumer des chemins exacts :
+- frontend ONIP/SIGPOP-RDC, navigation, composants de formulaires, cartographie et styles existants ;
+- API et conventions de routage/versioning ;
+- modèle FGP/personne, services d'adresse/résidence et historique ;
+- module 10 de cartographie et hiérarchie territoriale ;
+- module 11 de comptes, rôles, périmètres territoriaux et journalisation ;
+- modules 4 (recensement/campagnes), 8 (état civil), 1 (dashboard), 7 (NIN) et 9 (CIN) lorsque pertinent ;
+- ORM, migrations, contraintes, tests, CI, logging, stockage de pièces et notifications ;
+- authentification, autorisations serveur, prévention IDOR, rate-limits et protections des exports.
+Produit un rapport avec : éléments existants réutilisables, écarts, risques, dépendances, tests actuels, liste des fichiers candidats au changement et plan par petits lots. Si une fonction existe déjà, réutilise-la au lieu de la dupliquer.
+PHASE 2 — QUESTIONS BLOQUANTES ET HYPOTHÈSES
+Avant d'activer une logique métier non confirmée, identifie et marque comme bloquants : définition officielle de la résidence habituelle ; base juridique pour chaque catégorie de mouvement ; rôles habilités à déclarer, vérifier, valider et consulter ; données et justificatifs autorisés ; règles de conservation ; traitement des PDI ; partage externe ; modalités de rectification ; seuils de confidentialité des statistiques. N'invente ni procédure réglementaire, ni format de preuve obligatoire, ni durée de conservation. Si la validation manque, implémente le code derrière une configuration désactivée ou laisse la capacité en attente, en documentant la décision.
+PHASE 3 — CONCEPTION PROPOSÉE
+Élabore un modèle conceptuel compatible avec le dépôt, comprenant si nécessaire : événement de mouvement lié à la personne FGP existante ; lieux d'origine/destination liés au référentiel territorial versionné ; source de données ; justificatifs protégés ; revue/décision ; historique d'événements ; reçu d'import/idempotence ; restrictions de confidentialité. Adapte les noms et relations aux conventions déjà en place. Ne recopie pas tous les attributs de la personne dans chaque mouvement. Les champs proposés incluent : identifiant technique, person_id, type, statut, date de déclaration, date estimée/effet, date de vérification, origine, destination, code de motif minimal, source, sensibilité, auteur, réviseur, approbateur et version. Marque l'incertitude de date ou de lieu ; ne transforme pas une estimation en donnée certifiée.
+PHASE 4 — CYCLE DE VIE ET RÈGLES
+Implémente des transitions explicites et validées par le serveur, adaptées au workflow existant : brouillon, soumis, en vérification, complément requis, validé, rejeté, contesté et annulé. Évite les états superflus si le dépôt possède déjà une machine d'état pertinente. Une déclaration ne modifie pas automatiquement la résidence FGP. Lors d'une validation qui est autorisée à changer la résidence, applique toutes les modifications liées dans une transaction atomique et conserve l'ancienne valeur et son historique. Les corrections doivent être des actions tracées liées à l'événement d'origine, jamais une réécriture silencieuse. Les événements successifs doivent être conservés ; ne génère pas un nouveau profil de personne et ne modifie jamais le NIN.
+PHASE 5 — API ET AUTORISATIONS
+Réutilise d'abord les services et routes existants. Si de nouvelles routes sont réellement nécessaires, propose des contrats documentés pour la recherche paginée, création/soumission d'un événement, lecture autorisée, revue, approbation, correction et statistiques agrégées. Tous les contrôles d'accès sont appliqués côté serveur : rôle, territoire, sensibilité, relation au dossier et finalité. Ne t'appuie jamais uniquement sur la dissimulation d'un bouton dans l'interface. Protège contre l'accès direct non autorisé à un identifiant (IDOR), l'énumération, l'injection, la CSRF, l'abus de fréquence et les exports massifs. Ne divulgue pas dans les erreurs l'existence d'un dossier sensible si ce n'est pas autorisé.
+PHASE 6 — CONFIDENTIALITÉ DES PDI ET LOCALISATIONS
+Les déplacements forcés sont à traiter comme une catégorie sensible. N'implémente pas de suivi GPS permanent. Ne mets pas d'adresse sensible dans les journaux, notifications, URL, exports ou cartes par défaut. Prévois une classe de sensibilité, une justification d'accès, une politique d'accès séparée et une journalisation des consultations. Les petits effectifs doivent être masqués ou agrégés avant publication. Le statut de PDI/réfugié ne doit pas être déduit automatiquement d'une localisation ou d'un motif libre ; il provient d'une source/autorité habilitée, ou est marqué comme non vérifié. Ne développe aucune fonctionnalité de prédiction/traçage d'itinéraire des personnes.
+PHASE 7 — INTERFACES UTILISATEUR
+Conçois une interface cohérente avec les composants, la navigation et le thème existants. Les vues minimales, si elles ne sont pas déjà présentes : liste filtrable et paginée des mouvements autorisés ; création/consultation d'une déclaration ; fiche d'événement avec origines/destinations, dates, source et historique ; file de vérification ; formulaire de décision/rectification ; rapports agrégés. Indique clairement les statuts et l'incertitude. Cache les détails sensibles par défaut. Les erreurs doivent être compréhensibles, et les champs obligatoires doivent dépendre du type de mouvement approuvé. N'expose pas les informations de personne en URL ou dans les logs de navigateur.
+PHASE 8 — INTEROPÉRABILITÉ ET SYNCHRONISATION
+N'active aucune intégration partenaire sans preuve d'autorisation et contrat de données validé. Pour les connecteurs approuvés, implémente validation de schéma, authentification robuste, provenance/source, identifiant externe, clé d'idempotence, horodatage, corrélation, quarantaine des erreurs et mécanisme de reprise sûr. Un rejeu du même message ne doit pas créer plusieurs mouvements. Un événement provenant du recensement n'est pas automatiquement un changement de résidence officiel ; un acte d'état civil n'est pas un événement de mobilité. Conserve les distinctions des sources.
+PHASE 9 — STATISTIQUES
+Crée des indicateurs avec définitions documentées et versionnées : déclarés, validés, en attente, délais de traitement, types de mouvement et flux agrégés entre territoires. Affiche la période et les statuts inclus. N'affiche pas de coordonnées ou de noms individuels sur les cartes de statistiques. Applique les seuils de petites cellules et vérifie la possibilité de ré-identification par filtres successifs. Les chiffres ne doivent pas compter de doublons d'import ou des déclarations non validées dans les indicateurs des mouvements confirmés.
+PHASE 10 — TESTS OBLIGATOIRES
+Ajoute des tests unitaires, d'intégration et d'API couvrant au moins : création et soumission ; dates et territoires incohérents ; parcours complément/validation/rejet ; tentative d'auto-approbation si interdite ; accès interdit par rôle, territoire ou sensibilité ; absence de mutation du FGP avant approbation ; mise à jour atomique et historique après approbation autorisée ; correction d'un événement validé ; import idempotent ; concurrence/version ; dépendance FGP indisponible ; petit effectif statistique masqué ; tentative d'export sans droit ; session révoquée ; payload partenaire invalide. Utilise uniquement des données synthétiques. Teste aussi les régressions des autres modules.
+PHASE 11 — MIGRATIONS, PERFORMANCE ET EXPLOITATION
+Les migrations doivent être minimales, relues et testées sur une copie synthétique ; documente une stratégie de retour arrière. Ajoute les index justifiés pour les filtres fréquents sans indexer inutilement les champs sensibles. Utilise pagination serveur, transactions, contraintes de clés étrangères, journaux structurés et alertes techniques minimales. Évite les données personnelles dans les logs et traces d'erreur. Documente sauvegarde/restauration, comportement quand FGP est indisponible, traitement des exceptions, supervision des intégrations et procédure d'incident. Si le mode offline n'existe pas et n'est pas nécessairement demandé, n'en invente pas un.
+PHASE 12 — PROCÉDURE DE LIVRAISON
+Travaille en lots petits et relis les changements après chaque lot. Lance les tests ciblés, puis la suite existante appropriée, le lint, les vérifications de types et le build. Corrige les nouvelles régressions sans masquer ni supprimer les tests existants. Mets à jour la documentation de l'API, du modèle, des rôles, des scénarios et des questions juridiques ouvertes. Ne prétends jamais qu'un test a passé s'il n'a pas été exécuté. Ne crée pas de commit ou push sans demande explicite. Avant la fin, donne un compte-rendu avec fichiers modifiés, migrations, endpoints, tests exécutés/résultats exacts, limitations, risques restants, paramètres désactivés et étapes manuelles nécessaires.
+CRITÈRES D'ACCEPTATION FINAUX
+- Le code s'intègre au FGP et au référentiel territorial existants sans registre de personnes parallèle.
+- Les mouvements et rectifications sont historisés, datés, sourcés et audités.
+- Le NIN reste inchangé et non géré par ce module.
+- Aucune déclaration ne devient un fait officiel sans workflow et autorisation approuvés.
+- Les autorisations sont vérifiées côté serveur, avec tests négatifs.
+- Les données sensibles ne fuient pas dans les cartes, exports, notifications, logs ou erreurs.
+- Les imports autorisés sont idempotents et les conflits sont présentés à un humain.
+- Les statistiques sont agrégées, documentées et résistantes à la ré-identification.
+- Les tests existants et nouveaux passent, ou les échecs restants sont explicitement consignés.
+- Une procédure de déploiement, de retour arrière et d'exploitation est remise.
+FORMAT DE COMPTE-RENDU ATTENDU
+Présente les résultats sous ces rubriques : 1) état initial de Git et du dépôt ; 2) architecture découverte ; 3) fonctions existantes réutilisées ; 4) écarts et décisions ; 5) fichiers créés/modifiés ; 6) migrations et procédures ; 7) routes et contrat d'API ; 8) matrice des rôles testée ; 9) tests effectivement exécutés et résultats ; 10) risques et décisions bloquantes ; 11) instructions précises de lancement/validation ; 12) confirmation qu'aucune modification destructive, donnée réelle ou intégration non autorisée n'a été introduite.
+18. Références et points de vérification juridique
+Références consultées pour cadrer le document (elles ne remplacent pas un avis juridique et ne suffisent pas à établir toutes les règles opérationnelles du module) :
+Décret n° 22/07 du 2 mars 2022 portant création du Fichier Général de la Population en RDC — notamment les données de résidence, la consignation des changements de situation et dates d’effet, l’accès, la confidentialité, l’information, la rectification et la sécurité.https://mail.leganet.cd/Legislation/Droit%20Public/Identification/decret%2022.04.02.03.2022.html
+Copie du texte FGP hébergée par le dépôt de législation santé de l’OMS/CPCD.https://extranet.who.int/cpcd/sites/default/files/public_file_repository/COD_Democratic-Republic-of-the-Congo_Decret-No-22-07-portant-creation-d-un-fichier-general-de-la-population-en-Republique-Democratique-du-Congo_2022.pdf
+Commission Nationale pour les Réfugiés : communiqué relatif à l’identification, l’enregistrement et la documentation des personnes déplacées internes et citant l’arrêté interministériel du 21 décembre 2024.https://cnr.cd/2025/06/06/lancement-de-loperation-didentification-denregistrement-et-de-documentation-des-personnes-deplacees-internes-dans-les-provinces-de-lituri-et-du-nord-kivu/
+Texte publié sur Leganews Pro décrivant l’arrêté interministériel du 21 décembre 2024 relatif à l’organisation et à la gestion des personnes déplacées internes.https://leganews.pro/articles/019cb021-702d-7107-9d42-562767d051e7
+18.1 Points à confirmer par les responsables autorisés
+Texte légal consolidé, versions officielles et dispositions applicables à la date de mise en production.
+Règles exactes de traitement des déplacements forcés, catégories d’acteurs et bases de partage.
+Définition juridique/administrative de la résidence et effets sur les champs du FGP.
+Règles de conservation, rectification, archivage et droits des personnes.
+Conditions précises d’échange avec la DGM, la CNR ou d’autres organismes, après validation des responsabilités et interfaces.
+Règles nationales de stockage, transferts, sécurité, journalisation et signalement d’incidents.
+CONCLUSIONLe Module 12 est une couche d’événements de mobilité, reliée au FGP et au référentiel territorial. Sa valeur vient de la traçabilité et de la qualité des informations, pas d’une surveillance continue. Le développement peut commencer par un audit et un MVP de changement de résidence ; les catégories plus sensibles ne doivent être activées qu’après validations métier, juridiques et sécurité.

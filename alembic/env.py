@@ -17,6 +17,7 @@ import apps.api.domains.notifications.models  # noqa: F401
 import apps.api.domains.identity.models  # noqa: F401
 import apps.api.domains.geography.models  # noqa: F401
 import apps.api.domains.core_registry.models  # noqa: F401
+import apps.api.domains.population_movements.models  # noqa: F401
 
 # Optional sibling-phase models (ignore if not yet present).
 for _mod in (
