@@ -24,13 +24,6 @@ import FgpFingerprintPanel, {
   type PendingFinger,
 } from "../components/FgpFingerprintPanel";
 import { nationaliteLabel } from "../nationalites";
-import {
-  NEWBORN_DELAI_JOURS,
-  ninRulesForKind,
-  personKindLabel,
-  suggestPersonKind,
-  type PersonKind,
-} from "../fgpPersonKind";
 
 type Tab = "identite" | "adresse" | "filiation" | "controles" | "historique" | "rectification";
 type Mode = "liste" | "creer" | "detail";
@@ -75,7 +68,6 @@ export default function PopulationFgpPage() {
   const [givenNames, setGivenNames] = useState("");
   const [otherNames, setOtherNames] = useState("");
   const [dob, setDob] = useState("");
-  const [personKind, setPersonKind] = useState<PersonKind>("ADULT");
   const [sex, setSex] = useState("UNKNOWN");
   const [pob, setPob] = useState("");
   const [birthActNo, setBirthActNo] = useState("");
@@ -193,7 +185,6 @@ export default function PopulationFgpPage() {
     setGivenNames("");
     setOtherNames("");
     setDob("");
-    setPersonKind("ADULT");
     setSex("UNKNOWN");
     setPob("");
     setBirthActNo("");
@@ -256,7 +247,6 @@ export default function PopulationFgpPage() {
         sex,
         place_of_birth: pob.trim() || undefined,
         birth_certificate_number: birthActNo.trim() || undefined,
-        person_kind: personKind,
         nationality: (nationality.trim() || "COD").toUpperCase(),
         marital_status: maritalStatus || undefined,
         occupation: occupation.trim() || undefined,
@@ -299,7 +289,7 @@ export default function PopulationFgpPage() {
       };
       const created = await registryApi.createCitizen(body);
       let bioNote = "";
-      if (personKind !== "NEWBORN" && pendingFingers.length > 0) {
+      if (pendingFingers.length > 0) {
         try {
           bioNote = await enrollPendingFingers(created.id, pendingFingers);
         } catch (bioErr) {
@@ -482,10 +472,8 @@ export default function PopulationFgpPage() {
                 <p className="muted small" style={{ margin: 0 }}>
                   <strong>État civil → ONIP :</strong> les personnes saisies seulement dans le
                   navigateur état civil (local) n’apparaissent pas ici. Elles rejoignent le FGP
-                  quand l’acte de naissance est <strong>validé via l’API</strong> (officier connecté)
-                  ou après un push recensement / fiche nationale. Distinguez bien{" "}
-                  <strong>bébé (NEWBORN)</strong> et <strong>parent / adulte</strong> — fiches
-                  séparées, liées par la filiation.
+                  quand l’acte est <strong>validé via l’API</strong> (officier connecté) ou après
+                  un push recensement / fiche nationale. Sinon créez directement le dossier ici.
                 </p>
               </div>
               <form
@@ -553,7 +541,6 @@ export default function PopulationFgpPage() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Type</th>
                       <th>Nom</th>
                       <th>Sexe</th>
                       <th>Naissance</th>
@@ -566,18 +553,13 @@ export default function PopulationFgpPage() {
                   <tbody>
                     {rows.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="muted">
+                        <td colSpan={7} className="muted">
                           Aucun résultat.
                         </td>
                       </tr>
                     ) : (
                       rows.map((r) => (
                         <tr key={r.id}>
-                          <td>
-                            <span className="status-pill">
-                              {personKindLabel(r.person_kind || suggestPersonKind(r.date_of_birth))}
-                            </span>
-                          </td>
                           <td>{[r.family_name, r.given_names].filter(Boolean).join(" ")}</td>
                           <td>{r.sex || "—"}</td>
                           <td>{r.date_of_birth || "—"}</td>
@@ -619,18 +601,6 @@ export default function PopulationFgpPage() {
               <h3>1. Identité</h3>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12 }}>
                 <label>
-                  Type de fiche *
-                  <select
-                    className="form-control"
-                    required
-                    value={personKind}
-                    onChange={(e) => setPersonKind(e.target.value as PersonKind)}
-                  >
-                    <option value="ADULT">Adulte / parent</option>
-                    <option value="NEWBORN">Bébé (nouveau-né ≤ {NEWBORN_DELAI_JOURS} j)</option>
-                  </select>
-                </label>
-                <label>
                   Nom *
                   <input className="form-control" required value={familyName} onChange={(e) => setFamilyName(e.target.value)} />
                 </label>
@@ -662,11 +632,7 @@ export default function PopulationFgpPage() {
                     type="date"
                     required
                     value={dob}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setDob(v);
-                      if (v) setPersonKind(suggestPersonKind(v));
-                    }}
+                    onChange={(e) => setDob(e.target.value)}
                   />
                 </label>
                 <label>
@@ -751,27 +717,12 @@ export default function PopulationFgpPage() {
                 </label>
               </div>
 
-              <h3>4. Filiation {personKind === "NEWBORN" ? "(parents du bébé)" : ""}</h3>
-              {personKind === "NEWBORN" ? (
-                <p className="muted small">
-                  Le bébé a sa propre fiche FGP. Les parents restent des adultes (fiches distinctes) ;
-                  renseignez ici la filiation déclarée.
-                </p>
-              ) : null}
-              <div className="fgp-nin-rules">
-                <strong>NIN — {personKindLabel(personKind)}</strong>
-                <ul>
-                  {ninRulesForKind(personKind).map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
-                </ul>
-              </div>
+              <h3>4. Filiation</h3>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12 }}>
                 <label>
                   Nom complet du père
                   <input
                     className="form-control"
-                    required={personKind === "NEWBORN"}
                     value={fatherName}
                     onChange={(e) => setFatherName(e.target.value)}
                   />
@@ -790,7 +741,6 @@ export default function PopulationFgpPage() {
                   Nom complet de la mère
                   <input
                     className="form-control"
-                    required={personKind === "NEWBORN"}
                     value={motherName}
                     onChange={(e) => setMotherName(e.target.value)}
                   />
@@ -824,20 +774,10 @@ export default function PopulationFgpPage() {
                 label="Résidence"
               />
 
-              {personKind === "NEWBORN" ? (
-                <div className="panel" style={{ marginTop: 12 }}>
-                  <h3 style={{ marginTop: 0 }}>6. Empreintes</h3>
-                  <p className="muted small" style={{ margin: 0 }}>
-                    Non exigées pour un nouveau-né. Capture possible plus tard sur la fiche
-                    (parent / adulte ou enfant plus âgé).
-                  </p>
-                </div>
-              ) : (
-                <FgpFingerprintPanel
-                  pending={pendingFingers}
-                  onPendingChange={setPendingFingers}
-                />
-              )}
+              <FgpFingerprintPanel
+                pending={pendingFingers}
+                onPendingChange={setPendingFingers}
+              />
 
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
                 <button type="button" className="btn-secondary" onClick={() => void checkSimilar()}>
@@ -1005,12 +945,6 @@ export default function PopulationFgpPage() {
                     <li>Lieu : {selected.place_of_birth || "—"}</li>
                     <li>N° acte de naissance : {selected.birth_certificate_number || "—"}</li>
                     <li>Nationalité : {nationaliteLabel(selected.nationality)}</li>
-                    <li>
-                      Type :{" "}
-                      {personKindLabel(
-                        selected.person_kind || suggestPersonKind(selected.date_of_birth),
-                      )}
-                    </li>
                     <li>État civil : {selected.marital_status || "—"}</li>
                     <li>Profession : {selected.occupation || "—"}</li>
                     <li>Taille : {selected.height_cm != null ? `${selected.height_cm} cm` : "—"}</li>
