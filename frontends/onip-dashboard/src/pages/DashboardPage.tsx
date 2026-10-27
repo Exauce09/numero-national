@@ -185,7 +185,7 @@ export default function DashboardPage() {
     {
       label: "NIN / NIC attribués",
       value: k?.assigned_nins ?? data.population.nin_assigned,
-      href: drill.nin,
+      href: drill.population || "/population",
       hint: "Provisoire tant que format officiel non confirmé",
     },
     {
