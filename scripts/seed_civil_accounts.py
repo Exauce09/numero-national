@@ -177,16 +177,8 @@ def main() -> None:
         admin_token = admin_tokens["access_token"]
 
         print("\nComptes créés / vérifiés :\n")
-        print(f"{'Alias UI':<14} {'Email':<42} {'Mot de passe':<24} Rôles")
-        print("-" * 110)
-
-        ui_passwords = {
-            "officier": "DemoCivil2026!",
-            "agent": "DemoAgentCivil2026!",
-            "responsable": "DemoResponsable2026!",
-            "auditeur": "DemoAuditeur2026!",
-            "admin": "DemoAdminProv2026!",
-        }
+        print(f"{'Alias':<14} {'Email':<42} Rôles")
+        print("-" * 90)
 
         for acc in CIVIL_ACCOUNTS:
             email = str(acc["email"])
@@ -202,17 +194,9 @@ def main() -> None:
             )
             alias = str(acc["alias"])
             final_roles = ",".join(profile.get("roles") or roles)
-            print(
-                f"{alias:<14} {email:<42} {password:<24} {final_roles}"
-            )
-            print(f"{'':14} {'alias UI ->':<42} {ui_passwords.get(alias, '-'):<24}")
+            print(f"{alias:<14} {email:<42} {final_roles}")
 
-        print("\nOK - site http://127.0.0.1:5176")
-        print("  officier / DemoCivil2026!   (validation actes)")
-        print("  agent / DemoAgentCivil2026! (saisie sans validation)")
-        print("  responsable / DemoResponsable2026!")
-        print("  auditeur / DemoAuditeur2026!")
-        print("  admin / DemoAdminProv2026!")
+        print("\nOK — mots de passe non affichés (variables d'environnement / ops).")
 
 
 if __name__ == "__main__":

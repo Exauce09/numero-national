@@ -34,8 +34,8 @@ export default function BiometricDashboardPage() {
       </p>
       <h2 className="page-title">Tableau de bord biométrique</h2>
       <p className="page-lead">Enrôlement 3 doigts · déduplication 1:N · revue des correspondances</p>
-      <div className="dash-demo-banner" role="note">
-        DONNÉES DE DÉMONSTRATION — seuils techniques (environment=demo), pas des statistiques
+      <div className="panel muted small" role="note">
+        Seuils techniques biométriques — pas des statistiques opérationnelles
         nationales officielles de la RDC.
       </div>
 

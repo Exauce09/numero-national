@@ -628,7 +628,7 @@ export const api = {
 };
 
 /** Stockage local de démo quand l'API est indisponible. */
-const DEMO_KEY = "nn_civil_demo_store";
+const DEMO_KEY = "nn_civil_local_store";
 
 type DemoStore = {
   acts: CivilAct[];

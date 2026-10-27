@@ -9,7 +9,6 @@ npm run dev
 ```
 
 - URL : [http://localhost:5176/](http://localhost:5176/)
-- Démo : `officier` / `DemoCivil2026!`
 
 Ouvrir dans Edge :
 

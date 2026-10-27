@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { DEMO_PASSWORD, DEMO_USER, getSession, login } from "../auth";
+import { getSession, login } from "../auth";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -71,8 +71,8 @@ export default function LoginPage() {
             {busy ? "Connexion…" : "Se connecter"}
           </button>
         </form>
-        <p className="login-subtitle" style={{ marginTop: "1.25rem", marginBottom: 0 }}>
-          Démo : <strong>{DEMO_USER}</strong> / <strong>{DEMO_PASSWORD}</strong>
+        <p className="login-subtitle muted" style={{ marginTop: "1.25rem", marginBottom: 0 }}>
+          Accès réservé aux comptes citoyens enregistrés.
         </p>
       </div>
     </div>

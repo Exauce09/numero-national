@@ -108,7 +108,7 @@ def main() -> None:
                 json={
                     "code": CAMPAIGN_CODE,
                     "name": "Recensement général 2026",
-                    "description": "Campagne démo terrain (seed APK)",
+                    "description": "Campagne terrain initiale",
                 },
             )
             if created.status_code not in {200, 201}:

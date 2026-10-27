@@ -765,7 +765,7 @@ async function tryPostCivil(
       // Jeton expiré / invalide : on ne bloque plus l'enregistrement local.
       updateSession({ accessToken: undefined });
       throw new CivilAuthError(
-        "Session API expirée ou invalide. L'acte est conservé localement — reconnectez-vous (officier / DemoCivil2026!) pour synchroniser.",
+        "Session API expirée ou invalide. L'acte est conservé localement — reconnectez-vous (vos identifiants professionnels) pour synchroniser.",
       );
     }
     if (session?.accessToken) {

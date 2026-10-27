@@ -169,12 +169,8 @@ Santé : tableaux **vides** par défaut ; formulaire d’ajout de structures ; p
 
 ### ONIP (5183)
 
-Connexion **API uniquement** (JWT). Exemple après seed :
-
-- Email : `admin.recensement@example.gov`
-- Mot de passe : `CensusAdmin123!`
-
-Aucune session démo hors API.
+Connexion **API uniquement** (JWT). Utilisez un compte administrateur provisionné
+par l’équipe ops (pas d’identifiants préremplis dans l’interface).
 
 ---
 

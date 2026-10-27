@@ -14,9 +14,9 @@ from datetime import date, datetime, timezone
 from typing import Any
 
 AUTHORIZED_SOURCES: dict[str, dict[str, Any]] = {
-    "EC_KIN_DEMO": {
-        "source_id": "EC_KIN_DEMO",
-        "label": "État civil Kinshasa (démo)",
+    "EC_KINSHASA": {
+        "source_id": "EC_KINSHASA",
+        "label": "État civil Kinshasa",
         "active": True,
         "contract_version": "1.0",
         "allowed_event_types": [
@@ -30,16 +30,16 @@ AUTHORIZED_SOURCES: dict[str, dict[str, Any]] = {
             "ANNULATION",
         ],
     },
-    "HOSPITAL_DEMO": {
-        "source_id": "HOSPITAL_DEMO",
-        "label": "Déclarations hôpital (démo)",
+    "HOSPITAL_PARTNER": {
+        "source_id": "HOSPITAL_PARTNER",
+        "label": "Déclarations structure sanitaire partenaire",
         "active": True,
         "contract_version": "1.0",
         "allowed_event_types": ["BIRTH", "DEATH"],
     },
     "EC_REVOKED": {
         "source_id": "EC_REVOKED",
-        "label": "Source révoquée (tests)",
+        "label": "Source révoquée",
         "active": False,
         "contract_version": "1.0",
         "allowed_event_types": ["BIRTH"],

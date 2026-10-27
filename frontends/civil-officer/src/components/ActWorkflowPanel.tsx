@@ -491,7 +491,7 @@ export default function ActWorkflowPanel({ act, summaryFields, onUpdated, onClos
 
       {supportsCivilWorkflow && !canValidate && status === "SUBMITTED" ? (
         <p className="muted small">
-          Acte soumis — validation réservée à l&apos;officier (`officier` / DemoCivil2026!).
+          Acte soumis — validation réservée à l&apos;officier (compte officier habilité).
         </p>
       ) : null}
       {supportsCivilWorkflow && !canSubmit && nextSteps.length > 0 ? (

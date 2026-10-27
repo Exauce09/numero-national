@@ -13,7 +13,7 @@ export type CivilDeclaration = {
   created_at: string;
 };
 
-const DEMO_KEY = "nn_civil_demo_store";
+const DEMO_KEY = "nn_civil_local_store";
 const DECL_CHANNEL = "nn_civil_declarations_sync";
 
 type DemoStore = {

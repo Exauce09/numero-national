@@ -37,7 +37,7 @@ def civil_catalog() -> dict[str, Any]:
             }
             for s in store.list_sources()
         ],
-        event_types=list(store.AUTHORIZED_SOURCES["EC_KIN_DEMO"]["allowed_event_types"]),
+        event_types=list(store.AUTHORIZED_SOURCES["EC_KINSHASA"]["allowed_event_types"]),
         processing_statuses=list(store.PROCESSING_STATUSES),
         endpoints={
             "catalog": "GET /api/v1/civil-events/catalog",

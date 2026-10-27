@@ -26,7 +26,6 @@ export const PORTAL_CREDENTIALS: Record<Portal, { username: string; password: st
   admin: { username: "admin", password: "Admin2026!" },
 };
 
-export const DEMO_CREDENTIALS = PORTAL_CREDENTIALS;
 
 const PORTAL_ROLE_TITLE: Record<Portal, string> = {
   sante: "Agent santé",

@@ -50,7 +50,7 @@ export type MinistryDashboard = {
 };
 
 const ACCOUNTS_KEY = "nn_health_facility_accounts_v2";
-const DECL_STORE_KEY = "nn_civil_demo_store";
+const DECL_STORE_KEY = "nn_civil_local_store";
 
 type AccountRaw = {
   id: string;

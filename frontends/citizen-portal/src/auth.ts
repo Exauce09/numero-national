@@ -7,9 +7,6 @@ export type Session = {
 
 const KEY = "nn_session_citizen";
 
-export const DEMO_USER = "citoyen";
-export const DEMO_PASSWORD = "DemoCitoyen2026!";
-
 export function getSession(): Session | null {
   const raw = sessionStorage.getItem(KEY);
   if (!raw) return null;
@@ -24,12 +21,13 @@ export function clearSession(): void {
   sessionStorage.removeItem(KEY);
 }
 
-function effectivePassword(): string {
-  return getCitizenPrefs().passwordOverride || DEMO_PASSWORD;
+function effectivePassword(): string | null {
+  return getCitizenPrefs().passwordOverride || null;
 }
 
 export function updateCitizenPassword(currentPassword: string, nextPassword: string): void {
-  if (currentPassword !== effectivePassword()) {
+  const expected = effectivePassword();
+  if (!expected || currentPassword !== expected) {
     throw new Error("Mot de passe actuel incorrect.");
   }
   if (nextPassword.length < 8) {
@@ -62,11 +60,5 @@ export async function login(username: string, password: string): Promise<Session
     /* API indisponible */
   }
 
-  if (user !== DEMO_USER || password !== effectivePassword()) {
-    throw new Error(`Identifiants incorrects. Démo : ${DEMO_USER} / ${DEMO_PASSWORD}`);
-  }
-
-  const session: Session = { username: user };
-  sessionStorage.setItem(KEY, JSON.stringify(session));
-  return session;
+  throw new Error("Identifiants incorrects ou API indisponible.");
 }

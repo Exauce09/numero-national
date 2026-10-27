@@ -11,7 +11,7 @@ export type CivilDeclaration = {
   created_at: string;
 };
 
-const DEMO_KEY = "nn_civil_demo_store";
+const DEMO_KEY = "nn_civil_local_store";
 const NOTIF_KEY = "nn_civil_officer_notifs";
 
 type DemoStore = {

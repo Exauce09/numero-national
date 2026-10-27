@@ -56,7 +56,7 @@ export type NationalSnapshot = {
 const STORE_KEY = "nn_presidence_national_v2";
 const REGISTRY_KEY = "nn_civil_registry_v1";
 const HEALTH_ACCOUNTS_KEY = "nn_health_facility_accounts_v2";
-const CIVIL_DECL_STORE_KEY = "nn_civil_demo_store";
+const CIVIL_DECL_STORE_KEY = "nn_civil_local_store";
 const OFFICER_ACCOUNTS_KEY = "nn_civil_officer_accounts";
 
 function emptyGft(): Gft {

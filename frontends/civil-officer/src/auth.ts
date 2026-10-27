@@ -297,31 +297,9 @@ export async function login(username: string, password: string): Promise<Session
     }
   }
 
-  const offlineDemo = resolveDemoAccount(user, password, passwordOverride);
-  if (!offlineDemo) {
-    throw new Error(
-      lastError ||
-        "Identifiants incorrects. Comptes : officier, agent, responsable, auditeur, admin (voir docs/demo-credentials.md).",
-    );
-  }
-
-  const sessionUser = offlineDemo.alias;
-  const roles = offlineDemo.rolesHint;
-  const labels = sessionLabel(sessionUser, roles);
-  const session = attachCommune(
-    {
-      username: sessionUser,
-      photoDataUrl,
-      displayName: labels.displayName,
-      roleTitle: labels.roleTitle,
-      roles,
-      permissions: [],
-      accountStatus: "ACTIVE",
-    },
-    sessionUser,
+  throw new Error(
+    lastError || "Identifiants incorrects ou API indisponible. Contactez l'administrateur.",
   );
-  sessionStorage.setItem(KEY, JSON.stringify(session));
-  return session;
 }
 
 /**

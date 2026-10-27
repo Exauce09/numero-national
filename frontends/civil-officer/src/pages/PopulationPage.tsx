@@ -317,7 +317,7 @@ export default function PopulationPage({ showAnalytics = false }: { showAnalytic
             ) : (
               <>
                 Mode local navigateur — <strong>{total}</strong> fiche(s) en cache seulement (ce n’est
-                pas le registre national à 110). Reconnectez-vous : officier / DemoCivil2026!
+                pas le registre national à 110). Reconnectez-vous : vos identifiants professionnels
               </>
             )}
           </p>

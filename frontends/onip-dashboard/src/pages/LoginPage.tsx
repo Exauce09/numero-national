@@ -5,8 +5,8 @@ import { getSession, homePathForSession, login } from "../auth";
 export default function LoginPage() {
   const navigate = useNavigate();
   const existing = getSession();
-  const [username, setUsername] = useState("admin.recensement@example.gov");
-  const [password, setPassword] = useState("CensusAdmin123!");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -49,7 +49,7 @@ export default function LoginPage() {
             type="email"
             inputMode="email"
             autoComplete="username"
-            placeholder="admin.recensement@example.gov"
+            placeholder="e-mail professionnel"
             value={username}
             onChange={(ev) => setUsername(ev.target.value)}
           />

@@ -167,7 +167,7 @@ export async function pushCensusToOnip(input: {
     return {
       queueId: item.id,
       message:
-        "Recensement local OK — reconnectez-vous (officier / DemoCivil2026!) pour envoyer le dossier à SIGPOP-RDC.",
+        "Recensement local OK — reconnectez-vous (vos identifiants professionnels) pour envoyer le dossier à SIGPOP-RDC.",
     };
   }
 

@@ -19,8 +19,6 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   static const _autoLogin = bool.fromEnvironment('AUTO_LOGIN');
-  static const _demoEmail = 'agent.recensement@example.gov';
-  static const _demoPassword = 'CensusAgent123!';
 
   final _email = TextEditingController();
   final _password = TextEditingController();
@@ -35,8 +33,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _email.text = _demoEmail;
-    _password.text = _demoPassword;
     _prefill();
     if (_autoLogin && widget.allowAutoLogin) {
       WidgetsBinding.instance.addPostFrameCallback((_) {

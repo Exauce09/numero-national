@@ -74,7 +74,7 @@ function formatLoginErrorDetail(detail: unknown): string | null {
           : "";
         const msg = String((d as { msg: unknown }).msg);
         if (loc.includes("email") || /email|value.?is.?not.?a.?valid.?email/i.test(msg)) {
-          return "Adresse e-mail invalide — utilisez le format nom@domaine (ex. admin.recensement@example.gov).";
+          return "Adresse e-mail invalide — utilisez le format nom@domaine.";
         }
         return msg;
       }
@@ -96,7 +96,7 @@ export async function login(username: string, password: string): Promise<Session
   }
   if (!user.includes("@") || !/\S+@\S+\.\S+/.test(user)) {
     throw new Error(
-      "Adresse e-mail invalide — utilisez le format nom@domaine (ex. admin.recensement@example.gov).",
+      "Adresse e-mail invalide — utilisez le format nom@domaine.",
     );
   }
 

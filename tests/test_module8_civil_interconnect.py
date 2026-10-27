@@ -74,7 +74,7 @@ async def test_client_proposed_nin_forbidden():
         await ingest_event(
             db,
             CivilEventIn(
-                source_id="EC_KIN_DEMO",
+                source_id="EC_KINSHASA",
                 source_event_id="e-nin",
                 event_type="BIRTH",
                 payload={"nin": "12345678901234"},
@@ -87,7 +87,7 @@ async def test_client_proposed_nin_forbidden():
 async def test_idempotent_replay_same_payload():
     db = AsyncMock()
     body = CivilEventIn(
-        source_id="EC_KIN_DEMO",
+        source_id="EC_KINSHASA",
         source_event_id="birth-001",
         event_type="BIRTH",
         citizen_id=uuid4(),
@@ -110,7 +110,7 @@ async def test_payload_conflict_quarantines():
     await ingest_event(
         db,
         CivilEventIn(
-            source_id="EC_KIN_DEMO",
+            source_id="EC_KINSHASA",
             source_event_id="death-9",
             event_type="DEATH",
             citizen_id=cid,
@@ -120,7 +120,7 @@ async def test_payload_conflict_quarantines():
     ack = await ingest_event(
         db,
         CivilEventIn(
-            source_id="EC_KIN_DEMO",
+            source_id="EC_KINSHASA",
             source_event_id="death-9",
             event_type="DEATH",
             citizen_id=cid,
@@ -139,7 +139,7 @@ async def test_ambiguous_goes_to_match_review():
     ack = await ingest_event(
         db,
         CivilEventIn(
-            source_id="EC_KIN_DEMO",
+            source_id="EC_KINSHASA",
             source_event_id="amb-1",
             event_type="MARRIAGE",
             candidate_citizen_ids=[uuid4(), uuid4()],
@@ -158,7 +158,7 @@ async def test_matching_quarantine_decision_no_nin_mutate():
     ack = await ingest_event(
         db,
         CivilEventIn(
-            source_id="EC_KIN_DEMO",
+            source_id="EC_KINSHASA",
             source_event_id="amb-2",
             event_type="DIVORCE",
             payload={},

@@ -1,4 +1,4 @@
-/** Comptes & session structure sanitaire (même SPA que l'état civil). */
+﻿/** Comptes & session structure sanitaire (même SPA que l'état civil). */
 
 export type FacilityAccount = {
   id: string;
@@ -29,15 +29,15 @@ export type HealthSession = {
 const ACCOUNTS_KEY = "nn_health_facility_accounts";
 const SESSION_KEY = "nn_session_health_facility";
 
-export const HEALTH_DEMO_USER = "hopital";
-export const HEALTH_DEMO_PASSWORD = "DemoSante2026!";
 export const HEALTH_ROLE_TITLE = "Infirmier titulaire — structure sanitaire";
 
-function normalizeAccount(raw: Partial<FacilityAccount> & {
-  id?: string;
-  username?: string;
-  password?: string;
-}): FacilityAccount | null {
+function normalizeAccount(
+  raw: Partial<FacilityAccount> & {
+    id?: string;
+    username?: string;
+    password?: string;
+  },
+): FacilityAccount | null {
   if (!raw.id || !raw.username || !raw.password) return null;
   return {
     id: String(raw.id),
@@ -49,10 +49,10 @@ function normalizeAccount(raw: Partial<FacilityAccount> & {
     )
       ? (raw.facilityType as FacilityAccount["facilityType"])
       : "HOPITAL",
-    commune_code: String(raw.commune_code ?? "KIN-GOMBE").trim() || "KIN-GOMBE",
-    commune_name: String(raw.commune_name ?? "Gombe").trim() || "Gombe",
-    province: String(raw.province ?? "Kinshasa").trim() || "Kinshasa",
-    ville: String(raw.ville ?? "Kinshasa").trim() || "Kinshasa",
+    commune_code: String(raw.commune_code ?? "").trim(),
+    commune_name: String(raw.commune_name ?? "").trim(),
+    province: String(raw.province ?? "").trim(),
+    ville: String(raw.ville ?? "").trim(),
     active: raw.active !== false,
     created_at: String(raw.created_at ?? new Date().toISOString()),
     updated_at: raw.updated_at ? String(raw.updated_at) : undefined,
@@ -80,46 +80,27 @@ function saveAccounts(list: FacilityAccount[]) {
   localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(normalized));
 }
 
-/** Migre / réécrit le store pour garantir le champ `active` et des ids valides. */
 function persistNormalizedAccounts(list: FacilityAccount[]): FacilityAccount[] {
   saveAccounts(list);
   return loadAccounts();
 }
 
-function ensureDemoAccount(): FacilityAccount {
-  let list = loadAccounts();
-  // Persiste la normalisation (ex. comptes anciens sans `active`).
+function ensureAccountsNormalized(): void {
+  const list = loadAccounts();
   if (list.length > 0) {
-    list = persistNormalizedAccounts(list);
+    persistNormalizedAccounts(list);
   }
-  const hit = list.find((a) => a.username === HEALTH_DEMO_USER);
-  if (hit) return hit;
-  const demo: FacilityAccount = {
-    id: "fac-demo-kin-gombe",
-    username: HEALTH_DEMO_USER,
-    password: HEALTH_DEMO_PASSWORD,
-    facilityName: "Hôpital Général de Référence — Gombe",
-    facilityType: "HOPITAL",
-    commune_code: "KIN-GOMBE",
-    commune_name: "Gombe",
-    province: "Kinshasa",
-    ville: "Kinshasa",
-    active: true,
-    created_at: new Date().toISOString(),
-  };
-  saveAccounts([demo, ...list]);
-  return demo;
 }
 
 export type FacilityAccountPublic = Omit<FacilityAccount, "password">;
 
 export function listFacilityAccounts(): FacilityAccountPublic[] {
-  ensureDemoAccount();
+  ensureAccountsNormalized();
   return loadAccounts().map(({ password: _pw, ...rest }) => rest);
 }
 
 export function getFacilityAccount(id: string): FacilityAccountPublic | null {
-  ensureDemoAccount();
+  ensureAccountsNormalized();
   const hit = loadAccounts().find((a) => a.id === id);
   if (!hit) return null;
   const { password: _pw, ...rest } = hit;
@@ -143,7 +124,7 @@ export function createFacilityAccount(input: {
   if (input.password.length < 8) {
     throw new Error("Le mot de passe doit contenir au moins 8 caractères.");
   }
-  ensureDemoAccount();
+  ensureAccountsNormalized();
   const list = loadAccounts();
   if (list.some((a) => a.username === username)) {
     throw new Error("Cet identifiant existe déjà.");
@@ -154,10 +135,10 @@ export function createFacilityAccount(input: {
     password: input.password,
     facilityName: input.facilityName.trim(),
     facilityType: input.facilityType,
-    commune_code: input.commune_code.trim() || "KIN-GOMBE",
-    commune_name: input.commune_name.trim() || "Gombe",
-    province: input.province.trim() || "Kinshasa",
-    ville: input.ville.trim() || "Kinshasa",
+    commune_code: input.commune_code.trim(),
+    commune_name: input.commune_name.trim(),
+    province: input.province.trim(),
+    ville: input.ville.trim(),
     active: true,
     created_at: new Date().toISOString(),
   };
@@ -178,7 +159,7 @@ export function updateFacilityAccount(
     ville: string;
   },
 ): FacilityAccount {
-  ensureDemoAccount();
+  ensureAccountsNormalized();
   const list = loadAccounts();
   const idx = list.findIndex((a) => a.id === id);
   if (idx < 0) throw new Error("Compte introuvable.");
@@ -201,10 +182,10 @@ export function updateFacilityAccount(
     password: input.password ? input.password : prev.password,
     facilityName: input.facilityName.trim(),
     facilityType: input.facilityType,
-    commune_code: input.commune_code.trim() || "KIN-GOMBE",
-    commune_name: input.commune_name.trim() || "Gombe",
-    province: input.province.trim() || "Kinshasa",
-    ville: input.ville.trim() || "Kinshasa",
+    commune_code: input.commune_code.trim(),
+    commune_name: input.commune_name.trim(),
+    province: input.province.trim(),
+    ville: input.ville.trim(),
     updated_at: new Date().toISOString(),
   };
   list[idx] = next;
@@ -229,7 +210,7 @@ export function updateFacilityAccount(
 }
 
 export function setFacilityAccountActive(id: string, active: boolean): FacilityAccount {
-  ensureDemoAccount();
+  ensureAccountsNormalized();
   const list = loadAccounts();
   const idx = list.findIndex((a) => a.id === id);
   if (idx < 0) throw new Error("Compte introuvable.");
@@ -254,13 +235,10 @@ export function setFacilityAccountActive(id: string, active: boolean): FacilityA
 }
 
 export function deleteFacilityAccount(id: string): void {
-  ensureDemoAccount();
+  ensureAccountsNormalized();
   const list = loadAccounts();
   const hit = list.find((a) => a.id === id);
   if (!hit) throw new Error("Compte introuvable.");
-  if (hit.username === HEALTH_DEMO_USER) {
-    throw new Error("Le compte démo ne peut pas être supprimé (vous pouvez le désactiver).");
-  }
   const remaining = list.filter((a) => a.id !== id);
   saveAccounts(remaining);
   if (loadAccounts().some((a) => a.id === id)) {
@@ -272,9 +250,8 @@ export function deleteFacilityAccount(id: string): void {
   }
 }
 
-/** Vérifie qu'un compte santé existe encore et est actif (garde de session). */
 export function isHealthAccountActive(facilityId: string): boolean {
-  ensureDemoAccount();
+  ensureAccountsNormalized();
   const hit = loadAccounts().find((a) => a.id === facilityId);
   return Boolean(hit?.active);
 }
@@ -294,11 +271,11 @@ export function clearHealthSession() {
 }
 
 export function loginHealth(username: string, password: string): HealthSession {
-  ensureDemoAccount();
+  ensureAccountsNormalized();
   const user = username.trim().toLowerCase();
   const account = loadAccounts().find((a) => a.username === user);
   if (!account || account.password !== password) {
-    throw new Error(`Identifiants incorrects. Démo : ${HEALTH_DEMO_USER} / ${HEALTH_DEMO_PASSWORD}`);
+    throw new Error("Identifiants incorrects.");
   }
   if (!account.active) {
     throw new Error("Ce compte est désactivé. Contactez l'officier d'état civil.");
@@ -318,7 +295,7 @@ export function loginHealth(username: string, password: string): HealthSession {
 }
 
 export function updateHealthPassword(username: string, currentPassword: string, nextPassword: string): void {
-  ensureDemoAccount();
+  ensureAccountsNormalized();
   const user = username.trim().toLowerCase();
   const list = loadAccounts();
   const idx = list.findIndex((a) => a.username === user);

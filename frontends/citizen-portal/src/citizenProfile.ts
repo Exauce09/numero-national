@@ -1,6 +1,5 @@
-/** Profil citoyen démo + carte + documents + régularité (localStorage). */
+/** Profil citoyen + carte + documents + régularité (localStorage). */
 
-import { DEMO_USER } from "./auth";
 import { pushCitizenNotification } from "./citizenPrefs";
 
 export type RegulariteStatus = "REGULIER" | "EN_COURS" | "INCOMPLET" | "IRREGULIER";
@@ -82,44 +81,37 @@ const DOC_CATALOG: Array<{ type: RequiredDocType; label: string; required: boole
   { type: "ACTE_MARIAGE", label: "Acte de mariage", required: false, order: 6 },
 ];
 
-function defaultProfile(): CitizenProfile {
-  const nic = "CD-KIN-1990-000142";
+function defaultProfile(username = ""): CitizenProfile {
   return {
-    username: DEMO_USER,
-    nic,
-    nom: "MUKENDI",
-    postnom: "KABASELE",
-    prenom: "Jean-Pierre",
+    username,
+    nic: "",
+    nom: "",
+    postnom: "",
+    prenom: "",
     sexe: "M",
-    date_naissance: "1990-04-12",
-    lieu_naissance: "Kinshasa / Gombe",
-    etat_civil: "Célibataire",
+    date_naissance: "",
+    lieu_naissance: "",
+    etat_civil: "",
     nationalite: "Congolaise",
-    commune: "Gombe",
-    adresse: "Av. du Commerce 12, Gombe, Kinshasa",
-    telephone: "+243 890 000 142",
-    email: "jean.mukendi@citoyen.cd",
+    commune: "",
+    adresse: "",
+    telephone: "",
+    email: "",
     card: {
-      status: "ACTIVE",
-      number: "CIN-2024-KIN-0142",
-      issued_at: "2024-06-15",
-      expires_at: "2034-06-15",
-      qr_payload: `NN|${nic}|CIN-2024-KIN-0142|ACTIVE`,
+      status: "EN_PRODUCTION",
+      number: "",
+      issued_at: "",
+      expires_at: "",
+      qr_payload: "",
     },
     documents: DOC_CATALOG.map((d) => {
-      const present =
-        d.type === "ACTE_NAISSANCE" ||
-        d.type === "PHOTO_IDENTITE" ||
-        d.type === "CARTE_NATIONALE" ||
-        d.type === "CERTIFICAT_NATIONALITE";
       return {
         id: `doc-${d.type}`,
         type: d.type,
         label: d.label,
         required: d.required,
         order: d.order,
-        status: present ? ("PRESENT" as const) : ("MANQUANT" as const),
-        issued_at: present ? "2024-01-10" : undefined,
+        status: "MANQUANT" as const,
       };
     }),
   };
@@ -130,14 +122,12 @@ export function getCitizenProfile(): CitizenProfile {
     const raw = localStorage.getItem(PROFILE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as CitizenProfile;
-      if (parsed?.nic && Array.isArray(parsed.documents)) return parsed;
+      if (parsed && Array.isArray(parsed.documents)) return parsed;
     }
   } catch {
     /* ignore */
   }
-  const profile = defaultProfile();
-  saveCitizenProfile(profile);
-  return profile;
+  return defaultProfile();
 }
 
 export function saveCitizenProfile(profile: CitizenProfile): void {

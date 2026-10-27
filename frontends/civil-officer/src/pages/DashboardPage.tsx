@@ -256,12 +256,10 @@ export default function DashboardPage() {
   const marriageSeries = countByMonth(marriages, months);
   const allActsSeries = countByMonth(acts, months);
 
-  const hasTemporal = [...birthSeries, ...deathSeries, ...allActsSeries].some((v) => v > 0);
-  /** Illustration uniquement si aucune série réelle — clairement marquée DEMO. */
-  const demoTemporal = !hasTemporal && apiLoaded;
-  const demoBirth = demoTemporal ? [2, 3, 4, 3, 5, 4] : birthSeries;
-  const demoDeath = demoTemporal ? [1, 1, 2, 1, 2, 1] : deathSeries;
-  const demoAll = demoTemporal ? [4, 5, 7, 6, 9, 8] : allActsSeries;
+  const demoTemporal = false;
+  const demoBirth = birthSeries;
+  const demoDeath = deathSeries;
+  const demoAll = allActsSeries;
 
   const helloName = session?.displayName || session?.username || "utilisateur";
   const roleTitle =
@@ -292,13 +290,6 @@ export default function DashboardPage() {
           Stats partielles (local) — {apiError}
         </p>
       ) : null}
-      {demoTemporal ? (
-        <div className="dash-demo-banner" role="note">
-          Courbes temporelles en <strong>données de démonstration</strong> (illustration) — les KPI
-          ci-dessous utilisent les données réelles disponibles.
-        </div>
-      ) : null}
-
       <div className="dash-kpi-grid">
         <StatCard
           title="Population"
@@ -312,7 +303,6 @@ export default function DashboardPage() {
           color={RDC.blue}
           spark={demoAll}
           href="/population"
-          demo={apiPop == null && localPop.length === 0}
         />
         <StatCard
           title="Naissances"
@@ -384,7 +374,7 @@ export default function DashboardPage() {
       <h3 className="dash-section-title">Statistiques &amp; graphiques</h3>
       <div className="eg-charts-row dash-charts-main">
         <LineChart
-          title={demoTemporal ? "Évolution des actes (DEMO)" : "Évolution des actes (6 mois)"}
+          title="Évolution des actes (6 mois)"
           labels={months.map((m) => m.label)}
           series={[
             { name: "Tous actes", color: RDC.blue, values: demoAll },
@@ -439,7 +429,7 @@ export default function DashboardPage() {
           </ul>
           <p className="muted small" style={{ marginBottom: 0, marginTop: "0.65rem" }}>
             <strong>Qui valide ?</strong> l&apos;officier d&apos;état civil (
-            <code>officier</code> / <code>DemoCivil2026!</code>). L&apos;agent saisit et{" "}
+            votre compte officier). L&apos;agent saisit et{" "}
             <em>soumet</em> ; l&apos;officier clique <em>Valider l&apos;acte</em> (pas de saut
             Brouillon → Validé).
             {drafts + submitted + validated + rejected === 0
@@ -474,7 +464,7 @@ export default function DashboardPage() {
 
       <div className="eg-charts-row">
         <LineChart
-          title={demoTemporal ? "Naissances vs décès (DEMO)" : "Naissances vs décès"}
+          title="Naissances vs décès"
           labels={months.map((m) => m.label)}
           series={[
             { name: "Naissances", color: RDC.yellow, values: demoBirth },

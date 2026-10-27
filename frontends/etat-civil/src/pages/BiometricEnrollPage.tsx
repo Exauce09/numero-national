@@ -136,8 +136,8 @@ export default function BiometricEnrollPage() {
           </>
         ) : null}
       </p>
-      <div className="dash-demo-banner" role="note">
-        Capture réelle ZK9500 (pont EngX). Posez le doigt quand demandé — pas de mode démo.
+      <div className="panel muted small" role="note">
+        Capture réelle ZK9500 (pont EngX). Posez le doigt quand demandé.
       </div>
 
       <div className="panel" style={{ marginBottom: "1rem" }}>

@@ -12,7 +12,6 @@ npm run dev
 
 Ouvrir : http://localhost:5178/login
 
-**Démo :** `interieur` / `DemoInterieur2026!`
 
 ## Menus
 
