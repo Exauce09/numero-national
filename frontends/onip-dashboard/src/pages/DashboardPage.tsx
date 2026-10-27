@@ -11,7 +11,7 @@ import {
   type OnipDashboard,
   type OnipDashboardFilters,
 } from "../api";
-import { getSession, hasPermission } from "../auth";
+import { getSession } from "../auth";
 
 const CITIZEN_STATUSES = ["", "DRAFT", "PENDING_VALIDATION", "ACTIVE", "DECEASED", "SUSPENDED"];
 const CARD_STATUSES = ["", "PENDING", "SENT_TO_COMMUNE", "ACTIVE", "DELIVERED", "EXPIRED"];
@@ -187,16 +187,6 @@ export default function DashboardPage() {
       value: k?.assigned_nins ?? data.population.nin_assigned,
       href: drill.nin,
       hint: "Provisoire tant que format officiel non confirmé",
-    },
-    {
-      label: "Doublons à examiner",
-      value: k?.duplicate_reviews_open ?? data.duplicates_open,
-      href: drill.duplicates,
-    },
-    {
-      label: "Cartes produites",
-      value: k?.cards_produced ?? data.cards.produced,
-      href: drill.cards,
     },
     {
       label: "Cartes remises",
@@ -390,15 +380,8 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid">
-        <Metric
-          label="Taux validation %"
-          value={k?.validation_rate_percent ?? data.population.validation_rate_percent}
-        />
-        <Metric label="Taux sync %" value={k?.sync_rate_percent ?? data.campaigns.sync_rate_percent} />
-        <Metric label="Échecs sync" value={k?.sync_failures ?? data.campaigns.sync_failures ?? 0} />
         <Metric label="Campagnes actives" value={k?.campaigns_active ?? data.campaigns.active} />
         <Metric label="Dossiers en attente" value={k?.pending_records ?? data.population.pending ?? 0} />
-        <Metric label="Revues biométrie" value={data.biometric_reviews_pending ?? 0} />
       </div>
 
       {(data.population.pending_by_status || k?.pending_by_status) && (
@@ -558,11 +541,6 @@ export default function DashboardPage() {
             ))}
           </ul>
         )}
-        {hasPermission("onip:dashboard", session) ? (
-          <Link className="btn-secondary" to="/admin">
-            Administration technique
-          </Link>
-        ) : null}
       </div>
     </div>
   );

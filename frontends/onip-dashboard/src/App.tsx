@@ -82,8 +82,6 @@ function Shell() {
           <NavLink to="/" end>
             Tableau de bord
           </NavLink>
-          <NavLink to="/feuille-de-route">Feuille de route</NavLink>
-          <NavLink to="/conformite">Conformité FGP / NIN</NavLink>
 
           {hasPermission("users:manage", session) ? (
             <>
@@ -95,18 +93,13 @@ function Shell() {
           <div className="nav-group-label">Recensement</div>
           <NavLink to="/enrolement">Enrôlement</NavLink>
           <NavLink to="/campaigns">Campagnes &amp; contrôle</NavLink>
-          <NavLink to="/anomalies">Anomalies</NavLink>
           <NavLink to="/cartographie">Cartographie</NavLink>
 
           <div className="nav-group-label">FGP</div>
           <NavLink to="/population">Population / FGP</NavLink>
-          <NavLink to="/nic">Numéros NIC</NavLink>
           <NavLink to="/biometrie">Biométrie</NavLink>
           <NavLink to="/etat-civil">État civil</NavLink>
           <NavLink to="/cards">Cartes d&apos;identité</NavLink>
-
-          <div className="nav-group-label">Exploitation</div>
-          <NavLink to="/admin">Administration technique</NavLink>
         </nav>
         <div className="sidebar-foot">
           <button type="button" className="btn-logout" onClick={logout}>

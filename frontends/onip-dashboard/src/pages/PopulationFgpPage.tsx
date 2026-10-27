@@ -403,7 +403,7 @@ export default function PopulationFgpPage() {
         <p>
           Module 5 — référentiel central (identifiant interne ≠ NIN). Dossiers Module 2 + santé /
           filiation / rectification / événements. Attribution NIN :{" "}
-          <Link to="/conformite">conformité</Link> · <Link to="/nic">NIN</Link>.
+          attribution NIN depuis la fiche (bouton « Générer NIN provisoire »).
         </p>
       </div>
 
