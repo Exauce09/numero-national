@@ -186,7 +186,7 @@ export default function DashboardPage() {
       label: "NIN / NIC attribués",
       value: k?.assigned_nins ?? data.population.nin_assigned,
       href: drill.population || "/population",
-      hint: "Provisoire tant que format officiel non confirmé",
+      hint: "NIN générable — format opérationnel confirmé",
     },
     {
       label: "Cartes remises",
@@ -196,11 +196,6 @@ export default function DashboardPage() {
     {
       label: "Cartes en attente",
       value: k?.cards_pending ?? data.cards.pending,
-      href: drill.cards,
-    },
-    {
-      label: "Cartes expirées",
-      value: k?.cards_expired ?? data.cards.expired,
       href: drill.cards,
     },
   ];

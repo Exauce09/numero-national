@@ -356,29 +356,6 @@ export default function EnrolementPage() {
             </table>
           </div>
 
-          {catalog?.transitions ? (
-            <div className="panel">
-              <h2 className="panel-title">Transitions autorisées</h2>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Depuis</th>
-                    <th>Vers</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(catalog.transitions).map(([from, to]) => (
-                    <tr key={from}>
-                      <td>
-                        <span className="status-pill">{from}</span>
-                      </td>
-                      <td>{to.length ? to.join(", ") : "— (terminal)"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
         </>
       )}
     </div>

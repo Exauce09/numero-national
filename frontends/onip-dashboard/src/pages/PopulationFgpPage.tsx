@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  biometricApi,
   fgpApi,
   ninOnipApi,
   registryApi,
@@ -24,6 +25,7 @@ import FgpFingerprintPanel, {
   type PendingFinger,
 } from "../components/FgpFingerprintPanel";
 import { nationaliteLabel } from "../nationalites";
+import { captureZkFingerprint, zkHealth } from "../zkBridge";
 
 type Tab = "identite" | "adresse" | "filiation" | "controles" | "historique" | "rectification";
 type Mode = "liste" | "creer" | "detail";
@@ -88,6 +90,12 @@ export default function PopulationFgpPage() {
   const [motherNat, setMotherNat] = useState("COD");
   const [residenceGeo, setResidenceGeo] = useState<GeoSelection>({});
   const [pendingFingers, setPendingFingers] = useState<PendingFinger[]>([]);
+  const [pendingPhoto, setPendingPhoto] = useState<{
+    name: string;
+    preview: string;
+    b64: string;
+  } | null>(null);
+  const [fingerBusy, setFingerBusy] = useState(false);
   const [similar, setSimilar] = useState<CitizenHit[]>([]);
   const [statusReason, setStatusReason] = useState("");
   const [dupJustification, setDupJustification] = useState("");
@@ -122,6 +130,84 @@ export default function PopulationFgpPage() {
       setLoading(false);
     }
   }, [hasToken, q, status, province, commune, placeOfBirth]);
+
+  async function searchByFingerprint() {
+    if (!hasToken) return;
+    setFingerBusy(true);
+    setError(null);
+    setInfo(null);
+    try {
+      const healthZk = await zkHealth();
+      if (!healthZk?.sdk_loaded || (healthZk.device_count ?? 0) < 1) {
+        throw new Error(
+          "Capteur ZK9500 indisponible — lancez scripts/start-zkteco-bridge.ps1.",
+        );
+      }
+      setInfo("Posez le doigt sur le ZK9500…");
+      const zk = await captureZkFingerprint("INDEX_DROIT", 30000);
+      const idRes = await biometricApi.identify({
+        modality: "FINGERPRINT",
+        template_b64: zk.template_b64,
+        max_candidates: 10,
+      });
+      if (!idRes.candidates.length) {
+        setRows([]);
+        setTotal(0);
+        setError("Aucune correspondance empreinte.");
+        setInfo(null);
+        return;
+      }
+      const found: CitizenHit[] = [];
+      for (const cand of idRes.candidates) {
+        try {
+          found.push(await fgpApi.getPerson(cand.citizen_id));
+        } catch {
+          /* skip */
+        }
+      }
+      setRows(found);
+      setTotal(found.length);
+      setInfo(
+        found.length === 1
+          ? "Citoyen identifié par empreinte."
+          : `${found.length} candidats empreinte.`,
+      );
+      setMode("liste");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Recherche empreinte impossible");
+      setInfo(null);
+    } finally {
+      setFingerBusy(false);
+    }
+  }
+
+  async function onPhotoSelected(file: File | null) {
+    if (!file) {
+      setPendingPhoto(null);
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setError("Fichier image requis pour la photo.");
+      return;
+    }
+    if (file.size > 4_000_000) {
+      setError("Photo trop lourde (max 4 Mo).");
+      return;
+    }
+    const buf = await file.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let binary = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    }
+    const b64 = btoa(binary);
+    setPendingPhoto({
+      name: file.name,
+      preview: URL.createObjectURL(file),
+      b64,
+    });
+  }
 
   useEffect(() => {
     void load();
@@ -205,6 +291,7 @@ export default function PopulationFgpPage() {
     setMotherNat("COD");
     setResidenceGeo({});
     setPendingFingers([]);
+    setPendingPhoto(null);
     setSimilar([]);
   }
 
@@ -288,20 +375,38 @@ export default function PopulationFgpPage() {
             : [],
       };
       const created = await registryApi.createCitizen(body);
-      let bioNote = "";
+      const notes: string[] = [];
       if (pendingFingers.length > 0) {
         try {
-          bioNote = await enrollPendingFingers(created.id, pendingFingers);
+          notes.push(await enrollPendingFingers(created.id, pendingFingers));
         } catch (bioErr) {
-          bioNote =
+          notes.push(
             bioErr instanceof Error
               ? `Empreintes non liées : ${bioErr.message}`
-              : "Empreintes non liées.";
+              : "Empreintes non liées.",
+          );
+        }
+      }
+      if (pendingPhoto) {
+        try {
+          await biometricApi.registerMedia({
+            citizen_id: created.id,
+            media_type: "OFFICIAL_PHOTO",
+            storage_uri: `data:image/jpeg;base64,${pendingPhoto.b64}`,
+            content_hash: pendingPhoto.b64.slice(0, 64),
+          });
+          notes.push("Photo enregistrée.");
+        } catch (photoErr) {
+          notes.push(
+            photoErr instanceof Error
+              ? `Photo non liée : ${photoErr.message}`
+              : "Photo non liée.",
+          );
         }
       }
       setInfo(
-        `Brouillon créé — identifiant interne ${created.id}. Aucun NIN attribué (RB-02).` +
-          (bioNote ? ` ${bioNote}` : ""),
+        `Brouillon créé. Le NIN s'attribue après validation (service central).` +
+          (notes.length ? ` ${notes.join(" ")}` : ""),
       );
       resetCreateForm();
       await openDetail(created.id);
@@ -422,10 +527,6 @@ export default function PopulationFgpPage() {
             <div className="muted">Doublons OPEN</div>
             <strong>{health.open_duplicates}</strong>
           </div>
-          <div className="stat-chip">
-            <div className="muted">NIN officiel</div>
-            <strong>{health.official_nin_format_confirmed ? "oui" : "non confirmé"}</strong>
-          </div>
         </div>
       ) : null}
 
@@ -488,7 +589,7 @@ export default function PopulationFgpPage() {
                     Recherche
                     <input
                       className="form-control"
-                      placeholder="Nom, prénom, NIC…"
+                      placeholder="Nom, prénom, NIN / NIC…"
                       value={q}
                       onChange={(e) => setQ(e.target.value)}
                     />
@@ -505,6 +606,14 @@ export default function PopulationFgpPage() {
                   </label>
                   <button type="submit" className="btn-primary" disabled={loading}>
                     {loading ? "…" : "Rechercher"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={fingerBusy || loading}
+                    onClick={() => void searchByFingerprint()}
+                  >
+                    {fingerBusy ? "Capture…" : "Par empreinte"}
                   </button>
                   <button
                     type="button"
@@ -593,9 +702,8 @@ export default function PopulationFgpPage() {
               <h2 className="panel-title">Fiche d&apos;identification FGP (brouillon)</h2>
               <p className="muted small">
                 Champs alignés sur le décret n° 22/07 du 2 mars 2022 (art. 8) et la pratique
-                d&apos;identification RDC (nom / postnom / prénom). Aucun NIN n&apos;est attribué ici.
-                Les empreintes se capturent ci-dessous via le capteur branché ; photo / signature =
-                production CIN.
+                d&apos;identification RDC (nom / postnom / prénom). Le NIN s&apos;attribue après
+                validation via le service central. Empreintes (ZK9500) et photo ci-dessous.
               </p>
 
               <h3>1. Identité</h3>
@@ -774,10 +882,43 @@ export default function PopulationFgpPage() {
                 label="Résidence"
               />
 
+              <h3>6. Biométrie &amp; photo</h3>
               <FgpFingerprintPanel
                 pending={pendingFingers}
                 onPendingChange={setPendingFingers}
               />
+              <label className="small" style={{ display: "block", marginTop: 12 }}>
+                Photo d&apos;identité
+                <input
+                  className="form-control"
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={(e) => void onPhotoSelected(e.target.files?.[0] ?? null)}
+                />
+              </label>
+              {pendingPhoto ? (
+                <div style={{ marginTop: 8, displayItems: "center", gap: 12, displayTemplateColumns: "96px 1fr", display: "grid" }}>
+                  <img
+                    src={pendingPhoto.preview}
+                    alt="Aperçu photo"
+                    style={{ width: 96, height: 120, objectFit: "cover", borderRadius: 4 }}
+                  />
+                  <div>
+                    <p className="muted small" style={{ margin: 0 }}>
+                      {pendingPhoto.name}
+                    </p>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{ marginTop: 6 }}
+                      onClick={() => setPendingPhoto(null)}
+                    >
+                      Retirer la photo
+                    </button>
+                  </div>
+                </div>
+              ) : null}
 
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
                 <button type="button" className="btn-secondary" onClick={() => void checkSimilar()}>

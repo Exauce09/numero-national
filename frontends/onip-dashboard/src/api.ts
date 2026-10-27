@@ -1092,7 +1092,7 @@ export const ninOnipApi = {
       method: "POST",
       body: JSON.stringify({
         citizen_id: citizenId,
-        mode: "provisional",
+        mode: "official",
         request_source: "ONIP_UI",
         ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
         ...(chosenNin ? { chosen_nin: chosenNin } : {}),
@@ -1251,6 +1251,26 @@ export const biometricApi = {
         modality: body.modality ?? "FINGERPRINT",
         template_b64: body.template_b64,
         max_candidates: body.max_candidates ?? 5,
+      }),
+    }),
+  registerMedia: (body: {
+    citizen_id: string;
+    media_type?: string;
+    storage_uri: string;
+    content_hash?: string | null;
+  }) =>
+    request<{
+      id: string;
+      citizen_id: string;
+      media_type: string;
+      storage_uri: string;
+    }>("/biometric/media", {
+      method: "POST",
+      body: JSON.stringify({
+        citizen_id: body.citizen_id,
+        media_type: body.media_type ?? "OFFICIAL_PHOTO",
+        storage_uri: body.storage_uri,
+        content_hash: body.content_hash ?? null,
       }),
     }),
 };

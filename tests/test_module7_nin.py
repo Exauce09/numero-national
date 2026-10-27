@@ -13,7 +13,6 @@ from apps.api.domains.core_registry.enums import CitizenStatus
 from apps.api.domains.core_registry.national_identity_number_service import (
     EVENT_NIN_EXCEPTION,
     OFFICIAL_NIN_FORMAT_CONFIRMED,
-    OfficialNinFormatUnresolvedError,
     NationalIdentityNumberService,
     nin_catalog,
 )
@@ -36,14 +35,14 @@ def _citizen(**kwargs):
 def test_catalog_blocks_official_and_invention():
     cat = nin_catalog()
     assert cat["module"] == 7
-    assert cat["official_nin_format_confirmed"] is False
-    assert cat["official_generation_enabled"] is False
+    assert cat["official_nin_format_confirmed"] is True
+    assert cat["official_generation_enabled"] is True
     assert cat["invent_nin_forbidden"] is True
     assert cat["offline_nin_forbidden"] is True
     assert cat["client_proposed_nin_forbidden"] is True
     assert "status" in cat["endpoints"]
     assert "exceptions" in cat["endpoints"]
-    assert OFFICIAL_NIN_FORMAT_CONFIRMED is False
+    assert OFFICIAL_NIN_FORMAT_CONFIRMED is True
 
 
 @pytest.mark.asyncio
@@ -58,26 +57,31 @@ async def test_evaluate_eligibility_incomplete():
 
 
 @pytest.mark.asyncio
-async def test_get_national_id_status_provisional():
+async def test_get_national_id_status_official_when_assigned():
     session = AsyncMock()
     session.scalar = AsyncMock(return_value=0)
     citizen = _citizen(nic="15001119900042")
     out = await NationalIdentityNumberService.get_national_id_status(session, citizen)
     assert out["has_nin"] is True
     assert out["nin"] == "15001119900042"
-    assert out["nin_status"] == "PROVISIONAL"
-    assert out["official"] is False
+    assert out["nin_status"] == "OFFICIAL"
+    assert out["official"] is True
     assert "already_assigned" in out["block_codes"]
 
 
 @pytest.mark.asyncio
-async def test_assign_with_request_official_blocked():
+async def test_assign_with_request_official_idempotent_existing():
     session = AsyncMock()
-    citizen = _citizen()
-    with pytest.raises(OfficialNinFormatUnresolvedError):
-        await NationalIdentityNumberService.assign_with_request(
-            session, citizen=citizen, mode="official"
-        )
+    session.add = MagicMock()
+    session.flush = AsyncMock()
+    citizen = _citizen(nic="15001119900042")
+    out = await NationalIdentityNumberService.assign_with_request(
+        session, citizen=citizen, mode="official"
+    )
+    assert out["nin"] == "15001119900042"
+    assert out["official"] is True
+    assert out["already_assigned"] is True
+    assert out["nin_status"] == "OFFICIAL"
 
 
 @pytest.mark.asyncio

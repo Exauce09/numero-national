@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import {
+  biometricApi,
   registryApi,
   cardsApi,
   type CardsCatalog,
@@ -9,6 +10,7 @@ import {
   type NationalCard,
 } from "../api";
 import { getSession } from "../auth";
+import { captureZkFingerprint, zkHealth } from "../zkBridge";
 import IdCardRdc, { printNationalIdCard } from "./IdCardRdc";
 
 /** Module 9 — CIN : demandes, admissibilité, prototype (pas de NIN inventé). */
@@ -24,6 +26,7 @@ export default function CardsPage() {
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [fingerBusy, setFingerBusy] = useState(false);
 
   useEffect(() => {
     if (!hasToken) return;
@@ -33,6 +36,45 @@ export default function CardsPage() {
       .then((r) => setRequests(r.items))
       .catch(() => setRequests([]));
   }, [hasToken]);
+
+  async function searchByFingerprint() {
+    if (!hasToken) return;
+    setFingerBusy(true);
+    setError(null);
+    setOk(null);
+    try {
+      const healthZk = await zkHealth();
+      if (!healthZk?.sdk_loaded || (healthZk.device_count ?? 0) < 1) {
+        throw new Error("Capteur ZK9500 indisponible — lancez le pont EngX.");
+      }
+      const zk = await captureZkFingerprint("INDEX_DROIT", 30000);
+      const idRes = await biometricApi.identify({
+        modality: "FINGERPRINT",
+        template_b64: zk.template_b64,
+        max_candidates: 10,
+      });
+      if (!idRes.candidates.length) {
+        setRows([]);
+        setError("Aucune correspondance empreinte.");
+        return;
+      }
+      const found: CitizenHit[] = [];
+      for (const cand of idRes.candidates) {
+        try {
+          found.push(await registryApi.getCitizen(cand.citizen_id));
+        } catch {
+          /* skip */
+        }
+      }
+      setRows(found);
+      setOk(`${found.length} citoyen(s) via empreinte.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Recherche empreinte impossible");
+      setRows([]);
+    } finally {
+      setFingerBusy(false);
+    }
+  }
 
   async function search(e?: FormEvent) {
     e?.preventDefault();
@@ -132,8 +174,8 @@ export default function CardsPage() {
           jamais de NIN.
         </p>
         <p className="muted small" style={{ marginBottom: 0 }}>
-          <strong>Prototype de démonstration</strong> — gabarit non homologué. Production officielle
-          bloquée tant que l&apos;annexe CIN/NIN n&apos;est pas confirmée.
+          Gabarit CIN prototype (non homologué). Le NIN attribué par le service central est
+          officiel ; la production physique reste soumise à l&apos;admissibilité dossier / NIC.
         </p>
       </div>
 
@@ -172,12 +214,20 @@ export default function CardsPage() {
             <input
               className="form-control"
               style={{ flex: "1 1 240px" }}
-              placeholder="Nom, prénom ou NIC…"
+              placeholder="Nom, prénom ou NIN…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
             <button type="submit" className="btn-primary" disabled={busy}>
               {busy ? "…" : "Rechercher"}
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={fingerBusy || busy}
+              onClick={() => void searchByFingerprint()}
+            >
+              {fingerBusy ? "Capture…" : "Par empreinte"}
             </button>
           </form>
 

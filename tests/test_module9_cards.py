@@ -35,7 +35,7 @@ def test_catalog_prototype_and_no_nin():
     assert cat["prototype_template_only"] is True
     assert cat["template_approved"] is False
     assert cat["official_mrz_forbidden"] is True
-    assert cat["official_nin_format_confirmed"] is False
+    assert cat["official_nin_format_confirmed"] is True
     assert "card_requests" in cat["endpoints"]
 
 
@@ -75,7 +75,7 @@ async def test_evaluate_eligibility_without_nic():
     assert out["admissible"] is False
     assert "nic_required" in out["codes"] or "NIN_NON_CONFIRME" in out["codes"]
     assert out["production_allowed"] is False
-    assert out["official_nin_confirmed"] is False
+    assert out["official_nin_confirmed"] is True
 
 
 @pytest.mark.asyncio

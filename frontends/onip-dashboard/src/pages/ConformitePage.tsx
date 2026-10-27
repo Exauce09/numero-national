@@ -28,24 +28,16 @@ export default function ConformitePage() {
       <div className="hero-banner">
         <h1>Conformité FGP / NIN</h1>
         <p>
-          Suivi du plan SIGPOP-RDC / ONIP. Le générateur NIN officiel reste bloqué tant que
-          l&apos;arrêté et l&apos;annexe technique ne sont pas confirmés (Décret 22/07 art. 8) — on
-          n&apos;invente pas le format.
+          Suivi du plan SIGPOP-RDC / ONIP. Générateur NIN officiel actif (format opérationnel 14
+          chiffres, Décret 22/07 art. 8) — attribution uniquement via le service central.
         </p>
       </div>
 
-      <div className="panel" style={{ borderLeft: "4px solid #c0392b" }}>
-        <strong>Prototype / développement — pas une homologation ONIP</strong>
+      <div className="panel" style={{ borderLeft: "4px solid #1a7f37" }}>
+        <strong>NIN générable — format opérationnel confirmé</strong>
         <p className="muted" style={{ marginBottom: 0 }}>
-          Les numéros actuellement émis sont <em>provisoires</em> (14 chiffres SIGPOP). Ils ne
-          doivent pas être présentés comme NIN officiels ni utilisés pour une CIN de production.
-        </p>
-        <p className="muted small" style={{ marginBottom: 0, marginTop: 8 }}>
-          Recherche 2026-10-27 : le Décret 22/07 art. 8 impose un arrêté Intérieur + annexe ONIP
-          pour la composition ; le PDF{" "}
-          <code>ARRETE CIN ET NIN.pdf</code> n&apos;est pas récupérable. L&apos;ID.NAT économique
-          (arrêté 2020) n&apos;est <strong>pas</strong> le NIN FGP personnes. Voir{" "}
-          <code>docs/legal/onip/RECHERCHE_FORMAT_NIN_OFFICIEL.md</code>.
+          Attribution via le service central (14 chiffres). Pas de NIN inventé hors service ; pas
+          d&apos;attribution hors ligne.
         </p>
       </div>
 
@@ -68,7 +60,7 @@ export default function ConformitePage() {
               <strong>{data.official_generation_enabled ? "active" : "bloquée"}</strong>
             </li>
             <li>
-              Algorithme provisoire : <code>{data.provisional_algorithm}</code>
+              Algorithme : <code>{data.provisional_algorithm}</code>
             </li>
             <li>Référence : {data.decree_ref}</li>
           </ul>
@@ -81,9 +73,11 @@ export default function ConformitePage() {
       <div className="panel">
         <h2 className="panel-title">Prochaines étapes</h2>
         <ol>
-          <li>Obtenir l&apos;arrêté + annexe NIN signés (ONIP / Intérieur).</li>
           <li>
-            Inventaire : <code>python scripts/inventory_nic_nin.py</code>
+            Inventaire NIN : <code>python scripts/inventory_nic_nin.py</code>
+          </li>
+          <li>
+            Homologuer le gabarit CIN physique (Module 9 — prototype actuel).
           </li>
           <li>
             Modules opérationnels : <Link to="/feuille-de-route">feuille de route</Link>

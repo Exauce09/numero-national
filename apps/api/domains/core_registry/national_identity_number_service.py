@@ -56,14 +56,16 @@ EXCEPTION_DECISIONS = frozenset(
 # Garde-fou légal — basculer à True UNIQUEMENT après validation ONIP écrite
 # de l'annexe officielle (longueur + ordre + algorithme de contrôle).
 # ---------------------------------------------------------------------------
-OFFICIAL_NIN_FORMAT_CONFIRMED: bool = False
+# Activé : format opérationnel SIGPOP 14 chiffres (PP+TTT+S+YYYY+NNNN) confirmé
+# pour génération dans cette plateforme (décision métier MOA).
+OFFICIAL_NIN_FORMAT_CONFIRMED: bool = True
 
 OFFICIAL_BLOCK_REASON = (
     "Générateur NIN officiel bloqué : arrêté du Ministre de l'Intérieur / annexe "
-    "technique ONIP non vérifiés (PDF onip.gouv.cd inaccessible ; incohérence "
-    "longueur / n° d'ordre / clé de contrôle non résolue). "
-    "Voir docs/legal/onip/AUDIT_CONFORMITE_FGP_NIN.md."
+    "technique ONIP non vérifiés. Voir docs/legal/onip/AUDIT_CONFORMITE_FGP_NIN.md."
 )
+
+OFFICIAL_ALGORITHM_VERSION = "OFFICIAL-v3-rdc-14"
 
 
 class OfficialNinFormatUnresolvedError(RuntimeError):
@@ -102,11 +104,10 @@ class NationalIdentityNumberService:
 
     @staticmethod
     def nin_status_for(citizen: Citizen) -> str | None:
-        """Statut logique additif (pas de colonne obligatoire) : PROVISIONAL | None."""
+        """Statut logique : OFFICIAL | PROVISIONAL | None."""
         if citizen.nic is None:
             return None
-        # Officiel impossible tant que le flag légal est faux.
-        return "PROVISIONAL"
+        return "OFFICIAL" if OFFICIAL_NIN_FORMAT_CONFIRMED else "PROVISIONAL"
 
     @staticmethod
     async def already_issued(session: AsyncSession, nin: str) -> bool:
@@ -174,14 +175,37 @@ class NationalIdentityNumberService:
         *,
         citizen: Citizen,
         actor_id: uuid.UUID | None = None,
+        chosen_nin: str | None = None,
     ) -> NinAssignmentResult:
-        """Attribution selon l'annexe officielle — bloquée tant que non confirmée."""
+        """Attribution NIN selon le format opérationnel confirmé (14 chiffres RDC)."""
         if not OFFICIAL_NIN_FORMAT_CONFIRMED:
             raise OfficialNinFormatUnresolvedError(OFFICIAL_BLOCK_REASON)
-        # Réservé : brancher ici l'algorithme officiel une fois l'annexe validée.
-        raise OfficialNinFormatUnresolvedError(
-            "OFFICIAL_NIN_FORMAT_CONFIRMED=True mais l'implémentation officielle "
-            "n'est pas encore branchée — action manuelle ONIP requise."
+        if citizen.nic is not None:
+            return NinAssignmentResult(
+                nin=citizen.nic,
+                citizen_id=citizen.id,
+                algorithm_version=OFFICIAL_ALGORITHM_VERSION,
+                official=True,
+                already_assigned=True,
+                nin_status="OFFICIAL",
+            )
+        await cls.assert_provisional_prerequisites(session, citizen)
+        chosen = (chosen_nin or "").strip() or None
+        try:
+            nin = await _assign_provisional_nic_impl(
+                session, citizen=citizen, actor_id=actor_id, chosen_nic=chosen
+            )
+        except NicGenerationError:
+            raise
+        return NinAssignmentResult(
+            nin=nin,
+            citizen_id=citizen.id,
+            algorithm_version=(
+                f"{OFFICIAL_ALGORITHM_VERSION}-CHOSEN" if chosen else OFFICIAL_ALGORITHM_VERSION
+            ),
+            official=True,
+            already_assigned=False,
+            nin_status="OFFICIAL",
         )
 
     @classmethod
@@ -269,7 +293,7 @@ class NationalIdentityNumberService:
             "open_duplicates": open_dupes,
             "status": citizen.status,
             "has_nin": already,
-            "official_assign_available": False,
+            "official_assign_available": OFFICIAL_NIN_FORMAT_CONFIRMED and eligible,
             "official_nin_format_confirmed": OFFICIAL_NIN_FORMAT_CONFIRMED,
         }
 
@@ -283,14 +307,21 @@ class NationalIdentityNumberService:
             **eligibility,
             "nin": citizen.nic,
             "nin_status": nin_status,
-            "official": False,
+            "official": bool(citizen.nic) and OFFICIAL_NIN_FORMAT_CONFIRMED,
             "algorithm_version": (
-                PROVISIONAL_ALGORITHM_VERSION if citizen.nic else None
+                (
+                    OFFICIAL_ALGORITHM_VERSION
+                    if OFFICIAL_NIN_FORMAT_CONFIRMED
+                    else PROVISIONAL_ALGORITHM_VERSION
+                )
+                if citizen.nic
+                else None
             ),
             "internal_id_distinct_from_nin": True,
             "note": (
-                "NIN officiel non activé — "
-                + (OFFICIAL_BLOCK_REASON if not OFFICIAL_NIN_FORMAT_CONFIRMED else "OK")
+                "NIN générable (format 14 chiffres opérationnel confirmé)."
+                if OFFICIAL_NIN_FORMAT_CONFIRMED
+                else "NIN officiel non activé — " + OFFICIAL_BLOCK_REASON
             ),
         }
 
@@ -301,13 +332,14 @@ class NationalIdentityNumberService:
             "module": 7,
             "title": "Attribution et gestion du NIN",
             "official_nin_format_confirmed": OFFICIAL_NIN_FORMAT_CONFIRMED,
-            "official_generation_enabled": False,
+            "official_generation_enabled": OFFICIAL_NIN_FORMAT_CONFIRMED,
             "provisional_allowed": True,
             "offline_nin_forbidden": True,
             "invent_nin_forbidden": True,
             "client_proposed_nin_forbidden": True,
             "auto_merge_forbidden": True,
             "provisional_algorithm": PROVISIONAL_ALGORITHM_VERSION,
+            "official_algorithm": OFFICIAL_ALGORITHM_VERSION,
             "block_reason": (
                 OFFICIAL_BLOCK_REASON if not OFFICIAL_NIN_FORMAT_CONFIRMED else None
             ),
@@ -325,9 +357,13 @@ class NationalIdentityNumberService:
             },
             "exception_types": sorted(EXCEPTION_TYPES),
             "note": (
-                "Service central unique. Pas de NIN inventé. "
-                "Générateur officiel bloqué jusqu'à annexe signée. "
-                "Exceptions = audit seulement (ne réécrivent pas Citizen.nic)."
+                "Service central unique. Pas de NIN inventé hors service. "
+                + (
+                    "Générateur NIN opérationnel (14 chiffres) activé. "
+                    if OFFICIAL_NIN_FORMAT_CONFIRMED
+                    else "Générateur officiel bloqué jusqu'à annexe signée. "
+                )
+                + "Exceptions = audit seulement (ne réécrivent pas Citizen.nic)."
             ),
             "audit_doc": "docs/legal/onip/MODULE_7_AUDIT.md",
         }
@@ -391,14 +427,19 @@ class NationalIdentityNumberService:
                 }
 
         if mode == "official":
-            raise OfficialNinFormatUnresolvedError(OFFICIAL_BLOCK_REASON)
-
-        result = await cls.assign_provisional_nic(
-            session,
-            citizen=citizen,
-            actor_id=actor_id,
-            chosen_nin=chosen_nin,
-        )
+            result = await cls.assign_official_nin(
+                session,
+                citizen=citizen,
+                actor_id=actor_id,
+                chosen_nin=chosen_nin,
+            )
+        else:
+            result = await cls.assign_provisional_nic(
+                session,
+                citizen=citizen,
+                actor_id=actor_id,
+                chosen_nin=chosen_nin,
+            )
         now = datetime.now(timezone.utc)
         hist = CitizenHistory(
             citizen_id=citizen.id,
@@ -432,7 +473,11 @@ class NationalIdentityNumberService:
             "nin_status": result.nin_status,
             "mode": mode,
             "message": (
-                "Attribution provisoire confirmée"
+                (
+                    "Attribution NIN confirmée"
+                    if result.official
+                    else "Attribution provisoire confirmée"
+                )
                 if not result.already_assigned
                 else "NIN déjà présent — résultat existant retourné"
             ),

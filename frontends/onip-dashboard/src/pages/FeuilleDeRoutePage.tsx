@@ -14,13 +14,13 @@ const ITEMS: Item[] = [
   { title: "Anomalies / doublons", status: "PARTIEL", href: "/anomalies", note: "Tickets SLA à ajouter" },
   { title: "Cartographie", status: "EXISTANT", href: "/cartographie", note: "Points GPS / milieu" },
   { title: "Population / FGP", status: "EXISTANT", href: "/population", note: "Recherche registry" },
-  { title: "Numéros NIC / NIN", status: "PARTIEL", href: "/nic", note: "Provisoire — officiel bloqué" },
+  { title: "Numéros NIC / NIN", status: "EXISTANT", href: "/nic", note: "Format officiel confirmé (14 chiffres)" },
   { title: "Biométrie", status: "PARTIEL", href: "/biometrie", note: "Stats ; revue humaine via API" },
   { title: "État civil → FGP", status: "PARTIEL", href: "/etat-civil", note: "File actes / déclarations" },
   { title: "Cartes d'identité", status: "PARTIEL", href: "/cards", note: "Gabarit prototype" },
   { title: "Conformité FGP / NIN", status: "EXISTANT", href: "/conformite", note: "Statut juridique live" },
   { title: "Administration technique", status: "EXISTANT", href: "/admin", note: "Ops health + inventaire" },
-  { title: "Générateur NIN officiel", status: "BLOQUE", note: "Attente arrêté + annexe (non inventé)" },
+  { title: "Générateur NIN officiel", status: "EXISTANT", href: "/nic", note: "OFFICIAL-v3-rdc-14 actif" },
 ];
 
 const COLOR: Record<Item["status"], string> = {

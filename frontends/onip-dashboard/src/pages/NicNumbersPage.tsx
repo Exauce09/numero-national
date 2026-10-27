@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  biometricApi,
   ninOnipApi,
   registryApi,
   type CitizenHit,
@@ -10,10 +11,10 @@ import {
   type NinStatus,
 } from "../api";
 import { getSession, hasPermission } from "../auth";
+import { captureZkFingerprint, zkHealth } from "../zkBridge";
 
 /**
- * Module 7 — attribution / gestion NIN (provisoire).
- * Pas de bouton « NIN officiel » (générateur bloqué).
+ * Module 7 — attribution / gestion NIN (format opérationnel 14 chiffres).
  */
 export default function NicNumbersPage() {
   const session = getSession();
@@ -22,6 +23,7 @@ export default function NicNumbersPage() {
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<CitizenHit[]>([]);
   const [total, setTotal] = useState(0);
+  const [fingerBusy, setFingerBusy] = useState(false);
   const [eligible, setEligible] = useState<NinEligibleItem[]>([]);
   const [log, setLog] = useState<
     Array<{ nic: string; citizen_id: string; issued_at?: string | null; algorithm_version: string }>
@@ -79,6 +81,43 @@ export default function NicNumbersPage() {
     void load(q);
   }
 
+  async function searchByFingerprint() {
+    setFingerBusy(true);
+    setError(null);
+    try {
+      const healthZk = await zkHealth();
+      if (!healthZk?.sdk_loaded || (healthZk.device_count ?? 0) < 1) {
+        throw new Error("Capteur ZK9500 indisponible — lancez le pont EngX.");
+      }
+      const zk = await captureZkFingerprint("INDEX_DROIT", 30000);
+      const idRes = await biometricApi.identify({
+        modality: "FINGERPRINT",
+        template_b64: zk.template_b64,
+        max_candidates: 10,
+      });
+      if (!idRes.candidates.length) {
+        setRows([]);
+        setTotal(0);
+        setError("Aucune correspondance empreinte.");
+        return;
+      }
+      const found: CitizenHit[] = [];
+      for (const cand of idRes.candidates) {
+        try {
+          found.push(await registryApi.getCitizen(cand.citizen_id));
+        } catch {
+          /* skip */
+        }
+      }
+      setRows(found);
+      setTotal(found.length);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Recherche empreinte impossible");
+    } finally {
+      setFingerBusy(false);
+    }
+  }
+
   async function assignProvisional(citizenId: string, nin?: string) {
     setAssignMsg(null);
     try {
@@ -89,7 +128,7 @@ export default function NicNumbersPage() {
           ? `Reprise idempotente : ${r.nin}`
           : r.already_assigned
             ? `Déjà attribué (idempotent) : ${r.nin}`
-            : `NIC provisoire attribué : ${r.nin}`,
+            : `NIN attribué : ${r.nin}`,
       );
       void load(q);
     } catch (e) {
@@ -183,8 +222,8 @@ export default function NicNumbersPage() {
       <div className="hero-banner">
         <h1>Module 7 — Numéros nationaux (NIC / NIN)</h1>
         <p>
-          Service central d&apos;attribution. Mode <strong>provisoire</strong> uniquement. Voir{" "}
-          <Link to="/conformite">Conformité FGP / NIN</Link>. Aucun bouton NIN officiel.
+          Service central d&apos;attribution. Format opérationnel confirmé (14 chiffres). Voir{" "}
+          <Link to="/conformite">Conformité FGP / NIN</Link>.
         </p>
       </div>
 
@@ -211,14 +250,9 @@ export default function NicNumbersPage() {
                   Génération officielle :{" "}
                   <strong>{catalog.official_generation_enabled ? "activée" : "bloquée"}</strong>
                 </li>
-                <li>Offline / inventer NIN : interdits</li>
-                <li>Algo provisoire : {catalog.provisional_algorithm}</li>
+                <li>Offline / inventer NIN hors service : interdits</li>
+                <li>Algorithme : {catalog.provisional_algorithm}</li>
               </ul>
-              {catalog.block_reason ? (
-                <p className="small" style={{ marginTop: 8 }}>
-                  {catalog.block_reason}
-                </p>
-              ) : null}
             </div>
           ) : null}
 
@@ -230,11 +264,10 @@ export default function NicNumbersPage() {
 
           <form className="panel" onSubmit={assignChosen}>
             <h2 className="panel-title" style={{ marginTop: 0 }}>
-              NIN provisoire au choix (DEV)
+              Attribuer un NIN
             </h2>
             <p className="muted small">
-              Tant que le format officiel n&apos;est pas confirmé : générez une proposition ou
-              saisissez 14 chiffres, puis attribuez. Non officiel — usage démo / transition.
+              Génération automatique ou saisie de 14 chiffres, via le service central uniquement.
             </p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
               <label style={{ flex: "1 1 260px" }}>
@@ -299,8 +332,8 @@ export default function NicNumbersPage() {
           <div className="panel">
             <h2 className="panel-title">Éligibles (sans NIC)</h2>
             <p className="muted small">
-              Refus automatique si dossier incomplet ou doublon OPEN. Mode officiel indisponible.
-              Attribution avec clé d&apos;idempotence.
+              Refus automatique si dossier incomplet ou doublon OPEN. Mode officiel actif —
+              attribution avec clé d&apos;idempotence.
             </p>
             <table className="data-table">
               <thead>
@@ -470,7 +503,7 @@ export default function NicNumbersPage() {
                       </td>
                       <td>{r.issued_at ? r.issued_at.slice(0, 19) : "—"}</td>
                       <td className="small">{r.algorithm_version}</td>
-                      <td>PROVISIONAL</td>
+                      <td>OFFICIEL</td>
                     </tr>
                   ))
                 )}
@@ -482,12 +515,20 @@ export default function NicNumbersPage() {
             <input
               className="form-control"
               style={{ flex: "1 1 220px" }}
-              placeholder="Rechercher nom, prénom ou NIC…"
+              placeholder="Rechercher nom, prénom ou NIN…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
             <button type="submit" className="btn-primary" disabled={loading}>
               {loading ? "…" : "Rechercher"}
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={fingerBusy || loading}
+              onClick={() => void searchByFingerprint()}
+            >
+              {fingerBusy ? "Capture…" : "Par empreinte"}
             </button>
           </form>
 
@@ -522,7 +563,7 @@ export default function NicNumbersPage() {
                     <td>{c.given_names}</td>
                     <td>{c.date_of_birth}</td>
                     <td>{c.status}</td>
-                    <td>{c.nic ? "PROVISIONAL" : "—"}</td>
+                    <td>{c.nic ? "OFFICIEL" : "—"}</td>
                   </tr>
                 ))}
                 {!rows.length ? (
