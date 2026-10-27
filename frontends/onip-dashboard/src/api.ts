@@ -1229,6 +1229,30 @@ export const biometricApi = {
       method: "POST",
       body: JSON.stringify({ decision, reason }),
     }),
+  identify: (body: {
+    modality?: "FINGERPRINT" | "FACE";
+    template_b64: string;
+    max_candidates?: number;
+  }) =>
+    request<{
+      candidates: Array<{
+        citizen_id: string;
+        template_id: string;
+        score: number;
+        finger_position?: string | null;
+        finger_label?: string | null;
+      }>;
+      decision: string;
+      session_id: string;
+      note?: string;
+    }>("/biometric/identify", {
+      method: "POST",
+      body: JSON.stringify({
+        modality: body.modality ?? "FINGERPRINT",
+        template_b64: body.template_b64,
+        max_candidates: body.max_candidates ?? 5,
+      }),
+    }),
 };
 
 export type CivilEventsCatalog = {
